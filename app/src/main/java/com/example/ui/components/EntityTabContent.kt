@@ -26,8 +26,18 @@ fun EntityTabContent(
                 onStoreClick = { store ->
                     onEntityClick?.invoke(store)
                 },
-                onChatClick = {
-                    if (onChatClick != null) onChatClick() else viewModel.openSupportChat()
+                onChatClick = { store ->
+                    if (onChatClick != null) {
+                        onChatClick()
+                    } else {
+                        viewModel.openDirectChat(
+                            targetUserId = store.id.ifBlank { store.phone },
+                            targetUserName = store.name,
+                            targetUserPhoto = store.logoImage.ifBlank { store.coverImage },
+                            relatedEntityId = store.id,
+                            relatedEntityType = "STORE"
+                        )
+                    }
                 },
                 onRequestServiceClick = {
                     onRequestActionClick?.invoke()
@@ -41,8 +51,18 @@ fun EntityTabContent(
                 onPropertyClick = { prop ->
                     onEntityClick?.invoke(prop)
                 },
-                onChatClick = {
-                    if (onChatClick != null) onChatClick() else viewModel.openSupportChat()
+                onChatClick = { prop ->
+                    if (onChatClick != null) {
+                        onChatClick()
+                    } else {
+                        viewModel.openDirectChat(
+                            targetUserId = prop.id.ifBlank { prop.phone },
+                            targetUserName = prop.title.ifBlank { prop.ownerName },
+                            targetUserPhoto = prop.images.firstOrNull() ?: "",
+                            relatedEntityId = prop.id,
+                            relatedEntityType = "PROPERTY"
+                        )
+                    }
                 },
                 onRequestInspectionClick = {
                     onRequestActionClick?.invoke()
@@ -56,8 +76,18 @@ fun EntityTabContent(
                 onRestaurantClick = { res ->
                     onEntityClick?.invoke(res)
                 },
-                onChatClick = {
-                    if (onChatClick != null) onChatClick() else viewModel.openSupportChat()
+                onChatClick = { res ->
+                    if (onChatClick != null) {
+                        onChatClick()
+                    } else {
+                        viewModel.openDirectChat(
+                            targetUserId = res.id.ifBlank { res.phone },
+                            targetUserName = res.name,
+                            targetUserPhoto = res.logoImage.ifBlank { res.coverImage },
+                            relatedEntityId = res.id,
+                            relatedEntityType = "RESTAURANT"
+                        )
+                    }
                 },
                 onOrderMealClick = {
                     onRequestActionClick?.invoke()
@@ -71,8 +101,18 @@ fun EntityTabContent(
                 onMedicalCenterClick = { med ->
                     onEntityClick?.invoke(med)
                 },
-                onChatClick = {
-                    if (onChatClick != null) onChatClick() else viewModel.openSupportChat()
+                onChatClick = { med ->
+                    if (onChatClick != null) {
+                        onChatClick()
+                    } else {
+                        viewModel.openDirectChat(
+                            targetUserId = med.id.ifBlank { med.phone },
+                            targetUserName = med.name,
+                            targetUserPhoto = med.profileImage,
+                            relatedEntityId = med.id,
+                            relatedEntityType = "MEDICAL"
+                        )
+                    }
                 },
                 onBookAppointmentClick = {
                     onRequestActionClick?.invoke()
@@ -84,7 +124,19 @@ fun EntityTabContent(
                 viewModel = viewModel,
                 themeColors = themeColors,
                 onStoreClick = { store -> onEntityClick?.invoke(store) },
-                onChatClick = { if (onChatClick != null) onChatClick() else viewModel.openSupportChat() },
+                onChatClick = { store ->
+                    if (onChatClick != null) {
+                        onChatClick()
+                    } else {
+                        viewModel.openDirectChat(
+                            targetUserId = store.id.ifBlank { store.phone },
+                            targetUserName = store.name,
+                            targetUserPhoto = store.logoImage.ifBlank { store.coverImage },
+                            relatedEntityId = store.id,
+                            relatedEntityType = "JOB"
+                        )
+                    }
+                },
                 onRequestServiceClick = { onRequestActionClick?.invoke() }
             )
         }

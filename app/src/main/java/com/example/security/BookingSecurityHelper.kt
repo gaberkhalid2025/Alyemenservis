@@ -41,7 +41,7 @@ object BookingSecurityHelper {
                     EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
                     EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
                 )
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 try {
                     appCtx.deleteSharedPreferences(SECURE_PREFS_NAME)
                     val masterKey = MasterKey.Builder(appCtx)
@@ -54,7 +54,7 @@ object BookingSecurityHelper {
                         EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
                         EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
                     )
-                } catch (ex: Exception) {
+                } catch (ex: Throwable) {
                     appCtx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                 }
             }
@@ -112,7 +112,7 @@ object BookingSecurityHelper {
         val lockTime = prefs.getLong(KEY_LOCKOUT_PREFIX + keyId, 0L)
         if (lockTime == 0L) return 0L
         val diff = computeRemainingLockoutMs(prefs, keyId, lockTime)
-        return if (diff > 0L) diff / 1000L else 0L
+        return if (diff > 0L) ((diff + 999L) / 1000L) else 0L
     }
 
     private fun computeRemainingLockoutMs(prefs: SharedPreferences, bookingId: String, lockTime: Long): Long {

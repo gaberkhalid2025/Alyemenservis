@@ -97,16 +97,21 @@ fun AppHeaderBar(
         if (filteredNotifs.isEmpty()) 0 else filteredNotifs.count { it.id !in readNotificationIds }
     }
 
-    // Calculate unread chats count
+    // Calculate unread chats count (تفضيل unreadCount من ChatChannel أولاً ثم fallback لـ SharedPreferences)
     val unreadChatsCount = remember(myChannels, chatChannels, headerSp, chatReadTrigger) {
         if (myChannels.isEmpty()) 0 else myChannels.count { ch ->
-            val lastMsg = ch.messages.lastOrNull()
-            if (lastMsg == null) {
-                false
+            val channelUnread = ch.unreadCount[currentUserId] ?: 0
+            if (channelUnread > 0) {
+                true
             } else {
-                val isMe = lastMsg.senderId == currentUserId || (myProvider != null && lastMsg.senderId == myProvider.id)
-                val readTime = headerSp.getLong("chat_read_${ch.id}", 0L)
-                !isMe && lastMsg.timestamp > readTime
+                val lastMsg = ch.messages.lastOrNull()
+                if (lastMsg == null) {
+                    false
+                } else {
+                    val isMe = lastMsg.senderId == currentUserId || (myProvider != null && lastMsg.senderId == myProvider.id)
+                    val readTime = headerSp.getLong("chat_read_${ch.id}", 0L)
+                    !isMe && lastMsg.timestamp > readTime
+                }
             }
         }
     }

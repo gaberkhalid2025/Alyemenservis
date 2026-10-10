@@ -37,75 +37,39 @@ class RegistrationRepositoryImpl(
         val cleanPhone = ValidatePhoneUseCase.normalizePhone(phone)
         if (cleanPhone.isBlank()) return@coroutineScope false
 
-        val joinReqDeferred = async {
-            runCatching {
-                !firestore.collection(AppConstants.COL_JOIN_REQUESTS)
-                    .whereEqualTo("phone", cleanPhone)
-                    .whereEqualTo("status", "PENDING")
-                    .limit(1)
-                    .get()
-                    .await()
-                    .isEmpty
-            }.getOrDefault(false)
-        }
+        // 1. فحص طلبات الانضمام المعلقة أولاً (استعلام واحد فقط محدود بواحد)
+        val hasPendingJoin = runCatching {
+            !firestore.collection(AppConstants.COL_JOIN_REQUESTS)
+                .whereEqualTo("phone", cleanPhone)
+                .whereEqualTo("status", "PENDING")
+                .limit(1)
+                .get()
+                .await()
+                .isEmpty
+        }.getOrDefault(false)
 
-        val userDeferred = async {
-            runCatching {
+        if (hasPendingJoin) return@coroutineScope true
+
+        // 2. فحص سريع للمستخدمين المسجلين عبر المعرف المباشر (Direct Document Get - يستهلك قراءة واحدة فقط)
+        val hasDirectUser = runCatching {
+            firestore.collection("registered_users").document(cleanPhone).get().await().exists() ||
                 firestore.collection("users").document(cleanPhone).get().await().exists() ||
-                    firestore.collection("users").document("u_$cleanPhone").get().await().exists() ||
-                    firestore.collection("registered_users").document(cleanPhone).get().await().exists() ||
-                    !firestore.collection("registered_users")
-                        .whereEqualTo("phone", cleanPhone)
-                        .limit(1)
-                        .get()
-                        .await()
-                        .isEmpty
-            }.getOrDefault(false)
-        }
+                firestore.collection("providers").document("p_$cleanPhone").get().await().exists()
+        }.getOrDefault(false)
 
-        val providerDeferred = async {
-            runCatching {
-                firestore.collection("providers").document("p_$cleanPhone").get().await().exists() ||
-                    !firestore.collection("providers")
-                        .whereEqualTo("phone", cleanPhone)
-                        .limit(1)
-                        .get()
-                        .await()
-                        .isEmpty
-            }.getOrDefault(false)
-        }
+        if (hasDirectUser) return@coroutineScope true
 
-        val storeDeferred = async {
-            runCatching {
-                firestore.collection("stores").document("s_$cleanPhone").get().await().exists() ||
-                    !firestore.collection("stores")
-                        .whereEqualTo("phone", cleanPhone)
-                        .limit(1)
-                        .get()
-                        .await()
-                        .isEmpty
-            }.getOrDefault(false)
-        }
+        // 3. فحص احتياطي موحد فقط عند عدم وجود وثيقة مباشرة
+        val hasIndexedUser = runCatching {
+            !firestore.collection("registered_users")
+                .whereEqualTo("phone", cleanPhone)
+                .limit(1)
+                .get()
+                .await()
+                .isEmpty
+        }.getOrDefault(false)
 
-        val propDeferred = async {
-            runCatching {
-                firestore.collection("properties").document("prop_$cleanPhone").get().await().exists() ||
-                    !firestore.collection("properties")
-                        .whereEqualTo("phone", cleanPhone)
-                        .limit(1)
-                        .get()
-                        .await()
-                        .isEmpty
-            }.getOrDefault(false)
-        }
-
-        awaitAll(
-            joinReqDeferred,
-            userDeferred,
-            providerDeferred,
-            storeDeferred,
-            propDeferred
-        ).any { it }
+        hasIndexedUser
     }
 
     private suspend fun sendAdminJoinNotification(requestId: String, applicantName: String, phone: String, type: String) {

@@ -306,18 +306,40 @@ class InstantRequestRepository(private val context: Context? = null) {
         val offerRef = requestRef.collection("offers").document(offerId)
         val topLevelOfferRef = firestore.collection("request_offers").document(offerId)
 
-        val onOfferAcceptedSuccess = {
-            offerRef.update("status", "ACCEPTED")
-            topLevelOfferRef.update("status", "ACCEPTED")
-
-            // Mark other competing offers for the same request as REJECTED
+        // تنفيذ عملية القبول عبر Transaction واحدة موحدة لتقليل استهلاك Firebase Spark
+        firestore.runTransaction { tx ->
+            val snapshot = tx.get(requestRef)
+            if (snapshot.exists()) {
+                val currentStatus = snapshot.getString("status")?.uppercase() ?: "WAITING_FOR_OFFERS"
+                val currentAcceptedOffer = snapshot.getString("acceptedOfferId") ?: ""
+                if (currentStatus in setOf("CANCELLED", "COMPLETED", "EXPIRED") ||
+                    (currentStatus == "ACCEPTED" && currentAcceptedOffer.isNotBlank() && currentAcceptedOffer != offerId)
+                ) {
+                    throw IllegalStateException("لا يمكن قبول العرض لأن حالة الطلب الحالية هي: $currentStatus")
+                }
+            }
+            tx.update(requestRef, updates)
+            tx.update(offerRef, "status", "ACCEPTED")
+            tx.update(topLevelOfferRef, "status", "ACCEPTED")
+        }.addOnSuccessListener {
+            // رفض العروض المنافسة المعلقة في Batch واحد محدود لتوفير استهلاك الكوتا
             requestRef.collection("offers")
+                .whereEqualTo("status", "PENDING")
+                .limit(FirebaseOptimizationManager.URGENT_REQUEST_PAGE_SIZE.toLong())
                 .get()
                 .addOnSuccessListener { snap ->
-                    snap.documents.forEach { doc ->
-                        if (doc.id != offerId && doc.getString("status") == "PENDING") {
-                            doc.reference.update("status", "REJECTED")
-                            firestore.collection("request_offers").document(doc.id).update("status", "REJECTED")
+                    if (!snap.isEmpty) {
+                        val rejectBatch = firestore.batch()
+                        var hasRejects = false
+                        snap.documents.forEach { doc ->
+                            if (doc.id != offerId) {
+                                rejectBatch.update(doc.reference, "status", "REJECTED")
+                                rejectBatch.update(firestore.collection("request_offers").document(doc.id), "status", "REJECTED")
+                                hasRejects = true
+                            }
+                        }
+                        if (hasRejects) {
+                            rejectBatch.commit()
                         }
                     }
                 }
@@ -342,30 +364,9 @@ class InstantRequestRepository(private val context: Context? = null) {
             }
             AnalyticsEventsHelper.logOfferAccepted(context, requestId, providerId)
             onSuccess()
+        }.addOnFailureListener { error ->
+            onError(error.localizedMessage ?: "فشل قبول العرض")
         }
-
-        requestRef.get()
-            .addOnSuccessListener { snapshot ->
-                if (snapshot != null && snapshot.exists()) {
-                    val currentStatus = snapshot.getString("status")?.uppercase() ?: "WAITING_FOR_OFFERS"
-                    val currentAcceptedOffer = snapshot.getString("acceptedOfferId") ?: ""
-                    if (currentStatus in setOf("CANCELLED", "COMPLETED", "EXPIRED") ||
-                        (currentStatus == "ACCEPTED" && currentAcceptedOffer.isNotBlank() && currentAcceptedOffer != offerId)
-                    ) {
-                        onError("لا يمكن قبول العرض لأن حالة الطلب الحالية هي: $currentStatus")
-                        return@addOnSuccessListener
-                    }
-                }
-                requestRef.update(updates)
-                    .addOnSuccessListener { onOfferAcceptedSuccess() }
-                    .addOnFailureListener { onError(it.localizedMessage ?: "فشل قبول العرض") }
-            }
-            .addOnFailureListener {
-                // في حال تعذر القراءة المسبقة (أوفلاين) نحاول التحديث المباشر
-                requestRef.update(updates)
-                    .addOnSuccessListener { onOfferAcceptedSuccess() }
-                    .addOnFailureListener { err -> onError(err.localizedMessage ?: "فشل قبول العرض") }
-            }
     }
 
     /**

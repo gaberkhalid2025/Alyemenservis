@@ -45,7 +45,7 @@ object HeatmapRenderer {
     }
 
     /**
-     * Draw KDE Heatmap on Canvas
+     * Draw KDE Heatmap on Canvas with realistic multi-stop Gaussian density gradients
      */
     fun drawHeatmapLayer(
         drawScope: DrawScope,
@@ -56,16 +56,17 @@ object HeatmapRenderer {
         if (points.isEmpty()) return
 
         for (pt in points) {
-            val radius = bandwidth * 1.5f
+            val radius = (bandwidth * (1.1f + 0.35f * pt.weight.coerceIn(0.5f, 2.5f))).coerceAtLeast(15f)
+            val alpha = (maxOpacity * (pt.weight / 1.1f)).coerceIn(0.20f, 0.85f)
+
             drawScope.drawCircle(
                 brush = Brush.radialGradient(
-                    colors = listOf(
-                        Color(0xFFEF4444).copy(alpha = maxOpacity * 0.7f), // Red
-                        Color(0xFFF59E0B).copy(alpha = maxOpacity * 0.5f), // Yellow
-                        Color(0xFF10B981).copy(alpha = maxOpacity * 0.3f), // Green
-                        Color(0xFF00E5FF).copy(alpha = maxOpacity * 0.15f), // Cyan
-                        Color.Transparent
-                    ),
+                    0.00f to Color(0xFFDC2626).copy(alpha = alpha),          // Hot Core (Deep Red)
+                    0.25f to Color(0xFFEA580C).copy(alpha = alpha * 0.85f),  // High density (Deep Orange)
+                    0.50f to Color(0xFFFBBF24).copy(alpha = alpha * 0.65f),  // Medium density (Amber)
+                    0.72f to Color(0xFF10B981).copy(alpha = alpha * 0.40f),  // Moderate density (Emerald)
+                    0.88f to Color(0xFF06B6D4).copy(alpha = alpha * 0.20f),  // Outer aura (Cyan)
+                    1.00f to Color.Transparent,
                     center = Offset(pt.x, pt.y),
                     radius = radius
                 ),

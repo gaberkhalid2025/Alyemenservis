@@ -147,7 +147,18 @@ fun AdminCustomBannerView(settingsState: AdminSettingsEntity, themeColors: Visua
 
                 when (settingsState.bannerType) {
                     "IMAGE" -> {
-                        if (imageBitmap != null) {
+                        val isRemoteUrl = settingsState.bannerContent.startsWith("http://") || settingsState.bannerContent.startsWith("https://")
+                        if (isRemoteUrl) {
+                            SmartAsyncImage(
+                                model = settingsState.bannerContent,
+                                contentDescription = "إعلان بنر",
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(130.dp)
+                                    .clip(RoundedCornerShape(8.dp)),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else if (imageBitmap != null) {
                             Image(
                                 bitmap = imageBitmap,
                                 contentDescription = "إعلان بنر",

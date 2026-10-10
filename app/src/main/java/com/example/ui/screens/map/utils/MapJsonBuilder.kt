@@ -1,3 +1,4 @@
+// LEGACY – لم يعد مستخدماً بعد التحويل إلى Native Canvas
 package com.example.ui.screens.map.utils
 
 import com.example.data.PropertyEntity
@@ -12,6 +13,7 @@ import org.json.JSONObject
 
 /**
  * 🗺️ MapJsonBuilder
+ * // LEGACY – لم يعد مستخدماً بعد التحويل إلى Native Canvas
  * Builds structured JSON strings for Leaflet WebView markers.
  */
 object MapJsonBuilder {

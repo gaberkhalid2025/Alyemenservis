@@ -305,14 +305,20 @@ fun ProviderDetailsDialog(
                                 .offset(y = (-15).dp),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            // Direct Chat Button
+                            // Direct Chat Button (إصلاح التوجيه لمقدم الخدمة مباشرة بدلاً من الدعم الفني)
                             Button(
                                 onClick = {
                                     onDismiss()
                                     if (onChatOpen != null) {
-                                        onChatOpen(provider.phone.ifBlank { provider.id })
+                                        onChatOpen(provider.id.ifBlank { provider.phone })
                                     } else {
-                                        viewModel.openSupportChat()
+                                        viewModel.openDirectChat(
+                                            targetUserId = provider.id.ifBlank { provider.phone },
+                                            targetUserName = provider.name,
+                                            targetUserPhoto = provider.profileImage,
+                                            relatedEntityId = provider.id,
+                                            relatedEntityType = "PROVIDER"
+                                        )
                                     }
                                 },
                                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6)),

@@ -130,10 +130,9 @@ fun OfflineInteractiveMap(
         originLng
     ) {
         val points = mutableListOf<InteractiveMapPoint>()
-        var fallbackAngle = 0.0
 
         // 1. Providers
-        nearbyProviders.forEachIndexed { idx, p ->
+        nearbyProviders.forEach { p ->
             val base = getProviderCoords(p)
             val rawLat = base.first
             val rawLng = base.second
@@ -152,12 +151,19 @@ fun OfflineInteractiveMap(
                 xMeters = (dLng * metersPerDegreeLng).toFloat()
                 yMeters = (-dLat * metersPerDegreeLat).toFloat()
             } else {
-                // Fallback circular distribution around the center only when coordinates are missing
-                val radiusMeters = 350.0 + (idx % 6) * 180.0
-                val rad = Math.toRadians(fallbackAngle)
-                xMeters = (radiusMeters * cos(rad)).toFloat()
-                yMeters = (radiusMeters * sin(rad)).toFloat()
-                fallbackAngle += 37.0
+                // إصلاح 1.2: عند غياب الإحداثيات نستخدم إحداثيات المدينة المحددة بدقة + إزاحة صغيرة جداً وثابتة بناءً على hash الـ id بدلاً من زاوية دائرية عشوائية
+                val targetCity = if (p.cityId.isNotBlank()) p.cityId else selectedCity
+                val cityCoords = com.example.ui.screens.map.utils.OfflineMapManager.getCityCoordinates(targetCity)
+                val dLng = cityCoords.longitude - originLng
+                val dLat = cityCoords.latitude - originLat
+                val baseXMeters = (dLng * metersPerDegreeLng).toFloat()
+                val baseYMeters = (-dLat * metersPerDegreeLat).toFloat()
+
+                val idHash = p.id.hashCode()
+                val hashAngle = ((idHash and 0xFFFF) % 360) * (Math.PI / 180.0)
+                val hashOffsetMeters = 40.0 + (abs(idHash ushr 16) % 120)
+                xMeters = baseXMeters + (hashOffsetMeters * cos(hashAngle)).toFloat()
+                yMeters = baseYMeters + (hashOffsetMeters * sin(hashAngle)).toFloat()
             }
 
             points.add(
@@ -178,7 +184,7 @@ fun OfflineInteractiveMap(
         }
 
         // 2. Stores & Restaurants & Medical Centers
-        nearbyStores.forEachIndexed { idx, s ->
+        nearbyStores.forEach { s ->
             val base = getStoreCoords(s)
             val rawLat = base.first
             val rawLng = base.second
@@ -197,12 +203,19 @@ fun OfflineInteractiveMap(
                 xMeters = (dLng * metersPerDegreeLng).toFloat()
                 yMeters = (-dLat * metersPerDegreeLat).toFloat()
             } else {
-                // Fallback circular distribution
-                val radiusMeters = 400.0 + (idx % 7) * 200.0
-                val rad = Math.toRadians(fallbackAngle)
-                xMeters = (radiusMeters * cos(rad)).toFloat()
-                yMeters = (radiusMeters * sin(rad)).toFloat()
-                fallbackAngle += 33.0
+                // إصلاح 1.2: إزاحة متسقة وصغيرة بناءً على hash الـ id بالقرب من إحداثيات المدينة
+                val targetCity = if (s.cityId.isNotBlank()) s.cityId else selectedCity
+                val cityCoords = com.example.ui.screens.map.utils.OfflineMapManager.getCityCoordinates(targetCity)
+                val dLng = cityCoords.longitude - originLng
+                val dLat = cityCoords.latitude - originLat
+                val baseXMeters = (dLng * metersPerDegreeLng).toFloat()
+                val baseYMeters = (-dLat * metersPerDegreeLat).toFloat()
+
+                val idHash = s.id.hashCode()
+                val hashAngle = ((idHash and 0xFFFF) % 360) * (Math.PI / 180.0)
+                val hashOffsetMeters = 40.0 + (abs(idHash ushr 16) % 120)
+                xMeters = baseXMeters + (hashOffsetMeters * cos(hashAngle)).toFloat()
+                yMeters = baseYMeters + (hashOffsetMeters * sin(hashAngle)).toFloat()
             }
 
             val isMedical = s.sectionId.contains("medical") || s.categoryId.contains("medical") || s.name.contains("طبي") || s.name.contains("صيدلية")
@@ -238,7 +251,7 @@ fun OfflineInteractiveMap(
         }
 
         // 3. Properties
-        nearbyProperties.forEachIndexed { idx, prop ->
+        nearbyProperties.forEach { prop ->
             val base = getPropertyCoords(prop)
             val rawLat = base.first
             val rawLng = base.second
@@ -257,12 +270,19 @@ fun OfflineInteractiveMap(
                 xMeters = (dLng * metersPerDegreeLng).toFloat()
                 yMeters = (-dLat * metersPerDegreeLat).toFloat()
             } else {
-                // Fallback circular distribution
-                val radiusMeters = 500.0 + (idx % 5) * 220.0
-                val rad = Math.toRadians(fallbackAngle)
-                xMeters = (radiusMeters * cos(rad)).toFloat()
-                yMeters = (radiusMeters * sin(rad)).toFloat()
-                fallbackAngle += 42.0
+                // إصلاح 1.2: إزاحة متسقة وصغيرة بناءً على hash الـ id بالقرب من إحداثيات المدينة
+                val targetCity = if (prop.cityId.isNotBlank()) prop.cityId else selectedCity
+                val cityCoords = com.example.ui.screens.map.utils.OfflineMapManager.getCityCoordinates(targetCity)
+                val dLng = cityCoords.longitude - originLng
+                val dLat = cityCoords.latitude - originLat
+                val baseXMeters = (dLng * metersPerDegreeLng).toFloat()
+                val baseYMeters = (-dLat * metersPerDegreeLat).toFloat()
+
+                val idHash = prop.id.hashCode()
+                val hashAngle = ((idHash and 0xFFFF) % 360) * (Math.PI / 180.0)
+                val hashOffsetMeters = 40.0 + (abs(idHash ushr 16) % 120)
+                xMeters = baseXMeters + (hashOffsetMeters * cos(hashAngle)).toFloat()
+                yMeters = baseYMeters + (hashOffsetMeters * sin(hashAngle)).toFloat()
             }
 
             points.add(

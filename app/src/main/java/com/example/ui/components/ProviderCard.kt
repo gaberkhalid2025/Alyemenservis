@@ -274,9 +274,9 @@ fun ProviderCard(
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // زر المحادثة الفورية
+                    // زر المحادثة الفورية (إصلاح التوجيه لكود الكيان الفعلي أولاً)
                     Button(
-                        onClick = { onChatOpen(provider.phone.ifBlank { provider.id }) },
+                        onClick = { onChatOpen(provider.id.ifBlank { provider.phone }) },
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6)),
                         shape = RoundedCornerShape(8.dp),
                         modifier = Modifier.weight(1f).height(32.dp),

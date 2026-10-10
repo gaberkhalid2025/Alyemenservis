@@ -29,6 +29,15 @@ class SyncWorker(
     }
 
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
+        if (!com.example.NetworkUtils.isNetworkAvailable(applicationContext)) {
+            Log.d(TAG, "No validated network connection available, deferring background sync")
+            return@withContext if (runAttemptCount < MAX_RETRY_ATTEMPTS) {
+                Result.retry()
+            } else {
+                Result.failure()
+            }
+        }
+
         return@withContext try {
             val (syncManager, offlineQueue) = try {
                 val entryPoint = EntryPointAccessors.fromApplication(
@@ -37,6 +46,7 @@ class SyncWorker(
                 )
                 entryPoint.fullSyncManager() to entryPoint.offlineQueueManager()
             } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
                 FullSyncManager(applicationContext) to OfflineQueueManager(applicationContext)
             }
 
@@ -45,6 +55,11 @@ class SyncWorker(
 
             // 2. معالجة طابور وضع عدم الاتصال (Offline Queue) والانتظار الفعلي حتى اكتمال الإرسال
             val queueSuccess = offlineQueue.processQueueSuspend()
+
+            // 3. تنظيف الكاش المحلي والرسائل القديمة (>30 يوماً) لتوفير الذاكرة وسعة الجهاز
+            try {
+                com.example.data.local.ChatLocalDataSource.getInstance(applicationContext).pruneStaleCache()
+            } catch (_: Exception) {}
 
             if (queueSuccess) {
                 Result.success()
@@ -55,6 +70,8 @@ class SyncWorker(
                     Result.failure()
                 }
             }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.e(TAG, "Background sync worker failed: ${e.message}", e)
             if (runAttemptCount < MAX_RETRY_ATTEMPTS) {

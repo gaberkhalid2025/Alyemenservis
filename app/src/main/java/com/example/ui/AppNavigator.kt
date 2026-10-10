@@ -202,8 +202,8 @@ fun AppNavigator(
                     onPropertyClick = {}, 
                     onChatClick = { prop ->
                         viewModel.openDirectChat(
-                            targetUserId = prop.phone.ifBlank { prop.id },
-                            targetUserName = prop.ownerName.ifBlank { prop.title },
+                            targetUserId = prop.id.ifBlank { prop.phone },
+                            targetUserName = prop.title.ifBlank { prop.ownerName },
                             targetUserPhoto = prop.images.firstOrNull() ?: "",
                             relatedEntityId = prop.id,
                             relatedEntityType = "PROPERTY"

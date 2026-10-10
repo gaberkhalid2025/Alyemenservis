@@ -106,8 +106,8 @@ class ChatRepository(
 
             val finalChannelId = customChannelId ?: when {
                 type == ChannelType.SUPPORT -> "channel_support_${cleanCurrent}"
-                type == ChannelType.PRIVATE && sortedParticipants.size == 2 -> "channel_${sortedParticipants[0]}_${sortedParticipants[1]}"
-                relatedEntityId != null -> "channel_${type.name.lowercase()}_${relatedEntityId.trim()}"
+                sortedParticipants.size == 2 -> "channel_${sortedParticipants[0]}_${sortedParticipants[1]}"
+                relatedEntityId != null -> "channel_${type.name.lowercase()}_${relatedEntityId.trim()}_${cleanCurrent}"
                 else -> channelsCollection.document().id
             }
 
@@ -156,7 +156,7 @@ class ChatRepository(
                         if (cleanOther.isNotBlank() && otherUserPhoto.isNotBlank()) put(cleanOther, otherUserPhoto)
                     },
                     type = type,
-                    title = if (type == ChannelType.SUPPORT) "الدعم الفني" else "",
+                    title = if (type == ChannelType.SUPPORT) "الدعم الفني" else finalOtherName.ifBlank { "" },
                     relatedEntityId = relatedEntityId,
                     relatedEntityType = relatedEntityType,
                     lastMessageTime = System.currentTimeMillis()
@@ -173,8 +173,8 @@ class ChatRepository(
             val sortedParticipants = listOf(cleanCurrent, cleanOther).filter { it.isNotBlank() }.sorted()
             val fallbackChannelId = when {
                 type == ChannelType.SUPPORT -> "channel_support_${cleanCurrent}"
-                type == ChannelType.PRIVATE && sortedParticipants.size == 2 -> "channel_${sortedParticipants[0]}_${sortedParticipants[1]}"
-                relatedEntityId != null -> "channel_${type.name.lowercase()}_${relatedEntityId.trim()}"
+                sortedParticipants.size == 2 -> "channel_${sortedParticipants[0]}_${sortedParticipants[1]}"
+                relatedEntityId != null -> "channel_${type.name.lowercase()}_${relatedEntityId.trim()}_${cleanCurrent}"
                 else -> ""
             }
             val localChannel = if (fallbackChannelId.isNotBlank()) local?.getChannelById(fallbackChannelId) else null

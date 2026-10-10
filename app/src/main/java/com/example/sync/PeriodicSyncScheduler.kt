@@ -21,17 +21,22 @@ class PeriodicSyncScheduler @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
 
+    companion object {
+        const val SYNC_INTERVAL_HOURS = 2L
+        const val BACKOFF_DELAY_MILLIS = 30_000L // 30 seconds backoff delay
+    }
+
     fun schedulePeriodicSync() {
         val constraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.CONNECTED)
             .setRequiresBatteryNotLow(true)
             .build()
 
-        val syncWorkRequest = PeriodicWorkRequestBuilder<SyncWorker>(2, TimeUnit.HOURS)
+        val syncWorkRequest = PeriodicWorkRequestBuilder<SyncWorker>(SYNC_INTERVAL_HOURS, TimeUnit.HOURS)
             .setConstraints(constraints)
             .setBackoffCriteria(
                 BackoffPolicy.EXPONENTIAL,
-                WorkRequest.MIN_BACKOFF_MILLIS,
+                BACKOFF_DELAY_MILLIS,
                 TimeUnit.MILLISECONDS
             )
             .addTag(SyncWorker.WORK_NAME)

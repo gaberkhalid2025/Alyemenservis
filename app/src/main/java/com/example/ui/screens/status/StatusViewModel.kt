@@ -166,13 +166,18 @@ class StatusViewModel(
                 _uiState.value = _uiState.value.copy(isRefreshing = true)
                 val result = statusRepository.refreshSystemStatus()
                 loadStatusData()
-                _uiState.value = _uiState.value.copy(isRefreshing = false, isLoading = false)
+                _uiState.value = _uiState.value.copy(isLoading = false)
                 if (result.isSuccess) {
                     _eventFlow.emit(StatusEvent.ShowSnackbar("🔄 تم تحديث حالات وبيانات المنصة"))
                 } else {
                     _eventFlow.emit(StatusEvent.ShowToast("تعذر التحديث: ${result.exceptionOrNull()?.localizedMessage}"))
                 }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _eventFlow.emit(StatusEvent.ShowToast("تعذر التحديث: ${e.localizedMessage}"))
             } finally {
+                _uiState.value = _uiState.value.copy(isRefreshing = false)
                 isRefreshingGuard.set(false)
             }
         }
@@ -217,6 +222,8 @@ class StatusViewModel(
                 if (isRefreshingGuard.compareAndSet(false, true)) {
                     try {
                         statusRepository.refreshSystemStatus()
+                    } catch (e: kotlinx.coroutines.CancellationException) {
+                        throw e
                     } catch (e: Exception) {
                         // Silent fail on background refresh
                     } finally {
