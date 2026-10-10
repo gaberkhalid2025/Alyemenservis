@@ -10,48 +10,30 @@ if (!admin.apps.length) {
 const db = admin.firestore();
 const secretManager = new SecretManagerServiceClient();
 
+// Helper: fetch with timeout
+async function fetchWithTimeout(resource, options = {}, timeout = 10000) {
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeout);
+    try {
+        const response = await fetch(resource, {
+            ...options,
+            signal: controller.signal
+        });
+        clearTimeout(id);
+        return response;
+    } catch (err) {
+        clearTimeout(id);
+        throw err;
+    }
+}
+
+
 /**
  * تهيئة Claims المالك والأدمن — مرة واحدة فقط.
  * محمية بمفتاح سري من متغيرات البيئة.
  * احذفها بعد الاستخدام.
  */
-exports.initializeAdminClaims = functions.https.onRequest(async (req, res) => {
-    const setupKey = req.query.key || req.headers['x-setup-key'];
-    if (!setupKey || setupKey !== process.env.ADMIN_SETUP_KEY) {
-        return res.status(403).json({ error: "Forbidden" });
-    }
-    
-    const ownerEmail = process.env.OWNER_EMAIL;
-    const adminEmail = process.env.ADMIN_EMAIL;
-    
-    if (!ownerEmail || !adminEmail) {
-        return res.status(500).json({ error: "Env vars missing" });
-    }
-    
-    try {
-        const ownerUser = await admin.auth().getUserByEmail(ownerEmail);
-        const adminUser = await admin.auth().getUserByEmail(adminEmail);
-        
-        await admin.auth().setCustomUserClaims(ownerUser.uid, {
-            role: "OWNER", admin: true, isAdmin: true,
-            isOwner: true, isSuperAdmin: true, registeredAt: Date.now()
-        });
-        
-        await admin.auth().setCustomUserClaims(adminUser.uid, {
-            role: "ADMIN", admin: true, isAdmin: true,
-            isOwner: false, isSuperAdmin: false, registeredAt: Date.now()
-        });
-        
-        res.status(200).json({
-            success: true,
-            owner: { email: ownerUser.email, uid: ownerUser.uid, role: "OWNER" },
-            admin: { email: adminUser.email, uid: adminUser.uid, role: "ADMIN" },
-            message: "Claims set. DELETE this function now."
-        });
-    } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
+
 
 /**
  * ⚠️ يُستدعى لتعيين Custom Claim للأدمن أو المالك عبر البريد الإلكتروني (getUserByEmail)
@@ -251,7 +233,7 @@ exports.verifyAdminLogin = functions.https.onCall(async (data, context) => {
     try {
         // التحقق عبر Firebase Auth REST API
         const apiKey = process.env.FIREBASE_API_KEY || functions.config().auth?.api_key || '';
-        const response = await fetch(
+        const response = await fetchWithTimeout(
             `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${apiKey}`,
             {
                 method: 'POST',
@@ -459,20 +441,60 @@ exports.onPasswordRecoveryRequest = functions.firestore
 /**
  * 📱 جلب FCM tokens لكل الأدمن
  */
+let cachedAdminTokens = null;
+let lastAdminTokensFetchTime = 0;
+const ADMIN_TOKENS_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes cache to save Firestore reads
+
+/**
+ * 📱 جلب FCM tokens لكل الأدمن
+ */
 async function getAdminFcmTokens() {
+    const now = Date.now();
+    if (cachedAdminTokens && (now - lastAdminTokensFetchTime) < ADMIN_TOKENS_CACHE_TTL_MS) {
+        console.log('⚡ Using cached admin FCM tokens (TTL: 5m, count: ' + cachedAdminTokens.length + ')');
+        return [...cachedAdminTokens];
+    }
+
     const tokens = [];
     
     try {
-        const listUsersResult = await admin.auth().listUsers(1000);
-        const adminUids = listUsersResult.users
-            .filter(user => {
-                const c = user.customClaims || {};
-                return c.isAdmin === true || c.admin === true || c.isOwner === true || c.isSuperAdmin === true ||
-                       ['admin', 'owner', 'super_admin'].includes((c.role || '').toLowerCase());
-            })
-            .map(user => user.uid);
+        const adminUids = new Set();
         
-        if (adminUids.length === 0) return [];
+        // 1. الأولوية: جلب الأدمن من collection admin_users في Firestore (أسرع وأرخص)
+        try {
+            const adminUsersSnap = await db.collection('admin_users').get();
+            if (!adminUsersSnap.empty) {
+                adminUsersSnap.forEach(doc => {
+                    const data = doc.data() || {};
+                    const role = (data.role || '').toLowerCase();
+                    if (data.isAdmin === true || data.admin === true || data.isOwner === true || data.isSuperAdmin === true ||
+                        ['admin', 'owner', 'super_admin'].includes(role) || !role) {
+                        adminUids.add(doc.id);
+                    }
+                });
+            }
+        } catch (dbErr) {
+            console.warn('Could not read admin_users collection, falling back to Auth listUsers:', dbErr);
+        }
+        
+        // 2. إذا لم نجد أياً من الأدمن أو كإجراء احتياطي، استخدام pagination عبر listUsers لدعم > 1000 مستخدم
+        if (adminUids.size === 0) {
+            let nextPageToken = undefined;
+            do {
+                const listUsersResult = await admin.auth().listUsers(1000, nextPageToken);
+                listUsersResult.users.forEach(user => {
+                    const c = user.customClaims || {};
+                    const role = (c.role || '').toLowerCase();
+                    if (c.isAdmin === true || c.admin === true || c.isOwner === true || c.isSuperAdmin === true || 
+                        ['admin', 'owner', 'super_admin'].includes(role)) {
+                        adminUids.add(user.uid);
+                    }
+                });
+                nextPageToken = listUsersResult.pageToken;
+            } while (nextPageToken);
+        }
+        
+        if (adminUids.size === 0) return [];
         
         // جلب التوكنات لكل أدمن
         for (const uid of adminUids) {
@@ -480,7 +502,7 @@ async function getAdminFcmTokens() {
                 .where('userId', '==', uid)
                 .where('isActive', '==', true)
                 .get();
-            
+                
             tokensSnapshot.forEach(doc => {
                 const token = doc.data().token;
                 if (token) tokens.push(token);
@@ -490,7 +512,10 @@ async function getAdminFcmTokens() {
         console.error('Error getting admin tokens:', e);
     }
     
-    return [...new Set(tokens)];
+    const uniqueTokens = [...new Set(tokens)];
+    cachedAdminTokens = uniqueTokens;
+    lastAdminTokensFetchTime = Date.now();
+    return uniqueTokens;
 }
 
 /**
@@ -624,6 +649,39 @@ exports.deleteChatChannel = functions.https.onCall(async (data, context) => {
     if (!context.auth) {
         throw new functions.https.HttpsError('unauthenticated', 'يجب تسجيل الدخول لحذف المحادثة.');
     }
+
+    const currentUid = context.auth.uid;
+    const isStaff = context.auth.token && (
+        context.auth.token.admin === true ||
+        context.auth.token.isAdmin === true ||
+        context.auth.token.isOwner === true ||
+        ['admin', 'owner', 'super_admin'].includes((context.auth.token.role || '').toLowerCase())
+    );
+
+    // Rate Limiting: 10 عمليات حذف في الساعة لكل مستخدم غير الأدمن
+    if (!isStaff) {
+        const rateLimitRef = db.collection('security').doc('delete_chat_' + currentUid);
+        const rateDoc = await rateLimitRef.get();
+        const rateData = rateDoc.data() || { count: 0, firstAttempt: Date.now() };
+        const ONE_HOUR = 60 * 60 * 1000;
+
+        if (Date.now() - rateData.firstAttempt > ONE_HOUR) {
+            rateData.count = 0;
+            rateData.firstAttempt = Date.now();
+        }
+
+        if (rateData.count >= 10) {
+            const remainingMin = Math.ceil((ONE_HOUR - (Date.now() - rateData.firstAttempt)) / 60000);
+            throw new functions.https.HttpsError(
+                'resource-exhausted',
+                'تم تجاوز الحد المسموح لحذف المحادثات (10 في الساعة). يرجى المحاولة بعد ' + remainingMin + ' دقيقة.'
+            );
+        }
+
+        rateData.count += 1;
+        await rateLimitRef.set(rateData, { merge: true });
+    }
+
     const channelId = (data && data.channelId ? String(data.channelId) : '').trim();
     if (!channelId) {
         throw new functions.https.HttpsError('invalid-argument', 'معرّف القناة مطلوب.');

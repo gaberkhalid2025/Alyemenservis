@@ -84,3 +84,8 @@
 
 
 
+
+# ===== Offline Map & Models Safe-Keep =====
+-keep class com.example.ui.screens.map.** { *; }
+-keep class com.example.domain.models.** { *; }
+-keep class com.example.data.sources.** { *; }

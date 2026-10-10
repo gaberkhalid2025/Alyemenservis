@@ -47,3 +47,16 @@
 - **الصوت**: Android SpeechRecognizer & TextToSpeech API
 - **الخرائط**: Leaflet JS + OpenStreetMap عبر WebView مخصص ومؤمن
 - **تحميل الصور**: Coil Compose
+
+---
+
+## 📚 روابط سريعة
+
+- [خطة الاختبار](TEST_PLAN.md)
+- [دليل المستخدم](USER_GUIDE.md)
+- [قواعد المشروع](AGENTS.md)
+- [دليل المطور](DEVELOPER_GUIDE.md)
+- [سياسة الخصوصية](PRIVACY_POLICY.md)
+- [خطة اختبارات الوحدة](TESTING_PLAN.md)
+- [سيناريوهات التسجيل](REGISTRATION_TEST_SCENARIOS.md)
+- [تقارير التدقيق](SYNC_AUDIT_REPORT.md)
