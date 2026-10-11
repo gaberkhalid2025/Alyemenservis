@@ -67,11 +67,26 @@ class ChatAttachmentManager(private val context: Context) {
                     }
                 }
                 
+                val mimeType = if (isImage) "image/jpeg" else {
+                    when (extension) {
+                        "m4a", "mp4" -> "audio/mp4"
+                        "mp3" -> "audio/mpeg"
+                        "ogg" -> "audio/ogg"
+                        "wav" -> "audio/wav"
+                        else -> "audio/mp4"
+                    }
+                }
+                
                 val fileName = "${UUID.randomUUID()}_${System.currentTimeMillis()}.$extension"
                 val ref = storageRef.child("chats/$channelId/$type/$fileName")
+                val metadata = com.google.firebase.storage.StorageMetadata.Builder()
+                    .setContentType(mimeType)
+                    .setCustomMetadata("channelId", channelId)
+                    .setCustomMetadata("type", type)
+                    .build()
 
-                android.util.Log.d("ChatAttachmentManager", "Uploading ${finalData.size / 1024} KB to Firebase...")
-                ref.putBytes(finalData).await()
+                android.util.Log.d("ChatAttachmentManager", "Uploading ${finalData.size / 1024} KB to Firebase at ${ref.path}...")
+                ref.putBytes(finalData, metadata).await()
                 
                 val url = ref.downloadUrl.await().toString()
                 
