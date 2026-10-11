@@ -442,48 +442,32 @@ fun RestaurantCard(
                         }
                     }
 
-                    // Button 1: Details
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = themeColors.accent,
-                        shadowElevation = 2.dp,
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(29.dp)
-                            .clickable { onClick() }
-                    ) {
-                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                            Text("التفاصيل 📋", fontSize = 9.sp, color = Color.Black, fontWeight = FontWeight.Bold)
-                        }
-                    }
-
-                    // Button 2: Instant Chat
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = themeColors.primary,
-                        shadowElevation = 2.dp,
-                        modifier = Modifier
-                            .weight(1.1f)
-                            .height(29.dp)
-                            .clickable { onChatClick() }
-                    ) {
-                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                            Text("محادثة 💬", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-
-                    // Button 3: Order Meal
+                    // Button 2: Order Meal
                     Surface(
                         shape = RoundedCornerShape(8.dp),
                         color = Color(0xFF10B981),
-                        shadowElevation = 2.dp,
+                        shadowElevation = 3.dp,
                         modifier = Modifier
                             .weight(1f)
                             .height(29.dp)
                             .clickable { onOrderMealClick() }
                     ) {
-                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                            Text("اطلب 🍕", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(
+                                    Brush.verticalGradient(
+                                        listOf(Color.White.copy(alpha = 0.25f), Color.Transparent)
+                                    )
+                                )
+                        ) {
+                            Text(
+                                text = "اطلب 🍕",
+                                color = Color.White,
+                                fontSize = 9.5.sp,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
                     }
                 }

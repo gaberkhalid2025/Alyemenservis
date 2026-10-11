@@ -67,11 +67,6 @@ fun AdminAssistantPanel(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        val currentSettings = viewModel.settings.collectAsState().value
-        var selectedEngine by remember(currentSettings) { mutableStateOf(currentSettings.selectedAiEngine) }
-        var customApiKey by remember(currentSettings) { mutableStateOf(currentSettings.customAiApiKey) }
-        var customModelName by remember(currentSettings) { mutableStateOf(currentSettings.customAiModelName) }
-
         // Header Card
         Card(
             shape = RoundedCornerShape(16.dp),
@@ -79,7 +74,7 @@ fun AdminAssistantPanel(
             border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.3f)),
             modifier = Modifier.fillMaxWidth()
         ) {
-            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Box(
                         modifier = Modifier
@@ -94,111 +89,6 @@ fun AdminAssistantPanel(
                         Text("إدارة المساعد الذكي وقاموس الصيانة 🇾🇪", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color.White)
                         Text("100+ دليل صيانة مجرب متوافق مع اللهجة والمصطلحات اليمنية", fontSize = 11.sp, color = Color.LightGray)
                     }
-                }
-
-                HorizontalDivider(color = Color.DarkGray)
-
-                Text("⚙️ اختيار محرك الذكاء الاصطناعي والمزامنة العامة:", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF38BDF8))
-
-                // Engine Option 1: Offline Yemen AI (Permanent Free)
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(if (selectedEngine == "OFFLINE_YEMEN_AI") Color(0xFF10B981).copy(alpha = 0.2f) else Color.Transparent)
-                        .clickable { selectedEngine = "OFFLINE_YEMEN_AI" }
-                        .padding(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    RadioButton(
-                        selected = (selectedEngine == "OFFLINE_YEMEN_AI"),
-                        onClick = { selectedEngine = "OFFLINE_YEMEN_AI" }
-                    )
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("🇾🇪 محرك الأوفلاين اليمني الذكي (مجاني 100% ودائم)", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.White)
-                        Text("يعمل بدون إنترنت وبسرعة خارقة، مجاني تماماً حتى لو وصل المستخدمون إلى عشرات الآلاف.", fontSize = 10.sp, color = Color.LightGray)
-                    }
-                }
-
-                // Engine Option 2: Gemini Free Flash
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(if (selectedEngine == "GEMINI_FREE_FLASH") Color(0xFF10B981).copy(alpha = 0.2f) else Color.Transparent)
-                        .clickable { selectedEngine = "GEMINI_FREE_FLASH" }
-                        .padding(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    RadioButton(
-                        selected = (selectedEngine == "GEMINI_FREE_FLASH"),
-                        onClick = { selectedEngine = "GEMINI_FREE_FLASH" }
-                    )
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("⚡ نموذج Gemini 2.5 Flash السريع والمجاني", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.White)
-                        Text("يستخدم مفتاح النظام المدمج للردود الذكية والواسعة مع الرجوع التلقائي للأوفلاين.", fontSize = 10.sp, color = Color.LightGray)
-                    }
-                }
-
-                // Engine Option 3: Custom API Key & Model
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(if (selectedEngine == "CUSTOM_API_KEY_MODEL") Color(0xFF10B981).copy(alpha = 0.2f) else Color.Transparent)
-                        .clickable { selectedEngine = "CUSTOM_API_KEY_MODEL" }
-                        .padding(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    RadioButton(
-                        selected = (selectedEngine == "CUSTOM_API_KEY_MODEL"),
-                        onClick = { selectedEngine = "CUSTOM_API_KEY_MODEL" }
-                    )
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("🔑 مفتاح API مخصص ونموذج خارجي يحدده الأدمن", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.White)
-                        Text("يتيح للأدمن إدخال مفتاح API خاص ومقترن بنموذج ذكاء اصطناعي من اختيارك.", fontSize = 10.sp, color = Color.LightGray)
-                    }
-                }
-
-                if (selectedEngine == "CUSTOM_API_KEY_MODEL") {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    OutlinedTextField(
-                        value = customApiKey,
-                        onValueChange = { customApiKey = it },
-                        label = { Text("أدخل مفتاح API المخصص (Custom API Key)", fontSize = 11.sp) },
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    OutlinedTextField(
-                        value = customModelName,
-                        onValueChange = { customModelName = it },
-                        label = { Text("اسم النموذج (مثل gemini-2.5-flash)", fontSize = 11.sp) },
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
-                    )
-                }
-
-                Button(
-                    onClick = {
-                        val updated = currentSettings.copy(
-                            selectedAiEngine = selectedEngine,
-                            customAiApiKey = customApiKey,
-                            customAiModelName = customModelName
-                        )
-                        viewModel.updateAdminSettings(updated)
-                        Toast.makeText(context, "✅ تم حفظ ومزامنة إعدادات الذكاء الاصطناعي بنجاح!", Toast.LENGTH_SHORT).show()
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("💾 حفظ ومزامنة إعدادات الذكاء الاصطناعي", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 }
 
                 // Stats Row

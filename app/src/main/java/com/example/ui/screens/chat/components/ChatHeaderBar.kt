@@ -187,7 +187,7 @@ fun ChatHeaderBar(
             }
         }
 
-        // Booking / Urgent Request / Entity Context Strip (Modern Telegram/Signal Style)
+        // Booking / Urgent Request Context Strip
         if (!relatedEntityId.isNullOrBlank() || !relatedEntityType.isNullOrBlank()) {
             val shortId = if (relatedEntityId != null && relatedEntityId.length > 8) {
                 relatedEntityId.takeLast(8)
@@ -195,41 +195,27 @@ fun ChatHeaderBar(
                 relatedEntityId ?: ""
             }
 
-            val (contextText, badgeColor) = when (relatedEntityType?.uppercase()) {
-                "BOOKING" -> "🗓️ مرتبط بحجز موعد: #$shortId" to Color(0xFF3B82F6) // Elegant Blue
-                "URGENT_REQUEST" -> "🚨 مرتبط بطلب عاجل: #$shortId" to Color(0xFFF59E0B) // Amber
-                "SUPPORT" -> "🛠️ محادثة الدعم الفني: #$shortId" to Color(0xFF10B981) // Emerald
-                "STORE", "RESTAURANT" -> "🏪 استفسار حول المتجر / المنتجات: #$shortId" to Color(0xFF8B5CF6) // Purple
-                "MEDICAL" -> "🏥 استفسار طبي / حجز عيادة: #$shortId" to Color(0xFFEC4899) // Rose
-                "PROPERTY" -> "🏠 استفسار حول العقار: #$shortId" to Color(0xFF06B6D4) // Cyan
-                else -> if (!relatedEntityId.isNullOrBlank()) "📋 طلب خدمة: #$shortId" to Color(0xFF64748B) else (null to Color.Transparent)
+            val contextText = when (relatedEntityType) {
+                "BOOKING" -> "🗓️ خاص بحجز: #$shortId"
+                "URGENT_REQUEST" -> "🚨 خاص بطلب عاجل: #$shortId"
+                "SUPPORT" -> "🛠️ تذكرة دعم: #$shortId"
+                else -> if (!relatedEntityId.isNullOrBlank()) "📋 خاص بطلب: #$shortId" else null
             }
 
             if (contextText != null) {
                 Surface(
-                    color = badgeColor.copy(alpha = 0.12f),
+                    color = Color.Red.copy(alpha = 0.12f),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Row(
+                    Text(
+                        text = contextText,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFFF5252), // Bright Red
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 14.dp, vertical = 5.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(6.dp)
-                                .background(badgeColor, CircleShape)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = contextText,
-                            fontSize = 11.5.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = badgeColor,
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
+                            .padding(horizontal = 14.dp, vertical = 4.dp)
+                    )
                 }
             }
         }

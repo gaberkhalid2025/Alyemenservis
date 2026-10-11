@@ -419,50 +419,61 @@ fun StoreItemCard(
                     Surface(
                         shape = RoundedCornerShape(8.dp),
                         color = themeColors.accent,
-                        shadowElevation = 2.dp,
+                        shadowElevation = 3.dp,
                         modifier = Modifier
                             .weight(1f)
                             .height(29.dp)
                             .clickable { onClick() }
                     ) {
-                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                            Text("التفاصيل 📋", fontSize = 9.sp, color = Color.Black, fontWeight = FontWeight.Bold)
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(
+                                    Brush.verticalGradient(
+                                        listOf(Color.White.copy(alpha = 0.25f), Color.Transparent)
+                                    )
+                                )
+                        ) {
+                            Text("التفاصيل 📋", fontSize = 9.5.sp, color = Color.Black, fontWeight = FontWeight.Bold)
                         }
                     }
 
-                    // Button 2: Instant Chat (دائماً يفتح المحادثة الفورية مع المتجر)
+                    // Button 2: Call or Chat
+                    val hasPhone = store.phone.isNotBlank()
+                    val actionBg = if (hasPhone) Color(0xFF10B981) else themeColors.primary
                     Surface(
                         shape = RoundedCornerShape(8.dp),
-                        color = themeColors.primary,
-                        shadowElevation = 2.dp,
+                        color = actionBg,
+                        shadowElevation = 3.dp,
                         modifier = Modifier
-                            .weight(1.1f)
+                            .weight(1f)
                             .height(29.dp)
-                            .clickable { onChatClick() }
-                    ) {
-                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                            Text("محادثة 💬", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-
-                    // Button 3: Direct Phone Call (إن وجد رقم هاتف)
-                    val hasPhone = store.phone.isNotBlank()
-                    if (hasPhone) {
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = Color(0xFF10B981),
-                            shadowElevation = 2.dp,
-                            modifier = Modifier
-                                .weight(0.9f)
-                                .height(29.dp)
-                                .clickable {
+                            .clickable {
+                                if (hasPhone) {
                                     val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${store.phone}"))
                                     context.startActivity(intent)
+                                } else {
+                                    onChatClick()
                                 }
-                        ) {
-                            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                                Text("اتصال 📞", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
                             }
+                    ) {
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(
+                                    Brush.verticalGradient(
+                                        listOf(Color.White.copy(alpha = 0.25f), Color.Transparent)
+                                    )
+                                )
+                        ) {
+                            Text(
+                                text = if (hasPhone) "اتصال 📞" else "محادثة 💬",
+                                color = Color.White,
+                                fontSize = 9.5.sp,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
                     }
                 }

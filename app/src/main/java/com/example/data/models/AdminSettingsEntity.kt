@@ -97,9 +97,6 @@ data class AdminSettingsEntity(
     // Assistant controls
     val isAssistantEnabled: Boolean = true,
     val isAssistantIconVisible: Boolean = true,
-    val selectedAiEngine: String = "OFFLINE_YEMEN_AI", // "OFFLINE_YEMEN_AI", "GEMINI_FREE_FLASH", "CUSTOM_API_KEY_MODEL"
-    val customAiApiKey: String = "",
-    val customAiModelName: String = "gemini-2.5-flash",
 
     // Card dimensions styles
     val coverHeight: Int = 0,
