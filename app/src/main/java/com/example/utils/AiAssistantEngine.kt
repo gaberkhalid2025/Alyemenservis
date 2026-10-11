@@ -45,17 +45,6 @@ data class TroubleshootingGuide(
  */
 class AiAssistantEngine(private val context: Context) {
 
-    companion object {
-        @Volatile
-        private var instance: AiAssistantEngine? = null
-
-        fun getInstance(context: Context): AiAssistantEngine {
-            return instance ?: synchronized(this) {
-                instance ?: AiAssistantEngine(context.applicationContext).also { instance = it }
-            }
-        }
-    }
-
     private val guidesList = mutableListOf<TroubleshootingGuide>()
     private val faqList = mutableListOf<Pair<List<String>, String>>()
     private val queryCache = ConcurrentHashMap<String, AiResponse>()
@@ -267,138 +256,60 @@ class AiAssistantEngine(private val context: Context) {
                 estimatedCost = "4,000 - 9,000 ريال يمني"
             )
         )
-
-        guidesList.add(
-            TroubleshootingGuide(
-                id = "refrigerator_freezer_repair",
-                category = "ثلاجات وتبريد",
-                keywords = listOf("ثلاجة", "ثلاجه", "فريزر", "تبريد الثلاجة", "الثلاجة ما تبردش", "تثلج", "تسريب فريون الثلاجة", "موتور الثلاجة", "تنزل ماء"),
-                title = "🧊 تشخيص أعطال الثلاجات والفريزرات المنزلية",
-                diySteps = listOf(
-                    "تأكد من ضبط مؤشر التبريد (الثرموستات) على الدرجة المناسبة (3-4 في الصيف و2 في الشتاء).",
-                    "افحص جوان (كاوتشوك) الباب وتأكد من إحكام إغلاقه وعدم تسريب الهواء البارد.",
-                    "نظف شبكة المكثف الخلفية من الغبار المتراكم لضمان كفاءة تبادل الحرارة.",
-                    "في حال تراكم الثلج في الفريزر وضعف التبريد في الكابينة السفلية، افحص سخان إذابة الثلج (Defrost Heater) ومروحة الهواء."
-                ),
-                preventiveTips = "تجنب وضع أطعمة ساخنة مباشرة داخل الثلاجة واترك مسافة 10 سم بين ظهر الثلاجة والجدار.",
-                referralAction = "CREATE_SERVICE_ORDER",
-                suggestedCategory = "صيانة أجهزة منزلية",
-                chipLabel = "❄️ طلب فني صيانة ثلاجات",
-                estimatedCost = "4,000 - 10,000 ريال يمني"
-            )
-        )
-
-        guidesList.add(
-            TroubleshootingGuide(
-                id = "inverter_fault_codes_solar",
-                category = "طاقة شمسية وانفرترات",
-                keywords = listOf("كود انفرتر", "كود خطأ", "انفرتر يصفر", "fault 04", "fault 05", "fault 52", "fault 01", "بطارية هابطة", "انخفاض الفولت", "شاحن شمسي", "mppt"),
-                title = "⚡ دليل أكواد أخطاء الإنفرترات والمنظومات الشمسية",
-                diySteps = listOf(
-                    "كود 04 / Low Battery: انخفاض فولتية البطاريات إلى حد الفصل؛ افصل الأحمال فوراً ودع الألواح تعيد الشحن.",
-                    "كود 05 / Overload: زيادة الحمل عن طاقة الإنفرتر؛ افصل الأجهزة الثقيلة (مكواة، غسالة، مضخة) وأعد تشغيله.",
-                    "كود 01 / Fan Fault: عطل أو توقف مروحة التبريد؛ نظف فتحات التهوية من الغبار وتأكد من دوران المروحة.",
-                    "كود 52 / Bus Voltage Low: خلل في دائرة الفولتية الداخلية أو ضعف كبير في ألواح الطاقة."
-                ),
-                preventiveTips = "احرص على تنظيف ألواح الطاقة الشمسية دورياً وفحص أقطاب البطاريات من التأكسد.",
-                referralAction = "CREATE_SERVICE_ORDER",
-                suggestedCategory = "طاقة شمسية",
-                chipLabel = "⚡ طلب مهندس طاقة شمسية",
-                estimatedCost = "3,500 - 8,000 ريال يمني"
-            )
-        )
-
-        guidesList.add(
-            TroubleshootingGuide(
-                id = "gas_stove_cylinder_leak",
-                category = "غاز ومطابخ",
-                keywords = listOf("غاز", "دبة غاز", "اسطوانة غاز", "تسريب غاز", "ريحة غاز", "فرن", "بوتجاز", "منظم الغاز", "عين البوتجاز"),
-                title = "🔥 طوارئ تسريب أسطوانات الغاز والأفران",
-                diySteps = listOf(
-                    "🚨 عند شم رائحة غاز: لا تشعل أي نار ولا تلمس مفاتيح الكهرباء إطلاقاً وافتح النوافذ فوراً للتهوية.",
-                    "أغلق صمام منظم الأسطوانة فوراً وأخرج الأسطوانة لمكان مفتوح إن أمكن.",
-                    "لاختبار مكان التسريب: استخدم إسفنجة مبللة بالماء والصابون على الوصلات والمنظم؛ ظهور فقاعات يدل على مكان التسريب.",
-                    "استبدل الخرطوم التالف أو الجلبة المطاطية (الواشر) فوراً ولا تستخدم خراطيم غير مخصصة للغاز."
-                ),
-                preventiveTips = "استبدل خرطوم الغسالة والمنظم كل سنتين واستخدم واشر نحاسي أو مطاطي أصلي.",
-                referralAction = "CREATE_SERVICE_ORDER",
-                suggestedCategory = "صيانة منزلية",
-                chipLabel = "🛠️ طلب فني صيانة أفران وغاز",
-                estimatedCost = "2,000 - 5,000 ريال يمني"
-            )
-        )
-
-        guidesList.add(
-            TroubleshootingGuide(
-                id = "roof_leak_waterproofing",
-                category = "عزل ودهانات",
-                keywords = listOf("تسريب السطح", "عزل مائي", "مروان", "قطران", "تقشير الدهان", "رطوبة الجدار", "نشع ماء", "دهان", "معجون"),
-                title = "🏠 معالجة تسريب مياه الأمطار وعزل الأسطح والرطوبة",
-                diySteps = listOf(
-                    "افحص ميازيب السطح ومجارير التصريف وتأكد من خلوها من الأتربة والشوائب.",
-                    "حدد الشروخ والتشققات في صبة السطح وقم بتنظيفها وتعبئتها بمعجون إيبوكسي أو أسمنت مقاوم.",
-                    "قم بطلاء السطح بطبقتين من العازل المطاطي (المروان أو الأكريليك المقاوم للشمس) مع شاش فايبر.",
-                    "للجدران الداخلية المصابة بالرطوبة: قشر الدهان القديم ورش مانع رطوبة قبل إعادة التأسيس والمعجون."
-                ),
-                preventiveTips = "ينصح بتجديد فحص عوازل الأسطح سنوياً قبل حلول موسم الأمطار.",
-                referralAction = "CREATE_SERVICE_ORDER",
-                suggestedCategory = "صيانة وترميم",
-                chipLabel = "🏗️ طلب مقاول عوازل وتشطيب",
-                estimatedCost = "6,000 - 18,000 ريال يمني"
-            )
-        )
     }
 
     /**
-     * معالجة الاستعلام وفهم السياق ولهجات اليمن فوري (Synchronous & Blazing Fast)
+     * معالجة الاستعلام وفهم السياق ولهجات اليمن مع دعم الكاشينج
      */
-    fun queryAssistantSync(
+    suspend fun queryAssistant(
         prompt: String,
-        currentCity: String = "صنعاء"
-    ): AiResponse {
-        val queryTrimmed = prompt.trim()
-        val queryLower = queryTrimmed.lowercase(Locale.getDefault())
+        currentCity: String = "صنعاء",
+        isOnlineAvailable: Boolean = false,
+        onResult: (AiResponse) -> Unit
+    ) {
+        val queryLower = prompt.trim().lowercase(Locale.getDefault())
 
-        if (queryLower.isBlank()) {
-            return AiResponse(
-                title = "مساعد دليل خدمات اليمن الذكي 🇾🇪",
-                message = "يا حيا ومسهلا بك! أنا مساعدك الذكي المدمج والمجاني بالكامل، أعمل معك على مدار الساعة حتى بدون نت للإجابة على كافة الاستفسارات، حل المشاكل، وطلب الفنيين.",
-                chipLabel = "🛠️ طلب خدمة جديدة",
-                referralAction = "CREATE_SERVICE_ORDER"
-            )
+        synchronized(queryCache) {
+            if (queryCache.size > 100) {
+                val keysToRemove = queryCache.keys.take(queryCache.size - 100)
+                keysToRemove.forEach { queryCache.remove(it) }
+            }
         }
 
-        // 1. Check in-memory cache safely
-        queryCache[queryLower]?.let { return it }
+        if (queryLower.isBlank()) {
+            onResult(
+                AiResponse(
+                    title = "مساعد دليل خدمات اليمن الذكي 🇾🇪",
+                    message = "حياك الله! أنا مساعدك الشخصي للبحث عن الفنيين، المحلات، العقارات، حل الأعطال، والاستعلام عن طلباتك.",
+                    chipLabel = "🛠️ طلب خدمة جديدة",
+                    referralAction = "CREATE_SERVICE_ORDER"
+                )
+            )
+            return
+        }
 
-        // 2. التحقق من استعلامات الحجوزات والطلبات
+        // Check in-memory cache safely
+        queryCache[queryLower]?.let { cachedResponse ->
+            onResult(cachedResponse)
+            return
+        }
+
+        // الاستعلام عن الحجوزات والطلبات السابقة
         if (queryLower.contains("حجز") || queryLower.contains("طلباتي") || queryLower.contains("حالة الطلب") || queryLower.contains("حجوزاتي") || queryLower.contains("وين وصل طلبي")) {
             val resp = AiResponse(
                 title = "📋 الاستعلام عن حالة الحجوزات والطلبات",
-                message = "يمكنك متابعة حالة جميع طلباتك وحجوزاتك الحية ومعرفة هل قبلها الفني أو هل هو في الطريق إليك عبر شاشة الحجوزات المباشرة.",
+                message = "يمكنك متابعة حالة جميع حجوزاتك وطلباتك المباشرة ومعرفة هل تم قبولها أو وصول الفني إليك من خلال شاشة الحجوزات.",
                 chipLabel = "📋 فتح سجل حجوزاتي الآن",
                 referralAction = "CHECK_BOOKINGS",
                 deepLinkRoute = "bookings_screen",
                 isOfflineMode = true
             )
             queryCache[queryLower] = resp
-            return resp
+            onResult(resp)
+            return
         }
 
-        // 3. أرقام الطوارئ في اليمن
-        if (queryLower.contains("طوارئ") || queryLower.contains("اسعاف") || queryLower.contains("دفاع مدني") || queryLower.contains("حريق") || queryLower.contains("نجده")) {
-            val resp = AiResponse(
-                title = "🚨 أرقام الطوارئ العامة الحيوية في اليمن",
-                message = "• الدفاع المدني والإطفاء: *191*\n• طوارئ المياه والصرف الصحي: *192*\n• طوارئ الكهرباء: *195*\n• الهلال الأحمر والإسعاف: *199*\n\nيرجى الاتصال المباشر بهذه الأرقام المجانية فوراً في الحالات الحرجة!",
-                chipLabel = "🚨 اتصال بالطوارئ",
-                referralAction = "CREATE_SERVICE_ORDER",
-                isOfflineMode = true
-            )
-            queryCache[queryLower] = resp
-            return resp
-        }
-
-        // 4. المطابقة الذكية مع أدلة الصيانة والمصطلحات اليمنية
+        // المطابقة الذكية مع أدلة الصيانة والمصطلحات
         var bestGuideMatch: TroubleshootingGuide? = null
         var maxScore = 0
 
@@ -407,8 +318,8 @@ class AiAssistantEngine(private val context: Context) {
             for (kw in guide.keywords) {
                 val kwLower = kw.lowercase(Locale.getDefault())
                 if (queryLower.contains(kwLower)) {
-                    matchCount += 4
-                } else if (fastLevenshtein(queryLower, kwLower) <= 2) {
+                    matchCount += 3
+                } else if (levenshteinDistance(queryLower, kwLower) <= 2) {
                     matchCount += 1
                 }
             }
@@ -422,7 +333,7 @@ class AiAssistantEngine(private val context: Context) {
             val costText = if (bestGuideMatch.estimatedCost.isNotBlank()) " | التكلفة التقديرية: ${bestGuideMatch.estimatedCost}" else ""
             val resp = AiResponse(
                 title = bestGuideMatch.title,
-                message = "إليك خطوات فحص وإصلاح سريعة ومجربة (DIY)$costText:",
+                message = "إليك خطوات فحص وصيانة سريعة ومجربة (DIY)$costText:",
                 diySteps = bestGuideMatch.diySteps,
                 preventiveTips = bestGuideMatch.preventiveTips.ifEmpty { null },
                 chipLabel = bestGuideMatch.chipLabel,
@@ -433,10 +344,11 @@ class AiAssistantEngine(private val context: Context) {
                 estimatedCost = bestGuideMatch.estimatedCost
             )
             queryCache[queryLower] = resp
-            return resp
+            onResult(resp)
+            return
         }
 
-        // 5. فحص الأسئلة الشائعة
+        // فحص الأسئلة الشائعة
         for ((kwList, answer) in faqList) {
             if (kwList.any { queryLower.contains(it.lowercase(Locale.getDefault())) }) {
                 val resp = AiResponse(
@@ -448,124 +360,43 @@ class AiAssistantEngine(private val context: Context) {
                     isOfflineMode = true
                 )
                 queryCache[queryLower] = resp
-                return resp
+                onResult(resp)
+                return
             }
         }
 
-        // 6. التحقق من المصطلحات واللهجات والأسئلة الشائعة اليمنية
-        val yemeniResp = handleYemeniDialectAndCulture(queryLower, queryTrimmed, currentCity)
-        if (yemeniResp != null) {
-            queryCache[queryLower] = yemeniResp
-            return yemeniResp
-        }
-
-        // 7. الرد الافتراضي الذكي الشامل
+        // الرد الافتراضي الذكي
         val defaultResp = AiResponse(
-            title = "المساعد الذكي لدليل اليمن 🇾🇪",
-            message = "يا حيا ومسهلا بك! استفسارك واضح: \"$prompt\".\n\nأنا جاهز لخدمتك فوراً في أي من المجالات التالية:\n• ⚡ طلب فني صيانة معتمد في $currentCity (سباكة، كهرباء، طاقة شمسية، تكييف، غسالات، سيارات).\n• 🏪 تصفح المحلات، المطاعم، والمراكز الطبية القريبة منك.\n• 🗺️ فتح الخريطة والرادار لاكتشاف الخدمات بدون إنترنت.\n\n💡 اكتب طلبك بالتفصيل أو اضغط الزر أدناه لإرسال طلب فوري!",
-            chipLabel = "⚡ اطلب فني الآن",
+            title = "المساعد الذكي 🇾🇪",
+            message = "فهمت استفسارك بخصوص: \"$prompt\" في مدينة $currentCity. يمكنك طلب فني معتمد أو البحث عبر الخريطة التفاعلية لاكتشاف أقرب مزودي الخدمات فوراً.",
+            chipLabel = "🛠️ إنشاء طلب لهذه المشكلة الآن",
             referralAction = "CREATE_SERVICE_ORDER",
             deepLinkRoute = "urgent_request_create",
             isOfflineMode = true
         )
         queryCache[queryLower] = defaultResp
-        return defaultResp
+        onResult(defaultResp)
     }
 
-    private fun handleYemeniDialectAndCulture(queryLower: String, prompt: String, currentCity: String): AiResponse? {
-        val isGreeting = queryLower.contains("يا حيا") || queryLower.contains("حياك") || queryLower.contains("حياكم") ||
-                queryLower.contains("كيفك") || queryLower.contains("كيف حالك") || queryLower.contains("ارحب") ||
-                queryLower.contains("مرحبا") || queryLower.contains("السلام عليكم") || queryLower.contains("هلا") ||
-                queryLower.contains("صبحك") || queryLower.contains("مسيك")
-
-        if (isGreeting) {
-            return AiResponse(
-                title = "يا حيا ومسهلا بأهل اليمن 🇾🇪",
-                message = "يا أهلاً وسهلاً بك وبأصلك الطيب! أرحب تراحيب السيل. أنا مساعدك الذكي اليمني، رفيقك في حل أي عطل منزلي والوصول لأفضل الفنيين والمحلات في كل محافظات اليمن. كيف أخدمك اليوم؟",
-                chipLabel = "🛠️ طلب خدمة جديدة",
-                referralAction = "CREATE_SERVICE_ORDER",
-                isOfflineMode = true
-            )
-        }
-
-        if (queryLower.contains("ما بش ماء") || queryLower.contains("ما به ماء") || queryLower.contains("انقطع الماء") || queryLower.contains("الخزان فاضي")) {
-            return AiResponse(
-                title = "💧 حلول مشكلة انقطاع المياه في المنزل",
-                message = "• تأكد أولاً من عمل الدينمو/الماطور ووصول التيار الكهربائي إليه.\n• قم بتنفيس الدينمو من برغي الهواء العلوي في حال سماع صوت دوران بدون رفع ماء.\n• افحص عوامة الخزان الأرضي والعلوي للتأكد من عدم تعليق السكر أو المحبس.\n• يمكنك طلب صهريج (وايت ماء) أو سباك معتمد فوراً لمعاينة الشبكة وتوصيل الخطوط.",
-                chipLabel = "🛠️ طلب سباك معتمد",
-                referralAction = "CREATE_SERVICE_ORDER",
-                suggestedCategory = "سباكة",
-                isOfflineMode = true,
-                estimatedCost = "3,000 - 6,000 ريال يمني"
-            )
-        }
-
-        if (queryLower.contains("سلتة") || queryLower.contains("فحسة") || queryLower.contains("زربيان") || queryLower.contains("مندي") || queryLower.contains("شاهي عدني") || queryLower.contains("مطاعم")) {
-            return AiResponse(
-                title = "🍲 المأكولات والمطاعم اليمنية الشهيرة",
-                message = "أصل الكرم واللذاذة اليمنية! تتوفر في الدليل أفضل المطاعم الشعبية والمميزة لتقديم السلتة الصنعانية الحارة، الفحسة باللحم البلدي، الزربيان العدني الأصيل، المندي والمظبي، والشاهي العدني الملبن بالهيل.\n\nتصفح قسم المطاعم والكافيهات بالدليل لمشاهدة القوائم والأسعار وأرقام التوصيل المباشر!",
-                chipLabel = "🍽️ تصفح المطاعم القريبة",
-                referralAction = "EXPLORE_STORES",
-                isOfflineMode = true
-            )
-        }
-
-        if (queryLower.contains("صنعاء القديمة") || queryLower.contains("باب اليمن") || queryLower.contains("دار الحجر") || queryLower.contains("قلعة القاهرة") || queryLower.contains("المعلا") || queryLower.contains("كريتر") || queryLower.contains("شبام")) {
-            return AiResponse(
-                title = "🏛️ عبق التاريخ والمعالم اليمنية الخالدة",
-                message = "اليمن موطن الحضارات وأول ناطحات سحاب طينية في العالم (شبام حضرموت)، وصنعاء القديمة بتراثها المعماري الفريد ونوافذ القمريات البديعة، وباب اليمن الشامخ، وقلعة القاهرة بتعز الحالمة، وصيرة والمعلا في ثغر اليمن الباسم (عدن). دليلنا يغطي كل هذه المدن العريقة ليخدم أهلها بكل فخر!",
-                chipLabel = "🗺️ استكشف الخريطة",
-                referralAction = "EXPLORE_MAP",
-                isOfflineMode = true
-            )
-        }
-
-        if (queryLower.contains("اسعار") || queryLower.contains("كم يكلف") || queryLower.contains("تسعيرة") || queryLower.contains("اجور")) {
-            return AiResponse(
-                title = "💰 قائمة الأسعار الاسترشادية للصيانة في اليمن",
-                message = "• معاينة سباكة / كهرباء: *2,500 - 4,000 ريال يمني*\n• صيانة دينمو أو ماطور ماء: *3,000 - 6,000 ريال يمني*\n• شحن فريون وصيانة مكيف: *5,000 - 10,000 ريال يمني*\n• صيانة غسالة أو ثلاجة: *4,000 - 8,000 ريال يمني*\n• فحص وبرمجة منظومة طاقة شمسية: *4,000 - 8,000 ريال يمني*\n• رقعة بنشر واشتراك بطارية: *1,500 - 3,500 ريال يمني*\n\nالأسعار استرشادية لضمان الشفافية وحمايتك من الاستغلال، والاتفاق النهائي يتم بالتراضي مع الفني.",
-                chipLabel = "⚡ طلب فني بالتسعيرة العادلة",
-                referralAction = "CREATE_SERVICE_ORDER",
-                isOfflineMode = true
-            )
-        }
-
-        return null
-    }
-
-    /**
-     * معالجة الاستعلام وفهم السياق ولهجات اليمن مع دعم الكاشينج
-     */
-    suspend fun queryAssistant(
-        prompt: String,
-        currentCity: String = "صنعاء",
-        isOnlineAvailable: Boolean = false,
-        onResult: (AiResponse) -> Unit
-    ) {
-        val resp = queryAssistantSync(prompt, currentCity)
-        onResult(resp)
-    }
-
-    private fun fastLevenshtein(lhs: CharSequence, rhs: CharSequence): Int {
+    private suspend fun levenshteinDistance(lhs: CharSequence, rhs: CharSequence): Int = withContext(Dispatchers.Default) {
         val lhsLength = lhs.length
         val rhsLength = rhs.length
-        if (lhsLength == 0) return rhsLength
-        if (rhsLength == 0) return lhsLength
-        if (kotlin.math.abs(lhsLength - rhsLength) > 3) return 99
-
-        var prev = IntArray(lhsLength + 1) { it }
-        var curr = IntArray(lhsLength + 1)
+        var cost = IntArray(lhsLength + 1) { it }
+        var newCost = IntArray(lhsLength + 1) { 0 }
 
         for (i in 1..rhsLength) {
-            curr[0] = i
+            newCost[0] = i
             for (j in 1..lhsLength) {
                 val match = if (lhs[j - 1] == rhs[i - 1]) 0 else 1
-                curr[j] = min(min(prev[j] + 1, curr[j - 1] + 1), prev[j - 1] + match)
+                val costReplace = cost[j - 1] + match
+                val costInsert = cost[j] + 1
+                val costDelete = newCost[j - 1] + 1
+                newCost[j] = min(min(costInsert, costDelete), costReplace)
             }
-            val temp = prev
-            prev = curr
-            curr = temp
+            val swap = cost
+            cost = newCost
+            newCost = swap
         }
-        return prev[lhsLength]
+        cost[lhsLength]
     }
 }
