@@ -86,20 +86,23 @@ service firebase.storage {
                       isAllowedImageType();
     }
 
-    // 2. وسائط المحادثات والشات (/chat/{channelId}/{type}/{fileName} أو /chats/...)
-    match /chat/{channelId}/{type}/{fileName} {
-      allow read: if isAuthenticated();
+    // 2. وسائط المحادثات والشات (/chat/{channelId}/{allPaths=**} و /chats/{channelId}/{allPaths=**})
+    match /chat/{channelId}/{allPaths=**} {
+      allow read: if true;
       allow write: if isAuthenticated() &&
                       isValidMediaSize() &&
-                      isSafeFileName(fileName) &&
-                      (isAllowedImageType() || isAllowedAudioType() || isAllowedDocType());
+                      (request.resource.contentType.matches('image/.*') || 
+                       request.resource.contentType.matches('audio/.*') || 
+                       request.resource.contentType.matches('application/.*'));
     }
-    match /chats/{channelId}/{type}/{fileName} {
-      allow read: if isAuthenticated();
+
+    match /chats/{channelId}/{allPaths=**} {
+      allow read: if true;
       allow write: if isAuthenticated() &&
                       isValidMediaSize() &&
-                      isSafeFileName(fileName) &&
-                      (isAllowedImageType() || isAllowedAudioType() || isAllowedDocType());
+                      (request.resource.contentType.matches('image/.*') || 
+                       request.resource.contentType.matches('audio/.*') || 
+                       request.resource.contentType.matches('application/.*'));
     }
 
     // 3. وسائط مزودي الخدمات والفنيين (/providers/{providerId}/{fileName})
