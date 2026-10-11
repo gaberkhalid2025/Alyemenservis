@@ -414,52 +414,44 @@ fun PropertyCard(
                     Surface(
                         shape = RoundedCornerShape(8.dp),
                         color = themeColors.accent,
-                        shadowElevation = 3.dp,
+                        shadowElevation = 2.dp,
                         modifier = Modifier
                             .weight(1f)
                             .height(29.dp)
                             .clickable { onClick() }
                     ) {
-                        Box(
-                            contentAlignment = Alignment.Center,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(
-                                    Brush.verticalGradient(
-                                        listOf(Color.White.copy(alpha = 0.25f), Color.Transparent)
-                                    )
-                                )
-                        ) {
-                            Text("التفاصيل 📋", fontSize = 9.5.sp, color = Color.Black, fontWeight = FontWeight.Bold)
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                            Text("التفاصيل 📋", fontSize = 9.sp, color = Color.Black, fontWeight = FontWeight.Bold)
                         }
                     }
 
-                    // Button 2: Request Inspection
+                    // Button 2: Instant Chat
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = themeColors.primary,
+                        shadowElevation = 2.dp,
+                        modifier = Modifier
+                            .weight(1.1f)
+                            .height(29.dp)
+                            .clickable { onChatClick() }
+                    ) {
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                            Text("محادثة 💬", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+
+                    // Button 3: Request Inspection
                     Surface(
                         shape = RoundedCornerShape(8.dp),
                         color = Color(0xFF10B981),
-                        shadowElevation = 3.dp,
+                        shadowElevation = 2.dp,
                         modifier = Modifier
                             .weight(1f)
                             .height(29.dp)
                             .clickable { onRequestInspectionClick() }
                     ) {
-                        Box(
-                            contentAlignment = Alignment.Center,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(
-                                    Brush.verticalGradient(
-                                        listOf(Color.White.copy(alpha = 0.25f), Color.Transparent)
-                                    )
-                                )
-                        ) {
-                            Text(
-                                text = "معاينة 👁️",
-                                color = Color.White,
-                                fontSize = 9.5.sp,
-                                fontWeight = FontWeight.Bold
-                            )
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                            Text("معاينة 👁️", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }

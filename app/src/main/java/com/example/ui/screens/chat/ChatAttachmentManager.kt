@@ -68,7 +68,7 @@ class ChatAttachmentManager(private val context: Context) {
                 }
                 
                 val fileName = "${UUID.randomUUID()}_${System.currentTimeMillis()}.$extension"
-                val ref = storageRef.child("chats/$channelId/$type/$fileName")
+                val ref = storageRef.child("chat/$channelId/$type/$fileName")
 
                 android.util.Log.d("ChatAttachmentManager", "Uploading ${finalData.size / 1024} KB to Firebase...")
                 ref.putBytes(finalData).await()

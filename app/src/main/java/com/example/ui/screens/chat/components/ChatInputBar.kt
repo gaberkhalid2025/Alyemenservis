@@ -12,9 +12,11 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -82,6 +84,7 @@ fun ChatInputBar(
     var audioFile by remember { mutableStateOf<File?>(null) }
     var uploadProgress by remember { mutableStateOf<Float?>(null) }
     var showAttachmentMenu by remember { mutableStateOf(false) }
+    var showEmojiPicker by remember { mutableStateOf(false) }
 
     // Live audio amplitudes for real-time waveform
     val liveAmplitudes = remember { mutableStateListOf<Int>() }
@@ -682,6 +685,17 @@ fun ChatInputBar(
                             textInput = it
                         }
                     },
+                    leadingIcon = {
+                        IconButton(
+                            onClick = { showEmojiPicker = !showEmojiPicker },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Text(
+                                text = if (showEmojiPicker) "⌨️" else "😊",
+                                fontSize = 16.sp
+                            )
+                        }
+                    },
                     placeholder = { Text("اكتب رسالتك هنا...", color = textSecondary, fontSize = 13.sp) },
                     modifier = Modifier
                         .weight(1f)
@@ -706,6 +720,7 @@ fun ChatInputBar(
                                 onSendMessage(trimmed, MediaType.TEXT, "")
                             }
                             textInput = ""
+                            showEmojiPicker = false
                         }
                     })
                 )
@@ -723,6 +738,7 @@ fun ChatInputBar(
                                     onSendMessage(trimmed, MediaType.TEXT, "")
                                 }
                                 textInput = ""
+                                showEmojiPicker = false
                             }
                         },
                         modifier = Modifier
@@ -740,6 +756,82 @@ fun ChatInputBar(
                             .background(primaryColor, CircleShape)
                     ) {
                         Icon(ChatIcons.Mic, contentDescription = "تسجيل صوتي", tint = Color.White, modifier = Modifier.size(22.dp))
+                    }
+                }
+            }
+
+            // Telegram/Signal-Style Rich Emoji Tray
+            AnimatedVisibility(visible = showEmojiPicker) {
+                Surface(
+                    color = Color(0xFF1E293B),
+                    shape = RoundedCornerShape(16.dp),
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp)
+                ) {
+                    val emojiCategories = remember {
+                        listOf(
+                            listOf("😀", "😃", "😄", "😁", "😆", "😅", "😂", "🤣", "😊", "😇"),
+                            listOf("🙂", "🙃", "😉", "😌", "😍", "🥰", "😘", "😗", "😋", "😛"),
+                            listOf("👍", "👎", "👏", "🙌", "🤝", "🙏", "✌️", "🤞", "💪", "❤️"),
+                            listOf("🔥", "⭐", "🎉", "✨", "💯", "✅", "⚠️", "🚨", "⏳", "📌"),
+                            listOf("💼", "🛠️", "🔧", "🏪", "🏥", "🍕", "🚗", "🏠", "📍", "📞")
+                        )
+                    }
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 4.dp, vertical = 2.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "رموز تعبيرية وتفاعلات سريعة",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = accentColor
+                            )
+                            IconButton(
+                                onClick = { showEmojiPicker = false },
+                                modifier = Modifier.size(20.dp)
+                            ) {
+                                Icon(Icons.Default.Close, contentDescription = "إغلاق", tint = textSecondary, modifier = Modifier.size(14.dp))
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        emojiCategories.forEach { rowEmojis ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 2.dp),
+                                horizontalArrangement = Arrangement.SpaceEvenly
+                            ) {
+                                rowEmojis.forEach { emoji ->
+                                    Box(
+                                        modifier = Modifier
+                                            .size(34.dp)
+                                            .clip(CircleShape)
+                                            .clickable {
+                                                if (textInput.length + emoji.length <= ChatValidationUtils.MAX_TEXT_LENGTH) {
+                                                    textInput += emoji
+                                                }
+                                            },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(text = emoji, fontSize = 20.sp)
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }

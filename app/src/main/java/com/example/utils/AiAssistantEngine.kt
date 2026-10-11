@@ -378,7 +378,7 @@ class AiAssistantEngine(private val context: Context) {
         onResult(defaultResp)
     }
 
-    private suspend fun levenshteinDistance(lhs: CharSequence, rhs: CharSequence): Int = withContext(Dispatchers.Default) {
+    private fun levenshteinDistance(lhs: CharSequence, rhs: CharSequence): Int {
         val lhsLength = lhs.length
         val rhsLength = rhs.length
         var cost = IntArray(lhsLength + 1) { it }
@@ -397,6 +397,6 @@ class AiAssistantEngine(private val context: Context) {
             cost = newCost
             newCost = swap
         }
-        cost[lhsLength]
+        return cost[lhsLength]
     }
 }

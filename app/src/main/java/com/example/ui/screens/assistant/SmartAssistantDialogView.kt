@@ -317,9 +317,6 @@ fun SmartAssistantDialogView(
                                             isOnline = isOnline,
                                             mainViewModel = viewModel,
                                             settings = settings,
-                                            onSpeechSpeak = {
-                                                try { VoiceManager.onSpeak?.invoke(it) } catch (_: Exception) {}
-                                            },
                                             onError = { err ->
                                                 coroutineScope.launch { snackbarHostState.showSnackbar(err) }
                                             }

@@ -86,10 +86,16 @@ service firebase.storage {
                       isAllowedImageType();
     }
 
-    // 2. وسائط المحادثات والشات (/chat/{channelId}/{fileName})
-    match /chat/{channelId}/{fileName} {
+    // 2. وسائط المحادثات والشات (/chat/{channelId}/{type}/{fileName} أو /chats/...)
+    match /chat/{channelId}/{type}/{fileName} {
       allow read: if isAuthenticated();
-      // الرفع متاح للمصادقين مع فحص الحجم والنوع ومنع الملفات التنفيذية
+      allow write: if isAuthenticated() &&
+                      isValidMediaSize() &&
+                      isSafeFileName(fileName) &&
+                      (isAllowedImageType() || isAllowedAudioType() || isAllowedDocType());
+    }
+    match /chats/{channelId}/{type}/{fileName} {
+      allow read: if isAuthenticated();
       allow write: if isAuthenticated() &&
                       isValidMediaSize() &&
                       isSafeFileName(fileName) &&
