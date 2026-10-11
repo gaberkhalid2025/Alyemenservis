@@ -89,12 +89,8 @@ class AssistantViewModel : ViewModel() {
                 val providersList = mainViewModel.providers.value
                 val categoriesList = mainViewModel.categories.value
 
-                // اختيار محرك الذكاء الاصطناعي بناءً على إعدادات الأدمن (Admin Settings)
-                val responseMsg = if (settings.selectedAiEngine == "OFFLINE_YEMEN_AI") {
-                    // محرك الأوفلاين الذكي المجاني 100% (يعمل بدقة ومجاني تماماً حتى لعشرات آلاف المستخدمين وبدون أي مفاتيح أو تكلفة)
-                    val (localText, localEntities) = generateLocalOfflineResponse(cleanPrompt, mainViewModel)
-                    AssistantMessage(text = localText, isUser = false, matchedEntities = localEntities)
-                } else if (isOnline) {
+                // محاولة الاتصال بالذكاء التوليدي السريع مع الرجوع التلقائي والفوري للأوفلاين الذكي في حال البطء أو انقطاع النت
+                val responseMsg = if (isOnline) {
                     try {
                         val onlineResult = kotlinx.coroutines.withTimeoutOrNull(4000L) {
                             queryGeminiApiOrFallback(
@@ -184,16 +180,7 @@ class AssistantViewModel : ViewModel() {
         }.take(5)
 
         try {
-            val apiKey = if (settings.selectedAiEngine == "CUSTOM_API_KEY_MODEL" && settings.customAiApiKey.isNotBlank()) {
-                settings.customAiApiKey
-            } else {
-                BuildConfig.GEMINI_API_KEY
-            }
-            val modelName = if (settings.selectedAiEngine == "CUSTOM_API_KEY_MODEL" && settings.customAiModelName.isNotBlank()) {
-                settings.customAiModelName
-            } else {
-                "gemini-2.5-flash"
-            }
+            val apiKey = BuildConfig.GEMINI_API_KEY
             if (apiKey.isNotEmpty()) {
                 val mediaType = "application/json; charset=utf-8".toMediaType()
                 val ragList = if (matched.isNotEmpty()) matched else providersList.filter { it.isVip }.take(10)
@@ -210,7 +197,7 @@ class AssistantViewModel : ViewModel() {
                 val systemInstructionText = """
                     أنت 'المساعد الذكي لدليل خدمات اليمن 🇾🇪' - نموذج ذكاء اصطناعي فائق الذكاء، سريع ومجاني بالكامل، ينافس ويتفوق على أفضل النماذج العالمية (مثل كلود وديب سيك وجروك).
                     تتميز بالسمات الجوهرية التالية:
-                    1. تتقن وتتحدث بجميع اللهجات اليمنية الأصيلة (الصنعانية، العدنية، التعزية، الحضرمية، التهامية، الإبية، وغيرها) وتجمع بين الفصاحة الذكية والروح اليمنية الدافئة المضيافة ("يا حيا ومسهلا بك يا خبير", "أرحب تراحيب السيل", "أبشر بسعدك وعزك", "على عيني ورأسي يا غالي").
+                    1. تتقن وتتحدث بجميع اللهجات اليمنية الأصيلة (الصنعانية، العدنية، التعزية، الحضرمية، التهامية، الإبية، وغيرها) وتجمع بين الفصاحة الذكية والروح اليمنية الدافئة المضيافة ("يا حيا ومسهلا بك يا خبير"، "أرحب تراحيب السيل"، "أبشر بسعدك وعزك"، "على عيني ورأسي يا غالي").
                     2. خبير وموسوعة عملية في حل وتفصيل أعطال الصيانة المنزلية (الكهرباء، الطاقة الشمسية، الإنفرترات وأكواد الأعطال، البطاريات، الغسالات، السباكة ومواطير المياه، التكييف والتبريد، تسريب الغاز، بنشر وميكانيك السيارات، وعوازل الأمطار).
                     3. تقدم خطوات تشخيص وإصلاح ذاتية عملية خطوة بخطوة (DIY) مع نصائح الأمان والوقاية، وتذكر التكلفة التقديرية بالريال اليمني لكل خدمة.
                     4. خبير بالجغرافيا اليمنية والمعالم والمدن والأحياء والمطاعم والأكلات الشعبية التراثية (سلتة، فحسة، زربيان، مندي، شاي عدني...).
@@ -254,7 +241,7 @@ class AssistantViewModel : ViewModel() {
                 finalRequestJsonObj.put("generationConfig", genConfigObj)
 
                 val request = Request.Builder()
-                    .url("https://generativelanguage.googleapis.com/v1beta/models/$modelName:generateContent?key=$apiKey")
+                    .url("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$apiKey")
                     .post(RequestBody.create(mediaType, finalRequestJsonObj.toString()))
                     .build()
 
@@ -299,7 +286,7 @@ class AssistantViewModel : ViewModel() {
         val properties = viewModel.properties.value
         val categories = viewModel.categories.value
         val settings = viewModel.settings.value
-        val selectedCity = "صنعاء"
+        val selectedCity = viewModel.selectedCity.value.ifEmpty { "صنعاء" }
 
         val matchedEntities = mutableListOf<Any>()
 
