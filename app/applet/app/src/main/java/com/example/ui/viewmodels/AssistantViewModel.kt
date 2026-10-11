@@ -64,7 +64,6 @@ class AssistantViewModel : ViewModel() {
         isOnline: Boolean,
         mainViewModel: MainViewModel,
         settings: AdminSettingsEntity,
-        onSpeechSpeak: ((String) -> Unit)? = null,
         onError: ((String) -> Unit)? = null
     ) {
         if (prompt.isBlank() || _isGenerating.value) return
@@ -83,9 +82,6 @@ class AssistantViewModel : ViewModel() {
             viewModelScope.launch {
                 _chatHistory.value = _chatHistory.value + cached
                 _isGenerating.value = false
-                if (settings.allowTextToSpeechAssistant) {
-                    onSpeechSpeak?.invoke(cached.text)
-                }
             }
             return
         }
@@ -107,10 +103,6 @@ class AssistantViewModel : ViewModel() {
                     _chatHistory.value = updatedHistoryWithResp
                     _isGenerating.value = false
                     cacheResponse(prompt, responseMsg)
-
-                    if (settings.allowTextToSpeechAssistant) {
-                        onSpeechSpeak?.invoke(responseMsg.text)
-                    }
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
