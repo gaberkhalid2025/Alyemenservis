@@ -63,18 +63,8 @@ fun SmartAssistantDialogView(
     onNavigateToMap: () -> Unit = {}
 ) {
     val context = LocalContext.current
-    var isOnline by remember {
-        mutableStateOf(try { NetworkUtils.isNetworkAvailable(context) } catch (_: Exception) { true })
-    }
-
-    LaunchedEffect(Unit) {
-        while (true) {
-            val liveStatus = try { NetworkUtils.isNetworkAvailable(context) } catch (_: Exception) { false }
-            if (isOnline != liveStatus) {
-                isOnline = liveStatus
-            }
-            kotlinx.coroutines.delay(3000)
-        }
+    val isOnline = remember(context) {
+        try { NetworkUtils.isNetworkAvailable(context) } catch (_: Exception) { true }
     }
     val coroutineScope = rememberCoroutineScope()
     val listState = rememberLazyListState()
@@ -322,15 +312,11 @@ fun SmartAssistantDialogView(
                             onSend = {
                                 try {
                                     if (typedText.isNotBlank() && !isGenerating) {
-                                        val currentNet = try { NetworkUtils.isNetworkAvailable(context) } catch (_: Exception) { isOnline }
                                         assistantViewModel.sendUserQuery(
                                             prompt = typedText,
-                                            isOnline = currentNet,
+                                            isOnline = isOnline,
                                             mainViewModel = viewModel,
                                             settings = settings,
-                                            onSpeechSpeak = {
-                                                try { VoiceManager.onSpeak?.invoke(it) } catch (_: Exception) {}
-                                            },
                                             onError = { err ->
                                                 coroutineScope.launch { snackbarHostState.showSnackbar(err) }
                                             }
