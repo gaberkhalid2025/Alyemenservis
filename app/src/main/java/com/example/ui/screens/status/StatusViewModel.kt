@@ -10,6 +10,7 @@ import com.example.data.PendingProviderEntity
 import com.example.data.models.InstantRequestEntity
 import com.example.data.repositories.IStatusRepository
 import com.example.data.repositories.SystemStatusMetrics
+import com.example.domain.usecases.ApproveJoinRequestUseCase
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
@@ -56,7 +57,8 @@ sealed class StatusEvent {
  * Implements auto-refresh every 30 seconds and offline-first state handling.
  */
 class StatusViewModel(
-    private val statusRepository: IStatusRepository
+    private val statusRepository: IStatusRepository,
+    private val approveJoinRequestUseCase: ApproveJoinRequestUseCase = ApproveJoinRequestUseCase(statusRepository)
 ) : ViewModel() {
 
     companion object {
@@ -183,9 +185,9 @@ class StatusViewModel(
         }
     }
 
-    fun approveJoinRequest(request: PendingProviderEntity) {
+    fun approveJoinRequest(request: PendingProviderEntity, actorRole: String = "ADMIN") {
         viewModelScope.launch {
-            val result = statusRepository.approveJoinRequest(request)
+            val result = approveJoinRequestUseCase(request, actorRole)
             result.onSuccess {
                 _eventFlow.emit(StatusEvent.ShowSnackbar("✅ تم قبول طلب انضمام: ${request.name}"))
             }.onFailure { e ->
@@ -194,8 +196,12 @@ class StatusViewModel(
         }
     }
 
-    fun rejectJoinRequest(request: PendingProviderEntity, reason: String = "") {
+    fun rejectJoinRequest(request: PendingProviderEntity, reason: String = "", actorRole: String = "ADMIN") {
         viewModelScope.launch {
+            if (actorRole !in listOf("OWNER", "ADMIN", "SUPERVISOR")) {
+                _eventFlow.emit(StatusEvent.ShowToast("ليس لديك صلاحية لرفض طلبات الانضمام"))
+                return@launch
+            }
             val result = statusRepository.rejectJoinRequest(request, reason)
             result.onSuccess {
                 _eventFlow.emit(StatusEvent.ShowSnackbar("❌ تم رفض طلب انضمام: ${request.name}"))

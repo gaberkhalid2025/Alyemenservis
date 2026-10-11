@@ -86,8 +86,12 @@ fun MapScreenContent(
     val userLatState by viewModel.userLatitude.collectAsState()
     val userLngState by viewModel.userLongitude.collectAsState()
 
-    val safeUserLat = if (userLatState != 0.0 && !userLatState.isNaN()) userLatState else 15.3694
-    val safeUserLng = if (userLngState != 0.0 && !userLngState.isNaN()) userLngState else 44.1910
+    // إصلاح 1.1: عند عدم توفر GPS حقيقي نستخدم مركز المدينة المحددة حالياً بدلاً من إحداثيات ثابتة قديمة
+    val fallbackCityCoords = remember(state.selectedCity) {
+        OfflineMapManager.getCityCoordinates(state.selectedCity)
+    }
+    val safeUserLat = if (userLatState != 0.0 && !userLatState.isNaN()) userLatState else fallbackCityCoords.latitude
+    val safeUserLng = if (userLngState != 0.0 && !userLngState.isNaN()) userLngState else fallbackCityCoords.longitude
 
     // Location Permission launcher
     val locationPermissionLauncher = rememberLauncherForActivityResult(

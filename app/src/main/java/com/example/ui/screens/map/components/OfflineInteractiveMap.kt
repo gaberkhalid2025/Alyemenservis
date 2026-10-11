@@ -71,34 +71,20 @@ fun OfflineInteractiveMap(
     onSwitchToRadar: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
-    val safeUserLat = if (userCoords.first != 0.0 && !userCoords.first.isNaN()) userCoords.first else 15.3585
-    val safeUserLng = if (userCoords.second != 0.0 && !userCoords.second.isNaN()) userCoords.second else 44.1880
+    // إصلاح 1.1: استخدام إحداثيات المدينة المحددة كـ fallback ديناميكي إذا لم تتوفر إحداثيات GPS حقيقية
+    val defaultCityCoords = remember(selectedCity) {
+        com.example.ui.screens.map.utils.OfflineMapManager.getCityCoordinates(selectedCity)
+    }
+    val safeUserLat = if (userCoords.first != 0.0 && !userCoords.first.isNaN()) userCoords.first else defaultCityCoords.latitude
+    val safeUserLng = if (userCoords.second != 0.0 && !userCoords.second.isNaN()) userCoords.second else defaultCityCoords.longitude
 
-    // Compute governorate center coordinates dynamically
+    // Compute governorate center coordinates dynamically from accurate registry
     val cityCenterCoords = remember(selectedCity, safeUserLat, safeUserLng) {
-        when {
-            selectedCity.contains("صنعاء") -> Pair(15.3585, 44.1880)
-            selectedCity.contains("تعز") -> Pair(13.5789, 44.0195)
-            selectedCity.contains("عدن") -> Pair(12.7855, 45.0186)
-            selectedCity.contains("إب") -> Pair(13.9667, 44.1833)
-            selectedCity.contains("الحديدة") -> Pair(14.7978, 42.9545)
-            selectedCity.contains("حضرموت") || selectedCity.contains("المكلا") -> Pair(14.5425, 49.1242)
-            selectedCity.contains("ذمار") -> Pair(14.5427, 44.4051)
-            selectedCity.contains("مأرب") -> Pair(15.4628, 45.3258)
-            selectedCity.contains("لحج") -> Pair(13.0600, 44.8800)
-            selectedCity.contains("أبين") || selectedCity.contains("زنجبار") -> Pair(13.1287, 45.3800)
-            selectedCity.contains("شبوة") || selectedCity.contains("عتق") -> Pair(14.5377, 46.8319)
-            selectedCity.contains("المهرة") || selectedCity.contains("الغيضة") -> Pair(16.2081, 52.1764)
-            selectedCity.contains("سقطرى") -> Pair(12.4634, 53.8237)
-            selectedCity.contains("صعدة") -> Pair(16.9402, 43.7639)
-            selectedCity.contains("عمران") -> Pair(15.6499, 43.9442)
-            selectedCity.contains("حجة") -> Pair(15.6260, 43.6026)
-            selectedCity.contains("البيضاء") -> Pair(13.9852, 45.5727)
-            selectedCity.contains("الضالع") -> Pair(13.6957, 44.7314)
-            selectedCity.contains("الجوف") -> Pair(16.1436, 45.4878)
-            selectedCity.contains("المحويت") -> Pair(15.4701, 43.5448)
-            selectedCity.contains("ريمة") -> Pair(14.6191, 43.7144)
-            else -> Pair(safeUserLat, safeUserLng)
+        if (selectedCity == "الكل" || selectedCity.isBlank()) {
+            Pair(safeUserLat, safeUserLng)
+        } else {
+            val c = com.example.ui.screens.map.utils.OfflineMapManager.getCityCoordinates(selectedCity)
+            Pair(c.latitude, c.longitude)
         }
     }
 
@@ -1059,24 +1045,25 @@ private fun DrawScope.drawCityRoadGrid(
         setShadowLayer(5f, 1f, 1f, android.graphics.Color.BLACK)
     }
 
-    // Draw road polylines
+    // إصلاح القسم 2: تحسين سماكة الشوارع وظهور الأسماء حسب مستوى التكبير (zoomScale)
     roads.forEach { r ->
         val pts = r.points.map { geoToScreen(it.first, it.second) }
+        val zoomFactor = zoomScale.coerceIn(0.4f, 4.0f)
+        val outerW = if (r.isHighway) (8.0f * zoomFactor).coerceIn(4f, 24f) else (5.0f * zoomFactor).coerceIn(2.5f, 16f)
+        val innerW = if (r.isHighway) (outerW * 0.55f) else (outerW * 0.45f)
+        val oCol = if (r.isHighway) highwayOuterColor else streetOuterColor
+        val iCol = if (r.isHighway) highwayInnerColor else streetInnerColor
+
         for (i in 0 until pts.size - 1) {
             val p1 = pts[i]
             val p2 = pts[i + 1]
-
-            val outerW = if (r.isHighway) 9.0f else 6.0f
-            val innerW = if (r.isHighway) 4.5f else 2.5f
-            val oCol = if (r.isHighway) highwayOuterColor else streetOuterColor
-            val iCol = if (r.isHighway) highwayInnerColor else streetInnerColor
-
             drawLine(color = oCol, start = p1, end = p2, strokeWidth = outerW)
             drawLine(color = iCol, start = p1, end = p2, strokeWidth = innerW)
         }
 
-        // Draw road name at middle segment
-        if (pts.size >= 2) {
+        // Draw road name at middle segment with visibility adjusted for highways vs local streets
+        val shouldShowLabel = if (r.isHighway) zoomScale >= 0.45f else zoomScale >= 0.85f
+        if (shouldShowLabel && pts.size >= 2) {
             val midIdx = (pts.size - 1) / 2
             val midX = (pts[midIdx].x + pts[midIdx + 1].x) / 2f
             val midY = (pts[midIdx].y + pts[midIdx + 1].y) / 2f
