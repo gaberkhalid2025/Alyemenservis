@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item
-        android:width="66dp"
-        android:height="66dp"
-        android:drawable="@drawable/yemen_services_3d_icon_1790985337347"
+        android:width="72dp"
+        android:height="72dp"
+        android:drawable="@drawable/app_launcher_shield_icon_1791811768744"
         android:gravity="center" />
 </layer-list>
