@@ -1,10 +1,13 @@
-.gradle/
+-e .gradle/
 build/
 app/build/
+.gradle/
 .build-outputs/
-app-release.apk
-backup_altiqani_wam_14_8_10pm/
-*.jks
+app/google-services.json
+debug.keystore
+debug.keystore.base64
+*.zip
+errors.txt
 local.properties
-.DS_Store
-.env
+
+**/google-services.json
