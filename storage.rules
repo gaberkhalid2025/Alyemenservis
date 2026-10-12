@@ -86,33 +86,23 @@ service firebase.storage {
                       isAllowedImageType();
     }
 
-    // 2. وسائط المحادثات والشات (/chat/{channelId}/{fileName})
-    match /chat/{channelId}/{fileName} {
+    // 2. وسائط المحادثات والشات (/chat/{channelId}/{allPaths=**} و /chats/{channelId}/{allPaths=**})
+    match /chat/{channelId}/{allPaths=**} {
       allow read: if true;
-      allow write: if isValidMediaSize() &&
-                      isSafeFileName(fileName) &&
-                      (isAllowedImageType() || isAllowedAudioType() || isAllowedDocType() || request.resource.contentType == 'application/octet-stream');
+      allow write: if isAuthenticated() &&
+                      isValidMediaSize() &&
+                      (request.resource.contentType.matches('image/.*') || 
+                       request.resource.contentType.matches('audio/.*') || 
+                       request.resource.contentType.matches('application/.*'));
     }
 
-    match /chat/{channelId}/{type}/{fileName} {
+    match /chats/{channelId}/{allPaths=**} {
       allow read: if true;
-      allow write: if isValidMediaSize() &&
-                      isSafeFileName(fileName) &&
-                      (isAllowedImageType() || isAllowedAudioType() || isAllowedDocType() || request.resource.contentType == 'application/octet-stream');
-    }
-
-    match /chats/{channelId}/{fileName} {
-      allow read: if true;
-      allow write: if isValidMediaSize() &&
-                      isSafeFileName(fileName) &&
-                      (isAllowedImageType() || isAllowedAudioType() || isAllowedDocType() || request.resource.contentType == 'application/octet-stream');
-    }
-
-    match /chats/{channelId}/{type}/{fileName} {
-      allow read: if true;
-      allow write: if isValidMediaSize() &&
-                      isSafeFileName(fileName) &&
-                      (isAllowedImageType() || isAllowedAudioType() || isAllowedDocType() || request.resource.contentType == 'application/octet-stream');
+      allow write: if isAuthenticated() &&
+                      isValidMediaSize() &&
+                      (request.resource.contentType.matches('image/.*') || 
+                       request.resource.contentType.matches('audio/.*') || 
+                       request.resource.contentType.matches('application/.*'));
     }
 
     // 3. وسائط مزودي الخدمات والفنيين (/providers/{providerId}/{fileName})

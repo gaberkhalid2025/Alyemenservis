@@ -442,19 +442,15 @@ fun MainViewModel.registerGuestUser(
 }
 
 fun MainViewModel.toggleFavorite(id: String) {
-    try {
-        val current = _favoriteIds.value.toMutableSet()
-        if (current.contains(id)) {
-            current.remove(id)
-            triggerNotification("💔 تم إزالة العنصر من المفضلة")
-        } else {
-            current.add(id)
-            triggerNotification("💖 تم إضافة العنصر إلى المفضلة")
-        }
-        _favoriteIds.value = current
-    } catch (e: Exception) {
-        android.util.Log.e("MainViewModel", "❌ Error in toggleFavorite", e)
+    val current = _favoriteIds.value.toMutableSet()
+    if (current.contains(id)) {
+        current.remove(id)
+        triggerNotification("💔 تم إزالة العنصر من المفضلة")
+    } else {
+        current.add(id)
+        triggerNotification("💖 تم إضافة العنصر إلى المفضلة")
     }
+    _favoriteIds.value = current
 }
 
 fun MainViewModel.addSupervisor(name: String, role: String, passcode: String, permissions: List<String> = emptyList()) =

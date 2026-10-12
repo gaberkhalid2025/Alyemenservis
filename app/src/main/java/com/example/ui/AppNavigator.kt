@@ -154,13 +154,7 @@ fun AppNavigator(
                 AppScreens.STORES_VIEW -> StoresScreen(
                     viewModel = viewModel, 
                     themeColors = themeColors, 
-                    onStoreClick = { store ->
-                        viewModel.selectedStore = store
-                        viewModel.selectedProvider = null
-                        viewModel.selectedProperty = null
-                        viewModel.selectedJob = null
-                        viewModel.navigateToScreen(AppScreens.STORE_DETAILS)
-                    }, 
+                    onStoreClick = {}, 
                     onChatClick = { store ->
                         viewModel.openDirectChat(
                             targetUserId = store.id,
@@ -175,13 +169,7 @@ fun AppNavigator(
                 AppScreens.MEDICAL_VIEW -> MedicalCentersScreen(
                     viewModel = viewModel, 
                     themeColors = themeColors, 
-                    onMedicalCenterClick = { med ->
-                        viewModel.selectedProvider = med
-                        viewModel.selectedStore = null
-                        viewModel.selectedProperty = null
-                        viewModel.selectedJob = null
-                        viewModel.navigateToScreen(AppScreens.PROVIDER_DETAILS)
-                    }, 
+                    onMedicalCenterClick = {}, 
                     onChatClick = { med ->
                         viewModel.openDirectChat(
                             targetUserId = med.id,
@@ -196,13 +184,7 @@ fun AppNavigator(
                 AppScreens.RESTAURANTS_VIEW -> RestaurantsScreen(
                     viewModel = viewModel, 
                     themeColors = themeColors, 
-                    onRestaurantClick = { rest ->
-                        viewModel.selectedStore = rest
-                        viewModel.selectedProvider = null
-                        viewModel.selectedProperty = null
-                        viewModel.selectedJob = null
-                        viewModel.navigateToScreen(AppScreens.STORE_DETAILS)
-                    }, 
+                    onRestaurantClick = {}, 
                     onChatClick = { rest ->
                         viewModel.openDirectChat(
                             targetUserId = rest.id,
@@ -217,13 +199,7 @@ fun AppNavigator(
                 AppScreens.PROPERTIES_VIEW -> PropertiesScreen(
                     viewModel = viewModel, 
                     themeColors = themeColors, 
-                    onPropertyClick = { prop ->
-                        viewModel.selectedProperty = prop
-                        viewModel.selectedProvider = null
-                        viewModel.selectedStore = null
-                        viewModel.selectedJob = null
-                        viewModel.navigateToScreen(AppScreens.PROPERTY_DETAILS)
-                    }, 
+                    onPropertyClick = {}, 
                     onChatClick = { prop ->
                         viewModel.openDirectChat(
                             targetUserId = prop.id.ifBlank { prop.phone },
@@ -298,39 +274,7 @@ fun AppNavigator(
                     job = viewModel.selectedJob,
                     viewModel = viewModel,
                     themeColors = themeColors,
-                    onBackClick = { viewModel.navigateToScreen(AppScreens.USER_BROWSE) },
-                    onOpenChat = { channelId ->
-                        val store = viewModel.selectedStore
-                        val provider = viewModel.selectedProvider
-                        val prop = viewModel.selectedProperty
-                        when {
-                            store != null -> viewModel.openDirectChat(
-                                targetUserId = store.id,
-                                targetUserName = store.name,
-                                targetUserPhoto = store.logoImage.ifBlank { store.coverImage },
-                                relatedEntityId = store.id,
-                                relatedEntityType = "STORE"
-                            )
-                            provider != null -> viewModel.openDirectChat(
-                                targetUserId = provider.id.ifBlank { provider.phone },
-                                targetUserName = provider.name,
-                                targetUserPhoto = provider.profileImage,
-                                relatedEntityId = provider.id,
-                                relatedEntityType = "PROVIDER"
-                            )
-                            prop != null -> viewModel.openDirectChat(
-                                targetUserId = prop.id.ifBlank { prop.phone },
-                                targetUserName = prop.title,
-                                targetUserPhoto = prop.images.firstOrNull().orEmpty(),
-                                relatedEntityId = prop.id,
-                                relatedEntityType = "PROPERTY"
-                            )
-                            else -> {
-                                viewModel.targetChatChannelId = channelId
-                                viewModel.navigateToScreen(AppScreens.CHAT_DIRECT)
-                            }
-                        }
-                    }
+                    onBackClick = { viewModel.navigateToScreen(AppScreens.USER_BROWSE) }
                 )
                 AppScreens.BOOKINGS_VIEW -> BookingsScreenLayout(viewModel = viewModel, themeColors = themeColors)
                 AppScreens.INSTANT_REQUESTS_VIEW -> InstantRequestsScreen(viewModel = viewModel, themeColors = themeColors)

@@ -26,42 +26,20 @@ object ChatValidationUtils {
     )
 
     fun validateFile(uri: Uri, context: Context, isImage: Boolean): ValidationResult {
-        var mimeType = try { context.contentResolver.getType(uri) } catch (_: Exception) { null }
+        var mimeType = context.contentResolver.getType(uri)
         if (mimeType.isNullOrBlank()) {
-            val uriStr = uri.toString().lowercase()
-            val ext = when {
-                uriStr.endsWith(".m4a") -> "m4a"
-                uriStr.endsWith(".mp3") -> "mp3"
-                uriStr.endsWith(".aac") -> "aac"
-                uriStr.endsWith(".wav") -> "wav"
-                uriStr.endsWith(".ogg") -> "ogg"
-                uriStr.endsWith(".jpg") || uriStr.endsWith(".jpeg") -> "jpg"
-                uriStr.endsWith(".png") -> "png"
-                uriStr.endsWith(".webp") -> "webp"
-                else -> {
-                    val lastSeg = uri.lastPathSegment?.lowercase().orEmpty()
-                    if (lastSeg.contains(".")) lastSeg.substringAfterLast(".") else ""
-                }
-            }
-            if (ext.isNotBlank()) {
-                mimeType = android.webkit.MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext)
-            }
-            if (mimeType.isNullOrBlank()) {
-                mimeType = if (isImage) "image/jpeg" else "audio/m4a"
+            val extension = android.webkit.MimeTypeMap.getFileExtensionFromUrl(uri.toString())
+            if (extension.isNotBlank()) {
+                mimeType = android.webkit.MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension.lowercase())
             }
         }
 
         // 1. فحص نوع الملف (MIME Type)
-        val isSupported = mimeType.isNotBlank() && (
-            mimeType in allowedMimeTypes ||
-            mimeType.startsWith("image/") ||
-            mimeType.startsWith("audio/") ||
-            mimeType == "application/octet-stream"
-        )
+        val isSupported = mimeType != null && (mimeType in allowedMimeTypes || mimeType.startsWith("image/") || mimeType.startsWith("audio/"))
         if (!isSupported) {
             return ValidationResult(
                 isValid = false,
-                message = "⚠️ نوع الملف غير مدعوم حالياً."
+                message = "⚠️ نوع الملف ($mimeType) غير مدعوم حالياً."
             )
         }
 

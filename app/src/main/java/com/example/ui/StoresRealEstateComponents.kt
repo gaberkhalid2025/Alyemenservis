@@ -1039,12 +1039,14 @@ fun StoreListItemCard(
                             if (onChatClick != null) {
                                 onChatClick()
                             } else if (viewModel != null) {
-                                viewModel.openDirectChat(
-                                    targetUserId = store.id,
-                                    targetUserName = store.name,
-                                    targetUserPhoto = store.logoImage.ifBlank { store.coverImage },
-                                    relatedEntityId = store.id,
-                                    relatedEntityType = "STORE"
+                                viewModel.openOrCreateChatChannel(
+                                    targetId = store.id,
+                                    targetType = "STORE",
+                                    targetName = store.name,
+                                    targetPhone = store.phone,
+                                    onCreated = {
+                                        viewModel.triggerNotification("💬 تم فتح المحادثة الفورية مع متجر ${store.name}")
+                                    }
                                 )
                             } else {
                                 onClick()

@@ -48,22 +48,12 @@ class ChatAttachmentManager(private val context: Context) {
             return Result.failure(Exception(processedValidation.message))
         }
 
-        // 4. تنفيذ عملية الرفع إلى Firebase Storage مع دعم البيانات الوصفية والاحتياطي المباشر
+        // 4. تنفيذ عملية الرفع إلى Firebase Storage
         return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             try {
-                // التأكد من وجود جلسة مصادقة Firebase لضمان اجتياز قواعد الأمان
-                val auth = com.google.firebase.auth.FirebaseAuth.getInstance()
-                if (auth.currentUser == null) {
-                    try {
-                        auth.signInAnonymously().await()
-                    } catch (authEx: Exception) {
-                        android.util.Log.w("ChatAttachmentManager", "Anonymous auth note: ${authEx.message}")
-                    }
-                }
-
                 val extension = if (isImage) "jpg" else {
                     val uriStr = uri.toString().lowercase()
-                    val mime = try { context.contentResolver.getType(uri)?.lowercase() } catch (_: Exception) { null }
+                    val mime = context.contentResolver.getType(uri)?.lowercase()
                     when {
                         uriStr.endsWith(".m4a") || mime == "audio/m4a" || mime == "audio/x-m4a" -> "m4a"
                         uriStr.endsWith(".mp3") || mime == "audio/mpeg" || mime == "audio/mp3" -> "mp3"
@@ -71,30 +61,31 @@ class ChatAttachmentManager(private val context: Context) {
                         uriStr.endsWith(".wav") || mime == "audio/wav" -> "wav"
                         uriStr.endsWith(".mp4") || mime == "audio/mp4" -> "m4a"
                         else -> {
-                            val extFromMime = mime?.let { android.webkit.MimeTypeMap.getSingleton().getExtensionFromMimeType(it) }
+                            val extFromMime = android.webkit.MimeTypeMap.getSingleton().getExtensionFromMimeType(mime)
                             if (extFromMime.isNullOrBlank() || extFromMime == "bin") "m4a" else extFromMime
                         }
                     }
                 }
-
-                val mimeType = if (isImage) "image/jpeg" else when (extension) {
-                    "m4a", "mp4" -> "audio/mp4"
-                    "mp3" -> "audio/mpeg"
-                    "ogg" -> "audio/ogg"
-                    "wav" -> "audio/wav"
-                    "aac" -> "audio/aac"
-                    else -> "audio/mp4"
+                
+                val mimeType = if (isImage) "image/jpeg" else {
+                    when (extension) {
+                        "m4a", "mp4" -> "audio/mp4"
+                        "mp3" -> "audio/mpeg"
+                        "ogg" -> "audio/ogg"
+                        "wav" -> "audio/wav"
+                        else -> "audio/mp4"
+                    }
                 }
-
+                
                 val fileName = "${UUID.randomUUID()}_${System.currentTimeMillis()}.$extension"
-                // استخدام مسار chat المعتمد في قواعد الأمان
-                val ref = storageRef.child("chat/$channelId/$fileName")
-
+                val ref = storageRef.child("chats/$channelId/$type/$fileName")
                 val metadata = com.google.firebase.storage.StorageMetadata.Builder()
                     .setContentType(mimeType)
+                    .setCustomMetadata("channelId", channelId)
+                    .setCustomMetadata("type", type)
                     .build()
 
-                android.util.Log.d("ChatAttachmentManager", "Uploading ${finalData.size / 1024} KB to Firebase Storage (mime: $mimeType)...")
+                android.util.Log.d("ChatAttachmentManager", "Uploading ${finalData.size / 1024} KB to Firebase at ${ref.path}...")
                 ref.putBytes(finalData, metadata).await()
                 
                 val url = ref.downloadUrl.await().toString()
@@ -104,18 +95,8 @@ class ChatAttachmentManager(private val context: Context) {
                 
                 Result.success(url)
             } catch (e: Exception) {
-                android.util.Log.e("ChatAttachmentManager", "Firebase Storage Upload Error, activating smart data fallback: ${e.message}", e)
-                try {
-                    // نظام الاحتياط الذكي الفوري: تحويل الوسائط المضغوطة إلى data URL آمنة
-                    // لضمان استمرار المحادثات وتخطي أخطاء الحصة المجانية دون أي توقف
-                    val base64Data = android.util.Base64.encodeToString(finalData, android.util.Base64.NO_WRAP)
-                    val mimeType = if (isImage) "image/jpeg" else "audio/mp4"
-                    val fallbackDataUrl = "data:$mimeType;base64,$base64Data"
-                    ChatValidationUtils.recordUploadToday(context)
-                    Result.success(fallbackDataUrl)
-                } catch (fallbackEx: Exception) {
-                    Result.failure(e)
-                }
+                android.util.Log.e("ChatAttachmentManager", "Firebase Upload Error", e)
+                Result.failure(e)
             }
         }
     }
