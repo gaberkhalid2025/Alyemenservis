@@ -86,20 +86,33 @@ service firebase.storage {
                       isAllowedImageType();
     }
 
-    // 2. وسائط المحادثات والشات (/chat/{channelId}/{type}/{fileName} أو /chats/...)
-    match /chat/{channelId}/{type}/{fileName} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated() &&
-                      isValidMediaSize() &&
+    // 2. وسائط المحادثات والشات (/chat/{channelId}/{fileName})
+    match /chat/{channelId}/{fileName} {
+      allow read: if true;
+      allow write: if isValidMediaSize() &&
                       isSafeFileName(fileName) &&
-                      (isAllowedImageType() || isAllowedAudioType() || isAllowedDocType());
+                      (isAllowedImageType() || isAllowedAudioType() || isAllowedDocType() || request.resource.contentType == 'application/octet-stream');
     }
-    match /chats/{channelId}/{type}/{fileName} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated() &&
-                      isValidMediaSize() &&
+
+    match /chat/{channelId}/{type}/{fileName} {
+      allow read: if true;
+      allow write: if isValidMediaSize() &&
                       isSafeFileName(fileName) &&
-                      (isAllowedImageType() || isAllowedAudioType() || isAllowedDocType());
+                      (isAllowedImageType() || isAllowedAudioType() || isAllowedDocType() || request.resource.contentType == 'application/octet-stream');
+    }
+
+    match /chats/{channelId}/{fileName} {
+      allow read: if true;
+      allow write: if isValidMediaSize() &&
+                      isSafeFileName(fileName) &&
+                      (isAllowedImageType() || isAllowedAudioType() || isAllowedDocType() || request.resource.contentType == 'application/octet-stream');
+    }
+
+    match /chats/{channelId}/{type}/{fileName} {
+      allow read: if true;
+      allow write: if isValidMediaSize() &&
+                      isSafeFileName(fileName) &&
+                      (isAllowedImageType() || isAllowedAudioType() || isAllowedDocType() || request.resource.contentType == 'application/octet-stream');
     }
 
     // 3. وسائط مزودي الخدمات والفنيين (/providers/{providerId}/{fileName})

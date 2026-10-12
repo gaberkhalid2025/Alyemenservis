@@ -13,7 +13,7 @@ import java.io.ByteArrayOutputStream
  */
 object ChatValidationUtils {
 
-    const val MAX_FILE_SIZE = (10 * 1024 * 1024).toLong() // 10MB - الحد الأقصى المسموح للرفع
+    const val MAX_FILE_SIZE = (1.5 * 1024 * 1024).toLong() // 1.5MB - الحد الأقصى المسموح للرفع (بعد الضغط للصور أو خام للصوت)
     const val MAX_TEXT_LENGTH = 1000
     const val MAX_DAILY_UPLOADS = 25
 
@@ -21,25 +21,47 @@ object ChatValidationUtils {
     val allowedMimeTypes = listOf(
         "image/jpeg", "image/png", "image/gif", "image/webp", "image/bmp",
         "audio/mpeg", "audio/mp3", "audio/aac", "audio/amr", "audio/wav", "audio/ogg", "audio/3gpp",
-        "audio/mp4", "audio/m4a", "audio/x-m4a", "audio/x-wav",
+        "audio/mp4", "audio/m4a", "audio/x-m4a",
         "video/mp4", "video/3gpp"
     )
 
     fun validateFile(uri: Uri, context: Context, isImage: Boolean): ValidationResult {
-        var mimeType = context.contentResolver.getType(uri)
+        var mimeType = try { context.contentResolver.getType(uri) } catch (_: Exception) { null }
         if (mimeType.isNullOrBlank()) {
-            val extension = android.webkit.MimeTypeMap.getFileExtensionFromUrl(uri.toString())
-            if (extension.isNotBlank()) {
-                mimeType = android.webkit.MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension.lowercase())
+            val uriStr = uri.toString().lowercase()
+            val ext = when {
+                uriStr.endsWith(".m4a") -> "m4a"
+                uriStr.endsWith(".mp3") -> "mp3"
+                uriStr.endsWith(".aac") -> "aac"
+                uriStr.endsWith(".wav") -> "wav"
+                uriStr.endsWith(".ogg") -> "ogg"
+                uriStr.endsWith(".jpg") || uriStr.endsWith(".jpeg") -> "jpg"
+                uriStr.endsWith(".png") -> "png"
+                uriStr.endsWith(".webp") -> "webp"
+                else -> {
+                    val lastSeg = uri.lastPathSegment?.lowercase().orEmpty()
+                    if (lastSeg.contains(".")) lastSeg.substringAfterLast(".") else ""
+                }
+            }
+            if (ext.isNotBlank()) {
+                mimeType = android.webkit.MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext)
+            }
+            if (mimeType.isNullOrBlank()) {
+                mimeType = if (isImage) "image/jpeg" else "audio/m4a"
             }
         }
 
         // 1. فحص نوع الملف (MIME Type)
-        val isSupported = mimeType != null && (mimeType in allowedMimeTypes || mimeType.startsWith("image/") || mimeType.startsWith("audio/"))
+        val isSupported = mimeType.isNotBlank() && (
+            mimeType in allowedMimeTypes ||
+            mimeType.startsWith("image/") ||
+            mimeType.startsWith("audio/") ||
+            mimeType == "application/octet-stream"
+        )
         if (!isSupported) {
             return ValidationResult(
                 isValid = false,
-                message = "⚠️ نوع الملف ($mimeType) غير مدعوم حالياً."
+                message = "⚠️ نوع الملف غير مدعوم حالياً."
             )
         }
 

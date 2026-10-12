@@ -12,11 +12,9 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -28,6 +26,13 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -85,6 +90,18 @@ fun ChatInputBar(
     var uploadProgress by remember { mutableStateOf<Float?>(null) }
     var showAttachmentMenu by remember { mutableStateOf(false) }
     var showEmojiPicker by remember { mutableStateOf(false) }
+    var selectedEmojiCategoryIndex by remember { mutableIntStateOf(0) }
+
+    val emojiCategories = remember {
+        listOf(
+            "🔥 الشائعة" to listOf("👍", "❤️", "😂", "🔥", "👏", "🎉", "🤝", "🤲", "💯", "✨", "🌹", "☕", "🇾🇪", "🫡", "🙏", "⚡", "😍", "🤩", "👌", "💪", "😎", "🥰", "🙌", "🎯"),
+            "😀 الوجوه" to listOf("😀", "😃", "😄", "😁", "😆", "😅", "🤣", "😂", "🙂", "🙃", "😉", "😊", "😇", "🥰", "😍", "🤩", "😘", "😋", "😛", "😜", "🤪", "🤫", "🤗", "🤔", "🤐", "🤨", "😐", "😑", "😶", "😏", "😒", "🙄", "😬", "😌", "😔", "😪", "😴", "😷", "🤒", "🤕", "🤢", "🤮", "🤧", "🥵", "🥶", "🥴", "😵", "🤯", "🥳", "😎", "🤓", "🧐", "😕", "😟", "🙁", "😮", "😯", "😲", "😳", "🥺", "😦", "😧", "😨", "😰", "😥", "😢", "😭", "😱", "😖", "😣", "😞", "😓", "😩", "😫", "🥱", "😤", "😡", "😠"),
+            "👍 الأيدي" to listOf("👋", "🤚", "🖐️", "✋", "🖖", "👌", "🤌", "🤏", "✌️", "🤞", "🫰", "🤟", "🤘", "🤙", "👈", "👉", "👆", "👇", "☝️", "👍", "👎", "✊", "👊", "🤛", "🤜", "👏", "🙌", "👐", "🤲", "🤝", "🙏", "✍️", "💪", "🤳", "💅"),
+            "❤️ القلوب" to listOf("❤️", "🧡", "💛", "💚", "💙", "💜", "🖤", "🤍", "🤎", "💔", "❣️", "💕", "💞", "💓", "💗", "💖", "💘", "💝", "💟", "💌"),
+            "💼 الخدمات" to listOf("🔧", "🔨", "🛠️", "🪚", "🔩", "⚙️", "🧰", "🧱", "🔌", "💡", "🔦", "🚗", "🚕", "🚙", "🚚", "📦", "🛍️", "🛒", "🏪", "🏥", "🩺", "💊", "🏢", "🏠", "🏡", "🔑", "📱", "💻", "💵", "💰", "💳", "🧾", "📞"),
+            "🇾🇪 وطنية" to listOf("🇾🇪", "🌴", "☕", "🦅", "🏰", "🕌", "⛰️", "🛡️", "⚔️", "🌟", "⭐", "🏆", "🥇", "✨", "💫", "👑")
+        )
+    }
 
     // Live audio amplitudes for real-time waveform
     val liveAmplitudes = remember { mutableStateListOf<Int>() }
@@ -677,7 +694,7 @@ fun ChatInputBar(
                     }
                 }
 
-                // Text field (Restricted to 500 characters max)
+                // Text field (Restricted to 1000 characters max)
                 OutlinedTextField(
                     value = textInput,
                     onValueChange = {
@@ -687,15 +704,28 @@ fun ChatInputBar(
                     },
                     leadingIcon = {
                         IconButton(
-                            onClick = { showEmojiPicker = !showEmojiPicker },
-                            modifier = Modifier.size(28.dp)
+                            onClick = {
+                                showEmojiPicker = !showEmojiPicker
+                                hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                            },
+                            modifier = Modifier.size(34.dp)
                         ) {
                             Text(
                                 text = if (showEmojiPicker) "⌨️" else "😊",
-                                fontSize = 16.sp
+                                fontSize = 18.sp
                             )
                         }
                     },
+                    trailingIcon = if (textInput.isNotEmpty()) {
+                        {
+                            IconButton(
+                                onClick = { textInput = "" },
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                Icon(Icons.Default.Close, contentDescription = "مسح", tint = textSecondary, modifier = Modifier.size(16.dp))
+                            }
+                        }
+                    } else null,
                     placeholder = { Text("اكتب رسالتك هنا...", color = textSecondary, fontSize = 13.sp) },
                     modifier = Modifier
                         .weight(1f)
@@ -759,78 +789,122 @@ fun ChatInputBar(
                     }
                 }
             }
+        }
 
-            // Telegram/Signal-Style Rich Emoji Tray
-            AnimatedVisibility(visible = showEmojiPicker) {
-                Surface(
-                    color = Color(0xFF1E293B),
-                    shape = RoundedCornerShape(16.dp),
-                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)),
+        // Modern Telegram/Signal Style Animated Emoji Keyboard Picker
+        AnimatedVisibility(visible = showEmojiPicker && !isRecording) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp)
+                    .background(Color(0xFF0F172A), RoundedCornerShape(16.dp))
+                    .border(1.dp, borderColor, RoundedCornerShape(16.dp))
+                    .padding(8.dp)
+            ) {
+                // Category Selector Tabs Row
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 8.dp)
+                        .horizontalScroll(rememberScrollState())
+                        .padding(bottom = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    val emojiCategories = remember {
-                        listOf(
-                            listOf("😀", "😃", "😄", "😁", "😆", "😅", "😂", "🤣", "😊", "😇"),
-                            listOf("🙂", "🙃", "😉", "😌", "😍", "🥰", "😘", "😗", "😋", "😛"),
-                            listOf("👍", "👎", "👏", "🙌", "🤝", "🙏", "✌️", "🤞", "💪", "❤️"),
-                            listOf("🔥", "⭐", "🎉", "✨", "💯", "✅", "⚠️", "🚨", "⏳", "📌"),
-                            listOf("💼", "🛠️", "🔧", "🏪", "🏥", "🍕", "🚗", "🏠", "📍", "📞")
-                        )
-                    }
-
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(8.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 4.dp, vertical = 2.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                    emojiCategories.forEachIndexed { index, (catName, _) ->
+                        val isSelected = selectedEmojiCategoryIndex == index
+                        Surface(
+                            onClick = {
+                                selectedEmojiCategoryIndex = index
+                                hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                            },
+                            shape = RoundedCornerShape(14.dp),
+                            color = if (isSelected) primaryColor else Color.White.copy(alpha = 0.08f),
+                            border = BorderStroke(1.dp, if (isSelected) primaryColor else Color.Transparent)
                         ) {
                             Text(
-                                text = "رموز تعبيرية وتفاعلات سريعة",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = accentColor
+                                text = catName,
+                                fontSize = 11.5.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isSelected) Color.White else Color.LightGray,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
                             )
-                            IconButton(
-                                onClick = { showEmojiPicker = false },
-                                modifier = Modifier.size(20.dp)
+                        }
+                    }
+                }
+
+                // Grid of Emojis
+                val currentCategoryEmojis = emojiCategories.getOrNull(selectedEmojiCategoryIndex)?.second ?: emptyList()
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(180.dp)
+                ) {
+                    LazyVerticalGrid(
+                        columns = GridCells.Adaptive(minSize = 38.dp),
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(4.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        items(currentCategoryEmojis) { emoji ->
+                            Box(
+                                modifier = Modifier
+                                    .size(38.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable {
+                                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        if ((textInput + emoji).length <= ChatValidationUtils.MAX_TEXT_LENGTH) {
+                                            textInput += emoji
+                                        }
+                                    },
+                                contentAlignment = Alignment.Center
                             ) {
-                                Icon(Icons.Default.Close, contentDescription = "إغلاق", tint = textSecondary, modifier = Modifier.size(14.dp))
+                                Text(text = emoji, fontSize = 22.sp)
                             }
                         }
+                    }
+                }
 
-                        Spacer(modifier = Modifier.height(4.dp))
-
-                        emojiCategories.forEach { rowEmojis ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 2.dp),
-                                horizontalArrangement = Arrangement.SpaceEvenly
-                            ) {
-                                rowEmojis.forEach { emoji ->
-                                    Box(
-                                        modifier = Modifier
-                                            .size(34.dp)
-                                            .clip(CircleShape)
-                                            .clickable {
-                                                if (textInput.length + emoji.length <= ChatValidationUtils.MAX_TEXT_LENGTH) {
-                                                    textInput += emoji
-                                                }
-                                            },
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(text = emoji, fontSize = 20.sp)
+                // Bottom Action Bar: Backspace / Clear / Close
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 6.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "اضغط على الإيموجي للإضافة الفورية ⚡",
+                        fontSize = 10.sp,
+                        color = Color.Gray
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        // Backspace button
+                        IconButton(
+                            onClick = {
+                                if (textInput.isNotEmpty()) {
+                                    textInput = if (textInput.length >= 2 && Character.isSurrogatePair(textInput[textInput.length - 2], textInput[textInput.length - 1])) {
+                                        textInput.dropLast(2)
+                                    } else {
+                                        textInput.dropLast(1)
                                     }
+                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
                                 }
-                            }
+                            },
+                            modifier = Modifier
+                                .size(32.dp)
+                                .background(Color.White.copy(alpha = 0.1f), CircleShape)
+                        ) {
+                            Text("⌫", fontSize = 16.sp, color = Color.White)
+                        }
+                        // Close button
+                        IconButton(
+                            onClick = { showEmojiPicker = false },
+                            modifier = Modifier
+                                .size(32.dp)
+                                .background(Color.White.copy(alpha = 0.1f), CircleShape)
+                        ) {
+                            Icon(Icons.Default.Close, contentDescription = "إغلاق الإيموجي", tint = Color.LightGray, modifier = Modifier.size(16.dp))
                         }
                     }
                 }
@@ -888,6 +962,26 @@ fun ChatInputBar(
                         ),
                         maxLines = 2
                     )
+
+                    Surface(
+                        color = Color(0xFF10B981).copy(alpha = 0.15f),
+                        shape = RoundedCornerShape(8.dp),
+                        border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.35f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Text(
+                                text = "⚡ ضغط ذكي فائق: جودة واضحة بحجم ~30KB لتوفير الباقة وسرعة إرسال خارقة",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color(0xFF10B981)
+                            )
+                        }
+                    }
 
                     if (isUploadingPreview) {
                         LinearProgressIndicator(

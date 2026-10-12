@@ -187,7 +187,7 @@ fun ChatHeaderBar(
             }
         }
 
-        // Booking / Urgent Request / Entity Context Strip (Modern Telegram/Signal Style)
+        // Booking / Store / Entity Context Info Pill (Telegram/Signal style)
         if (!relatedEntityId.isNullOrBlank() || !relatedEntityType.isNullOrBlank()) {
             val shortId = if (relatedEntityId != null && relatedEntityId.length > 8) {
                 relatedEntityId.takeLast(8)
@@ -195,14 +195,16 @@ fun ChatHeaderBar(
                 relatedEntityId ?: ""
             }
 
-            val (contextText, badgeColor) = when (relatedEntityType?.uppercase()) {
-                "BOOKING" -> "🗓️ مرتبط بحجز موعد: #$shortId" to Color(0xFF3B82F6) // Elegant Blue
-                "URGENT_REQUEST" -> "🚨 مرتبط بطلب عاجل: #$shortId" to Color(0xFFF59E0B) // Amber
-                "SUPPORT" -> "🛠️ محادثة الدعم الفني: #$shortId" to Color(0xFF10B981) // Emerald
-                "STORE", "RESTAURANT" -> "🏪 استفسار حول المتجر / المنتجات: #$shortId" to Color(0xFF8B5CF6) // Purple
-                "MEDICAL" -> "🏥 استفسار طبي / حجز عيادة: #$shortId" to Color(0xFFEC4899) // Rose
-                "PROPERTY" -> "🏠 استفسار حول العقار: #$shortId" to Color(0xFF06B6D4) // Cyan
-                else -> if (!relatedEntityId.isNullOrBlank()) "📋 طلب خدمة: #$shortId" to Color(0xFF64748B) else (null to Color.Transparent)
+            val (contextText, badgeColor) = when (relatedEntityType) {
+                "BOOKING" -> Pair("🗓️ حجز خدمة: #$shortId", Color(0xFF38BDF8))
+                "URGENT_REQUEST" -> Pair("⚡ طلب صيانة عاجل: #$shortId", Color(0xFFF59E0B))
+                "SUPPORT" -> Pair("🛡️ الدعم الفني وخدمة العملاء الرسمية", Color(0xFF10B981))
+                "STORE" -> Pair("🏪 متجر تجاري معتمد", Color(0xFF10B981))
+                "RESTAURANT" -> Pair("🍔 مطعم وكافيه معتمد", Color(0xFFF59E0B))
+                "MEDICAL" -> Pair("🏥 مركز طبي وعيادة معتمدة", Color(0xFF06B6D4))
+                "PROVIDER" -> Pair("🔧 فني / مهني معتمد", Color(0xFF38BDF8))
+                "PROPERTY" -> Pair("🏡 مكتب عقاري واستثماري", Color(0xFFA855F7))
+                else -> if (!relatedEntityId.isNullOrBlank()) Pair("💬 محادثة مباشرة معتمدة", Color(0xFF10B981)) else Pair(null, Color.Transparent)
             }
 
             if (contextText != null) {
@@ -213,21 +215,15 @@ fun ChatHeaderBar(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 14.dp, vertical = 5.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                            .padding(horizontal = 14.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(6.dp)
-                                .background(badgeColor, CircleShape)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = contextText,
-                            fontSize = 11.5.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = badgeColor,
-                            modifier = Modifier.weight(1f)
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = badgeColor
                         )
                     }
                 }
