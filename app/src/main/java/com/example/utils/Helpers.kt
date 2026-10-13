@@ -279,9 +279,14 @@ fun getProviderCoords(provider: ProviderEntity): Pair<Double, Double> {
         else -> "صنعاء"
     }
     val base = getAreaCoords(baseStr)
-    val hash = (provider.id.ifEmpty { provider.name }).hashCode() and Int.MAX_VALUE
-    val offsetLat = ((hash % 100) - 50) / 2500.0
-    val offsetLng = (((hash / 100) % 100) - 50) / 2500.0
+    // تطبيق الإزاحة الحتمية (Deterministic Hash Offset) بين 40 و 160 متر
+    val idHash = (provider.id.ifEmpty { provider.name }).hashCode().toLong()
+    val hashAngle = (kotlin.math.abs(idHash) % 360).toDouble() * (Math.PI / 180.0)
+    val hashOffsetMeters = 40.0 + (kotlin.math.abs(idHash ushr 16) % 120)
+    val metersPerDegreeLat = 110540.0
+    val metersPerDegreeLng = 111320.0 * kotlin.math.cos(Math.toRadians(base.first))
+    val offsetLat = (hashOffsetMeters * kotlin.math.sin(hashAngle)) / metersPerDegreeLat
+    val offsetLng = (hashOffsetMeters * kotlin.math.cos(hashAngle)) / metersPerDegreeLng
     return Pair(base.first + offsetLat, base.second + offsetLng)
 }
 
@@ -295,9 +300,14 @@ fun getStoreCoords(store: StoreEntity): Pair<Double, Double> {
         else -> "صنعاء"
     }
     val base = getAreaCoords(baseStr)
-    val hash = (store.id.ifEmpty { store.name }).hashCode() and Int.MAX_VALUE
-    val offsetLat = ((hash % 100) - 50) / 2500.0
-    val offsetLng = (((hash / 100) % 100) - 50) / 2500.0
+    // تطبيق الإزاحة الحتمية (Deterministic Hash Offset) بين 40 و 160 متر
+    val idHash = (store.id.ifEmpty { store.name }).hashCode().toLong()
+    val hashAngle = (kotlin.math.abs(idHash) % 360).toDouble() * (Math.PI / 180.0)
+    val hashOffsetMeters = 40.0 + (kotlin.math.abs(idHash ushr 16) % 120)
+    val metersPerDegreeLat = 110540.0
+    val metersPerDegreeLng = 111320.0 * kotlin.math.cos(Math.toRadians(base.first))
+    val offsetLat = (hashOffsetMeters * kotlin.math.sin(hashAngle)) / metersPerDegreeLat
+    val offsetLng = (hashOffsetMeters * kotlin.math.cos(hashAngle)) / metersPerDegreeLng
     return Pair(base.first + offsetLat, base.second + offsetLng)
 }
 
@@ -311,9 +321,14 @@ fun getPropertyCoords(property: PropertyEntity): Pair<Double, Double> {
         else -> "صنعاء"
     }
     val base = getAreaCoords(baseStr)
-    val hash = (property.id.ifEmpty { property.title }).hashCode() and Int.MAX_VALUE
-    val offsetLat = ((hash % 100) - 50) / 2500.0
-    val offsetLng = (((hash / 100) % 100) - 50) / 2500.0
+    // تطبيق الإزاحة الحتمية (Deterministic Hash Offset) بين 40 و 160 متر
+    val idHash = (property.id.ifEmpty { property.title }).hashCode().toLong()
+    val hashAngle = (kotlin.math.abs(idHash) % 360).toDouble() * (Math.PI / 180.0)
+    val hashOffsetMeters = 40.0 + (kotlin.math.abs(idHash ushr 16) % 120)
+    val metersPerDegreeLat = 110540.0
+    val metersPerDegreeLng = 111320.0 * kotlin.math.cos(Math.toRadians(base.first))
+    val offsetLat = (hashOffsetMeters * kotlin.math.sin(hashAngle)) / metersPerDegreeLat
+    val offsetLng = (hashOffsetMeters * kotlin.math.cos(hashAngle)) / metersPerDegreeLng
     return Pair(base.first + offsetLat, base.second + offsetLng)
 }
 
@@ -321,9 +336,13 @@ fun getProviderCoords(providerId: String): Pair<Double, Double> {
     return when (providerId) {
         "p_amin" -> Pair(15.3694, 44.1910)
         else -> {
-            val hash = providerId.hashCode() and Int.MAX_VALUE
-            val offsetLat = ((hash % 100) - 50) / 2500.0
-            val offsetLng = (((hash / 100) % 100) - 50) / 2500.0
+            val idHash = providerId.hashCode().toLong()
+            val hashAngle = (kotlin.math.abs(idHash) % 360).toDouble() * (Math.PI / 180.0)
+            val hashOffsetMeters = 40.0 + (kotlin.math.abs(idHash ushr 16) % 120)
+            val metersPerDegreeLat = 110540.0
+            val metersPerDegreeLng = 111320.0 * kotlin.math.cos(Math.toRadians(15.3694))
+            val offsetLat = (hashOffsetMeters * kotlin.math.sin(hashAngle)) / metersPerDegreeLat
+            val offsetLng = (hashOffsetMeters * kotlin.math.cos(hashAngle)) / metersPerDegreeLng
             Pair(15.3694 + offsetLat, 44.1910 + offsetLng)
         }
     }

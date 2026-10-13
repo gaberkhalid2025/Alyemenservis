@@ -356,8 +356,12 @@ fun MapScreenContent(
                     state.zoomScale = (state.zoomScale / 1.30f).coerceIn(0.25f, 8.0f)
                 },
                 onRecenterLocation = {
+                    // إصلاح 1.1: زر "موقعي" يعيد ضبط panOffset و zoomScale إلى موقع المستخدم الحالي فوراً
+                    state.panOffset = Offset.Zero
+                    state.zoomScale = 1.0f
                     val hasFine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-                    if (hasFine) {
+                    val hasCoarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                    if (hasFine || hasCoarse) {
                         viewModel.startLocationUpdates()
                         coroutineScope.launch {
                             snackbarHostState.showSnackbar("تمت إعادة التمركز إلى موقعك الفعلي 📍")

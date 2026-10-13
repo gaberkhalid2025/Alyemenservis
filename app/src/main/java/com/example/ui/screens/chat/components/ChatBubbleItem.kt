@@ -376,6 +376,53 @@ fun ChatBubbleItem(
                         }
                     }
                 }
+                MediaType.VIDEO -> {
+                    if (message.mediaUrl.isNotBlank()) {
+                        val context = LocalContext.current
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(180.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(Color.Black.copy(alpha = 0.5f))
+                                .clickable {
+                                    try {
+                                        val intent = Intent(Intent.ACTION_VIEW).apply {
+                                            setDataAndType(Uri.parse(message.mediaUrl), "video/*")
+                                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                        }
+                                        context.startActivity(intent)
+                                    } catch (e: Exception) {
+                                        Toast.makeText(context, "تعذر تشغيل الفيديو: ${e.message}", Toast.LENGTH_SHORT).show()
+                                    }
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.PlayArrow,
+                                    contentDescription = "تشغيل الفيديو",
+                                    tint = Color.White,
+                                    modifier = Modifier
+                                        .size(48.dp)
+                                        .background(Color(0xFF2563EB).copy(alpha = 0.9f), CircleShape)
+                                        .padding(8.dp)
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "اضغط لتشغيل الفيديو 🎥",
+                                    color = Color.White,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                    }
+                }
                 MediaType.FILE -> {
                     Text("📎 ${message.message.ifBlank { "ملف مرفق" }}", color = Color(0xFF90CAF9), fontSize = 12.sp)
                     Spacer(modifier = Modifier.height(4.dp))

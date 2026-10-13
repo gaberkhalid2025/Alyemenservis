@@ -38,6 +38,7 @@ object MarkerRenderer {
     fun getColorForType(type: String): Color {
         return when (type.uppercase()) {
             "PROVIDER", "TECHNICIAN" -> Color(0xFF00E5FF)
+            "URGENT_PROVIDER", "URGENT" -> Color(0xFFEF4444)
             "STORE" -> Color(0xFF10B981)
             "RESTAURANT" -> Color(0xFFF59E0B)
             "MEDICAL" -> Color(0xFFEC4899)
@@ -50,6 +51,7 @@ object MarkerRenderer {
     fun getEmojiForType(type: String): String {
         return when (type.uppercase()) {
             "PROVIDER", "TECHNICIAN" -> "👷"
+            "URGENT_PROVIDER", "URGENT" -> "⚡"
             "STORE" -> "🏪"
             "RESTAURANT" -> "🍔"
             "MEDICAL" -> "🏥"

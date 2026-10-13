@@ -122,7 +122,7 @@ fun ChatScreen(
     }
 
     // Initialize Channel
-    LaunchedEffect(channel, channelId, targetUserId) {
+    LaunchedEffect(channel, channelId, targetUserId, relatedEntityId, relatedEntityType) {
         if (channel != null) {
             chatViewModel.openChannel(channel, currentUserId)
         } else if (!channelId.isNullOrBlank()) {
@@ -131,7 +131,9 @@ fun ChatScreen(
                 currentUserId = currentUserId,
                 currentUserName = currentUserName,
                 fallbackTargetUserId = targetUserId,
-                fallbackUserName = targetUserName
+                fallbackUserName = targetUserName,
+                relatedEntityId = relatedEntityId,
+                relatedEntityType = relatedEntityType
             )
         } else if (!targetUserId.isNullOrBlank()) {
             chatViewModel.startDirectChat(

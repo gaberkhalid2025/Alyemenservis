@@ -122,20 +122,40 @@ fun AppNavigator(
                             } else {
                                 val foundStore = viewModel.stores.value.find { it.id == targetId }
                                 if (foundStore != null) {
+                                    val isMedical = foundStore.sectionId.contains("medical") || foundStore.categoryId.contains("medical") || foundStore.name.contains("طبي") || foundStore.name.contains("صيدلية")
+                                    val isRestaurant = !isMedical && (foundStore.sectionId.contains("restaurant") || foundStore.categoryId.contains("restaurant") || foundStore.name.contains("مطعم") || foundStore.name.contains("كافيه"))
+                                    val entityType = when {
+                                        isMedical -> "MEDICAL"
+                                        isRestaurant -> "RESTAURANT"
+                                        else -> "STORE"
+                                    }
                                     viewModel.openDirectChat(
                                         targetUserId = foundStore.id,
                                         targetUserName = foundStore.name,
                                         targetUserPhoto = foundStore.logoImage.ifBlank { foundStore.coverImage },
                                         relatedEntityId = foundStore.id,
-                                        relatedEntityType = "STORE"
+                                        relatedEntityType = entityType
                                     )
                                 } else {
-                                    viewModel.openDirectChat(
-                                        targetUserId = targetId,
-                                        targetUserName = "مقدم الخدمة",
-                                        relatedEntityId = targetId,
-                                        relatedEntityType = "PROVIDER"
-                                    )
+                                    val foundProp = viewModel.properties.value.find { it.id == targetId }
+                                    if (foundProp != null) {
+                                        viewModel.openDirectChat(
+                                            targetUserId = foundProp.id.ifBlank { foundProp.phone },
+                                            targetUserName = foundProp.title.ifBlank { foundProp.ownerName },
+                                            targetUserPhoto = foundProp.images.firstOrNull() ?: "",
+                                            relatedEntityId = foundProp.id,
+                                            relatedEntityType = "PROPERTY"
+                                        )
+                                    } else if (targetId == "support_channel_id" || targetId == "admin_support") {
+                                        viewModel.openSupportChat()
+                                    } else {
+                                        viewModel.openDirectChat(
+                                            targetUserId = targetId,
+                                            targetUserName = "مقدم الخدمة",
+                                            relatedEntityId = targetId,
+                                            relatedEntityType = "PROVIDER"
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -191,7 +211,7 @@ fun AppNavigator(
                             targetUserName = rest.name,
                             targetUserPhoto = rest.logoImage.ifBlank { rest.coverImage },
                             relatedEntityId = rest.id,
-                            relatedEntityType = "STORE"
+                            relatedEntityType = "RESTAURANT"
                         )
                     }, 
                     onOrderMealClick = { viewModel.navigateToScreen(AppScreens.QUICK_SERVICE_REQUEST) }
@@ -338,7 +358,15 @@ fun AppNavigator(
                     requestId = viewModel.selectedRequestId,
                     viewModel = viewModel,
                     themeColors = themeColors,
-                    onNavigateBack = { viewModel.goBack() }
+                    onNavigateBack = { viewModel.goBack() },
+                    onNavigateToChat = { phoneOrId, name ->
+                        viewModel.openDirectChat(
+                            targetUserId = phoneOrId,
+                            targetUserName = name,
+                            relatedEntityId = viewModel.selectedRequestId,
+                            relatedEntityType = "URGENT_PROVIDER"
+                        )
+                    }
                 )
                 AppScreens.OFFERS_LIST -> UrgentOffersList(
                     offers = requestOffers,
@@ -346,12 +374,12 @@ fun AppNavigator(
                     onAcceptOffer = { _ -> },
                     onContactProvider = { offer ->
                         viewModel.openOrCreateChatChannel(
-                            targetId = offer.technicianId,
-                            targetType = "URGENT_REQUEST",
+                            targetId = offer.technicianId.ifBlank { offer.technicianPhone },
+                            targetType = "URGENT_PROVIDER",
                             targetName = offer.technicianName,
                             targetPhone = offer.technicianPhone,
                             relatedEntityId = offer.requestId,
-                            relatedEntityType = "URGENT_REQUEST"
+                            relatedEntityType = "URGENT_PROVIDER"
                         ) {
                             viewModel.navigateToScreen(AppScreens.CHAT_DIRECT)
                         }

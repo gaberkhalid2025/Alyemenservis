@@ -125,12 +125,7 @@ fun UrgentRequestDetailsScreen(
                         }
                     },
                     onContactProvider = { offer ->
-                        if (offer.technicianPhone.isNotBlank()) {
-                            val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${offer.technicianPhone}"))
-                            context.startActivity(intent)
-                        } else {
-                            onNavigateToChat(offer.technicianId, offer.technicianName)
-                        }
+                        onNavigateToChat(offer.technicianId.ifBlank { offer.technicianPhone }, offer.technicianName)
                     }
                 )
 

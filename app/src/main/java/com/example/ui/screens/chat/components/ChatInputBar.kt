@@ -93,6 +93,13 @@ fun ChatInputBar(
     var previewImageUri by remember { mutableStateOf<Uri?>(null) }
     var imageCaption by remember { mutableStateOf("") }
     var isUploadingPreview by remember { mutableStateOf(false) }
+    var imageUploadError by remember { mutableStateOf<String?>(null) }
+
+    // Video preview state
+    var previewVideoUri by remember { mutableStateOf<Uri?>(null) }
+    var videoCaption by remember { mutableStateOf("") }
+    var isUploadingVideo by remember { mutableStateOf(false) }
+    var videoUploadError by remember { mutableStateOf<String?>(null) }
 
     // Temporary camera capture storage
     var pendingCameraFile by remember { mutableStateOf<File?>(null) }
@@ -164,6 +171,23 @@ fun ChatInputBar(
             }
             previewImageUri = uri
             imageCaption = ""
+            imageUploadError = null
+        }
+    }
+
+    // Video Gallery Picker
+    val videoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            val validation = ChatValidationUtils.validateFile(uri, context, isImage = false, isVideo = true)
+            if (!validation.isValid) {
+                Toast.makeText(context, validation.message, Toast.LENGTH_LONG).show()
+                return@rememberLauncherForActivityResult
+            }
+            previewVideoUri = uri
+            videoCaption = ""
+            videoUploadError = null
         }
     }
 
@@ -639,6 +663,14 @@ fun ChatInputBar(
                             leadingIcon = { Icon(Icons.Default.Image, contentDescription = null, tint = accentColor) }
                         )
                         DropdownMenuItem(
+                            text = { Text("🎥 اختيار فيديو من المعرض", color = textPrimary, fontSize = 13.sp) },
+                            onClick = {
+                                showAttachmentMenu = false
+                                videoPickerLauncher.launch("video/*")
+                            },
+                            leadingIcon = { Text("🎬", fontSize = 16.sp) }
+                        )
+                        DropdownMenuItem(
                             text = { Text("📷 التقاط صورة بالكاميرا", color = textPrimary, fontSize = 13.sp) },
                             onClick = {
                                 showAttachmentMenu = false
@@ -846,6 +878,7 @@ fun ChatInputBar(
                 if (!isUploadingPreview) {
                     previewImageUri = null
                     imageCaption = ""
+                    imageUploadError = null
                     pendingCameraFile?.delete()
                     pendingCameraFile = null
                 }
@@ -898,6 +931,28 @@ fun ChatInputBar(
                             color = primaryColor
                         )
                     }
+
+                    if (imageUploadError != null) {
+                        Surface(
+                            color = Color(0xFFEF4444).copy(alpha = 0.15f),
+                            shape = RoundedCornerShape(8.dp),
+                            border = BorderStroke(1.dp, Color(0xFFEF4444).copy(alpha = 0.4f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = imageUploadError ?: "فشل الرفع",
+                                    color = Color(0xFFFCA5A5),
+                                    fontSize = 11.sp,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                        }
+                    }
                 }
             },
             confirmButton = {
@@ -905,6 +960,7 @@ fun ChatInputBar(
                     onClick = {
                         scope.launch {
                             isUploadingPreview = true
+                            imageUploadError = null
                             val uploadResult = attachmentManager.uploadAttachment(
                                 channelId = channelId,
                                 uri = activePreviewUri,
@@ -916,17 +972,23 @@ fun ChatInputBar(
                                 onSendMessage(imageCaption.trim(), MediaType.IMAGE, downloadUrl)
                                 previewImageUri = null
                                 imageCaption = ""
+                                imageUploadError = null
                                 pendingCameraFile?.delete()
                                 pendingCameraFile = null
                             }.onFailure { ex ->
-                                Toast.makeText(context, "فشل الرفع: ${ex.message}", Toast.LENGTH_SHORT).show()
+                                imageUploadError = ex.message ?: "فشل رفع الصورة"
+                                Toast.makeText(context, imageUploadError, Toast.LENGTH_SHORT).show()
                             }
                         }
                     },
                     enabled = !isUploadingPreview,
                     colors = ButtonDefaults.buttonColors(containerColor = primaryColor)
                 ) {
-                    Text("إرسال الصورة 🚀", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text(
+                        text = if (imageUploadError != null) "إعادة المحاولة 🔄" else "إرسال الصورة 🚀",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             },
             dismissButton = {
@@ -934,10 +996,153 @@ fun ChatInputBar(
                     onClick = {
                         previewImageUri = null
                         imageCaption = ""
+                        imageUploadError = null
                         pendingCameraFile?.delete()
                         pendingCameraFile = null
                     },
                     enabled = !isUploadingPreview
+                ) {
+                    Text("إلغاء", color = textSecondary)
+                }
+            },
+            containerColor = surfaceColor
+        )
+    }
+
+    // Video Preview Before Send Dialog
+    val activePreviewVideoUri = previewVideoUri
+    if (activePreviewVideoUri != null) {
+        AlertDialog(
+            onDismissRequest = {
+                if (!isUploadingVideo) {
+                    previewVideoUri = null
+                    videoCaption = ""
+                    videoUploadError = null
+                }
+            },
+            title = {
+                Text(
+                    text = "معاينة الفيديو قبل الإرسال 🎥",
+                    color = textPrimary,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(180.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color.Black.copy(alpha = 0.4f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.PlayArrow,
+                                contentDescription = "فيديو محدد",
+                                tint = Color.White,
+                                modifier = Modifier
+                                    .size(54.dp)
+                                    .background(primaryColor, CircleShape)
+                                    .padding(8.dp)
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text("فيديو محدد للإرسال", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+
+                    OutlinedTextField(
+                        value = videoCaption,
+                        onValueChange = { if (it.length <= 200) videoCaption = it },
+                        placeholder = { Text("إضافة تعليق على الفيديو...", color = textSecondary, fontSize = 12.sp) },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = textPrimary,
+                            unfocusedTextColor = textPrimary,
+                            focusedBorderColor = primaryColor,
+                            unfocusedBorderColor = borderColor
+                        ),
+                        maxLines = 2
+                    )
+
+                    if (isUploadingVideo) {
+                        LinearProgressIndicator(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(4.dp)
+                                .clip(RoundedCornerShape(2.dp)),
+                            color = primaryColor
+                        )
+                    }
+
+                    if (videoUploadError != null) {
+                        Surface(
+                            color = Color(0xFFEF4444).copy(alpha = 0.15f),
+                            shape = RoundedCornerShape(8.dp),
+                            border = BorderStroke(1.dp, Color(0xFFEF4444).copy(alpha = 0.4f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = videoUploadError ?: "فشل رفع الفيديو",
+                                color = Color(0xFFFCA5A5),
+                                fontSize = 11.sp,
+                                modifier = Modifier.padding(8.dp)
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        scope.launch {
+                            isUploadingVideo = true
+                            videoUploadError = null
+                            val uploadResult = attachmentManager.uploadAttachment(
+                                channelId = channelId,
+                                uri = activePreviewVideoUri,
+                                type = "video"
+                            )
+                            isUploadingVideo = false
+
+                            uploadResult.onSuccess { downloadUrl ->
+                                onSendMessage(videoCaption.trim(), MediaType.VIDEO, downloadUrl)
+                                previewVideoUri = null
+                                videoCaption = ""
+                                videoUploadError = null
+                            }.onFailure { ex ->
+                                videoUploadError = ex.message ?: "فشل رفع الفيديو"
+                                Toast.makeText(context, videoUploadError, Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    },
+                    enabled = !isUploadingVideo,
+                    colors = ButtonDefaults.buttonColors(containerColor = primaryColor)
+                ) {
+                    Text(
+                        text = if (videoUploadError != null) "إعادة المحاولة 🔄" else "إرسال الفيديو 🚀",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        previewVideoUri = null
+                        videoCaption = ""
+                        videoUploadError = null
+                    },
+                    enabled = !isUploadingVideo
                 ) {
                     Text("إلغاء", color = textSecondary)
                 }

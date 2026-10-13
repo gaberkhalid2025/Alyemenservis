@@ -172,7 +172,7 @@ fun UrgentOffersList(
                                         shape = RoundedCornerShape(8.dp),
                                         modifier = Modifier.weight(1f)
                                     ) {
-                                        Text("تواصل 📞", fontSize = 12.sp)
+                                        Text("دردشة 💬", fontSize = 12.sp)
                                     }
                                 }
                             }

@@ -55,8 +55,18 @@ object OfflineMapManager {
     )
 
     fun getCityCoordinates(cityName: String): CityCoordinates {
-        return MAJOR_YEMENI_CITIES.find { it.nameAr.contains(cityName) || cityName.contains(it.nameAr) }
-            ?: CityCoordinates("صنعاء", 15.3694, 44.1910, 13)
+        val trimmed = cityName.trim()
+        val direct = MAJOR_YEMENI_CITIES.find { it.nameAr.contains(trimmed) || trimmed.contains(it.nameAr) }
+        if (direct != null) return direct
+
+        // فحص مرن عبر أسماء الأحياء والرموز في CityAliases
+        for ((city, aliases) in CityAliases.ALIASES) {
+            if (aliases.any { it.equals(trimmed, ignoreCase = true) || trimmed.contains(it, ignoreCase = true) }) {
+                val matched = MAJOR_YEMENI_CITIES.find { it.nameAr.contains(city) || city.contains(it.nameAr) }
+                if (matched != null) return matched
+            }
+        }
+        return CityCoordinates("صنعاء", 15.3694, 44.1910, 13)
     }
 
     /**
