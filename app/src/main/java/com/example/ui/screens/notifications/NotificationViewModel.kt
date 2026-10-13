@@ -77,6 +77,17 @@ class NotificationViewModel(
         deleteAllNotifications()
     }
 
+    // مجموعة مفاتيح منع التكرار لآخر 300 إشعار (تمت الإضافة لمنع التكرار)
+    private val recentDedupKeys = object : LinkedHashSet<String>() {
+        override fun add(element: String): Boolean {
+            if (size >= 300) {
+                val first = iterator().next()
+                remove(first)
+            }
+            return super.add(element)
+        }
+    }
+
     fun filterAudienceNotifications(
         allList: List<NotificationEntity>,
         phone: String,
@@ -106,7 +117,7 @@ class NotificationViewModel(
                 isProvider = isProv,
                 currentResidence = currentRes
             )
-        }.distinctBy { it.id.ifBlank { "${it.title}_${it.timestamp}" } }
+        }.distinctBy { it.id.ifBlank { "${it.title}_${it.timestamp}" } }.take(200) // حصر عدد الإشعارات بحد أقصى 200 في الذاكرة
     }
 
     fun addNotification(
@@ -119,6 +130,15 @@ class NotificationViewModel(
         targetUserIds: List<String> = emptyList(),
         notificationType: String = "NORMAL"
     ) {
+        // فحص منع التكرار باستخدام dedupKey وقائمة آخر 300 إشعار
+        val dedupKey = "${notificationType}_${title.hashCode()}_${targetValue}_${targetUserIds.sorted().joinToString(",")}_${System.currentTimeMillis() / 90000}"
+        synchronized(recentDedupKeys) {
+            if (recentDedupKeys.contains(dedupKey)) {
+                return // تم الإشعار مسبقاً، منع التكرار
+            }
+            recentDedupKeys.add(dedupKey)
+        }
+
         mainViewModel.addNotification(
             title = title,
             message = message,

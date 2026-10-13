@@ -239,26 +239,44 @@ fun UserNotificationsContent(
                             isUnread = !readIds.contains(notif.id),
                             onCardClick = {
                                 notifViewModel.markNotificationAsRead(context, notif.id)
+                                // توجيه النقر على الإشعار حسب نوعه (رسالة، حجز، طلب عاجل، أو عام)
+                                val isMessage = notif.notificationType == "MESSAGE" || notif.title.contains("دردشة") || notif.message.contains("دردشة") || notif.title.contains("رسالة") || notif.message.contains("رسالة")
                                 val isBookingNotif = notif.notificationType == "BOOKING" || notif.title.contains("حجز") || notif.message.contains("حجز")
-                                if (isBookingNotif) {
-                                    // Try to match booking by bookingNumber, id or matching phone/content
-                                    val matchedBooking = bookings.find { b ->
-                                        (b.bookingNumber.isNotBlank() && (notif.title.contains(b.bookingNumber) || notif.message.contains(b.bookingNumber))) ||
-                                        (b.bookingCode.isNotBlank() && (notif.title.contains(b.bookingCode) || notif.message.contains(b.bookingCode))) ||
-                                        (b.id.isNotBlank() && notif.message.contains(b.id.take(6)))
-                                    } ?: bookings.firstOrNull { b ->
-                                        val cPhone = com.example.ui.helpers.AppPreferenceHelper.normalizePhoneNumber(b.clientPhone)
-                                        val pPhone = com.example.ui.helpers.AppPreferenceHelper.normalizePhoneNumber(b.customerPhone)
-                                        val notifTarget = com.example.ui.helpers.AppPreferenceHelper.normalizePhoneNumber(notif.targetValue)
-                                        notifTarget.isNotEmpty() && (notifTarget == cPhone || notifTarget == pPhone)
+                                val isUrgentOrOffer = notif.notificationType == "SPECIAL_OFFER" || notif.title.contains("عاجل") || notif.message.contains("عاجل") || notif.title.contains("عرض") || notif.message.contains("عرض")
+
+                                when {
+                                    isMessage -> {
+                                        val targetUserId = notif.targetValue.ifBlank { notif.senderId.ifBlank { "support" } }
+                                        viewModel.openDirectChat(
+                                            targetUserId = targetUserId,
+                                            targetUserName = notif.title.ifBlank { "محادثة" },
+                                            relatedEntityId = notif.relatedRequestId.ifBlank { null },
+                                            relatedEntityType = "REQUEST"
+                                        )
                                     }
-                                    if (matchedBooking != null) {
-                                        selectedBookingForDetails = matchedBooking
-                                    } else {
+                                    isBookingNotif -> {
+                                        val matchedBooking = bookings.find { b ->
+                                            (b.bookingNumber.isNotBlank() && (notif.title.contains(b.bookingNumber) || notif.message.contains(b.bookingNumber))) ||
+                                            (b.bookingCode.isNotBlank() && (notif.title.contains(b.bookingCode) || notif.message.contains(b.bookingCode))) ||
+                                            (b.id.isNotBlank() && notif.message.contains(b.id.take(6)))
+                                        } ?: bookings.firstOrNull { b ->
+                                            val cPhone = com.example.ui.helpers.AppPreferenceHelper.normalizePhoneNumber(b.clientPhone)
+                                            val pPhone = com.example.ui.helpers.AppPreferenceHelper.normalizePhoneNumber(b.customerPhone)
+                                            val notifTarget = com.example.ui.helpers.AppPreferenceHelper.normalizePhoneNumber(notif.targetValue)
+                                            notifTarget.isNotEmpty() && (notifTarget == cPhone || notifTarget == pPhone)
+                                        }
+                                        if (matchedBooking != null) {
+                                            selectedBookingForDetails = matchedBooking
+                                        } else {
+                                            viewModel.navigateToScreen(AppScreens.BOOKINGS_VIEW)
+                                        }
+                                    }
+                                    isUrgentOrOffer -> {
+                                        viewModel.navigateToScreen(AppScreens.INSTANT_REQUESTS_VIEW)
+                                    }
+                                    else -> {
                                         selectedGenericNotifForDetails = notif
                                     }
-                                } else {
-                                    selectedGenericNotifForDetails = notif
                                 }
                             },
                             onDeleteClick = {

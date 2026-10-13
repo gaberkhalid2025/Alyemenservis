@@ -143,7 +143,31 @@ fun NotificationsScreen(
                     readIds = readIds,
                     onNotificationClick = { notif ->
                         notifViewModel.markNotificationAsRead(context, notif.id)
-                        onNotificationClick(notif)
+                        // توجيه النقر للإشعارات في الشاشة الكاملة حسب نوع الإشعار
+                        val isMessage = notif.notificationType == "MESSAGE" || notif.title.contains("دردشة") || notif.message.contains("دردشة") || notif.title.contains("رسالة") || notif.message.contains("رسالة")
+                        val isBooking = notif.notificationType == "BOOKING" || notif.title.contains("حجز") || notif.message.contains("حجز")
+                        val isUrgentOrOffer = notif.notificationType == "SPECIAL_OFFER" || notif.title.contains("عاجل") || notif.message.contains("عاجل") || notif.title.contains("عرض") || notif.message.contains("عرض")
+
+                        when {
+                            isMessage -> {
+                                val targetUserId = notif.targetValue.ifBlank { notif.senderId.ifBlank { "support" } }
+                                viewModel.openDirectChat(
+                                    targetUserId = targetUserId,
+                                    targetUserName = notif.title.ifBlank { "محادثة" },
+                                    relatedEntityId = notif.relatedRequestId.ifBlank { null },
+                                    relatedEntityType = "REQUEST"
+                                )
+                            }
+                            isBooking -> {
+                                viewModel.navigateToScreen(AppScreens.BOOKINGS_VIEW)
+                            }
+                            isUrgentOrOffer -> {
+                                viewModel.navigateToScreen(AppScreens.INSTANT_REQUESTS_VIEW)
+                            }
+                            else -> {
+                                onNotificationClick(notif)
+                            }
+                        }
                     },
                     onDeleteNotification = { notif ->
                         notifViewModel.deleteNotification(notif.id)

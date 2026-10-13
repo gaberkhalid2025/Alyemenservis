@@ -19,6 +19,7 @@ object NotificationAudienceFilter {
     ): Boolean {
         if (!notif.isValid()) return false
 
+        // التحقق من الحساسية والأمان للإشعارات (تم التحقق من دقة الجمهور)
         val isSensitive = notif.title.contains("كلمة مرور") || notif.message.contains("كلمة المرور") || 
                           notif.title.contains("استعادة") || notif.title.contains("رمز التحقق")
         if (isSensitive) {
