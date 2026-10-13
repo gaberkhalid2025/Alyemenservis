@@ -126,25 +126,17 @@ fun BookingsScreenLayout(
                     viewModel.deleteBookingImpl(booking.id)
                 },
                 onOpenChatClick = { booking ->
-                    val otherId = booking.providerId.ifEmpty { booking.providerPhone.ifEmpty { "ADMIN" } }
-                    val otherName = booking.providerName.ifEmpty { "مقدم الخدمة" }
-                    val otherPhone = booking.providerPhone
+                    // توجيه المحادثة من بطاقة الحجز بشكل دقيق مع تمرير مرجع الحجز والأطراف الصحيحة
+                    val isCurrentClient = currentUserId.isNotBlank() && (booking.customerId == currentUserId || booking.clientId == currentUserId)
+                    val targetUserId = if (isCurrentClient) booking.providerId.ifBlank { booking.providerPhone } else booking.clientId.ifBlank { booking.customerId.ifBlank { booking.customerPhone } }
+                    val targetUserName = if (isCurrentClient) booking.providerName.ifBlank { "مقدم الخدمة" } else booking.customerName.ifBlank { booking.clientName.ifBlank { "العميل" } }
 
-                    viewModel.openOrCreateChatChannel(
-                        targetId = otherId,
-                        targetType = "BOOKING",
-                        targetName = otherName,
-                        targetPhone = otherPhone,
-                        targetCategory = booking.category,
+                    viewModel.openDirectChat(
+                        targetUserId = targetUserId.ifBlank { "support" },
+                        targetUserName = targetUserName,
                         relatedEntityId = booking.id,
                         relatedEntityType = "BOOKING"
-                    ) { createdCh ->
-                        if (createdCh != null && createdCh.id.isNotEmpty()) {
-                            viewModel.updateBookingRelatedChatChannel(booking.id, createdCh.id)
-                        }
-                        viewModel.openChatChannel(createdCh)
-                        viewModel.navigateTo("CHAT_DIRECT")
-                    }
+                    )
                 }
             )
         }

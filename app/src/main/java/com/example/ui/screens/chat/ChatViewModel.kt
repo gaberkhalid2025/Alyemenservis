@@ -89,7 +89,8 @@ class ChatViewModel @Inject constructor(
             if (channel != null) {
                 openChannel(channel, currentUserId)
             } else {
-                val isPasswordRecovery = relatedEntityType == "PASSWORD_RECOVERY"
+                // إصلاح توجيه المحادثات: التحقق من نوع الكيان (دعم، فني، محل، مركز) بدقة وتجنب التوجيه الخاطئ
+                val isPasswordRecovery = relatedEntityType == "PASSWORD_RECOVERY" || relatedEntityType == "SUPPORT"
                 val channelType = if (isPasswordRecovery) ChannelType.SUPPORT else ChannelType.PRIVATE
                 val targetId = if (isPasswordRecovery) ChatRepository.SUPPORT_ADMIN_ID else (fallbackTargetUserId ?: channelId)
                 val targetName = if (isPasswordRecovery) ChatRepository.SUPPORT_ADMIN_NAME else (fallbackUserName ?: "مقدم الخدمة")
@@ -123,7 +124,8 @@ class ChatViewModel @Inject constructor(
         relatedEntityType: String? = null
     ) {
         viewModelScope.launch {
-            val isPasswordRecovery = relatedEntityType == "PASSWORD_RECOVERY"
+            // إصلاح توجيه المحادثات المباشرة للفنيين والمحلات والمراكز والإدارة بدقة
+            val isPasswordRecovery = relatedEntityType == "PASSWORD_RECOVERY" || relatedEntityType == "SUPPORT"
             val channelType = if (isPasswordRecovery) ChannelType.SUPPORT else ChannelType.PRIVATE
             val finalOtherId = if (isPasswordRecovery) ChatRepository.SUPPORT_ADMIN_ID else otherUserId.trim()
             val finalOtherName = if (isPasswordRecovery) ChatRepository.SUPPORT_ADMIN_NAME else otherUserName.trim().ifBlank { "مقدم الخدمة" }

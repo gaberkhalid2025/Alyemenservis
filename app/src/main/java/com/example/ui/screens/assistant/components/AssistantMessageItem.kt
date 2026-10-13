@@ -113,25 +113,38 @@ fun AssistantMessageItem(
                                 Text("📍 الخريطة", fontSize = 8.5.sp, color = Color(0xFF10B981), fontWeight = FontWeight.Bold)
                             }
 
-                            // 3. Direct Chat
+                            // 3. Direct Chat (توجيه المحادثة للكيان المطابق أو الدعم الفني كملجأ أخير)
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(6.dp))
                                     .background(Color(0xFF3B82F6).copy(alpha = 0.15f))
                                     .border(0.8.dp, Color(0xFF3B82F6).copy(alpha = 0.6f), RoundedCornerShape(6.dp))
                                     .clickable {
-                                        val firstEntityId = msg.matchedEntities.orEmpty()
+                                        val firstEntity = msg.matchedEntities.orEmpty()
                                             .filterNotNull()
-                                            .firstOrNull()?.let { ent ->
-                                                when (ent) {
-                                                    is ProviderEntity -> ent.id
-                                                    is StoreEntity -> ent.id
-                                                    is PropertyEntity -> ent.id
-                                                    else -> null
-                                                }
+                                            .firstOrNull()
+                                        if (firstEntity != null) {
+                                            when (firstEntity) {
+                                                is ProviderEntity -> viewModel.openDirectChat(
+                                                    targetUserId = firstEntity.id,
+                                                    targetUserName = firstEntity.name,
+                                                    relatedEntityId = firstEntity.id,
+                                                    relatedEntityType = "PROVIDER"
+                                                )
+                                                is StoreEntity -> viewModel.openDirectChat(
+                                                    targetUserId = firstEntity.id,
+                                                    targetUserName = firstEntity.name,
+                                                    relatedEntityId = firstEntity.id,
+                                                    relatedEntityType = "STORE"
+                                                )
+                                                is PropertyEntity -> viewModel.openDirectChat(
+                                                    targetUserId = firstEntity.id,
+                                                    targetUserName = firstEntity.title,
+                                                    relatedEntityId = firstEntity.id,
+                                                    relatedEntityType = "PROPERTY"
+                                                )
+                                                else -> onChatOpen("support_channel_id")
                                             }
-                                        if (firstEntityId != null) {
-                                            onChatOpen(firstEntityId)
                                         } else {
                                             onChatOpen("support_channel_id")
                                         }

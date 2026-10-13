@@ -36,6 +36,7 @@ fun ChatReadReceipt(
     onRetryClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
+    // عرض علامات التسليم وقراءة الرسائل بدقة (☑ ثم ☑☑)
     Box(
         modifier = modifier,
         contentAlignment = Alignment.Center

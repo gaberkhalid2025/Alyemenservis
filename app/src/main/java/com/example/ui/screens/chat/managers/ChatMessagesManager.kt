@@ -45,9 +45,23 @@ class ChatMessagesManager(
     ) {
         scope.launch {
             _isSending.value = true
+            // التحديث الفوري المحلي (Optimistic Update) لإظهار الرسالة دون تأخير
+            val tempMessage = ChatMessage(
+                id = "temp_${System.currentTimeMillis()}",
+                channelId = channelId,
+                senderId = senderId,
+                senderName = senderName,
+                message = text,
+                mediaType = mediaType,
+                mediaUrl = mediaUrl,
+                timestamp = System.currentTimeMillis(),
+                status = MessageStatus.SENDING
+            )
+            _messages.value = _messages.value + tempMessage
+
             var attempt = 0
             var finalResult: AppResult<ChatMessage>? = null
-            while (attempt < 3) {
+            while (attempt < 2) {
                 attempt++
                 try {
                     val result = repository.sendMessage(
@@ -65,23 +79,33 @@ class ChatMessagesManager(
                     finalResult = result
                     if (result is AppResult.Success) {
                         break
-                    } else if (attempt < 3) {
-                        kotlinx.coroutines.delay((attempt * 800L))
+                    } else if (attempt < 2) {
+                        kotlinx.coroutines.delay(400L)
                     }
                 } catch (e: Exception) {
-                    if (attempt >= 3) {
+                    if (attempt >= 2) {
                         _isSending.value = false
+                        // تحديث حالة الرسالة المؤقتة إلى FAILED عند فشل الإرسال النهائي
+                        _messages.value = _messages.value.map { if (it.id == tempMessage.id) it.copy(status = MessageStatus.FAILED) else it }
                         onError(e.message ?: "حدث خطأ أثناء الإرسال")
                         return@launch
                     }
-                    kotlinx.coroutines.delay((attempt * 800L))
+                    kotlinx.coroutines.delay(400L)
                 }
             }
             _isSending.value = false
+            // إزالة الرسالة المؤقتة واستبدالها بالرسالة الناجحة من الخادم
+            _messages.value = _messages.value.filter { it.id != tempMessage.id }
             when (finalResult) {
                 is AppResult.Success -> onSuccess(finalResult.data)
-                is AppResult.Error -> onError(finalResult.error.messageArabic)
-                null -> onError("فشل إرسال الرسالة بعد عدة محاولات")
+                is AppResult.Error -> {
+                    _messages.value = _messages.value + tempMessage.copy(status = MessageStatus.FAILED)
+                    onError(finalResult.error.messageArabic)
+                }
+                null -> {
+                    _messages.value = _messages.value + tempMessage.copy(status = MessageStatus.FAILED)
+                    onError("فشل إرسال الرسالة، يرجى الناعرة لإعادة المحاولة")
+                }
             }
         }
     }

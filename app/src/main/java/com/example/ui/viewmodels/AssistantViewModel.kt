@@ -73,10 +73,24 @@ class AssistantViewModel : ViewModel() {
     ) {
         if (prompt.isBlank() || _isGenerating.value) return
 
+        // فحص الكاش المحلي أولاً للرد السريع (آخر 40 سؤال)
+        val cached = getCachedResponse(prompt)
+        if (cached != null) {
+            val userMsg = AssistantMessage(text = prompt.trim(), isUser = true)
+            var updatedHistory = _chatHistory.value + userMsg + cached
+            if (updatedHistory.size > 50) updatedHistory = updatedHistory.takeLast(50)
+            _chatHistory.value = updatedHistory
+            _typedText.value = ""
+            if (settings.allowTextToSpeechAssistant) {
+                onSpeechSpeak?.invoke(cached.text)
+            }
+            return
+        }
+
         val userMsg = AssistantMessage(text = prompt.trim(), isUser = true)
         var updatedHistory = _chatHistory.value + userMsg
-        if (updatedHistory.size > 75) {
-            updatedHistory = updatedHistory.takeLast(75)
+        if (updatedHistory.size > 50) { // حصر سجل المحادثة بحد أقصى 50 رسالة
+            updatedHistory = updatedHistory.takeLast(50)
         }
         _chatHistory.value = updatedHistory
         _typedText.value = ""
@@ -98,13 +112,15 @@ class AssistantViewModel : ViewModel() {
                     )
                 } else {
                     val (localText, localEntities) = generateLocalOfflineResponse(prompt, mainViewModel)
-                    AssistantMessage(text = localText, isUser = false, matchedEntities = localEntities)
+                    val res = AssistantMessage(text = localText, isUser = false, matchedEntities = localEntities)
+                    cacheResponse(prompt, res)
+                    res
                 }
 
                 withContext(Dispatchers.Main) {
                     var updatedHistoryWithResp = _chatHistory.value + responseMsg
-                    if (updatedHistoryWithResp.size > 75) {
-                        updatedHistoryWithResp = updatedHistoryWithResp.takeLast(75)
+                    if (updatedHistoryWithResp.size > 50) { // حصر سجل المحادثة بحد أقصى 50 رسالة
+                        updatedHistoryWithResp = updatedHistoryWithResp.takeLast(50)
                     }
                     _chatHistory.value = updatedHistoryWithResp
                     _isGenerating.value = false
@@ -122,7 +138,12 @@ class AssistantViewModel : ViewModel() {
         }
     }
 
-    private val cachedResponses = mutableMapOf<String, AssistantMessage>()
+    // كاش محلي يحتفظ بآخر 40 سؤال وجواب كحد أقصى
+    private val cachedResponses = object : LinkedHashMap<String, AssistantMessage>(40, 0.75f, true) {
+        override fun removeEldestEntry(eldest: Map.Entry<String, AssistantMessage>?): Boolean {
+            return size > 40
+        }
+    }
 
     fun getCachedResponse(query: String): AssistantMessage? {
         val normalized = normalizeArabic(query)

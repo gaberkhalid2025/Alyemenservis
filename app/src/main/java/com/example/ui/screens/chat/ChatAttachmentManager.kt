@@ -49,61 +49,71 @@ class ChatAttachmentManager(private val context: Context) {
             return Result.failure(Exception(processedValidation.message))
         }
 
-        // 4. تنفيذ عملية الرفع إلى Firebase Storage
+        // 4. تنفيذ عملية الرفع إلى Firebase Storage مع إعادة المحاولة لضمان الموثوقية
         return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            try {
-                val extension = when {
-                    isImage -> "jpg"
-                    isVideo -> "mp4"
-                    else -> {
-                        val uriStr = uri.toString().lowercase()
-                        val mime = context.contentResolver.getType(uri)?.lowercase()
-                        when {
-                            uriStr.endsWith(".m4a") || mime == "audio/m4a" || mime == "audio/x-m4a" -> "m4a"
-                            uriStr.endsWith(".mp3") || mime == "audio/mpeg" || mime == "audio/mp3" -> "mp3"
-                            uriStr.endsWith(".ogg") || mime == "audio/ogg" -> "ogg"
-                            uriStr.endsWith(".wav") || mime == "audio/wav" -> "wav"
-                            uriStr.endsWith(".mp4") || mime == "audio/mp4" -> "m4a"
-                            else -> "m4a"
+            var uploadAttempt = 0
+            var lastException: Exception? = null
+            while (uploadAttempt < 3) {
+                uploadAttempt++
+                try {
+                    val extension = when {
+                        isImage -> "jpg"
+                        isVideo -> "mp4"
+                        else -> {
+                            val uriStr = uri.toString().lowercase()
+                            val mime = context.contentResolver.getType(uri)?.lowercase()
+                            when {
+                                uriStr.endsWith(".m4a") || mime == "audio/m4a" || mime == "audio/x-m4a" -> "m4a"
+                                uriStr.endsWith(".mp3") || mime == "audio/mpeg" || mime == "audio/mp3" -> "mp3"
+                                uriStr.endsWith(".ogg") || mime == "audio/ogg" -> "ogg"
+                                uriStr.endsWith(".wav") || mime == "audio/wav" -> "wav"
+                                uriStr.endsWith(".mp4") || mime == "audio/mp4" -> "m4a"
+                                else -> "m4a"
+                            }
                         }
                     }
-                }
-                
-                val mimeType = when {
-                    isImage -> "image/jpeg"
-                    isVideo -> "video/mp4"
-                    else -> {
-                        when (extension) {
-                            "m4a", "mp4" -> "audio/mp4"
-                            "mp3" -> "audio/mpeg"
-                            "ogg" -> "audio/ogg"
-                            "wav" -> "audio/wav"
-                            else -> "audio/mp4"
+                    
+                    val mimeType = when {
+                        isImage -> "image/jpeg"
+                        isVideo -> "video/mp4"
+                        else -> {
+                            when (extension) {
+                                "m4a", "mp4" -> "audio/mp4"
+                                "mp3" -> "audio/mpeg"
+                                "ogg" -> "audio/ogg"
+                                "wav" -> "audio/wav"
+                                else -> "audio/mp4"
+                            }
                         }
                     }
-                }
-                
-                val fileName = "${UUID.randomUUID()}_${System.currentTimeMillis()}.$extension"
-                val ref = storageRef.child("chats/$channelId/$type/$fileName")
-                val metadata = com.google.firebase.storage.StorageMetadata.Builder()
-                    .setContentType(mimeType)
-                    .setCustomMetadata("channelId", channelId)
-                    .setCustomMetadata("type", type)
-                    .build()
+                    
+                    val fileName = "${UUID.randomUUID()}_${System.currentTimeMillis()}.$extension"
+                    val ref = storageRef.child("chats/$channelId/$type/$fileName")
+                    val metadata = com.google.firebase.storage.StorageMetadata.Builder()
+                        .setContentType(mimeType)
+                        .setCustomMetadata("channelId", channelId)
+                        .setCustomMetadata("type", type)
+                        .build()
 
-                android.util.Log.d("ChatAttachmentManager", "Uploading ${finalData.size / 1024} KB to Firebase at ${ref.path}...")
-                ref.putBytes(finalData, metadata).await()
-                
-                val url = ref.downloadUrl.await().toString()
-                
-                // تسجيل استهلاك الحصة اليومية بعد نجاح الرفع
-                ChatValidationUtils.recordUploadToday(context)
-                
-                Result.success(url)
-            } catch (e: Exception) {
-                android.util.Log.e("ChatAttachmentManager", "Firebase Upload Error", e)
-                Result.failure(Exception("فشل رفع الملف إلى الخادم: ${e.localizedMessage ?: "خطأ في الشبكة"}"))
+                    android.util.Log.d("ChatAttachmentManager", "Uploading ${finalData.size / 1024} KB to Firebase at ${ref.path} (attempt $uploadAttempt)...")
+                    ref.putBytes(finalData, metadata).await()
+                    
+                    val url = ref.downloadUrl.await().toString()
+                    if (url.isBlank()) throw Exception("رابط التحميل فارغ")
+                    
+                    // تسجيل استهلاك الحصة اليومية بعد نجاح الرفع
+                    ChatValidationUtils.recordUploadToday(context)
+                    
+                    return@withContext Result.success(url)
+                } catch (e: Exception) {
+                    lastException = e
+                    android.util.Log.e("ChatAttachmentManager", "Firebase Upload Attempt $uploadAttempt Error", e)
+                    if (uploadAttempt < 3) {
+                        kotlinx.coroutines.delay(800L * uploadAttempt)
+                    }
+                }
             }
+            Result.failure(Exception("فشل رفع الملف إلى الخادم بعد المحاولات: ${lastException?.localizedMessage ?: "خطأ في الشبكة"}"))
         }
     }
 }

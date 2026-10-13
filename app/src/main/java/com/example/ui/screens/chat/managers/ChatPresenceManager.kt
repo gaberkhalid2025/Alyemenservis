@@ -19,6 +19,7 @@ class ChatPresenceManager(
     private var presenceJob: Job? = null
 
     fun listenToPresence(otherUserId: String) {
+        // تتبع حالة الاتصال للمستخدم الآخر بشكل حي ومستمر
         presenceJob?.cancel()
         if (otherUserId.isBlank()) return
 
