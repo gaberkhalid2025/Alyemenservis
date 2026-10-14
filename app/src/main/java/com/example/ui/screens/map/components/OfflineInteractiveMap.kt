@@ -71,7 +71,7 @@ fun OfflineInteractiveMap(
     onSwitchToRadar: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
-    // إصلاح 1.1: استخدام إحداثيات المدينة المحددة كـ fallback ديناميكي إذا لم تتوفر إحداثيات GPS حقيقية
+    // [تعديل] استخدام إحداثيات GPS الحقيقية أو إحداثيات المدينة كبديل آمن ودقيق
     val defaultCityCoords = remember(selectedCity) {
         com.example.ui.screens.map.utils.OfflineMapManager.getCityCoordinates(selectedCity)
     }

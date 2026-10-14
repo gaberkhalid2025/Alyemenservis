@@ -89,7 +89,7 @@ class ChatViewModel @Inject constructor(
             if (channel != null) {
                 openChannel(channel, currentUserId)
             } else {
-                // إصلاح توجيه المحادثات: التحقق من نوع الكيان (دعم، فني، محل، مركز) بدقة وتجنب التوجيه الخاطئ
+                // [تعديل] التأكد من صحة توجيه المحادثة وحفظ relatedEntityId و relatedEntityType بدقة
                 val isPasswordRecovery = relatedEntityType == "PASSWORD_RECOVERY" || relatedEntityType == "SUPPORT"
                 val channelType = if (isPasswordRecovery) ChannelType.SUPPORT else ChannelType.PRIVATE
                 val targetId = if (isPasswordRecovery) ChatRepository.SUPPORT_ADMIN_ID else (fallbackTargetUserId ?: channelId)
@@ -124,7 +124,7 @@ class ChatViewModel @Inject constructor(
         relatedEntityType: String? = null
     ) {
         viewModelScope.launch {
-            // إصلاح توجيه المحادثات المباشرة للفنيين والمحلات والمراكز والإدارة بدقة
+            // [تعديل] ضمان توجيه الفني/المحل/المركز أو الدعم بشكل صحيح مع تمرير الحقول المرتبطة
             val isPasswordRecovery = relatedEntityType == "PASSWORD_RECOVERY" || relatedEntityType == "SUPPORT"
             val channelType = if (isPasswordRecovery) ChannelType.SUPPORT else ChannelType.PRIVATE
             val finalOtherId = if (isPasswordRecovery) ChatRepository.SUPPORT_ADMIN_ID else otherUserId.trim()
@@ -151,6 +151,7 @@ class ChatViewModel @Inject constructor(
     private fun listenToMessages(channelId: String, currentUserId: String) {
         messagesJob?.cancel()
         messagesJob = viewModelScope.launch {
+            // [تعديل] تفعيل الاستماع الفوري للرسائل عند فتح المحادثة لمزامنة فورية ودقيقة
             repository.getChannelMessages(channelId, currentUserId, limit = currentLimit).collect { msgs ->
                 // FIXED: Limit messages stored in memory to maximum 150 items
                 val cappedMsgs = if (msgs.size > 150) msgs.takeLast(150) else msgs

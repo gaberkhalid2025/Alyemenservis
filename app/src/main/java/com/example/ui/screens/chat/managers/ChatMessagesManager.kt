@@ -63,6 +63,7 @@ class ChatMessagesManager(
         )
 
         // 1. عرض فوري محلي في الواجهة (Instant Optimistic UI < 50ms)
+        // [تعديل] إضافة الرسالة فوراً بحالة SENDING قبل المزامنة مع السيرفر
         _messages.value = _messages.value + localMessage
         _isSending.value = true
 

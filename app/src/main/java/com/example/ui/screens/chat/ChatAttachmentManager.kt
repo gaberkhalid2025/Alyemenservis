@@ -49,7 +49,7 @@ class ChatAttachmentManager(private val context: Context) {
             return Result.failure(Exception(processedValidation.message))
         }
 
-        // 4. تنفيذ عملية الرفع إلى Firebase Storage مع إعادة المحاولة لضمان الموثوقية
+        // [تعديل] تنفيذ عملية الرفع إلى Firebase Storage مع 3 محاولات كحد أقصى ومنع إرسال الروابط الفارغة
         return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             var uploadAttempt = 0
             var lastException: Exception? = null

@@ -95,13 +95,13 @@ fun MapFilterBar(
                             color = Color(0xFF94A3B8)
                         )
                     },
+                    // [تعديل] تحديد لون وحجم النص المكتوب صراحة ليظهر باللون الأبيض الناصع
+                    textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontSize = 13.sp),
                     colors = TextFieldDefaults.colors(
                         focusedContainerColor = Color.Transparent,
                         unfocusedContainerColor = Color.Transparent,
                         focusedIndicatorColor = Color.Transparent,
                         unfocusedIndicatorColor = Color.Transparent,
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
                         cursorColor = Color(0xFF00E5FF)
                     ),
                     singleLine = true,
@@ -123,24 +123,7 @@ fun MapFilterBar(
                         )
                     }
                 }
-
-                // Orange Lightning Action Circle (كالصورة المرفقة)
-                Surface(
-                    shape = CircleShape,
-                    color = Color(0xFFFF4500), // Vibrant Red-Orange
-                    modifier = Modifier
-                        .size(36.dp)
-                        .testTag("quick_urgent_action_btn")
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Default.Bolt,
-                            contentDescription = "طلب عاجل",
-                            tint = Color.White,
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
-                }
+                // [تعديل] حذف الزر الأحمر (البرق) نهائياً بناءً على طلب المستخدم
             }
         }
 
