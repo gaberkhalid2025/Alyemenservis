@@ -176,8 +176,9 @@
 
         // Tile Providers (100% Free OpenStreetMap TileSource MAPNIK with Arabic support)
         var tileProviders = {
-            // OpenStreetMap Standard (TileSourceFactory.MAPNIK Official Server - Free without API Key)
-            'osm': L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            // [تعديل] تفعيل خوادم OpenStreetMap الرسمية مع التوزيع عبر خوادم البلاطات الثلاثة a,b,c لدعم السرعة القصوى
+            'osm': L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                subdomains: ['a', 'b', 'c'],
                 minZoom: 4,
                 maxZoom: 20,
                 attribution: '© OpenStreetMap contributors'

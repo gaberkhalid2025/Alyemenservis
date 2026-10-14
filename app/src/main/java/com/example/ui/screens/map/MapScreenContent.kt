@@ -240,62 +240,62 @@ fun MapScreenContent(
                         },
                         modifier = Modifier.fillMaxSize()
                     )
+                }
+            }
 
-                    // شارة مصدر الخريطة والنقاط المكتشفة كالصورة المرفقة
-                    Surface(
-                        shape = RoundedCornerShape(20.dp),
-                        color = Color(0xFF0F172A).copy(alpha = 0.88f),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF334155)),
+            // [تعديل] شارة مصدر الخريطة والنقاط المكتشفة كالصورة المرفقة تماماً
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = Color(0xFF0F172A).copy(alpha = 0.88f),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF334155)),
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .navigationBarsPadding()
+                    .padding(start = 16.dp, bottom = if (state.selectedEntity != null) 220.dp else 24.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Box(
                         modifier = Modifier
-                            .align(Alignment.BottomStart)
-                            .navigationBarsPadding()
-                            .padding(start = 16.dp, bottom = if (state.selectedEntity != null) 220.dp else 24.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(8.dp)
-                                    .background(Color(0xFF10B981), androidx.compose.foundation.shape.CircleShape)
-                            )
-                            Text(
-                                text = "OpenStreetMap · ${radarPoints.size} نقطة مكتشفة",
-                                color = Color.White,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
-                    }
+                            .size(8.dp)
+                            .background(Color(0xFF10B981), androidx.compose.foundation.shape.CircleShape)
+                    )
+                    Text(
+                        text = if (state.isRadarMode) "رادار كشف الخدمات · ${radarPoints.size} نقطة مكتشفة" else "OpenStreetMap · ${radarPoints.size} نقطة مكتشفة",
+                        color = Color.White,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
 
-                    // الزر الدائري الأحمر العائم في الأسفل يميناً كالصورة المرفقة (تبديل الرادار والطلبات السريعة)
-                    Surface(
-                        shape = androidx.compose.foundation.shape.CircleShape,
-                        color = Color(0xFFDC2626), // Red circle as in screenshot
-                        shadowElevation = 8.dp,
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .navigationBarsPadding()
-                            .padding(end = 16.dp, bottom = if (state.selectedEntity != null) 220.dp else 24.dp)
-                            .size(54.dp)
-                    ) {
-                        IconButton(
-                            onClick = {
-                                showMapErrorOverlay = false
-                                state.isRadarMode = !state.isRadarMode
-                            },
-                            modifier = Modifier.fillMaxSize().testTag("floating_radar_fab")
-                        ) {
-                            Icon(
-                                imageVector = if (state.isRadarMode) Icons.Default.Place else Icons.Default.Navigation,
-                                contentDescription = "رادار الخدمات",
-                                tint = Color.White,
-                                modifier = Modifier.size(26.dp)
-                            )
-                        }
-                    }
+            // [تعديل] الزر الدائري الأحمر العائم في الأسفل يميناً كالصورة المرفقة (تبديل الرادار والخريطة الحية)
+            Surface(
+                shape = androidx.compose.foundation.shape.CircleShape,
+                color = Color(0xFFDC2626), // Red circle as in screenshot
+                shadowElevation = 8.dp,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .navigationBarsPadding()
+                    .padding(end = 16.dp, bottom = if (state.selectedEntity != null) 220.dp else 24.dp)
+                    .size(54.dp)
+            ) {
+                IconButton(
+                    onClick = {
+                        showMapErrorOverlay = false
+                        state.isRadarMode = !state.isRadarMode
+                    },
+                    modifier = Modifier.fillMaxSize().testTag("floating_radar_fab")
+                ) {
+                    Icon(
+                        imageVector = if (state.isRadarMode) Icons.Default.Place else Icons.Default.Navigation,
+                        contentDescription = "رادار الخدمات",
+                        tint = Color.White,
+                        modifier = Modifier.size(26.dp)
+                    )
                 }
             }
 

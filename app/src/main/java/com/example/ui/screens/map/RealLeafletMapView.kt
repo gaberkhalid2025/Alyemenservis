@@ -99,10 +99,23 @@ fun RealLeafletMapView(
         }
     }
 
-    // التحكم في التكبير والتصغير التفاعلي
+    // [تعديل] التحكم في التكبير والتصغير التفاعلي وربطه مباشرة مع خريطة OpenStreetMap
+    var lastZoomScale by remember { mutableFloatStateOf(zoomScale) }
     LaunchedEffect(zoomScale) {
         if (isMapReady && webViewRef != null) {
-            // مزامنة التكبير إن طلب
+            if (zoomScale > lastZoomScale) {
+                webViewRef?.evaluateJavascript("if (window.zoomIn) { window.zoomIn(); }", null)
+            } else if (zoomScale < lastZoomScale) {
+                webViewRef?.evaluateJavascript("if (window.zoomOut) { window.zoomOut(); }", null)
+            }
+            lastZoomScale = zoomScale
+        }
+    }
+
+    // [تعديل] إعادة التمركز إلى موقع المستخدم عند استدعاء زر موقعي (panOffset = Offset.Zero)
+    LaunchedEffect(panOffset) {
+        if (isMapReady && webViewRef != null && panOffset == Offset.Zero) {
+            webViewRef?.evaluateJavascript("if (window.recenterUser) { window.recenterUser(); }", null)
         }
     }
 
@@ -126,6 +139,7 @@ fun RealLeafletMapView(
                             domStorageEnabled = true
                             databaseEnabled = true
                             cacheMode = WebSettings.LOAD_DEFAULT
+                            userAgentString = "AlYemenServicesApp/1.0 (Android; OpenStreetMap)"
                             setSupportZoom(true)
                             builtInZoomControls = false
                             displayZoomControls = false
@@ -176,9 +190,23 @@ fun RealLeafletMapView(
                                 failingUrl: String?
                             ) {
                                 super.onReceivedError(view, errorCode, description, failingUrl)
-                                // في حال حدوث خطأ نادر نتحول بسلاسة إلى الخريطة البديلة
-                                hasLoadError = true
-                                onMapLoadFailed?.invoke()
+                                // [تعديل] لا ننتقل للبديل إلا إذا كان الملف الأساسي المحلي نفسه فشل لضمان عدم ظهور شاشة سوداء
+                                if (failingUrl?.contains("map.html") == true) {
+                                    hasLoadError = true
+                                    onMapLoadFailed?.invoke()
+                                }
+                            }
+
+                            override fun onReceivedError(
+                                view: WebView?,
+                                request: android.webkit.WebResourceRequest?,
+                                error: android.webkit.WebResourceError?
+                            ) {
+                                super.onReceivedError(view, request, error)
+                                if (request?.isForMainFrame == true) {
+                                    hasLoadError = true
+                                    onMapLoadFailed?.invoke()
+                                }
                             }
                         }
 

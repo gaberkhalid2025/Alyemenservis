@@ -17,10 +17,11 @@ import kotlinx.coroutines.flow.*
  */
 class MapScreenViewModel : ViewModel() {
 
-    private val _uiState = MutableStateFlow<MapScreenUiState>(MapScreenUiState.Success(isRadarMode = true))
+    // [تعديل] الخريطة المباشرة OpenStreetMap هي الوضع الافتراضي لتقديم التجربة التفاعلية الكاملة
+    private val _uiState = MutableStateFlow<MapScreenUiState>(MapScreenUiState.Success(isRadarMode = false))
     val uiState: StateFlow<MapScreenUiState> = _uiState.asStateFlow()
 
-    private val _isRadarMode = MutableStateFlow(true)
+    private val _isRadarMode = MutableStateFlow(false)
     val isRadarMode: StateFlow<Boolean> = _isRadarMode.asStateFlow()
 
     private val _hasMapError = MutableStateFlow(false)
