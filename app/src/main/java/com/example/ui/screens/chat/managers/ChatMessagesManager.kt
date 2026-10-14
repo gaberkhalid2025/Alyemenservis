@@ -12,6 +12,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
+import com.example.utils.EntityIdGenerator
+
 class ChatMessagesManager(
     private val repository: IChatRepository,
     private val scope: CoroutineScope
@@ -43,69 +45,65 @@ class ChatMessagesManager(
         onSuccess: (ChatMessage) -> Unit,
         onError: (String) -> Unit
     ) {
-        scope.launch {
-            _isSending.value = true
-            // التحديث الفوري المحلي (Optimistic Update) لإظهار الرسالة دون تأخير
-            val tempMessage = ChatMessage(
-                id = "temp_${System.currentTimeMillis()}",
-                channelId = channelId,
-                senderId = senderId,
-                senderName = senderName,
-                message = text,
-                mediaType = mediaType,
-                mediaUrl = mediaUrl,
-                timestamp = System.currentTimeMillis(),
-                status = MessageStatus.SENDING
-            )
-            _messages.value = _messages.value + tempMessage
+        val messageId = EntityIdGenerator.generate("msg")
+        val localMessage = ChatMessage(
+            id = messageId,
+            channelId = channelId,
+            senderId = senderId,
+            senderName = senderName,
+            message = text,
+            mediaType = mediaType,
+            mediaUrl = mediaUrl,
+            replyToId = replyTo?.id,
+            replyToText = replyTo?.message,
+            attachment = attachment,
+            audioWaveform = audioWaveform,
+            status = MessageStatus.SENDING,
+            timestamp = System.currentTimeMillis()
+        )
 
-            var attempt = 0
-            var finalResult: AppResult<ChatMessage>? = null
-            while (attempt < 2) {
-                attempt++
-                try {
-                    val result = repository.sendMessage(
-                        channelId = channelId,
-                        senderId = senderId,
-                        senderName = senderName,
-                        messageText = text,
-                        mediaType = mediaType,
-                        mediaUrl = mediaUrl,
-                        replyToId = replyTo?.id,
-                        replyToText = replyTo?.message,
-                        attachment = attachment,
-                        audioWaveform = audioWaveform
-                    )
-                    finalResult = result
-                    if (result is AppResult.Success) {
-                        break
-                    } else if (attempt < 2) {
-                        kotlinx.coroutines.delay(400L)
+        // 1. عرض فوري محلي في الواجهة (Instant Optimistic UI < 50ms)
+        _messages.value = _messages.value + localMessage
+        _isSending.value = true
+
+        // 2. كتابة متفائلة واحدة - التخزين المحلي لـ Firestore وقائمة الانتظار تتولى المزامنة التلقائية دون تأخير
+        scope.launch {
+            try {
+                val result = repository.sendMessage(
+                    channelId = channelId,
+                    senderId = senderId,
+                    senderName = senderName,
+                    messageText = text,
+                    mediaType = mediaType,
+                    mediaUrl = mediaUrl,
+                    replyToId = replyTo?.id,
+                    replyToText = replyTo?.message,
+                    attachment = attachment,
+                    audioWaveform = audioWaveform
+                )
+
+                _isSending.value = false
+                when (result) {
+                    is AppResult.Success -> {
+                        // تحديث الرسالة بالنسخة المؤكدة من السيرفر/الكاش
+                        _messages.value = _messages.value.map {
+                            if (it.id == localMessage.id) result.data else it
+                        }
+                        onSuccess(result.data)
                     }
-                } catch (e: Exception) {
-                    if (attempt >= 2) {
-                        _isSending.value = false
-                        // تحديث حالة الرسالة المؤقتة إلى FAILED عند فشل الإرسال النهائي
-                        _messages.value = _messages.value.map { if (it.id == tempMessage.id) it.copy(status = MessageStatus.FAILED) else it }
-                        onError(e.message ?: "حدث خطأ أثناء الإرسال")
-                        return@launch
+                    is AppResult.Error -> {
+                        _messages.value = _messages.value.map {
+                            if (it.id == localMessage.id) it.copy(status = MessageStatus.FAILED) else it
+                        }
+                        onError(result.error.messageArabic)
                     }
-                    kotlinx.coroutines.delay(400L)
                 }
-            }
-            _isSending.value = false
-            // إزالة الرسالة المؤقتة واستبدالها بالرسالة الناجحة من الخادم
-            _messages.value = _messages.value.filter { it.id != tempMessage.id }
-            when (finalResult) {
-                is AppResult.Success -> onSuccess(finalResult.data)
-                is AppResult.Error -> {
-                    _messages.value = _messages.value + tempMessage.copy(status = MessageStatus.FAILED)
-                    onError(finalResult.error.messageArabic)
+            } catch (e: Exception) {
+                _isSending.value = false
+                _messages.value = _messages.value.map {
+                    if (it.id == localMessage.id) it.copy(status = MessageStatus.FAILED) else it
                 }
-                null -> {
-                    _messages.value = _messages.value + tempMessage.copy(status = MessageStatus.FAILED)
-                    onError("فشل إرسال الرسالة، يرجى الناعرة لإعادة المحاولة")
-                }
+                onError(e.message ?: "حدث خطأ أثناء الإرسال")
             }
         }
     }
@@ -118,6 +116,10 @@ class ChatMessagesManager(
         onError: (String) -> Unit
     ) {
         scope.launch {
+            // إعادة المحاولة على نفس الرسالة بنفس الترتيب الزمني والمعرف
+            _messages.value = _messages.value.map {
+                if (it.id == targetMsg.id) it.copy(status = MessageStatus.SENDING) else it
+            }
             try {
                 val result = repository.sendMessage(
                     channelId = channelId,
@@ -128,16 +130,27 @@ class ChatMessagesManager(
                     mediaUrl = targetMsg.mediaUrl,
                     replyToId = targetMsg.replyToId,
                     replyToText = targetMsg.replyToText,
-                    attachment = targetMsg.attachment
+                    attachment = targetMsg.attachment,
+                    audioWaveform = targetMsg.audioWaveform
                 )
                 when (result) {
                     is AppResult.Success -> {
-                        repository.deleteMessage(channelId, targetMsg.id, forEveryone = false, currentUserId = currentUserId)
+                        _messages.value = _messages.value.map {
+                            if (it.id == targetMsg.id) result.data else it
+                        }
                         onSuccess(result.data)
                     }
-                    is AppResult.Error -> onError(result.error.messageArabic)
+                    is AppResult.Error -> {
+                        _messages.value = _messages.value.map {
+                            if (it.id == targetMsg.id) it.copy(status = MessageStatus.FAILED) else it
+                        }
+                        onError(result.error.messageArabic)
+                    }
                 }
             } catch (e: Exception) {
+                _messages.value = _messages.value.map {
+                    if (it.id == targetMsg.id) it.copy(status = MessageStatus.FAILED) else it
+                }
                 onError(e.message ?: "فشلت إعادة الإرسال")
             }
         }

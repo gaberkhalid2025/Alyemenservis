@@ -3,6 +3,7 @@ package com.example.ui.screens.chat.components
 import androidx.compose.foundation.background
 import com.example.ui.*
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -37,18 +38,28 @@ fun ChatHeaderBar(
     isTyping: Boolean,
     relatedEntityId: String? = null,
     relatedEntityType: String? = null,
+    relatedEntityStatus: String? = null,
     onBackClick: () -> Unit,
     onSearchToggle: () -> Unit,
     onMediaGalleryClick: () -> Unit = {},
     onBlockClick: () -> Unit,
     onDeleteChannelClick: () -> Unit,
+    onContextClick: (() -> Unit)? = null,
     themeColors: VisualThemePalette? = null
 ) {
     var showMenu by remember { mutableStateOf(false) }
 
+    val entityAccentColor = when (relatedEntityType?.uppercase()) {
+        "PROVIDER" -> Color(0xFF3B82F6) // Blue
+        "STORE", "RESTAURANT" -> Color(0xFF10B981) // Emerald
+        "MEDICAL" -> Color(0xFFEC4899) // Rose
+        "PROPERTY" -> Color(0xFF8B5CF6) // Purple
+        else -> themeColors?.accent ?: Color(0xFF64FFDA)
+    }
+
     val surfaceColor = themeColors?.surface ?: Color(0xFF142030)
     val primaryColor = themeColors?.primary ?: Color(0xFF1E88E5)
-    val accentColor = themeColors?.accent ?: Color(0xFF64FFDA)
+    val accentColor = entityAccentColor
     val textPrimary = themeColors?.textPrimary ?: Color.White
     val textSecondary = themeColors?.textSecondary ?: Color.Gray
     val borderColor = themeColors?.border ?: Color.White.copy(alpha = 0.08f)
@@ -187,7 +198,7 @@ fun ChatHeaderBar(
             }
         }
 
-        // Booking / Urgent Request / Entity Context Strip (Modern Telegram/Signal Style)
+        // Booking / Urgent Request / Entity Context Strip (Specialized Maintenance/Service Context)
         if (!relatedEntityId.isNullOrBlank() || !relatedEntityType.isNullOrBlank()) {
             val shortId = if (relatedEntityId != null && relatedEntityId.length > 8) {
                 relatedEntityId.takeLast(8)
@@ -195,40 +206,56 @@ fun ChatHeaderBar(
                 relatedEntityId ?: ""
             }
 
+            val statusSuffix = if (!relatedEntityStatus.isNullOrBlank()) " · $relatedEntityStatus" else ""
+
             val (contextText, badgeColor) = when (relatedEntityType?.uppercase()) {
-                "BOOKING" -> "🗓️ مرتبط بحجز موعد: #$shortId" to Color(0xFF3B82F6) // Elegant Blue
-                "URGENT_REQUEST" -> "🚨 مرتبط بطلب عاجل: #$shortId" to Color(0xFFF59E0B) // Amber
-                "SUPPORT" -> "🛠️ محادثة الدعم الفني: #$shortId" to Color(0xFF10B981) // Emerald
-                "STORE", "RESTAURANT" -> "🏪 استفسار حول المتجر / المنتجات: #$shortId" to Color(0xFF8B5CF6) // Purple
-                "MEDICAL" -> "🏥 استفسار طبي / حجز عيادة: #$shortId" to Color(0xFFEC4899) // Rose
-                "PROPERTY" -> "🏠 استفسار حول العقار: #$shortId" to Color(0xFF06B6D4) // Cyan
-                else -> if (!relatedEntityId.isNullOrBlank()) "📋 طلب خدمة: #$shortId" to Color(0xFF64748B) else (null to Color.Transparent)
+                "BOOKING" -> "🗓️ حجز موعد صيانة #$shortId$statusSuffix" to Color(0xFF3B82F6) // Elegant Blue
+                "URGENT_REQUEST" -> "🚨 طلب صيانة عاجل #$shortId$statusSuffix" to Color(0xFFF59E0B) // Amber
+                "SUPPORT" -> "🛠️ محادثة الدعم الفني #$shortId$statusSuffix" to Color(0xFF10B981) // Emerald
+                "STORE", "RESTAURANT" -> "🏪 استفسار حول المتجر / المنتجات #$shortId$statusSuffix" to Color(0xFF8B5CF6) // Purple
+                "MEDICAL" -> "🏥 استفسار طبي / موعد عيادة #$shortId$statusSuffix" to Color(0xFFEC4899) // Rose
+                "PROPERTY" -> "🏠 استفسار حول العقار #$shortId$statusSuffix" to Color(0xFF06B6D4) // Cyan
+                else -> if (!relatedEntityId.isNullOrBlank()) "🔧 طلب خدمة صيانة #$shortId$statusSuffix" to Color(0xFF64748B) else (null to Color.Transparent)
             }
 
             if (contextText != null) {
                 Surface(
-                    color = badgeColor.copy(alpha = 0.12f),
-                    modifier = Modifier.fillMaxWidth()
+                    color = badgeColor.copy(alpha = 0.15f),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .then(
+                            if (onContextClick != null) Modifier.clickable { onContextClick() } else Modifier
+                        )
                 ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 14.dp, vertical = 5.dp),
+                            .padding(horizontal = 14.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(6.dp)
+                                .size(7.dp)
                                 .background(badgeColor, CircleShape)
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
+                        Spacer(modifier = Modifier.width(7.dp))
                         Text(
                             text = contextText,
                             fontSize = 11.5.sp,
-                            fontWeight = FontWeight.Medium,
+                            fontWeight = FontWeight.SemiBold,
                             color = badgeColor,
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
+                        if (onContextClick != null) {
+                            Text(
+                                text = "تفاصيل الخدمة ↗",
+                                fontSize = 10.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = badgeColor
+                            )
+                        }
                     }
                 }
             }

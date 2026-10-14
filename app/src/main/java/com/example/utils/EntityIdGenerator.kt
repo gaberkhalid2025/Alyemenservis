@@ -46,7 +46,9 @@ object EntityIdGenerator {
     /**
      * Generates a unique prefixed ID with timestamp sequence guarantee
      */
-    fun generate(prefix: Prefix): String {
+    fun generate(prefix: Prefix): String = generate(prefix.tag)
+
+    fun generate(prefixStr: String): String {
         var now = System.currentTimeMillis()
         var prev = lastTimestamp.get()
         while (now <= prev) {
@@ -54,8 +56,9 @@ object EntityIdGenerator {
         }
         lastTimestamp.set(now)
 
+        val cleanTag = prefixStr.trim().uppercase().ifBlank { "ID" }
         val randomSuffix = UUID.randomUUID().toString().replace("-", "").take(6).uppercase()
-        return "${prefix.tag}_${now}_$randomSuffix"
+        return "${cleanTag}_${now}_$randomSuffix"
     }
 
     fun generateUserId(): String = generate(Prefix.USER)

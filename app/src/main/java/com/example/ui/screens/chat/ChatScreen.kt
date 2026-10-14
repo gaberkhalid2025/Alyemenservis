@@ -8,8 +8,11 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import com.example.ui.screens.chat.managers.ChatSmartSuggestionsEngine
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -253,6 +256,7 @@ fun ChatScreen(
                     isTyping = isTypingOther,
                     relatedEntityId = activeChannel?.relatedEntityId ?: relatedEntityId,
                     relatedEntityType = activeChannel?.relatedEntityType ?: relatedEntityType,
+                    relatedEntityStatus = "قيد التنفيذ والمتابعة",
                     onBackClick = onBackClick,
                     onSearchToggle = {
                         isSearchOpen = !isSearchOpen
@@ -269,6 +273,10 @@ fun ChatScreen(
                     },
                     onMediaGalleryClick = {
                         showMediaGallery = true
+                    },
+                    onContextClick = {
+                        val refId = (activeChannel?.relatedEntityId ?: relatedEntityId)?.takeLast(6) ?: ""
+                        Toast.makeText(context, "الخدمة مرتبطة بالسجل #$refId", Toast.LENGTH_SHORT).show()
                     },
                     themeColors = themeColors
                 )
@@ -396,6 +404,42 @@ fun ChatScreen(
                             }
                         }
 
+                        // Smart conversation summary card when opening a busy chat
+                        val smartSummary = ChatSmartSuggestionsEngine.summarizeMessages(filteredMessages)
+                        if (smartSummary != null) {
+                            item(key = "conversation_summary_card") {
+                                Surface(
+                                    color = Color(0xFF1E293B).copy(alpha = 0.85f),
+                                    shape = RoundedCornerShape(12.dp),
+                                    border = BorderStroke(1.dp, Color(0xFF38BDF8).copy(alpha = 0.25f)),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 4.dp, vertical = 4.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text("📋", fontSize = 16.sp)
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = smartSummary.summaryTitle,
+                                                color = Color(0xFF38BDF8),
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                            Text(
+                                                text = smartSummary.summaryDetails,
+                                                color = Color(0xFF94A3B8),
+                                                fontSize = 10.5.sp
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
                         itemsIndexed(filteredMessages, key = { _, msg -> msg.id }) { index, msg ->
                             val showDateSeparator = index == 0 || !isSameDay(filteredMessages[index - 1].timestamp, msg.timestamp)
                             if (showDateSeparator && msg.timestamp > 0) {
@@ -403,9 +447,19 @@ fun ChatScreen(
                             }
 
                             val isMe = msg.senderId == currentUserId
+                            val isPreviousSame = index > 0 &&
+                                    filteredMessages[index - 1].senderId == msg.senderId &&
+                                    !showDateSeparator
+                            val isNextSame = index < filteredMessages.size - 1 &&
+                                    filteredMessages[index + 1].senderId == msg.senderId &&
+                                    isSameDay(filteredMessages[index + 1].timestamp, msg.timestamp)
+
                             ChatBubbleItem(
                                 message = msg,
                                 isMe = isMe,
+                                isPreviousSameSender = isPreviousSame,
+                                isNextSameSender = isNextSame,
+                                relatedEntityType = activeChannel?.relatedEntityType ?: relatedEntityType,
                                 onReplyClick = { chatViewModel.setReplyingTo(msg) },
                                 onLongClick = { selectedMessageForAction = msg },
                                 onReactionClick = { emoji -> chatViewModel.toggleReaction(msg.id, emoji) },
@@ -459,6 +513,52 @@ fun ChatScreen(
                         userName = activeChannel?.participantNames?.get(otherUserId) ?: otherUserName
                     )
                 }
+
+                // 🧠 Smart Quick Reply Suggestions (اقتراحات الردود الذكية فوق شريط الإدخال)
+                val lastMsg = messages.lastOrNull()
+                val isLastMsgMine = lastMsg?.senderId == currentUserId
+                val smartSuggestions = remember(lastMsg?.id, lastMsg?.message, isLastMsgMine) {
+                    ChatSmartSuggestionsEngine.generateSuggestions(
+                        lastMessage = lastMsg,
+                        isLastMessageMine = isLastMsgMine,
+                        relatedEntityType = activeChannel?.relatedEntityType ?: relatedEntityType
+                    )
+                }
+
+                if (smartSuggestions.isNotEmpty() && !isTypingOther && editingMessage == null) {
+                    LazyRow(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        items(smartSuggestions) { suggestion ->
+                            Surface(
+                                color = Color(0xFF1E293B),
+                                shape = RoundedCornerShape(16.dp),
+                                border = BorderStroke(1.dp, Color(0xFF38BDF8).copy(alpha = 0.35f)),
+                                shadowElevation = 1.dp,
+                                modifier = Modifier.clickable {
+                                    chatViewModel.sendMessage(
+                                        senderId = currentUserId,
+                                        senderName = currentUserName,
+                                        text = suggestion,
+                                        mediaType = MediaType.TEXT
+                                    )
+                                }
+                            ) {
+                                Text(
+                                    text = suggestion,
+                                    color = Color(0xFFF1F5F9),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
                 ChatInputBar(
                     channelId = activeChannel?.id ?: channelId ?: "direct_chat",
                     replyingTo = replyingTo,
