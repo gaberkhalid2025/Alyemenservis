@@ -1,11 +1,11 @@
 package com.example.ui.screens.map.components
 
 import androidx.compose.foundation.BorderStroke
-import com.example.ui.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -22,11 +22,11 @@ import com.example.ui.screens.map.utils.OfflineMapManager
 import com.example.utils.VisualThemePalette
 
 /**
- * 🔍 MapFilterBar
- * Interactive top filter bar containing:
- * - Search text field
- * - City selector dropdown (Sana'a, Aden, Taiz, etc.)
- * - Categorical filter chips (All, Technicians, Stores, Restaurants, Medical, Properties)
+ * 🔍 MapFilterBar (مطابق للشاشة المرفقة)
+ * شريط البحث والفلاتر المزدوج:
+ * 1. شريط بحث أسود مع زر البرق البرتقالي للطلبات العاجلة
+ * 2. شريط شرائح الفئات: كل الفئات، فنيين، متاجر ومحلات، مطاعم وكافيهات، مراكز طبية، عقارات
+ * 3. شريط شرائح المحافظات: كل المحافظات، صنعاء، عدن، تعز، الحديدة، إب...
  */
 @Composable
 fun MapFilterBar(
@@ -39,142 +39,112 @@ fun MapFilterBar(
     themeColors: VisualThemePalette,
     modifier: Modifier = Modifier
 ) {
-    var isCityMenuExpanded by remember { mutableStateOf(false) }
+    val categories = remember {
+        listOf(
+            Triple("ALL", "كل الفئات 🌐", "🌐"),
+            Triple("PROVIDERS", "فنيين 👷", "👷"),
+            Triple("STORES", "متاجر ومحلات 🏪", "🏪"),
+            Triple("RESTAURANTS", "مطاعم وكافيهات 🍔", "🍔"),
+            Triple("MEDICAL", "مراكز طبية 🏥", "🏥"),
+            Triple("PROPERTIES", "عقارات 🏠", "🏠")
+        )
+    }
 
-    val categories = listOf(
-        Triple("ALL", "الكل", "🌐"),
-        Triple("PROVIDERS", "فنيون 👷", "👷"),
-        Triple("STORES", "متاجر 🏪", "🏪"),
-        Triple("RESTAURANTS", "مطاعم 🍔", "🍔"),
-        Triple("MEDICAL", "طبية 🏥", "🏥"),
-        Triple("PROPERTIES", "عقارات 🏠", "🏠")
-    )
+    val governorates = remember {
+        listOf("الكل", "صنعاء", "عدن", "تعز", "الحديدة", "إب", "حضرموت (المكلا)", "مأرب", "ذمار")
+    }
 
     Column(
         modifier = modifier
             .fillMaxWidth()
             .background(Color(0xFF0F172A))
-            .padding(horizontal = 12.dp, vertical = 6.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        // Search & City Row
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
+        // 1. Search Bar with Quick Action Lightning Button
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = Color(0xFF1E293B),
+            border = BorderStroke(1.dp, Color(0xFF334155)),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(52.dp)
         ) {
-            // Search Field
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = onSearchQueryChange,
-                placeholder = { 
-                    Text(
-                        text = "بحث عن خدمة، فني، مركز أو متجر...", 
-                        fontSize = 12.5.sp, 
-                        fontWeight = FontWeight.Normal,
-                        color = Color(0xFF94A3B8)
-                    ) 
-                },
-                leadingIcon = { 
-                    Icon(
-                        Icons.Default.Search, 
-                        contentDescription = "بحث", 
-                        tint = Color(0xFF00E5FF), 
-                        modifier = Modifier.size(20.dp)
-                    ) 
-                },
-                trailingIcon = {
-                    if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { onSearchQueryChange("") }, modifier = Modifier.size(28.dp)) {
-                            Icon(
-                                Icons.Default.Clear, 
-                                contentDescription = "مسح", 
-                                tint = Color(0xFF00E5FF), 
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                    }
-                },
-                textStyle = androidx.compose.ui.text.TextStyle(
-                    color = Color.White,
-                    fontSize = 13.5.sp,
-                    fontWeight = FontWeight.SemiBold
-                ),
-                singleLine = true,
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = Color(0xFF1E293B),
-                    unfocusedContainerColor = Color(0xFF1E293B),
-                    focusedBorderColor = Color(0xFF00E5FF),
-                    unfocusedBorderColor = Color(0xFF334155),
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White,
-                    cursorColor = Color(0xFF00E5FF),
-                    focusedPlaceholderColor = Color(0xFF94A3B8),
-                    unfocusedPlaceholderColor = Color(0xFF94A3B8)
-                ),
+            Row(
                 modifier = Modifier
-                    .weight(1f)
-                    .testTag("map_search_input")
-            )
+                    .fillMaxSize()
+                    .padding(horizontal = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Search,
+                    contentDescription = "بحث",
+                    tint = Color(0xFF10B981),
+                    modifier = Modifier.size(22.dp)
+                )
 
-            // City Selector Box
-            Box {
-                Surface(
-                    onClick = { isCityMenuExpanded = true },
-                    shape = RoundedCornerShape(12.dp),
-                    color = Color(0xFF1E293B),
-                    border = BorderStroke(1.dp, Color(0xFF334155)),
-                    modifier = Modifier.height(48.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Icon(Icons.Default.Place, contentDescription = null, tint = Color(0xFF00E5FF), modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+
+                TextField(
+                    value = searchQuery,
+                    onValueChange = onSearchQueryChange,
+                    placeholder = {
                         Text(
-                            text = selectedCity.ifEmpty { "المدينة" },
-                            color = Color.White,
+                            text = "ابحث عن فني، متجر، مطعم، صيدلية، عقار...",
                             fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold
+                            color = Color(0xFF94A3B8)
                         )
-                        Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = Color(0xFF94A3B8))
+                    },
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = Color.Transparent,
+                        unfocusedContainerColor = Color.Transparent,
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent,
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        cursorColor = Color(0xFF00E5FF)
+                    ),
+                    singleLine = true,
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("map_search_input")
+                )
+
+                if (searchQuery.isNotEmpty()) {
+                    IconButton(
+                        onClick = { onSearchQueryChange("") },
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Clear,
+                            contentDescription = "مسح",
+                            tint = Color(0xFF94A3B8),
+                            modifier = Modifier.size(16.dp)
+                        )
                     }
                 }
 
-                DropdownMenu(
-                    expanded = isCityMenuExpanded,
-                    onDismissRequest = { isCityMenuExpanded = false },
-                    modifier = Modifier.background(Color(0xFF1E293B))
+                // Orange Lightning Action Circle (كالصورة المرفقة)
+                Surface(
+                    shape = CircleShape,
+                    color = Color(0xFFFF4500), // Vibrant Red-Orange
+                    modifier = Modifier
+                        .size(36.dp)
+                        .testTag("quick_urgent_action_btn")
                 ) {
-                    DropdownMenuItem(
-                        text = { Text("جميع المدن والمحافظات", color = Color(0xFF00E5FF), fontSize = 13.sp, fontWeight = FontWeight.Bold) },
-                        onClick = {
-                            onCitySelected("الكل")
-                            isCityMenuExpanded = false
-                        },
-                        leadingIcon = {
-                            Icon(Icons.Default.Place, contentDescription = null, tint = Color(0xFF00E5FF), modifier = Modifier.size(16.dp))
-                        }
-                    )
-                    OfflineMapManager.MAJOR_YEMENI_CITIES.forEach { city ->
-                        DropdownMenuItem(
-                            text = { Text(city.nameAr, color = Color.White, fontSize = 13.sp) },
-                            onClick = {
-                                onCitySelected(city.nameAr)
-                                isCityMenuExpanded = false
-                            },
-                            leadingIcon = {
-                                Icon(Icons.Default.Place, contentDescription = null, tint = Color(0xFF94A3B8), modifier = Modifier.size(16.dp))
-                            }
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.Bolt,
+                            contentDescription = "طلب عاجل",
+                            tint = Color.White,
+                            modifier = Modifier.size(22.dp)
                         )
                     }
                 }
             }
         }
 
-        // Horizontal Category Filter Chips
+        // 2. Category Filter Chips (Row 1)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -183,32 +153,77 @@ fun MapFilterBar(
         ) {
             categories.forEach { (catKey, catLabel, _) ->
                 val isSelected = selectedCategory == catKey
-                FilterChip(
-                    selected = isSelected,
-                    onClick = { onCategorySelected(catKey) },
-                    label = {
-                        Text(
-                            catLabel,
-                            fontSize = 11.5.sp,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                            color = if (isSelected) Color(0xFF0F172A) else Color.White
-                        )
-                    },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = Color(0xFF00E5FF),
-                        containerColor = Color(0xFF1E293B),
-                        selectedLabelColor = Color(0xFF0F172A),
-                        labelColor = Color.White
-                    ),
-                    border = FilterChipDefaults.filterChipBorder(
-                        enabled = true,
-                        selected = isSelected,
-                        borderColor = Color(0xFF334155),
-                        selectedBorderColor = Color(0xFF00E5FF)
-                    ),
+                Surface(
                     shape = RoundedCornerShape(20.dp),
-                    modifier = Modifier.testTag("filter_chip_$catKey")
-                )
+                    color = if (isSelected) Color(0xFF2563EB) else Color(0xFF1E293B),
+                    border = BorderStroke(
+                        1.dp,
+                        if (isSelected) Color(0xFF60A5FA) else Color(0xFF334155)
+                    ),
+                    modifier = Modifier
+                        .height(34.dp)
+                        .testTag("filter_chip_$catKey")
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .padding(horizontal = 12.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        androidx.compose.foundation.text.ClickableText(
+                            text = androidx.compose.ui.text.AnnotatedString(catLabel),
+                            style = androidx.compose.ui.text.TextStyle(
+                                color = if (isSelected) Color.White else Color(0xFFCBD5E1),
+                                fontSize = 11.5.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                            ),
+                            onClick = { onCategorySelected(catKey) }
+                        )
+                    }
+                }
+            }
+        }
+
+        // 3. Governorate Selector Chips (Row 2 - كالصورة المرفقة)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            governorates.forEach { gov ->
+                val isSelected = (gov == "الكل" && (selectedCity == "الكل" || selectedCity.isBlank())) ||
+                        selectedCity == gov
+                val label = if (gov == "الكل") "كل المحافظات 📍" else gov
+
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = if (isSelected) Color(0xFF0F766E) else Color(0xFF1E293B),
+                    border = BorderStroke(
+                        1.dp,
+                        if (isSelected) Color(0xFF14B8A6) else Color(0xFF334155)
+                    ),
+                    modifier = Modifier
+                        .height(30.dp)
+                        .testTag("city_chip_$gov")
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .padding(horizontal = 10.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        androidx.compose.foundation.text.ClickableText(
+                            text = androidx.compose.ui.text.AnnotatedString(label),
+                            style = androidx.compose.ui.text.TextStyle(
+                                color = if (isSelected) Color.White else Color(0xFF94A3B8),
+                                fontSize = 11.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                            ),
+                            onClick = { onCitySelected(gov) }
+                        )
+                    }
+                }
             }
         }
     }

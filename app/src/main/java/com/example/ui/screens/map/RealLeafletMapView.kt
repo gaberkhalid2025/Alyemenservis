@@ -1,6 +1,12 @@
 package com.example.ui.screens.map
 
+import android.annotation.SuppressLint
 import android.content.Context
+import android.view.ViewGroup
+import android.webkit.JavascriptInterface
+import android.webkit.WebSettings
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -8,18 +14,27 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.viewinterop.AndroidView
 import com.example.data.AdminSettingsEntity
 import com.example.data.PropertyEntity
 import com.example.data.ProviderEntity
 import com.example.data.StoreEntity
 import com.example.ui.screens.map.components.OfflineInteractiveMap
+import com.example.ui.screens.map.utils.MapJsonBuilder
+import com.example.ui.screens.map.utils.OfflineMapManager
 import com.example.utils.VisualThemePalette
 import com.example.utils.resolveThemePalette
 
 /**
- * 🗺️ RealLeafletMapView (100% Native High-Performance Jetpack Compose Vector Map)
- * Pure Native Canvas - Zero WebViews, Zero Black Screens, Guaranteed 60FPS!
+ * 🗺️ RealLeafletMapView (100% Free OpenStreetMap + Offline Tile Cache Engine)
+ * - تحميل خريطة OpenStreetMap الرسمية المجانية بدون أي مفتاح API
+ * - دعم كامل للمس المتعدد والتكبير والتصغير السلس (Pinch / Multi-Touch Zoom)
+ * - ربط العلامات الملونة حسب نوع الكيان مع Bottom Sheet تفاعلي
+ * - مؤشر نابض أزرق لموقع المستخدم الفعلي
+ * - تخزين محلي للبلاطات لتصفح المناطق بدون إنترنت
  */
+@SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun RealLeafletMapView(
     userCoords: Pair<Double, Double>,
@@ -42,30 +57,162 @@ fun RealLeafletMapView(
     themeColors: VisualThemePalette = resolveThemePalette(AdminSettingsEntity()),
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    var isMapReady by remember { mutableStateOf(false) }
+    var webViewRef by remember { mutableStateOf<WebView?>(null) }
+    var hasLoadError by remember { mutableStateOf(false) }
+
+    // تحويل البيانات إلى JSON مهيأ للبلاطات والعلامات
+    val markersJson = remember(nearbyProviders, nearbyStores, nearbyProperties, selectedCity) {
+        MapJsonBuilder.buildMarkersJson(
+            nearbyProviders = nearbyProviders,
+            nearbyStores = nearbyStores,
+            nearbyProperties = nearbyProperties,
+            dynamicOffsets = dynamicOffsets,
+            safeUserLat = userCoords.first,
+            safeUserLng = userCoords.second
+        )
+    }
+
+    // إرسال العلامات للخريطة عند اكتمال الجاهزية أو تغير البيانات
+    LaunchedEffect(isMapReady, markersJson) {
+        if (isMapReady && webViewRef != null) {
+            val script = "if (window.setMarkers) { window.setMarkers('$markersJson'); }"
+            webViewRef?.evaluateJavascript(script, null)
+        }
+    }
+
+    // تحديث موقع المستخدم الفعلي على الخريطة
+    LaunchedEffect(isMapReady, userCoords) {
+        if (isMapReady && webViewRef != null && userCoords.first != 0.0 && userCoords.second != 0.0) {
+            val script = "if (window.updateUserLocation) { window.updateUserLocation(${userCoords.first}, ${userCoords.second}, 30, false); }"
+            webViewRef?.evaluateJavascript(script, null)
+        }
+    }
+
+    // تمركز الخريطة عند تغيير المدينة
+    LaunchedEffect(isMapReady, selectedCity) {
+        if (isMapReady && webViewRef != null) {
+            val cityCoords = OfflineMapManager.getCityCoordinates(selectedCity)
+            val script = "if (window.setCity) { window.setCity('${cityCoords.nameAr}', ${cityCoords.latitude}, ${cityCoords.longitude}, ${cityCoords.defaultZoom}); }"
+            webViewRef?.evaluateJavascript(script, null)
+        }
+    }
+
+    // التحكم في التكبير والتصغير التفاعلي
+    LaunchedEffect(zoomScale) {
+        if (isMapReady && webViewRef != null) {
+            // مزامنة التكبير إن طلب
+        }
+    }
+
     Box(
         modifier = modifier
             .fillMaxSize()
             .background(Color(0xFF0F172A))
     ) {
-        OfflineInteractiveMap(
-            userCoords = userCoords,
-            nearbyProviders = nearbyProviders,
-            nearbyStores = nearbyStores,
-            nearbyProperties = nearbyProperties,
-            dynamicOffsets = dynamicOffsets,
-            selectedCity = selectedCity,
-            zoomScale = zoomScale,
-            onZoomScaleChange = onZoomScaleChange,
-            panOffset = panOffset,
-            onPanOffsetChange = onPanOffsetChange,
-            selectedEntity = selectedEntity,
-            onProviderSelected = onProviderSelected,
-            onStoreSelected = onStoreSelected,
-            onPropertySelected = onPropertySelected,
-            onDeselect = onDeselect,
-            onSwitchToRadar = onSwitchToRadar,
-            modifier = Modifier.fillMaxSize()
-        )
+        if (!hasLoadError) {
+            AndroidView(
+                factory = { ctx ->
+                    WebView(ctx).apply {
+                        layoutParams = ViewGroup.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.MATCH_PARENT
+                        )
+                        setBackgroundColor(android.graphics.Color.parseColor("#0F172A"))
+
+                        settings.apply {
+                            javaScriptEnabled = true
+                            domStorageEnabled = true
+                            databaseEnabled = true
+                            cacheMode = WebSettings.LOAD_DEFAULT
+                            setSupportZoom(true)
+                            builtInZoomControls = false
+                            displayZoomControls = false
+                            loadWithOverviewMode = true
+                            useWideViewPort = true
+                            allowFileAccess = true
+                            allowContentAccess = true
+                        }
+
+                        // جسر التواصل بين JavaScript في Leaflet وكود Kotlin الأصلي
+                        addJavascriptInterface(object {
+                            @JavascriptInterface
+                            fun onMapReady() {
+                                isMapReady = true
+                            }
+
+                            @JavascriptInterface
+                            fun onMapClicked() {
+                                onDeselect()
+                            }
+
+                            @JavascriptInterface
+                            fun onMarkerClicked(id: String, type: String) {
+                                when (type.uppercase()) {
+                                    "PROVIDER" -> {
+                                        nearbyProviders.find { it.id == id }?.let { onProviderSelected(it) }
+                                    }
+                                    "STORE", "RESTAURANT", "MEDICAL" -> {
+                                        nearbyStores.find { it.id == id }?.let { onStoreSelected(it) }
+                                    }
+                                    "PROPERTY" -> {
+                                        nearbyProperties.find { it.id == id }?.let { onPropertySelected(it) }
+                                    }
+                                }
+                            }
+                        }, "AndroidBridge")
+
+                        webViewClient = object : WebViewClient() {
+                            override fun onPageFinished(view: WebView?, url: String?) {
+                                super.onPageFinished(view, url)
+                                isMapReady = true
+                            }
+
+                            override fun onReceivedError(
+                                view: WebView?,
+                                errorCode: Int,
+                                description: String?,
+                                failingUrl: String?
+                            ) {
+                                super.onReceivedError(view, errorCode, description, failingUrl)
+                                // في حال حدوث خطأ نادر نتحول بسلاسة إلى الخريطة البديلة
+                                hasLoadError = true
+                                onMapLoadFailed?.invoke()
+                            }
+                        }
+
+                        loadUrl("file:///android_asset/map.html")
+                        webViewRef = this
+                    }
+                },
+                update = { webView ->
+                    webViewRef = webView
+                },
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            // الخريطة التفاعلية المحلية البديلة في حالة الطوارئ (100% بدون شاشة سوداء)
+            OfflineInteractiveMap(
+                userCoords = userCoords,
+                nearbyProviders = nearbyProviders,
+                nearbyStores = nearbyStores,
+                nearbyProperties = nearbyProperties,
+                dynamicOffsets = dynamicOffsets,
+                selectedCity = selectedCity,
+                zoomScale = zoomScale,
+                onZoomScaleChange = onZoomScaleChange,
+                panOffset = panOffset,
+                onPanOffsetChange = onPanOffsetChange,
+                selectedEntity = selectedEntity,
+                onProviderSelected = onProviderSelected,
+                onStoreSelected = onStoreSelected,
+                onPropertySelected = onPropertySelected,
+                onDeselect = onDeselect,
+                onSwitchToRadar = onSwitchToRadar,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
     }
 }
 

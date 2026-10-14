@@ -80,7 +80,7 @@ object MapJsonBuilder {
                 put("phone", p.phone)
                 put("rating", if (p.rating > 0) String.format(java.util.Locale.US, "%.1f", p.rating) else "5.0")
                 put("status", if (p.isAvailable) "متاح لاستقبال الطلبات 🟢" else "مشغول حالياً 🟡")
-                put("badgeColor", "#00E5FF")
+                put("badgeColor", "#2563EB") // أزرق للفنيين
                 put("serviceCategory", "فنيون صيانة")
             }
             jsonArray.put(obj)
@@ -104,9 +104,9 @@ object MapJsonBuilder {
             val isApproximate = s.latitude == 0.0 || s.longitude == 0.0
 
             val (badgeColor, categoryLabel) = when {
-                isMedical -> Pair("#EC4899", "مراكز طبية وصيدليات")
-                isRestaurant -> Pair("#F59E0B", "مطاعم وكافيهات")
-                else -> Pair("#10B981", "متاجر وأسواق")
+                isMedical -> Pair("#EF4444", "مراكز طبية وصيدليات") // أحمر للمراكز الطبية
+                isRestaurant -> Pair("#F59E0B", "مطاعم وكافيهات") // برتقالي للمطاعم
+                else -> Pair("#10B981", "متاجر وأسواق") // أخضر للمتاجر
             }
 
             val cleanDesc = s.description.ifBlank { if (isMedical) "مركز طبي / صيدلية معتمدة" else "محل / متجر معتمد" }.take(60)

@@ -247,6 +247,26 @@ fun MapBottomSheet(
                         Icon(Icons.Default.LocationOn, contentDescription = "فتح في خرائط جوجل", tint = Color(0xFF10B981), modifier = Modifier.size(18.dp))
                     }
 
+                    // Share Button (زر مشاركة البيانات)
+                    IconButton(
+                        onClick = {
+                            try {
+                                val shareText = "📍 $title\n🏷️ $subtitle ($categoryLabel)\n📞 الهاتف: $phone\n🗺️ تمت المشاركة عبر تطبيق دليل خدمات اليمن"
+                                val sendIntent = Intent().apply {
+                                    action = Intent.ACTION_SEND
+                                    putExtra(Intent.EXTRA_TEXT, shareText)
+                                    type = "text/plain"
+                                }
+                                context.startActivity(Intent.createChooser(sendIntent, "مشاركة بيانات الخدمة"))
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+                        },
+                        modifier = Modifier.size(32.dp).testTag("share_entity_btn")
+                    ) {
+                        Icon(Icons.Default.Share, contentDescription = "مشاركة", tint = Color(0xFF38BDF8), modifier = Modifier.size(18.dp))
+                    }
+
                     // Close Button
                     IconButton(
                         onClick = onDismiss,

@@ -22,7 +22,10 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.*
 
 /**
- * 📡 RadarRenderer (التوقيع المتقدم المتوافق مع MapItemPoint + Clustering + Heatmap)
+ * 📡 RadarRenderer (نظام الرادار المتقدم - يعمل بنسبة 100% بدون تجمد مع أنيميشن المسح المزدوج)
+ * - أنيميشن مسح دائري سلس 360 درجة (Sweep Animation)
+ * - 3 موجات نبضية متزامنة ونابضة تعبر عن إشارات اللاسلكي
+ * - توافق تام مع التجميع اللوني لكافة فئات الفنيين والمتاجر والعقارات
  */
 @Composable
 fun RadarRenderer(

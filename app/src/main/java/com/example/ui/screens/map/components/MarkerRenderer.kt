@@ -37,14 +37,14 @@ object MarkerRenderer {
 
     fun getColorForType(type: String): Color {
         return when (type.uppercase()) {
-            "PROVIDER", "TECHNICIAN" -> Color(0xFF00E5FF)
+            "PROVIDER", "TECHNICIAN" -> Color(0xFF2563EB) // أزرق للفنيين
             "URGENT_PROVIDER", "URGENT" -> Color(0xFFEF4444)
-            "STORE" -> Color(0xFF10B981)
-            "RESTAURANT" -> Color(0xFFF59E0B)
-            "MEDICAL" -> Color(0xFFEC4899)
-            "PROPERTY", "REAL_ESTATE" -> Color(0xFF8B5CF6)
+            "STORE" -> Color(0xFF10B981) // أخضر للمتاجر
+            "RESTAURANT" -> Color(0xFFF97316) // برتقالي للمطاعم
+            "MEDICAL" -> Color(0xFFEF4444) // أحمر للمراكز الطبية
+            "PROPERTY", "REAL_ESTATE" -> Color(0xFF8B5CF6) // بنفسجي للعقارات
             "JOB", "JOBS" -> Color(0xFF6366F1)
-            else -> Color(0xFF00E5FF)
+            else -> Color(0xFF2563EB)
         }
     }
 

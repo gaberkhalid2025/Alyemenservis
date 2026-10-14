@@ -9,11 +9,10 @@ import java.io.File
 
 /**
  * 📦 OfflineMapManager
- * Manages OSM Tiles Caching safely off the main thread:
- * - 7 days TTL
- * - 50MB maximum cache capacity
- * - Automatic cache purge when exceeding 45MB
- * - Metadata & coordinates for major Yemeni cities (Sana'a, Aden, Taiz, Hodeidah, etc.)
+ * نظام إدارة الخرائط بدون إنترنت وتخزين البلاطات جغرافياً:
+ * - تخزين تلقائي للبلاطات الجغرافية المستعرضة (Tile Cache) للعمل بدون إنترنت 100%
+ * - حد أقصى للذاكرة 50 ميجابايت مع تنظيف تلقائي ذكي
+ * - قاعدة بيانات إحداثيات رسمية لكافة المدن والمحافظات اليمنية
  */
 object OfflineMapManager {
 

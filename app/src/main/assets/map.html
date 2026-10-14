@@ -157,9 +157,9 @@
 
     <!-- Quick Map Type Switcher -->
     <div class="map-layer-switch">
-        <button id="btnGoogleRoads" class="layer-btn active" onclick="switchLayer('google_roads')">شوارع</button>
+        <button id="btnOSM" class="layer-btn active" onclick="switchLayer('osm')">خريطة OSM الحية</button>
+        <button id="btnGoogleRoads" class="layer-btn" onclick="switchLayer('google_roads')">شوارع</button>
         <button id="btnGoogleSat" class="layer-btn" onclick="switchLayer('google_satellite')">قمر صناعي</button>
-        <button id="btnOSM" class="layer-btn" onclick="switchLayer('osm')">OSM</button>
     </div>
 
     <script src="leaflet.js"></script>
@@ -172,41 +172,46 @@
         var userAccuracyCircle = null;
         var userLat = 15.3694;
         var userLng = 44.1910;
-        var activeLayerKey = 'google_roads';
+        var activeLayerKey = 'osm';
 
-        // Tile Providers (100% Free with Full Yemeni Arabic Street Names)
+        // Tile Providers (100% Free OpenStreetMap TileSource MAPNIK with Arabic support)
         var tileProviders = {
-            // Google Maps Roadmap in Arabic (All streets, neighborhoods, rounds, shops)
+            // OpenStreetMap Standard (TileSourceFactory.MAPNIK Official Server - Free without API Key)
+            'osm': L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                minZoom: 4,
+                maxZoom: 20,
+                attribution: '© OpenStreetMap contributors'
+            }),
+            // Google Maps Roadmap in Arabic fallback
             'google_roads': L.tileLayer('https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}&hl=ar', {
                 subdomains: ['0', '1', '2', '3'],
-                maxZoom: 21,
+                minZoom: 4,
+                maxZoom: 20,
                 attribution: '© Google Maps'
             }),
-            // Google Maps Hybrid/Satellite (Satellite imagery with road names in Arabic)
+            // Google Maps Hybrid/Satellite
             'google_satellite': L.tileLayer('https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}&hl=ar', {
                 subdomains: ['0', '1', '2', '3'],
-                maxZoom: 21,
+                minZoom: 4,
+                maxZoom: 20,
                 attribution: '© Google Satellite'
-            }),
-            // OpenStreetMap Standard
-            'osm': L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                maxZoom: 19,
-                attribution: '© OpenStreetMap contributors'
             })
         };
 
         function initMap() {
             try {
-                // Initialize map centered on Sana'a by default
+                // Initialize map centered on Sana'a by default with minZoom 4 and maxZoom 20
                 map = L.map('map', {
                     center: [userLat, userLng],
                     zoom: 15,
+                    minZoom: 4,
+                    maxZoom: 20,
                     zoomControl: false,
                     attributionControl: true
                 });
 
-                // Attach default road layer
-                currentTileLayer = tileProviders['google_roads'].addTo(map);
+                // Attach default OpenStreetMap MAPNIK layer
+                currentTileLayer = tileProviders['osm'].addTo(map);
 
                 // Cluster group with custom styling
                 markerClusterGroup = L.markerClusterGroup({
