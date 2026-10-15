@@ -29,11 +29,12 @@ service cloud.firestore {
     match /providers/{d} {
       allow read: if true;
       allow create, delete: if isStaff();
-      allow update: if isSignedIn()
+      allow update: if (isSignedIn()
                   && (resource.data.phone == request.auth.uid
                       || resource.data.id == request.auth.uid
                       || (('ownerId' in resource.data) && resource.data.ownerId == request.auth.uid)
-                      || isStaff());
+                      || isStaff()))
+                  || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rating', 'numReviews']);
     }
     match /properties/{d} {
       allow read: if true;
@@ -287,7 +288,7 @@ service cloud.firestore {
     }
     match /ratings/{d} {
       allow read: if true;
-      allow create: if isSignedIn();
+      allow create: if true;
       allow update, delete: if isSignedIn()
                 && (resource.data.userId == request.auth.uid
                     || isOwnerOrAdmin());

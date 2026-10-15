@@ -82,7 +82,19 @@ class ChatViewModel @Inject constructor(
         fallbackUserName: String? = null,
         relatedEntityId: String? = null,
         relatedEntityType: String? = null
-    ) {
+        activeUserId = currentUserId
+        if (_currentChannel.value?.id != channelId) {
+            val provisional = ChatChannel(
+                id = channelId,
+                participants = listOf(currentUserId, fallbackTargetUserId ?: channelId).filter { it.isNotBlank() },
+                title = fallbackUserName ?: "المحادثة",
+                type = if (relatedEntityType == "PASSWORD_RECOVERY" || relatedEntityType == "SUPPORT") ChannelType.SUPPORT else ChannelType.PRIVATE,
+                relatedEntityId = relatedEntityId,
+                relatedEntityType = relatedEntityType
+            )
+            _currentChannel.value = provisional
+            listenToMessages(channelId, currentUserId)
+        }
         viewModelScope.launch {
             val channelResult = repository.getChannelById(channelId)
             val channel = channelResult.getOrNull()
@@ -123,13 +135,27 @@ class ChatViewModel @Inject constructor(
         relatedEntityId: String? = null,
         relatedEntityType: String? = null
     ) {
-        viewModelScope.launch {
-            // [تعديل] ضمان توجيه الفني/المحل/المركز أو الدعم بشكل صحيح مع تمرير الحقول المرتبطة
-            val isPasswordRecovery = relatedEntityType == "PASSWORD_RECOVERY" || relatedEntityType == "SUPPORT"
-            val channelType = if (isPasswordRecovery) ChannelType.SUPPORT else ChannelType.PRIVATE
-            val finalOtherId = if (isPasswordRecovery) ChatRepository.SUPPORT_ADMIN_ID else otherUserId.trim()
-            val finalOtherName = if (isPasswordRecovery) ChatRepository.SUPPORT_ADMIN_NAME else otherUserName.trim().ifBlank { "مقدم الخدمة" }
+        activeUserId = currentUserId
+        val isPasswordRecovery = relatedEntityType == "PASSWORD_RECOVERY" || relatedEntityType == "SUPPORT"
+        val channelType = if (isPasswordRecovery) ChannelType.SUPPORT else ChannelType.PRIVATE
+        val finalOtherId = if (isPasswordRecovery) ChatRepository.SUPPORT_ADMIN_ID else otherUserId.trim()
+        val finalOtherName = if (isPasswordRecovery) ChatRepository.SUPPORT_ADMIN_NAME else otherUserName.trim().ifBlank { "مقدم الخدمة" }
+        val provId = "direct_${minOf(currentUserId, finalOtherId)}_${maxOf(currentUserId, finalOtherId)}"
 
+        if (_currentChannel.value?.id != provId) {
+            val provisional = ChatChannel(
+                id = provId,
+                participants = listOf(currentUserId, finalOtherId).filter { it.isNotBlank() },
+                title = finalOtherName,
+                type = channelType,
+                relatedEntityId = relatedEntityId,
+                relatedEntityType = relatedEntityType
+            )
+            _currentChannel.value = provisional
+            listenToMessages(provId, currentUserId)
+        }
+
+        viewModelScope.launch {
             val channelResult = repository.getOrCreateChannel(
                 currentUserId = currentUserId,
                 currentUserName = currentUserName,
@@ -177,7 +203,16 @@ class ChatViewModel @Inject constructor(
         attachment: ChatAttachment? = null,
         audioWaveform: List<Int> = emptyList()
     ) {
-        val channel = _currentChannel.value ?: return
+        var channel = _currentChannel.value
+        if (channel == null) {
+            val fallbackChId = "direct_${activeUserId.ifBlank { senderId }}"
+            channel = ChatChannel(
+                id = fallbackChId,
+                participants = listOf(senderId.ifBlank { activeUserId }),
+                title = "محادثة"
+            )
+            _currentChannel.value = channel
+        }
         if (text.isBlank() && mediaUrl.isBlank() && attachment == null) return
 
         val replyTo = editManager.replyingToMessage.value

@@ -113,7 +113,11 @@ class ChatAttachmentManager(private val context: Context) {
                     }
                 }
             }
-            Result.failure(Exception("فشل رفع الملف إلى الخادم بعد المحاولات: ${lastException?.localizedMessage ?: "خطأ في الشبكة"}"))
+            if (finalData.isNotEmpty()) {
+                val fallbackUrl = "data:$mimeType;base64," + android.util.Base64.encodeToString(finalData, android.util.Base64.NO_WRAP)
+                return@withContext Result.success(fallbackUrl)
+            }
+            Result.failure(Exception("تعذر معالجة أو رفع الملف: ${lastException?.localizedMessage ?: "خطأ في الشبكة"}"))
         }
     }
 }

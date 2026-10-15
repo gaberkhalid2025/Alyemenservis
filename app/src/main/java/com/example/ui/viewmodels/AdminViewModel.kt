@@ -2852,8 +2852,14 @@ fun deleteAllOrders(customerPhone: String) {
     }
 
 fun addRating(rating: com.example.data.RatingEntity) {
-        val targetId = db.collection("ratings").document().id
+        val targetId = if (rating.id.isBlank()) db.collection("ratings").document().id else rating.id
         val finalRating = rating.copy(id = targetId)
+        // تحديث متفائل فوري للواجهة
+        val currentList = appState._ratings.value.toMutableList()
+        currentList.removeAll { it.id == targetId }
+        currentList.add(0, finalRating)
+        appState._ratings.value = currentList
+
         db.collection("ratings").document(targetId).set(finalRating).addOnSuccessListener {
             mainViewModel.triggerNotification("⭐ شكراً لتقييمك! تم إرسال تقييمك بنجاح.")
             recalculateTargetRating(rating.targetId, rating.targetType)
@@ -2875,6 +2881,7 @@ fun addRatingReply(ratingId: String, replyText: String) {
     }
 
 fun deleteRating(ratingId: String) {
+        appState._ratings.value = appState._ratings.value.filter { it.id != ratingId }
         db.collection("ratings").document(ratingId).get().addOnSuccessListener { snap ->
             val rating = snap.toObject(com.example.data.RatingEntity::class.java)
             if (rating != null) {
@@ -2899,8 +2906,18 @@ fun submitRating(providerId: String, rating: Int) {
     }
 
 fun submitRating(ratingEntity: com.example.data.RatingEntity, onComplete: () -> Unit = {}) {
+        // تحديث متفائل فوري للتقييمات
+        val currentList = appState._ratings.value.toMutableList()
+        currentList.removeAll { it.id == ratingEntity.id }
+        currentList.add(0, ratingEntity)
+        appState._ratings.value = currentList
+
         db.collection("ratings").document(ratingEntity.id).set(ratingEntity)
             .addOnSuccessListener {
+                recalculateTargetRating(ratingEntity.targetId, ratingEntity.targetType)
+                onComplete()
+            }
+            .addOnFailureListener {
                 recalculateTargetRating(ratingEntity.targetId, ratingEntity.targetType)
                 onComplete()
             }
@@ -2911,20 +2928,47 @@ fun recalculateTargetRating(targetId: String, targetType: String) {
             val ratingsList = snapshot.documents.mapNotNull { it.toObject(com.example.data.RatingEntity::class.java) }
             val count = ratingsList.size
             val avg = if (count > 0) ratingsList.map { it.rating }.sum() / count else 5.0f
-            
-            if (targetType == "STORE") {
+
+            if (targetType.equals("PROVIDER", ignoreCase = true) || targetType.equals("TECHNICIAN", ignoreCase = true)) {
+                // تحديث مزود الخدمة / الفني في قاعدة البيانات
+                db.collection("providers").document(targetId).get().addOnSuccessListener { provSnap ->
+                    val prov = provSnap.toObject(com.example.data.ProviderEntity::class.java)
+                    if (prov != null) {
+                        db.collection("providers").document(targetId).set(prov.copy(rating = avg, numReviews = count))
+                    }
+                }
+                // تحديث الذاكرة فوراً لتظهر في البطاقات
+                val provList = mainViewModel.providers.value.toMutableList()
+                val pIdx = provList.indexOfFirst { it.id == targetId }
+                if (pIdx >= 0) {
+                    provList[pIdx] = provList[pIdx].copy(rating = avg, numReviews = count)
+                    mainViewModel._providers.value = provList
+                }
+            } else if (targetType.equals("STORE", ignoreCase = true) || targetType.equals("RESTAURANT", ignoreCase = true) || targetType.equals("MEDICAL", ignoreCase = true)) {
                 db.collection("stores").document(targetId).get().addOnSuccessListener { storeSnap ->
                     val store = storeSnap.toObject(com.example.data.StoreEntity::class.java)
                     if (store != null) {
                         db.collection("stores").document(targetId).set(store.copy(rating = avg, numReviews = count))
                     }
                 }
-            } else if (targetType == "PROPERTY") {
+                val sList = mainViewModel.stores.value.toMutableList()
+                val sIdx = sList.indexOfFirst { it.id == targetId }
+                if (sIdx >= 0) {
+                    sList[sIdx] = sList[sIdx].copy(rating = avg, numReviews = count)
+                    mainViewModel._stores.value = sList
+                }
+            } else if (targetType.equals("PROPERTY", ignoreCase = true)) {
                 db.collection("properties").document(targetId).get().addOnSuccessListener { propSnap ->
                     val prop = propSnap.toObject(com.example.data.PropertyEntity::class.java)
                     if (prop != null) {
                         db.collection("properties").document(targetId).set(prop.copy(rating = avg, numReviews = count))
                     }
+                }
+                val pList = mainViewModel.properties.value.toMutableList()
+                val propIdx = pList.indexOfFirst { it.id == targetId }
+                if (propIdx >= 0) {
+                    pList[propIdx] = pList[propIdx].copy(rating = avg, numReviews = count)
+                    mainViewModel._properties.value = pList
                 }
             }
         }

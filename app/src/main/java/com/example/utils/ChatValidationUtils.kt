@@ -35,6 +35,15 @@ object ChatValidationUtils {
                 mimeType = android.webkit.MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension.lowercase())
             }
         }
+        if (mimeType.isNullOrBlank()) {
+            val uriStr = uri.toString().lowercase()
+            mimeType = when {
+                isImage -> "image/jpeg"
+                isVideo -> "video/mp4"
+                uriStr.endsWith(".m4a") || uriStr.endsWith(".mp3") || uriStr.endsWith(".aac") || uriStr.contains("audio") || uriStr.contains("record") -> "audio/mp4"
+                else -> if (!isImage && !isVideo) "audio/mp4" else null
+            }
+        }
 
         // 1. فحص نوع الملف (MIME Type)
         val isSupported = mimeType != null && (

@@ -127,8 +127,15 @@ fun MainViewModel.logout(context: Context) {
 }
 
 fun MainViewModel.navigateToScreen(screen: String) {
+    if (screen == AppScreens.USER_BROWSE || screen == "HOME") {
+        _screenBackStack.value = listOf(AppScreens.USER_BROWSE)
+        _currentScreen.value = AppScreens.USER_BROWSE
+        return
+    }
     val updated = _screenBackStack.value.toMutableList()
-    updated.add(screen)
+    if (updated.lastOrNull() != screen) {
+        updated.add(screen)
+    }
     _screenBackStack.value = updated
     _currentScreen.value = screen
 }
@@ -136,32 +143,39 @@ fun MainViewModel.navigateToScreen(screen: String) {
 fun MainViewModel.navigateAndRemoveScreens(targetScreen: String, screensToRemove: List<String>) {
     val updated = _screenBackStack.value.toMutableList()
     updated.removeAll(screensToRemove)
-    updated.add(targetScreen)
+    if (updated.lastOrNull() != targetScreen) {
+        updated.add(targetScreen)
+    }
     _screenBackStack.value = updated
     _currentScreen.value = targetScreen
 }
 
 fun MainViewModel.navigateTo(screen: String) {
-    val updated = _screenBackStack.value.toMutableList()
-    updated.add(screen)
-    _screenBackStack.value = updated
-    _currentScreen.value = screen
+    navigateToScreen(screen)
 }
 
 fun MainViewModel.goBack(): Boolean {
+    // إذا كان المستخدم في الشاشة الرئيسية حالياً، امنع العودة للشاشات السابقة واطلب الخروج من التطبيق
+    if (_currentScreen.value == AppScreens.USER_BROWSE || _currentScreen.value == "HOME") {
+        _screenBackStack.value = listOf(AppScreens.USER_BROWSE)
+        return false
+    }
     val current = _screenBackStack.value
     if (current.size > 1) {
         val updated = current.toMutableList()
         updated.removeAt(updated.size - 1)
+        while (updated.size > 1 && updated.last() == _currentScreen.value) {
+            updated.removeAt(updated.size - 1)
+        }
+        val targetScreen = updated.lastOrNull() ?: AppScreens.USER_BROWSE
         _screenBackStack.value = updated
-        _currentScreen.value = updated.last()
+        _currentScreen.value = targetScreen
         return true
-    } else if (current.isNotEmpty() && _currentScreen.value != AppScreens.USER_BROWSE && _currentScreen.value != "HOME") {
+    } else {
         _currentScreen.value = AppScreens.USER_BROWSE
         _screenBackStack.value = listOf(AppScreens.USER_BROWSE)
-        return true
+        return false
     }
-    return false
 }
 
 fun MainViewModel.switchLanguage() {

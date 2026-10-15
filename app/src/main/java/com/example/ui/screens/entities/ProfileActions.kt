@@ -57,6 +57,20 @@ fun ProfileActions(
         )
     }
 
+    val handleOpenChat = {
+        if (currentUserId.isBlank() || currentUserId == "guest") {
+            showGuestDialog = true
+        } else {
+            viewModel.openDirectChat(
+                targetUserId = entityId.ifBlank { entityPhone },
+                targetUserName = entityName,
+                targetUserPhoto = "",
+                relatedEntityId = entityId,
+                relatedEntityType = entityType.name
+            )
+        }
+    }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -133,14 +147,7 @@ fun ProfileActions(
                                 Text(if (entityType == ProfileEntityType.STORE) "طلب بضاعة" else "حجز طاولة / طلب", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
                             }
                             Button(
-                                onClick = {
-                                    if (currentUserId.isBlank()) {
-                                        // Guest Dialog should be handled upstream
-                                    } else {
-                                        val channelId = "chat_store_$entityId"
-                                        onOpenChat(channelId)
-                                    }
-                                },
+                                onClick = handleOpenChat,
                                 colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray),
                                 shape = RoundedCornerShape(24.dp),
                                 modifier = Modifier.weight(1f).fillMaxHeight()
@@ -168,13 +175,7 @@ fun ProfileActions(
                     }
                     ProfileEntityType.TECHNICIAN -> {
                         Button(
-                            onClick = {
-                                if (currentUserId.isBlank()) {
-                                    // Handled upstream
-                                } else {
-                                    onOpenChat("chat_p_$entityId")
-                                }
-                            },
+                            onClick = handleOpenChat,
                             colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray),
                             shape = RoundedCornerShape(10.dp),
                             modifier = Modifier.weight(1f).height(44.dp)
@@ -196,13 +197,7 @@ fun ProfileActions(
                     }
                     ProfileEntityType.MEDICAL -> {
                         Button(
-                            onClick = {
-                                if (currentUserId.isBlank()) {
-                                    // Handled upstream
-                                } else {
-                                    onOpenChat("chat_general_$entityId")
-                                }
-                            },
+                            onClick = handleOpenChat,
                             colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray),
                             shape = RoundedCornerShape(10.dp),
                             modifier = Modifier.weight(1f).height(44.dp)
@@ -224,13 +219,7 @@ fun ProfileActions(
                     }
                     ProfileEntityType.REAL_ESTATE -> {
                         Button(
-                            onClick = {
-                                if (currentUserId.isBlank()) {
-                                    // Handled upstream
-                                } else {
-                                    onOpenChat("chat_prop_$entityId")
-                                }
-                            },
+                            onClick = handleOpenChat,
                             colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray),
                             shape = RoundedCornerShape(10.dp),
                             modifier = Modifier.weight(1f).height(44.dp)
@@ -269,13 +258,7 @@ fun ProfileActions(
                     }
                     ProfileEntityType.GENERAL -> {
                         Button(
-                            onClick = {
-                                if (currentUserId.isBlank()) {
-                                    // Handled upstream
-                                } else {
-                                    onOpenChat("chat_general_$entityId")
-                                }
-                            },
+                            onClick = handleOpenChat,
                             colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray),
                             shape = RoundedCornerShape(10.dp),
                             modifier = Modifier.weight(1f).height(44.dp)
