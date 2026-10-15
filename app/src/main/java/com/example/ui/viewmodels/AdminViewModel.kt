@@ -2938,11 +2938,11 @@ fun recalculateTargetRating(targetId: String, targetType: String) {
                     }
                 }
                 // تحديث الذاكرة فوراً لتظهر في البطاقات
-                val provList = mainViewModel.providers.value.toMutableList()
+                val provList = mainViewModel.homeViewModel.providers.value.toMutableList()
                 val pIdx = provList.indexOfFirst { it.id == targetId }
                 if (pIdx >= 0) {
                     provList[pIdx] = provList[pIdx].copy(rating = avg, numReviews = count)
-                    mainViewModel._providers.value = provList
+                    mainViewModel.homeViewModel._providers.value = provList
                 }
             } else if (targetType.equals("STORE", ignoreCase = true) || targetType.equals("RESTAURANT", ignoreCase = true) || targetType.equals("MEDICAL", ignoreCase = true)) {
                 db.collection("stores").document(targetId).get().addOnSuccessListener { storeSnap ->
@@ -2951,11 +2951,11 @@ fun recalculateTargetRating(targetId: String, targetType: String) {
                         db.collection("stores").document(targetId).set(store.copy(rating = avg, numReviews = count))
                     }
                 }
-                val sList = mainViewModel.stores.value.toMutableList()
+                val sList = stores.value.toMutableList()
                 val sIdx = sList.indexOfFirst { it.id == targetId }
                 if (sIdx >= 0) {
                     sList[sIdx] = sList[sIdx].copy(rating = avg, numReviews = count)
-                    mainViewModel._stores.value = sList
+                    _stores.value = sList
                 }
             } else if (targetType.equals("PROPERTY", ignoreCase = true)) {
                 db.collection("properties").document(targetId).get().addOnSuccessListener { propSnap ->
@@ -2964,11 +2964,11 @@ fun recalculateTargetRating(targetId: String, targetType: String) {
                         db.collection("properties").document(targetId).set(prop.copy(rating = avg, numReviews = count))
                     }
                 }
-                val pList = mainViewModel.properties.value.toMutableList()
+                val pList = properties.value.toMutableList()
                 val propIdx = pList.indexOfFirst { it.id == targetId }
                 if (propIdx >= 0) {
                     pList[propIdx] = pList[propIdx].copy(rating = avg, numReviews = count)
-                    mainViewModel._properties.value = pList
+                    _properties.value = pList
                 }
             }
         }

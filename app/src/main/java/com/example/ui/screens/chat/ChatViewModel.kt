@@ -82,6 +82,7 @@ class ChatViewModel @Inject constructor(
         fallbackUserName: String? = null,
         relatedEntityId: String? = null,
         relatedEntityType: String? = null
+    ) {
         activeUserId = currentUserId
         if (_currentChannel.value?.id != channelId) {
             val provisional = ChatChannel(

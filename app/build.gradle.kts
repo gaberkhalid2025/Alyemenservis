@@ -7,7 +7,7 @@ plugins {
   alias(libs.plugins.google.devtools.ksp)
   alias(libs.plugins.hilt.android)
   alias(libs.plugins.firebase.crashlytics)
-  id("com.google.gms.google-services")
+  // id("com.google.gms.google-services")
   id("kotlin-parcelize")
 }
 
