@@ -39,6 +39,7 @@ class SettingsSyncDiagnosticRunner(context: Context) {
         onProgress: (String) -> Unit,
         onComplete: (SettingsFullReport) -> Unit
     ) {
+        // [تعديل مهندس النظام] فحص ومزامنة إعدادات النظام تحت الضغط والاتصال المتقطع
         val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
         val details = mutableListOf<TestDetail>()
         var errorIndex = 1

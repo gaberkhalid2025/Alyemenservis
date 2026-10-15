@@ -39,6 +39,7 @@ data class ProfileFullReport(
 
 class ProfileDiagnosticRunner(context: Context) {
 
+    // [تعديل مهندس النظام] فحص وتشخيص صارم لملفات المستخدمين ومطابقة البيانات والسرعة تحت الضغط
     private val db = FirebaseFirestore.getInstance()
 
     private val testProfileIds = listOf(

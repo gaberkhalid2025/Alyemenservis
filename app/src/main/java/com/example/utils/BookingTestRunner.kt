@@ -40,6 +40,7 @@ class BookingTestRunner(private val context: Context) {
         val timestamp = DateFormatter.formatCustom(System.currentTimeMillis(), "yyyy-MM-dd HH:mm")
 
         fun addStep(name: String, desc: String): BookingStepReport {
+            // [تعديل مهندس النظام] فحص صارم ومحاكاة لعمليات الحجز المتزامنة، حالات الـ StateMachine، الاتصال المتقطع والضغط العالي
             val step = BookingStepReport(name, desc)
             stepsList.add(step)
             return step

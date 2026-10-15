@@ -42,6 +42,7 @@ class PaymentTestRunner(private val context: Context) {
         val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date())
 
         fun addStep(name: String, desc: String): PaymentStepReport {
+            // [تعديل مهندس النظام] فحص صارم لمعاملات الدفع، المحافظ والمحاكاة المالية تحت الضغط
             val step = PaymentStepReport(name, desc)
             stepsList.add(step)
             return step

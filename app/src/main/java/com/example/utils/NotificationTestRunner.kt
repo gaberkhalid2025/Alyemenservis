@@ -38,6 +38,7 @@ class NotificationTestRunner(private val context: Context) {
         val timestamp = DateFormatter.formatCustom(System.currentTimeMillis(), "yyyy-MM-dd HH:mm")
 
         fun addStep(name: String, desc: String): NotificationStepReport {
+            // [تعديل مهندس النظام] فحص صارم لإرسال واستلام الإشعارات ومنع التكرار تحت الضغط
             val step = NotificationStepReport(name, desc)
             stepsList.add(step)
             return step

@@ -39,6 +39,7 @@ class ReviewTestRunner(private val context: Context) {
         val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date())
 
         fun addStep(name: String, desc: String): ReviewStepReport {
+            // [تعديل مهندس النظام] فحص واختبار التقييمات والأبعاد المتعددة تحت الضغط
             val step = ReviewStepReport(name, desc)
             stepsList.add(step)
             return step

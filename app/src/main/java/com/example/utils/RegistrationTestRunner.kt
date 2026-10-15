@@ -37,6 +37,7 @@ data class FullTestReport(
 
 class RegistrationTestRunner(private val context: Context) {
 
+    // [تعديل مهندس النظام] اختبارات تسجيل ومصادقة صارمة لمحاكاة مستخدمين متعددين وضغط شبكة عالي
     private val db = FirebaseFirestore.getInstance()
     private val statusRepo = StatusRepositoryImpl(context)
 

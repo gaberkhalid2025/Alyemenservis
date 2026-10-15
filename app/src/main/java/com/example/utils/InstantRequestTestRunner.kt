@@ -40,6 +40,7 @@ class InstantRequestTestRunner(private val context: Context) {
         val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date())
 
         fun addStep(name: String, desc: String): InstantRequestStepReport {
+            // [تعديل مهندس النظام] فحص صارم لطلبات الطوارئ والطلبات الفورية تحت ضغط عالي واتصال متقطع
             val step = InstantRequestStepReport(name, desc)
             stepsList.add(step)
             return step

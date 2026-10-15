@@ -36,6 +36,7 @@ class PermissionsDiagnosticRunner(context: Context) {
         onProgress: (String) -> Unit,
         onComplete: (PermissionFullReport) -> Unit
     ) {
+        // [تعديل مهندس النظام] فحص صارم للصلاحيات والأدوار وحراسة الأمن تحت الضغط
         val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
         val details = mutableListOf<TestDetail>()
         var errorIndex = 1

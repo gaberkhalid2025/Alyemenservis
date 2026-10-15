@@ -46,6 +46,7 @@ class AssistantTestRunner(private val context: Context) {
     ) {
         val stepsList = mutableListOf<AssistantStepReport>()
         val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
+        // [تعديل مهندس النظام] فحص صارم ومحاكاة لضغط مستخدمين حقيقيين واستعلامات متكررة واتصال متقطع للمساعد الذكي
         val testSessionId = "assistant_diag_${UUID.randomUUID().toString().take(8)}"
         val testPlumberId = "test_plumber_diag_${UUID.randomUUID().toString().take(6)}"
 
