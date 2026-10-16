@@ -1,27 +1,22 @@
 package com.example.ui.screens.chat.managers
 
-import android.content.Context
-import android.net.Uri
-import com.example.NetworkUtils
 import com.example.data.models.ChatAttachment
 import com.example.data.models.ChatMessage
 import com.example.data.models.MediaType
 import com.example.data.models.MessageStatus
 import com.example.data.repositories.IChatRepository
-import com.example.ui.screens.chat.ChatAttachmentManager
 import com.example.utils.AppResult
-import com.example.utils.EntityIdGenerator
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import java.io.File
+
+import com.example.utils.EntityIdGenerator
 
 class ChatMessagesManager(
     private val repository: IChatRepository,
-    private val scope: CoroutineScope,
-    private val context: Context? = null
+    private val scope: CoroutineScope
 ) {
     private val _messages = MutableStateFlow<List<ChatMessage>>(emptyList())
     val messages: StateFlow<List<ChatMessage>> = _messages.asStateFlow()
@@ -29,20 +24,8 @@ class ChatMessagesManager(
     private val _isSending = MutableStateFlow(false)
     val isSending: StateFlow<Boolean> = _isSending.asStateFlow()
 
-    private val attachmentManager by lazy { context?.let { ChatAttachmentManager(it) } }
-
-    /**
-     * تحديث قائمة الرسائل مع الحفاظ الصارم على الرسائل المحلية المعلقة (SENDING / PENDING)
-     * لمنع اختفاء الرسائل أو مسحها من الواجهة أثناء المزامنة.
-     */
     fun updateMessagesList(list: List<ChatMessage>) {
-        val current = _messages.value
-        val pendingOrSending = current.filter { localMsg ->
-            (localMsg.status == MessageStatus.SENDING || localMsg.status == MessageStatus.PENDING) &&
-            list.none { remote -> remote.id == localMsg.id }
-        }
-        val combined = (list + pendingOrSending).distinctBy { it.id }.sortedBy { it.timestamp }
-        _messages.value = combined
+        _messages.value = list
     }
 
     fun setSending(sending: Boolean) {
@@ -63,7 +46,6 @@ class ChatMessagesManager(
         onError: (String) -> Unit
     ) {
         val messageId = EntityIdGenerator.generate("msg")
-        val timestamp = System.currentTimeMillis()
         val localMessage = ChatMessage(
             id = messageId,
             channelId = channelId,
@@ -77,73 +59,42 @@ class ChatMessagesManager(
             attachment = attachment,
             audioWaveform = audioWaveform,
             status = MessageStatus.SENDING,
-            timestamp = timestamp
+            timestamp = System.currentTimeMillis()
         )
 
-        // 1. عرض فوري محلي في الواجهة (Instant Optimistic UI كـ WhatsApp و Telegram)
+        // 1. عرض فوري محلي في الواجهة (Instant Optimistic UI < 50ms)
+        // [تعديل] إضافة الرسالة فوراً بحالة SENDING قبل المزامنة مع السيرفر
         _messages.value = _messages.value + localMessage
         _isSending.value = true
 
+        // 2. كتابة متفائلة واحدة - التخزين المحلي لـ Firestore وقائمة الانتظار تتولى المزامنة التلقائية دون تأخير
         scope.launch {
             try {
-                var finalMediaUrl = mediaUrl
-                val isLocalFile = mediaUrl.isNotBlank() && (
-                    mediaUrl.startsWith("/") || mediaUrl.startsWith("file:") || mediaUrl.startsWith("content:")
-                )
-
-                // إذا كان الملف محلياً (صورة أو صوت)، نرفع إلى Firebase Storage في الخلفية دون تعطيل الواجهة
-                if (isLocalFile && (mediaType == MediaType.IMAGE || mediaType == MediaType.AUDIO || mediaType == MediaType.VIDEO)) {
-                    val isOnline = context?.let { NetworkUtils.isNetworkAvailable(it) } ?: true
-                    if (isOnline && attachmentManager != null) {
-                        try {
-                            val mediaUri = if (mediaUrl.startsWith("content:") || mediaUrl.startsWith("file:")) {
-                                Uri.parse(mediaUrl)
-                            } else {
-                                Uri.fromFile(File(mediaUrl))
-                            }
-                            val uploadType = when (mediaType) {
-                                MediaType.IMAGE -> "image"
-                                MediaType.AUDIO -> "audio"
-                                MediaType.VIDEO -> "video"
-                                else -> "file"
-                            }
-                            val uploadResult = attachmentManager?.uploadAttachment(channelId, mediaUri, uploadType)
-                            if (uploadResult != null && uploadResult.isSuccess) {
-                                finalMediaUrl = uploadResult.getOrNull() ?: mediaUrl
-                            }
-                        } catch (e: Exception) {
-                            android.util.Log.w("ChatMessagesManager", "Media upload failed, saving local copy: ${e.message}")
-                        }
-                    }
-                }
-
                 val result = repository.sendMessage(
                     channelId = channelId,
                     senderId = senderId,
                     senderName = senderName,
                     messageText = text,
                     mediaType = mediaType,
-                    mediaUrl = finalMediaUrl,
+                    mediaUrl = mediaUrl,
                     replyToId = replyTo?.id,
                     replyToText = replyTo?.message,
                     attachment = attachment,
-                    audioWaveform = audioWaveform,
-                    existingMessageId = messageId,
-                    existingTimestamp = timestamp
+                    audioWaveform = audioWaveform
                 )
 
                 _isSending.value = false
                 when (result) {
                     is AppResult.Success -> {
-                        val confirmed = result.data
+                        // تحديث الرسالة بالنسخة المؤكدة من السيرفر/الكاش
                         _messages.value = _messages.value.map {
-                            if (it.id == localMessage.id) confirmed else it
+                            if (it.id == localMessage.id) result.data else it
                         }
-                        onSuccess(confirmed)
+                        onSuccess(result.data)
                     }
                     is AppResult.Error -> {
                         _messages.value = _messages.value.map {
-                            if (it.id == localMessage.id) it.copy(status = MessageStatus.PENDING) else it
+                            if (it.id == localMessage.id) it.copy(status = MessageStatus.FAILED) else it
                         }
                         onError(result.error.messageArabic)
                     }
@@ -151,9 +102,9 @@ class ChatMessagesManager(
             } catch (e: Exception) {
                 _isSending.value = false
                 _messages.value = _messages.value.map {
-                    if (it.id == localMessage.id) it.copy(status = MessageStatus.PENDING) else it
+                    if (it.id == localMessage.id) it.copy(status = MessageStatus.FAILED) else it
                 }
-                onError(e.message ?: "جاري الحفظ للمزامنة التلقائية")
+                onError(e.message ?: "حدث خطأ أثناء الإرسال")
             }
         }
     }
@@ -166,48 +117,22 @@ class ChatMessagesManager(
         onError: (String) -> Unit
     ) {
         scope.launch {
+            // إعادة المحاولة على نفس الرسالة بنفس الترتيب الزمني والمعرف
             _messages.value = _messages.value.map {
                 if (it.id == targetMsg.id) it.copy(status = MessageStatus.SENDING) else it
             }
             try {
-                var finalMediaUrl = targetMsg.mediaUrl
-                val isLocalFile = targetMsg.mediaUrl.isNotBlank() && (
-                    targetMsg.mediaUrl.startsWith("/") || targetMsg.mediaUrl.startsWith("file:") || targetMsg.mediaUrl.startsWith("content:")
-                )
-
-                if (isLocalFile && attachmentManager != null && context != null && NetworkUtils.isNetworkAvailable(context)) {
-                    try {
-                        val mediaUri = if (targetMsg.mediaUrl.startsWith("content:") || targetMsg.mediaUrl.startsWith("file:")) {
-                            Uri.parse(targetMsg.mediaUrl)
-                        } else {
-                            Uri.fromFile(File(targetMsg.mediaUrl))
-                        }
-                        val uploadType = when (targetMsg.mediaType) {
-                            MediaType.IMAGE -> "image"
-                            MediaType.AUDIO -> "audio"
-                            MediaType.VIDEO -> "video"
-                            else -> "file"
-                        }
-                        val uploadResult = attachmentManager?.uploadAttachment(channelId, mediaUri, uploadType)
-                        if (uploadResult != null && uploadResult.isSuccess) {
-                            finalMediaUrl = uploadResult.getOrNull() ?: targetMsg.mediaUrl
-                        }
-                    } catch (_: Exception) {}
-                }
-
                 val result = repository.sendMessage(
                     channelId = channelId,
                     senderId = targetMsg.senderId,
                     senderName = targetMsg.senderName,
                     messageText = targetMsg.message,
                     mediaType = targetMsg.mediaType,
-                    mediaUrl = finalMediaUrl,
+                    mediaUrl = targetMsg.mediaUrl,
                     replyToId = targetMsg.replyToId,
                     replyToText = targetMsg.replyToText,
                     attachment = targetMsg.attachment,
-                    audioWaveform = targetMsg.audioWaveform,
-                    existingMessageId = targetMsg.id,
-                    existingTimestamp = targetMsg.timestamp
+                    audioWaveform = targetMsg.audioWaveform
                 )
                 when (result) {
                     is AppResult.Success -> {
@@ -218,14 +143,14 @@ class ChatMessagesManager(
                     }
                     is AppResult.Error -> {
                         _messages.value = _messages.value.map {
-                            if (it.id == targetMsg.id) it.copy(status = MessageStatus.PENDING) else it
+                            if (it.id == targetMsg.id) it.copy(status = MessageStatus.FAILED) else it
                         }
                         onError(result.error.messageArabic)
                     }
                 }
             } catch (e: Exception) {
                 _messages.value = _messages.value.map {
-                    if (it.id == targetMsg.id) it.copy(status = MessageStatus.PENDING) else it
+                    if (it.id == targetMsg.id) it.copy(status = MessageStatus.FAILED) else it
                 }
                 onError(e.message ?: "فشلت إعادة الإرسال")
             }

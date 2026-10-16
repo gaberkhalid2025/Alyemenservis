@@ -53,9 +53,7 @@ interface IChatRepository {
         replyToId: String? = null,
         replyToText: String? = null,
         attachment: ChatAttachment? = null,
-        audioWaveform: List<Int> = emptyList(),
-        existingMessageId: String? = null,
-        existingTimestamp: Long? = null
+        audioWaveform: List<Int> = emptyList()
     ): AppResult<ChatMessage>
 
     /**

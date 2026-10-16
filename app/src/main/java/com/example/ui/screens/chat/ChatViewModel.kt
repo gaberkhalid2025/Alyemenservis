@@ -1,6 +1,5 @@
 package com.example.ui.screens.chat
 
-import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.models.*
@@ -11,7 +10,6 @@ import com.example.ui.screens.chat.managers.ChatPresenceManager
 import com.example.ui.screens.chat.managers.ChatTypingManager
 import com.example.utils.AppResult
 import dagger.hilt.android.lifecycle.HiltViewModel
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -30,12 +28,11 @@ sealed class ChatEvent {
 
 @HiltViewModel
 class ChatViewModel @Inject constructor(
-    private val repository: ChatRepository,
-    @ApplicationContext private val context: Context
+    private val repository: ChatRepository
 ) : ViewModel() {
 
     // --- Specialized Sub-Managers ---
-    val messagesManager = ChatMessagesManager(repository, viewModelScope, context)
+    val messagesManager = ChatMessagesManager(repository, viewModelScope)
     val typingManager = ChatTypingManager(repository, viewModelScope)
     val presenceManager = ChatPresenceManager(repository, viewModelScope)
     val editManager = ChatEditManager(repository, viewModelScope)
@@ -75,11 +72,6 @@ class ChatViewModel @Inject constructor(
         presenceManager.listenToPresence(otherUserId)
         typingManager.listenToTyping(channel.id, otherUserId)
         markAsRead(channel.id, currentUserId)
-        viewModelScope.launch {
-            try {
-                repository.retryPendingMessages(currentUserId)
-            } catch (_: Exception) {}
-        }
     }
 
     fun openChannelById(
@@ -92,23 +84,18 @@ class ChatViewModel @Inject constructor(
         relatedEntityType: String? = null
     ) {
         activeUserId = currentUserId
-        // Initialize channel immediately with known data so UI and messages work without waiting for network
-        if (_currentChannel.value == null || _currentChannel.value?.id != channelId) {
-            val placeholder = ChatChannel(
+        if (_currentChannel.value?.id != channelId) {
+            val provisional = ChatChannel(
                 id = channelId,
-                participants = listOf(currentUserId, fallbackTargetUserId.orEmpty()).filter { it.isNotBlank() },
-                participantNames = mapOf(
-                    currentUserId to currentUserName,
-                    fallbackTargetUserId.orEmpty() to (fallbackUserName ?: "مقدم الخدمة")
-                ).filterKeys { it.isNotBlank() },
+                participants = listOf(currentUserId, fallbackTargetUserId ?: channelId).filter { it.isNotBlank() },
                 title = fallbackUserName ?: "المحادثة",
+                type = if (relatedEntityType == "PASSWORD_RECOVERY" || relatedEntityType == "SUPPORT") ChannelType.SUPPORT else ChannelType.PRIVATE,
                 relatedEntityId = relatedEntityId,
                 relatedEntityType = relatedEntityType
             )
-            _currentChannel.value = placeholder
+            _currentChannel.value = provisional
             listenToMessages(channelId, currentUserId)
         }
-
         viewModelScope.launch {
             val channelResult = repository.getChannelById(channelId)
             val channel = channelResult.getOrNull()
@@ -154,20 +141,19 @@ class ChatViewModel @Inject constructor(
         val channelType = if (isPasswordRecovery) ChannelType.SUPPORT else ChannelType.PRIVATE
         val finalOtherId = if (isPasswordRecovery) ChatRepository.SUPPORT_ADMIN_ID else otherUserId.trim()
         val finalOtherName = if (isPasswordRecovery) ChatRepository.SUPPORT_ADMIN_NAME else otherUserName.trim().ifBlank { "مقدم الخدمة" }
-        val sorted = listOf(currentUserId.trim(), finalOtherId).filter { it.isNotBlank() }.sorted()
-        val derivedChannelId = if (isPasswordRecovery) "channel_support_${currentUserId.trim()}" else "channel_${sorted.getOrElse(0) { "u1" }}_${sorted.getOrElse(1) { "u2" }}"
+        val provId = "direct_${minOf(currentUserId, finalOtherId)}_${maxOf(currentUserId, finalOtherId)}"
 
-        if (_currentChannel.value == null || _currentChannel.value?.id != derivedChannelId) {
-            val placeholder = ChatChannel(
-                id = derivedChannelId,
-                participants = listOf(currentUserId, finalOtherId),
-                participantNames = mapOf(currentUserId to currentUserName, finalOtherId to finalOtherName),
+        if (_currentChannel.value?.id != provId) {
+            val provisional = ChatChannel(
+                id = provId,
+                participants = listOf(currentUserId, finalOtherId).filter { it.isNotBlank() },
                 title = finalOtherName,
+                type = channelType,
                 relatedEntityId = relatedEntityId,
                 relatedEntityType = relatedEntityType
             )
-            _currentChannel.value = placeholder
-            listenToMessages(derivedChannelId, currentUserId)
+            _currentChannel.value = provisional
+            listenToMessages(provId, currentUserId)
         }
 
         viewModelScope.launch {
@@ -216,13 +202,17 @@ class ChatViewModel @Inject constructor(
         mediaType: MediaType = MediaType.TEXT,
         mediaUrl: String = "",
         attachment: ChatAttachment? = null,
-        audioWaveform: List<Int> = emptyList(),
-        explicitChannelId: String? = null
+        audioWaveform: List<Int> = emptyList()
     ) {
-        val targetChannelId = explicitChannelId ?: _currentChannel.value?.id
-        if (targetChannelId.isNullOrBlank()) {
-            android.util.Log.w("ChatViewModel", "sendMessage ignored: no active channel ID")
-            return
+        var channel = _currentChannel.value
+        if (channel == null) {
+            val fallbackChId = "direct_${activeUserId.ifBlank { senderId }}"
+            channel = ChatChannel(
+                id = fallbackChId,
+                participants = listOf(senderId.ifBlank { activeUserId }),
+                title = "محادثة"
+            )
+            _currentChannel.value = channel
         }
         if (text.isBlank() && mediaUrl.isBlank() && attachment == null) return
 
@@ -230,7 +220,7 @@ class ChatViewModel @Inject constructor(
         editManager.setReplyingTo(null)
 
         messagesManager.sendMessage(
-            channelId = targetChannelId,
+            channelId = channel.id,
             senderId = senderId.ifBlank { activeUserId },
             senderName = senderName,
             text = text.trim(),

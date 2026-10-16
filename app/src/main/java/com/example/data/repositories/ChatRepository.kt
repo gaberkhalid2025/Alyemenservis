@@ -354,9 +354,7 @@ class ChatRepository(
         replyToId: String?,
         replyToText: String?,
         attachment: ChatAttachment?,
-        audioWaveform: List<Int>,
-        existingMessageId: String?,
-        existingTimestamp: Long?
+        audioWaveform: List<Int>
     ): AppResult<ChatMessage> = sendMessageInternal(
         channelId = channelId,
         senderId = senderId,
@@ -368,8 +366,8 @@ class ChatRepository(
         replyToText = replyToText,
         attachment = attachment,
         audioWaveform = audioWaveform,
-        existingMessageId = existingMessageId,
-        existingTimestamp = existingTimestamp
+        existingMessageId = null,
+        existingTimestamp = null
     )
 
     private suspend fun sendMessageInternal(
@@ -411,101 +409,64 @@ class ChatRepository(
             audioWaveform = audioWaveform
         )
 
-        // 1. Immediately store in local cache with SENDING state for instant UI
-        local?.insertOrUpdateMessage(initialMsg)
-
-        // إذا لم يكن هناك اتصال بالإنترنت، نحفظ في طابور الأوفلاين فوراً دون انتظار المهلة
-        val isOnline = com.example.NetworkUtils.isNetworkAvailable(context)
-        if (!isOnline) {
-            val offlineMsg = initialMsg.copy(
-                status = MessageStatus.PENDING,
-                syncStatus = SyncStatus.PENDING_UPLOAD
-            )
-            local?.queuePendingMessage(offlineMsg)
-            local?.insertOrUpdateMessage(offlineMsg)
-            return@withContext AppResult.Success(offlineMsg)
-        }
-
         try {
-            val sendSuccess = kotlinx.coroutines.withTimeoutOrNull(10000L) {
-                val channelRef = channelsCollection.document(channelId)
-                val channelSnapshot = channelRef.get().await()
-                val channel = channelSnapshot.toObject(ChatChannel::class.java)
+            // 1. Immediately store in local cache with SENDING state for instant UI
+            local?.insertOrUpdateMessage(initialMsg)
 
-                if (channel != null && channel.isUserBlocked(senderId)) {
-                    local?.updateMessageStatus(channelId, messageId, MessageStatus.FAILED)
-                    local?.removePendingMessage(messageId)
-                    return@withTimeoutOrNull AppResult.Error(AppError.UnauthorizedError("لا يمكنك إرسال الرسالة لأنك محظور في هذه المحادثة."))
-                }
+            // 2. Attempt remote send
+            val channelRef = channelsCollection.document(channelId)
+            val channelSnapshot = channelRef.get().await()
+            val channel = channelSnapshot.toObject(ChatChannel::class.java)
 
-                val confirmedMsg = initialMsg.copy(status = MessageStatus.SENT, syncStatus = SyncStatus.SYNCED)
-
-                val displayLast = when (mediaType) {
-                    MediaType.IMAGE -> "📷 صورة"
-                    MediaType.VIDEO -> "🎥 فيديو"
-                    MediaType.AUDIO -> "🎤 تسجيل صوتي"
-                    MediaType.FILE -> "📎 ${attachment?.fileName.orEmpty().ifBlank { "ملف مرفق" }}"
-                    MediaType.LOCATION -> "📍 موقع جغرافي"
-                    MediaType.CALL -> "📞 مكالمة صوتية"
-                    MediaType.TEXT -> messageText
-                }
-
-                val updates = mutableMapOf<String, Any>(
-                    "lastMessage" to displayLast,
-                    "lastMessageTime" to now,
-                    "lastMessageSenderId" to senderId,
-                    "updatedAt" to System.currentTimeMillis()
-                )
-
-                channel?.participants?.forEach { pId ->
-                    if (pId != senderId) {
-                        updates["unreadCount.$pId"] = com.google.firebase.firestore.FieldValue.increment(1)
-                    }
-                }
-
-                val batch = firestore.batch()
-                batch.set(channelRef.collection("messages").document(messageId), confirmedMsg)
-                if (channelSnapshot.exists()) {
-                    batch.update(channelRef, updates)
-                } else {
-                    val initialChan = ChatChannel(
-                        id = channelId,
-                        participants = listOf(senderId).filter { it.isNotBlank() },
-                        participantNames = mapOf(senderId to senderName),
-                        lastMessage = displayLast,
-                        lastMessageTime = now,
-                        lastMessageSenderId = senderId,
-                        updatedAt = System.currentTimeMillis()
-                    )
-                    batch.set(channelRef, initialChan, com.google.firebase.firestore.SetOptions.merge())
-                }
-                batch.commit().await()
-
-                local?.insertOrUpdateMessage(confirmedMsg)
+            if (channel != null && channel.isUserBlocked(senderId)) {
+                local?.updateMessageStatus(channelId, messageId, MessageStatus.FAILED)
                 local?.removePendingMessage(messageId)
-                AppResult.Success(confirmedMsg)
+                return@withContext AppResult.Error(AppError.UnauthorizedError("لا يمكنك إرسال الرسالة لأنك محظور في هذه المحادثة."))
             }
 
-            if (sendSuccess != null) {
-                return@withContext sendSuccess
-            } else {
-                // انتهت مهلة الرفع السحابي، الحفظ في طابور الأوفلاين
-                val offlineMsg = initialMsg.copy(
-                    status = MessageStatus.PENDING,
-                    syncStatus = SyncStatus.PENDING_UPLOAD
-                )
-                local?.queuePendingMessage(offlineMsg)
-                local?.insertOrUpdateMessage(offlineMsg)
-                return@withContext AppResult.Success(offlineMsg)
+            val confirmedMsg = initialMsg.copy(status = MessageStatus.SENT, syncStatus = SyncStatus.SYNCED)
+
+            val displayLast = when (mediaType) {
+                MediaType.IMAGE -> "📷 صورة"
+                MediaType.VIDEO -> "🎥 فيديو"
+                MediaType.AUDIO -> "🎤 تسجيل صوتي"
+                MediaType.FILE -> "📎 ${attachment?.fileName.orEmpty().ifBlank { "ملف مرفق" }}"
+                MediaType.LOCATION -> "📍 موقع جغرافي"
+                MediaType.CALL -> "📞 مكالمة صوتية"
+                MediaType.TEXT -> messageText
             }
+
+            val updates = mutableMapOf<String, Any>(
+                "lastMessage" to displayLast,
+                "lastMessageTime" to now,
+                "lastMessageSenderId" to senderId,
+                "updatedAt" to System.currentTimeMillis()
+            )
+
+            channel?.participants?.forEach { pId ->
+                if (pId != senderId) {
+                    updates["unreadCount.$pId"] = com.google.firebase.firestore.FieldValue.increment(1)
+                }
+            }
+
+            // Write message and update channel atomically in a single batch
+            val batch = firestore.batch()
+            batch.set(channelRef.collection("messages").document(messageId), confirmedMsg)
+            batch.update(channelRef, updates)
+            batch.commit().await()
+
+            // Update local to SENT and remove from pending queue if present
+            local?.insertOrUpdateMessage(confirmedMsg)
+            local?.removePendingMessage(messageId)
+            AppResult.Success(confirmedMsg)
         } catch (e: Exception) {
             Log.e("ChatRepository", "sendMessage failed, saving to offline queue: ${e.message}")
+            // Fallback: Queue the same message ID offline without creating a duplicate record
             val offlineMsg = initialMsg.copy(
                 status = MessageStatus.PENDING,
                 syncStatus = SyncStatus.PENDING_UPLOAD
             )
             local?.queuePendingMessage(offlineMsg)
-            local?.insertOrUpdateMessage(offlineMsg)
             AppResult.Success(offlineMsg)
         }
     }

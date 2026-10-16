@@ -89,19 +89,19 @@ service firebase.storage {
     // 2. وسائط المحادثات والشات (/chat/{channelId}/{allPaths=**} و /chats/{channelId}/{allPaths=**})
     match /chat/{channelId}/{allPaths=**} {
       allow read: if true;
-      allow write: if isValidMediaSize() &&
+      allow write: if isAuthenticated() &&
+                      isValidMediaSize() &&
                       (request.resource.contentType.matches('image/.*') || 
                        request.resource.contentType.matches('audio/.*') || 
-                       request.resource.contentType.matches('video/.*') || 
                        request.resource.contentType.matches('application/.*'));
     }
 
     match /chats/{channelId}/{allPaths=**} {
       allow read: if true;
-      allow write: if isValidMediaSize() &&
+      allow write: if isAuthenticated() &&
+                      isValidMediaSize() &&
                       (request.resource.contentType.matches('image/.*') || 
                        request.resource.contentType.matches('audio/.*') || 
-                       request.resource.contentType.matches('video/.*') || 
                        request.resource.contentType.matches('application/.*'));
     }
 
