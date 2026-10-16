@@ -36,7 +36,12 @@ class ChatAttachmentManager(private val context: Context) {
                 ChatValidationUtils.compressImage(context, uri)
             } else {
                 try {
-                    context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: byteArrayOf()
+                    val uriPath = uri.path
+                    if (uri.scheme == "file" || (uriPath != null && java.io.File(uriPath).exists())) {
+                        java.io.File(uriPath ?: uri.toString()).readBytes()
+                    } else {
+                        context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: byteArrayOf()
+                    }
                 } catch (e: Exception) {
                     byteArrayOf()
                 }
@@ -49,44 +54,53 @@ class ChatAttachmentManager(private val context: Context) {
             return Result.failure(Exception(processedValidation.message))
         }
 
-        // [تعديل] تنفيذ عملية الرفع إلى Firebase Storage مع 3 محاولات كحد أقصى ومنع إرسال الروابط الفارغة
-        return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            val extension = when {
-                isImage -> "jpg"
-                isVideo -> "mp4"
-                else -> {
-                    val uriStr = uri.toString().lowercase()
-                    val mime = context.contentResolver.getType(uri)?.lowercase()
-                    when {
-                        uriStr.endsWith(".m4a") || mime == "audio/m4a" || mime == "audio/x-m4a" -> "m4a"
-                        uriStr.endsWith(".mp3") || mime == "audio/mpeg" || mime == "audio/mp3" -> "mp3"
-                        uriStr.endsWith(".ogg") || mime == "audio/ogg" -> "ogg"
-                        uriStr.endsWith(".wav") || mime == "audio/wav" -> "wav"
-                        uriStr.endsWith(".mp4") || mime == "audio/mp4" -> "m4a"
-                        else -> "m4a"
-                    }
+        // التأكد من تسجيل الدخول قبل الرفع لتجنب أخطاء الصلاحيات
+        try {
+            val auth = com.google.firebase.auth.FirebaseAuth.getInstance()
+            if (auth.currentUser == null) {
+                kotlinx.coroutines.withTimeoutOrNull(4000L) {
+                    auth.signInAnonymously().await()
                 }
             }
-            
-            val mimeType = when {
-                isImage -> "image/jpeg"
-                isVideo -> "video/mp4"
-                else -> {
-                    when (extension) {
-                        "m4a", "mp4" -> "audio/mp4"
-                        "mp3" -> "audio/mpeg"
-                        "ogg" -> "audio/ogg"
-                        "wav" -> "audio/wav"
-                        else -> "audio/mp4"
-                    }
-                }
-            }
+        } catch (_: Exception) {}
 
+        // 4. تنفيذ عملية الرفع إلى Firebase Storage مع مهلة محددة لمنع تجميد الشاشة
+        return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             var uploadAttempt = 0
             var lastException: Exception? = null
-            while (uploadAttempt < 3) {
+            while (uploadAttempt < 2) {
                 uploadAttempt++
                 try {
+                    val extension = when {
+                        isImage -> "jpg"
+                        isVideo -> "mp4"
+                        else -> {
+                            val uriStr = uri.toString().lowercase()
+                            val mime = try { context.contentResolver.getType(uri)?.lowercase() } catch (_: Exception) { null }
+                            when {
+                                uriStr.endsWith(".m4a") || mime == "audio/m4a" || mime == "audio/x-m4a" -> "m4a"
+                                uriStr.endsWith(".mp3") || mime == "audio/mpeg" || mime == "audio/mp3" -> "mp3"
+                                uriStr.endsWith(".ogg") || mime == "audio/ogg" -> "ogg"
+                                uriStr.endsWith(".wav") || mime == "audio/wav" -> "wav"
+                                uriStr.endsWith(".mp4") || mime == "audio/mp4" -> "m4a"
+                                else -> "m4a"
+                            }
+                        }
+                    }
+                    
+                    val mimeType = when {
+                        isImage -> "image/jpeg"
+                        isVideo -> "video/mp4"
+                        else -> {
+                            when (extension) {
+                                "m4a", "mp4" -> "audio/mp4"
+                                "mp3" -> "audio/mpeg"
+                                "ogg" -> "audio/ogg"
+                                "wav" -> "audio/wav"
+                                else -> "audio/mp4"
+                            }
+                        }
+                    }
                     
                     val fileName = "${UUID.randomUUID()}_${System.currentTimeMillis()}.$extension"
                     val ref = storageRef.child("chats/$channelId/$type/$fileName")
@@ -97,28 +111,28 @@ class ChatAttachmentManager(private val context: Context) {
                         .build()
 
                     android.util.Log.d("ChatAttachmentManager", "Uploading ${finalData.size / 1024} KB to Firebase at ${ref.path} (attempt $uploadAttempt)...")
-                    ref.putBytes(finalData, metadata).await()
-                    
-                    val url = ref.downloadUrl.await().toString()
-                    if (url.isBlank()) throw Exception("رابط التحميل فارغ")
-                    
-                    // تسجيل استهلاك الحصة اليومية بعد نجاح الرفع
-                    ChatValidationUtils.recordUploadToday(context)
-                    
-                    return@withContext Result.success(url)
+                    val uploadTaskResult = kotlinx.coroutines.withTimeoutOrNull(20000L) {
+                        ref.putBytes(finalData, metadata).await()
+                        val url = ref.downloadUrl.await().toString()
+                        if (url.isBlank()) throw Exception("رابط التحميل فارغ")
+                        url
+                    }
+
+                    if (uploadTaskResult != null) {
+                        ChatValidationUtils.recordUploadToday(context)
+                        return@withContext Result.success(uploadTaskResult)
+                    } else {
+                        throw Exception("انتهت مهلة الرفع، جاري الحفظ محلياً والمزامنة لاحقاً")
+                    }
                 } catch (e: Exception) {
                     lastException = e
                     android.util.Log.e("ChatAttachmentManager", "Firebase Upload Attempt $uploadAttempt Error", e)
-                    if (uploadAttempt < 3) {
-                        kotlinx.coroutines.delay(800L * uploadAttempt)
+                    if (uploadAttempt < 2) {
+                        kotlinx.coroutines.delay(600L * uploadAttempt)
                     }
                 }
             }
-            if (finalData.isNotEmpty()) {
-                val fallbackUrl = "data:$mimeType;base64," + android.util.Base64.encodeToString(finalData, android.util.Base64.NO_WRAP)
-                return@withContext Result.success(fallbackUrl)
-            }
-            Result.failure(Exception("تعذر معالجة أو رفع الملف: ${lastException?.localizedMessage ?: "خطأ في الشبكة"}"))
+            Result.failure(Exception(lastException?.localizedMessage ?: "فشل رفع الملف إلى الخادم. تم الحفظ في قائمة الانتظار للمزامنة فور توفر الإنترنت."))
         }
     }
 }

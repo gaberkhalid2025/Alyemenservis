@@ -324,6 +324,7 @@ fun ChatInputBar(
 
     fun stopAndSendRecording() {
         val capturedWaveform = liveAmplitudes.toList()
+        val durationSec = recordingDuration
         try {
             mediaRecorder?.let { recorder ->
                 try { recorder.stop() } catch (_: Exception) {}
@@ -333,71 +334,45 @@ fun ChatInputBar(
             mediaRecorder = null
             isRecording = false
             isLockedRecording = false
+            recordingDuration = 0
         }
 
         val file = audioFile
-        if (file != null && file.exists() && recordingDuration >= 1) {
-            val uri = try {
-                FileProvider.getUriForFile(
-                    context,
-                    "${context.packageName}.fileprovider",
-                    file
-                )
+        if (file != null && file.exists() && durationSec >= 1) {
+            val localMediaDir = File(context.filesDir, "chat_media").apply { mkdirs() }
+            val persistentAudio = File(localMediaDir, "audio_${System.currentTimeMillis()}.m4a")
+            try {
+                file.copyTo(persistentAudio, overwrite = true)
+                file.delete()
             } catch (e: Exception) {
                 e.printStackTrace()
-                null
             }
-            if (uri == null) {
-                Toast.makeText(context, "فشل تجهيز التسجيل الصوتي", Toast.LENGTH_SHORT).show()
-                file.delete()
-                audioFile = null
-                recordingDuration = 0
-                return
-            }
-            val validation = ChatValidationUtils.validateFile(uri, context, false)
-            if (!validation.isValid) {
-                Toast.makeText(context, validation.message, Toast.LENGTH_LONG).show()
-                file.delete()
-                audioFile = null
-                recordingDuration = 0
-                return
+            audioFile = null
+
+            val audioPath = if (persistentAudio.exists() && persistentAudio.length() > 0) {
+                persistentAudio.absolutePath
+            } else {
+                file.absolutePath
             }
 
-            val recordedDurationText = "تسجيل صوتي (${recordingDuration}ث)"
-            val localAudioUri = uri.toString()
-            val waveformToSend = capturedWaveform.toList()
-
-            // إرسال الصوت فوراً ليظهر في شاشة المحادثة بحالة قيد الإرسال كما في تطبيقات التواصل
+            // إرسال فوري إلى المحادثة مع ظهور مؤشر "قيد الإرسال" والموجات الصوتية فوراً
             if (onSendAudioMessage != null) {
                 onSendAudioMessage(
-                    recordedDurationText,
-                    localAudioUri,
-                    waveformToSend
+                    "تسجيل صوتي (${durationSec}ث)",
+                    audioPath,
+                    capturedWaveform
                 )
             } else {
                 onSendMessage(
-                    recordedDurationText,
+                    "تسجيل صوتي (${durationSec}ث)",
                     MediaType.AUDIO,
-                    localAudioUri
+                    audioPath
                 )
-            }
-
-            scope.launch {
-                val uploadResult = attachmentManager.uploadAttachment(
-                    channelId = channelId,
-                    uri = uri,
-                    type = "audio"
-                )
-                uploadResult.onSuccess { downloadUrl ->
-                    // تم الرفع بنجاح في الخلفية
-                }
-                file.delete()
             }
         } else {
             file?.delete()
+            audioFile = null
         }
-        audioFile = null
-        recordingDuration = 0
     }
 
     fun cancelRecording() {
@@ -875,11 +850,13 @@ fun ChatInputBar(
     if (activePreviewUri != null) {
         AlertDialog(
             onDismissRequest = {
-                previewImageUri = null
-                imageCaption = ""
-                imageUploadError = null
-                pendingCameraFile?.delete()
-                pendingCameraFile = null
+                if (!isUploadingPreview) {
+                    previewImageUri = null
+                    imageCaption = ""
+                    imageUploadError = null
+                    pendingCameraFile?.delete()
+                    pendingCameraFile = null
+                }
             },
             title = {
                 Text(
@@ -919,32 +896,82 @@ fun ChatInputBar(
                         ),
                         maxLines = 2
                     )
+
+                    if (isUploadingPreview) {
+                        LinearProgressIndicator(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(4.dp)
+                                .clip(RoundedCornerShape(2.dp)),
+                            color = primaryColor
+                        )
+                    }
+
+                    if (imageUploadError != null) {
+                        Surface(
+                            color = Color(0xFFEF4444).copy(alpha = 0.15f),
+                            shape = RoundedCornerShape(8.dp),
+                            border = BorderStroke(1.dp, Color(0xFFEF4444).copy(alpha = 0.4f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = imageUploadError ?: "فشل الرفع",
+                                    color = Color(0xFFFCA5A5),
+                                    fontSize = 11.sp,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                        }
+                    }
                 }
             },
             confirmButton = {
                 Button(
                     onClick = {
-                        val captionToSend = imageCaption.trim()
-                        val uriToSend = activePreviewUri
+                        val activeUri = activePreviewUri
+                        val caption = imageCaption.trim()
+                        val cameraFileToClean = pendingCameraFile
+
+                        // 1. إغلاق النافذة فوراً حتى لا تتجمد الواجهة مطلقاً
                         previewImageUri = null
                         imageCaption = ""
                         imageUploadError = null
-                        isUploadingPreview = false
+                        pendingCameraFile = null
+                        pendingCameraUri = null
 
-                        // إضافة الصورة فوراً لشاشة المحادثة لتظهر بحالة "قيد الإرسال" كما في واتساب وتليجرام
-                        onSendMessage(captionToSend, MediaType.IMAGE, uriToSend.toString())
-
-                        scope.launch {
-                            val uploadResult = attachmentManager.uploadAttachment(
-                                channelId = channelId,
-                                uri = uriToSend,
-                                type = "image"
-                            )
-                            uploadResult.onSuccess { downloadUrl ->
-                                // تم الرفع بنجاح
+                        // 2. نسخ الصورة محلياً وإرسالها فوراً إلى المحادثة مع مؤشر قيد الإرسال
+                        scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                            val localMediaDir = File(context.filesDir, "chat_media").apply { mkdirs() }
+                            val persistentImage = File(localMediaDir, "img_${System.currentTimeMillis()}.jpg")
+                            try {
+                                val bytes = ChatValidationUtils.compressImage(context, activeUri)
+                                if (bytes.isNotEmpty()) {
+                                    persistentImage.writeBytes(bytes)
+                                } else {
+                                    context.contentResolver.openInputStream(activeUri)?.use { input ->
+                                        persistentImage.outputStream().use { output -> input.copyTo(output) }
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            } finally {
+                                cameraFileToClean?.delete()
                             }
-                            pendingCameraFile?.delete()
-                            pendingCameraFile = null
+
+                            val imagePath = if (persistentImage.exists() && persistentImage.length() > 0) {
+                                persistentImage.absolutePath
+                            } else {
+                                activeUri.toString()
+                            }
+
+                            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                onSendMessage(caption, MediaType.IMAGE, imagePath)
+                            }
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = primaryColor)
@@ -964,6 +991,7 @@ fun ChatInputBar(
                         imageUploadError = null
                         pendingCameraFile?.delete()
                         pendingCameraFile = null
+                        pendingCameraUri = null
                     }
                 ) {
                     Text("إلغاء", color = textSecondary)
@@ -978,9 +1006,11 @@ fun ChatInputBar(
     if (activePreviewVideoUri != null) {
         AlertDialog(
             onDismissRequest = {
-                previewVideoUri = null
-                videoCaption = ""
-                videoUploadError = null
+                if (!isUploadingVideo) {
+                    previewVideoUri = null
+                    videoCaption = ""
+                    videoUploadError = null
+                }
             },
             title = {
                 Text(
@@ -1035,36 +1065,63 @@ fun ChatInputBar(
                         ),
                         maxLines = 2
                     )
+
+                    if (isUploadingVideo) {
+                        LinearProgressIndicator(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(4.dp)
+                                .clip(RoundedCornerShape(2.dp)),
+                            color = primaryColor
+                        )
+                    }
+
+                    if (videoUploadError != null) {
+                        Surface(
+                            color = Color(0xFFEF4444).copy(alpha = 0.15f),
+                            shape = RoundedCornerShape(8.dp),
+                            border = BorderStroke(1.dp, Color(0xFFEF4444).copy(alpha = 0.4f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = videoUploadError ?: "فشل رفع الفيديو",
+                                color = Color(0xFFFCA5A5),
+                                fontSize = 11.sp,
+                                modifier = Modifier.padding(8.dp)
+                            )
+                        }
+                    }
                 }
             },
             confirmButton = {
                 Button(
                     onClick = {
-                        val captionToSend = videoCaption.trim()
-                        val uriToSend = activePreviewVideoUri
-                        previewVideoUri = null
-                        videoCaption = ""
-                        videoUploadError = null
-                        isUploadingVideo = false
-
-                        // إضافة الفيديو فوراً لشاشة المحادثة
-                        onSendMessage(captionToSend, MediaType.VIDEO, uriToSend.toString())
-
                         scope.launch {
+                            isUploadingVideo = true
+                            videoUploadError = null
                             val uploadResult = attachmentManager.uploadAttachment(
                                 channelId = channelId,
-                                uri = uriToSend,
+                                uri = activePreviewVideoUri,
                                 type = "video"
                             )
+                            isUploadingVideo = false
+
                             uploadResult.onSuccess { downloadUrl ->
-                                // تم الرفع بنجاح
+                                onSendMessage(videoCaption.trim(), MediaType.VIDEO, downloadUrl)
+                                previewVideoUri = null
+                                videoCaption = ""
+                                videoUploadError = null
+                            }.onFailure { ex ->
+                                videoUploadError = ex.message ?: "فشل رفع الفيديو"
+                                Toast.makeText(context, videoUploadError, Toast.LENGTH_SHORT).show()
                             }
                         }
                     },
+                    enabled = !isUploadingVideo,
                     colors = ButtonDefaults.buttonColors(containerColor = primaryColor)
                 ) {
                     Text(
-                        text = "إرسال الفيديو 🚀",
+                        text = if (videoUploadError != null) "إعادة المحاولة 🔄" else "إرسال الفيديو 🚀",
                         color = Color.White,
                         fontWeight = FontWeight.Bold
                     )
@@ -1076,7 +1133,8 @@ fun ChatInputBar(
                         previewVideoUri = null
                         videoCaption = ""
                         videoUploadError = null
-                    }
+                    },
+                    enabled = !isUploadingVideo
                 ) {
                     Text("إلغاء", color = textSecondary)
                 }

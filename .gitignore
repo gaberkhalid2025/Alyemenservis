@@ -1,7 +1,6 @@
--e .gradle/
+.gradle/
 build/
 app/build/
-.gradle/
 .build-outputs/
 app/google-services.json
 debug.keystore
@@ -9,5 +8,6 @@ debug.keystore.base64
 *.zip
 errors.txt
 local.properties
-
+.env
+*.env
 **/google-services.json

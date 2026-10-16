@@ -87,6 +87,57 @@ fun ServicesBrowserLayout(
         list.toList()
     }
 
+    if (activeTabName == "المفضلة") {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(themeColors.background)
+        ) {
+            // Tab Navigation Chips (allows switching back to الرئيسية or other tabs)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 6.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                activeTabs.forEach { tabName ->
+                    val isSelected = activeTabName == tabName
+                    Surface(
+                        onClick = { viewModel.setActiveBrowserTab(tabName) },
+                        shape = RoundedCornerShape(20.dp),
+                        color = if (isSelected) themeColors.accent else themeColors.surface,
+                        border = BorderStroke(1.dp, if (isSelected) themeColors.accent else Color.White.copy(alpha = 0.1f))
+                    ) {
+                        Text(
+                            text = tabName,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isSelected) Color.Black else Color.White,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                        )
+                    }
+                }
+            }
+
+            Box(modifier = Modifier.weight(1f)) {
+                FavoritesScreenLayout(
+                    viewModel = viewModel,
+                    themeColors = themeColors,
+                    onBackClick = { viewModel.setActiveBrowserTab("الرئيسية") },
+                    onOpenProviderDetails = {
+                        viewModel.selectedProvider = it
+                        viewModel.navigateTo("DYNAMIC_PROFILE")
+                    },
+                    onOpenStoreDetails = { selectedStoreForDetails = it },
+                    onOpenPropertyDetails = { selectedPropertyForDetails = it },
+                    onOpenChat = onChatOpen
+                )
+            }
+        }
+        return
+    }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp),
@@ -170,20 +221,6 @@ fun ServicesBrowserLayout(
         // 5. Main Tab Content
         item {
             when (activeTabName) {
-                "المفضلة" -> {
-                    FavoritesScreenLayout(
-                        viewModel = viewModel,
-                        themeColors = themeColors,
-                        onBackClick = { viewModel.setActiveBrowserTab("الرئيسية") },
-                        onOpenProviderDetails = {
-                            viewModel.selectedProvider = it
-                            viewModel.navigateTo("DYNAMIC_PROFILE")
-                        },
-                        onOpenStoreDetails = { selectedStoreForDetails = it },
-                        onOpenPropertyDetails = { selectedPropertyForDetails = it },
-                        onOpenChat = onChatOpen
-                    )
-                }
                 "المحلات والمتاجر", "المحلات", settingsState.storesTabName -> {
                     StoresSectionView(
                         viewModel = viewModel,

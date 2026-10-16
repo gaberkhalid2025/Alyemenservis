@@ -17,7 +17,7 @@ object ChatValidationUtils {
     const val MAX_VIDEO_SIZE = (15 * 1024 * 1024).toLong() // 15MB - الحد الأقصى للفيديو
     const val MAX_FILE_SIZE = (1.5 * 1024 * 1024).toLong() // 1.5MB - الحد الأقصى المسموح للصوت
     const val MAX_TEXT_LENGTH = 1000
-    const val MAX_DAILY_UPLOADS = 25
+    const val MAX_DAILY_UPLOADS = 300
 
     // القائمة المحدثة للصيغ المسموح بها لتشمل كافة أنواع التسجيل الصوتي والفيديو
     val allowedMimeTypes = listOf(
@@ -28,30 +28,36 @@ object ChatValidationUtils {
     )
 
     fun validateFile(uri: Uri, context: Context, isImage: Boolean, isVideo: Boolean = false): ValidationResult {
-        var mimeType = context.contentResolver.getType(uri)
+        val uriStr = uri.toString().lowercase()
+        val pathStr = uri.path?.lowercase().orEmpty()
+        var mimeType = try { context.contentResolver.getType(uri) } catch (_: Exception) { null }
         if (mimeType.isNullOrBlank()) {
             val extension = android.webkit.MimeTypeMap.getFileExtensionFromUrl(uri.toString())
             if (extension.isNotBlank()) {
                 mimeType = android.webkit.MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension.lowercase())
             }
         }
-        if (mimeType.isNullOrBlank()) {
-            val uriStr = uri.toString().lowercase()
-            mimeType = when {
-                isImage -> "image/jpeg"
-                isVideo -> "video/mp4"
-                uriStr.endsWith(".m4a") || uriStr.endsWith(".mp3") || uriStr.endsWith(".aac") || uriStr.contains("audio") || uriStr.contains("record") -> "audio/mp4"
-                else -> if (!isImage && !isVideo) "audio/mp4" else null
-            }
-        }
 
-        // 1. فحص نوع الملف (MIME Type)
-        val isSupported = mimeType != null && (
+        // 1. فحص نوع الملف (MIME Type) مع فحص الامتدادات والمسار المحلي
+        val isAudioExtension = uriStr.endsWith(".m4a") || pathStr.endsWith(".m4a") ||
+                uriStr.endsWith(".mp3") || pathStr.endsWith(".mp3") ||
+                uriStr.endsWith(".aac") || pathStr.endsWith(".aac") ||
+                uriStr.endsWith(".wav") || pathStr.endsWith(".wav") ||
+                uriStr.endsWith(".ogg") || pathStr.endsWith(".ogg") ||
+                pathStr.contains("audio_rec_")
+        val isImageExtension = uriStr.endsWith(".jpg") || pathStr.endsWith(".jpg") ||
+                uriStr.endsWith(".jpeg") || pathStr.endsWith(".jpeg") ||
+                uriStr.endsWith(".png") || pathStr.endsWith(".png") ||
+                uriStr.endsWith(".webp") || pathStr.endsWith(".webp") ||
+                pathStr.contains("camera_")
+
+        val isSupported = (mimeType != null && (
             mimeType in allowedMimeTypes ||
             mimeType.startsWith("image/") ||
             mimeType.startsWith("audio/") ||
             mimeType.startsWith("video/")
-        )
+        )) || (isImage && isImageExtension) || (!isImage && !isVideo && isAudioExtension)
+
         if (!isSupported) {
             return ValidationResult(
                 isValid = false,
@@ -61,7 +67,12 @@ object ChatValidationUtils {
 
         // 2. فحص الحجم الخام
         val fileSize = try {
-            context.contentResolver.openAssetFileDescriptor(uri, "r")?.use { it.length } ?: 0L
+            val path = uri.path
+            if (uri.scheme == "file" || (path != null && java.io.File(path).exists())) {
+                java.io.File(path ?: uri.toString()).length()
+            } else {
+                context.contentResolver.openAssetFileDescriptor(uri, "r")?.use { it.length } ?: 0L
+            }
         } catch (_: Exception) { 0L }
 
         if (isVideo && fileSize > MAX_VIDEO_SIZE) {
@@ -92,13 +103,30 @@ object ChatValidationUtils {
         return ValidationResult(isValid = true, message = "")
     }
 
+    private fun openUriStream(context: Context, uri: Uri): java.io.InputStream? {
+        return try {
+            val path = uri.path
+            if (uri.scheme == "file" || (path != null && java.io.File(path).exists())) {
+                java.io.FileInputStream(java.io.File(path ?: uri.toString()))
+            } else {
+                context.contentResolver.openInputStream(uri)
+            }
+        } catch (_: Exception) {
+            try {
+                context.contentResolver.openInputStream(uri)
+            } catch (_: Exception) {
+                null
+            }
+        }
+    }
+
     /**
      * تطبيق ضغط الصور بدقة (حد أقصى 800x800) وجودة 70% مع ضمان عدم تجاوز 500KB
      */
     fun compressImage(context: Context, uri: Uri): ByteArray {
         return try {
             val boundsOptions = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            var inputStream = context.contentResolver.openInputStream(uri)
+            var inputStream = openUriStream(context, uri)
             BitmapFactory.decodeStream(inputStream, null, boundsOptions)
             inputStream?.close()
 
@@ -110,11 +138,15 @@ object ChatValidationUtils {
             }
 
             val decodeOptions = BitmapFactory.Options().apply { inSampleSize = sampleSize }
-            inputStream = context.contentResolver.openInputStream(uri)
+            inputStream = openUriStream(context, uri)
             val bitmap = BitmapFactory.decodeStream(inputStream, null, decodeOptions)
             inputStream?.close()
 
-            if (bitmap == null) return byteArrayOf()
+            if (bitmap == null) {
+                return try {
+                    openUriStream(context, uri)?.use { it.readBytes() } ?: byteArrayOf()
+                } catch (_: Exception) { byteArrayOf() }
+            }
 
             val scaledBitmap = if (bitmap.width > maxWidth || bitmap.height > maxHeight) {
                 val scale = minOf(maxWidth.toFloat() / bitmap.width, maxHeight.toFloat() / bitmap.height)

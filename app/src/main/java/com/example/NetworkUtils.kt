@@ -7,9 +7,10 @@ import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 
 object NetworkUtils {
-    fun isNetworkAvailable(context: Context): Boolean {
+    fun isNetworkAvailable(context: Context? = null): Boolean {
         return try {
-            val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+            val ctx = context ?: MyApplication.instance ?: return false
+            val connectivityManager = ctx.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
             if (connectivityManager != null) {
                 val activeNetwork = connectivityManager.activeNetwork ?: return false
                 val capabilities = connectivityManager.getNetworkCapabilities(activeNetwork) ?: return false

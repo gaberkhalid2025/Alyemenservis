@@ -29,12 +29,11 @@ service cloud.firestore {
     match /providers/{d} {
       allow read: if true;
       allow create, delete: if isStaff();
-      allow update: if (isSignedIn()
+      allow update: if isSignedIn()
                   && (resource.data.phone == request.auth.uid
                       || resource.data.id == request.auth.uid
                       || (('ownerId' in resource.data) && resource.data.ownerId == request.auth.uid)
-                      || isStaff()))
-                  || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rating', 'numReviews']);
+                      || isStaff());
     }
     match /properties/{d} {
       allow read: if true;
@@ -243,42 +242,32 @@ service cloud.firestore {
 
     // 8. المحادثات والرسائل والتواجد
     match /chat_channels/{channelId} {
-      allow read: if isSignedIn() && (
-        isStaff() || request.auth.uid in resource.data.participants
-      );
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && (
-        isStaff() || request.auth.uid in resource.data.participants
-      );
-      allow delete: if isStaff();
+      allow read, write: if true;
       
       match /messages/{msgId} {
-        allow read: if isSignedIn() && (
-          isStaff() ||
-          request.auth.uid in get(/databases/$(db)/documents/chat_channels/$(channelId)).data.participants
-        );
-        allow create: if isSignedIn() && (
-          request.auth.uid in get(/databases/$(db)/documents/chat_channels/$(channelId)).data.participants
-        );
-        allow update, delete: if isStaff();
+        allow read, write: if true;
       }
     }
     match /chat_rooms/{roomId} {
-      allow read, write: if isSignedIn();
+      allow read, write: if true;
       match /messages/{msgId} {
-        allow read, write: if isSignedIn();
+        allow read, write: if true;
       }
     }
     match /chats/{chatId} {
-      allow read, write: if isSignedIn() && (request.auth.uid in resource.data.participants || isStaff());
+      allow read, write: if true;
       match /messages/{msgId} {
-        allow read, write: if isSignedIn() && (
-          request.auth.uid in get(/databases/$(db)/documents/chats/$(chatId)).data.participants || isStaff()
-        );
+        allow read, write: if true;
       }
     }
     match /presence/{d} {
-      allow read, write: if isSignedIn();
+      allow read, write: if true;
+    }
+    match /user_presence/{d} {
+      allow read, write: if true;
+    }
+    match /user_typing/{d} {
+      allow read, write: if true;
     }
 
     // 9. التقييمات والمراجعات وسجلات النظام
@@ -288,7 +277,7 @@ service cloud.firestore {
     }
     match /ratings/{d} {
       allow read: if true;
-      allow create: if true;
+      allow create: if isSignedIn();
       allow update, delete: if isSignedIn()
                 && (resource.data.userId == request.auth.uid
                     || isOwnerOrAdmin());

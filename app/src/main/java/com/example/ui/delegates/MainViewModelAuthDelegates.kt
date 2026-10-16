@@ -155,26 +155,24 @@ fun MainViewModel.navigateTo(screen: String) {
 }
 
 fun MainViewModel.goBack(): Boolean {
-    // إذا كان المستخدم في الشاشة الرئيسية حالياً، امنع العودة للشاشات السابقة واطلب الخروج من التطبيق
+    // إذا كان المستخدم في الشاشة الرئيسية، لا نرجع لأي شاشات سابقة مطلقاً
     if (_currentScreen.value == AppScreens.USER_BROWSE || _currentScreen.value == "HOME") {
         _screenBackStack.value = listOf(AppScreens.USER_BROWSE)
-        return false
+        return false // يعود لـ MainActivity للتعامل مع الخروج بضغطة ثانية
     }
+
     val current = _screenBackStack.value
     if (current.size > 1) {
         val updated = current.toMutableList()
         updated.removeAt(updated.size - 1)
-        while (updated.size > 1 && updated.last() == _currentScreen.value) {
-            updated.removeAt(updated.size - 1)
-        }
-        val targetScreen = updated.lastOrNull() ?: AppScreens.USER_BROWSE
+        val target = updated.lastOrNull() ?: AppScreens.USER_BROWSE
         _screenBackStack.value = updated
-        _currentScreen.value = targetScreen
+        _currentScreen.value = target
         return true
     } else {
         _currentScreen.value = AppScreens.USER_BROWSE
         _screenBackStack.value = listOf(AppScreens.USER_BROWSE)
-        return false
+        return true
     }
 }
 

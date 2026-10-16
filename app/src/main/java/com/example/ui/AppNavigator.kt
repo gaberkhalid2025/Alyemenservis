@@ -239,7 +239,7 @@ fun AppNavigator(
                         viewModel.targetChatChannelId = ch.id
                         viewModel.navigateToScreen(AppScreens.CHAT_DIRECT)
                     },
-                    onBackClick = { viewModel.navigateToScreen(AppScreens.USER_BROWSE) },
+                    onBackClick = { viewModel.goBack() },
                     onStartSupportChat = { viewModel.openSupportChat() }
                 )
                 AppScreens.CHAT_DIRECT -> ChatScreen(
@@ -260,7 +260,7 @@ fun AppNavigator(
                         viewModel.targetChatUserPhoto = null
                         viewModel.targetChatRelatedEntityId = null
                         viewModel.targetChatRelatedEntityType = null
-                        viewModel.navigateToScreen(AppScreens.USER_BROWSE)
+                        viewModel.goBack()
                     }
                 )
                 AppScreens.CREATE_BOOKING -> {
@@ -280,7 +280,7 @@ fun AppNavigator(
                         providerId = pId,
                         providerName = pName,
                         preselectedService = pService,
-                        onBack = { viewModel.navigateToScreen(AppScreens.USER_BROWSE) },
+                        onBack = { viewModel.goBack() },
                         onBookingCreated = { booking ->
                             viewModel.createBooking(booking)
                             viewModel.navigateToScreen(AppScreens.BOOKINGS_VIEW)
@@ -294,14 +294,14 @@ fun AppNavigator(
                     job = viewModel.selectedJob,
                     viewModel = viewModel,
                     themeColors = themeColors,
-                    onBackClick = { viewModel.navigateToScreen(AppScreens.USER_BROWSE) }
+                    onBackClick = { viewModel.goBack() }
                 )
                 AppScreens.BOOKINGS_VIEW -> BookingsScreenLayout(viewModel = viewModel, themeColors = themeColors)
                 AppScreens.INSTANT_REQUESTS_VIEW -> InstantRequestsScreen(viewModel = viewModel, themeColors = themeColors)
                 AppScreens.ORDERS_VIEW -> OrdersScreenLayout(viewModel = viewModel, themeColors = themeColors, onRequestQuickService = { viewModel.navigateToScreen(AppScreens.QUICK_SERVICE_REQUEST) })
                 AppScreens.MAP_VIEW -> MapScreenLayout(
                     viewModel = viewModel,
-                    onBackClick = { viewModel.navigateToScreen(AppScreens.USER_BROWSE) },
+                    onBackClick = { viewModel.goBack() },
                     onOpenProviderDetails = { provider ->
                         viewModel.selectedProvider = provider
                         viewModel.selectedStore = null
@@ -352,7 +352,7 @@ fun AppNavigator(
                 AppScreens.FAVORITES_VIEW -> FavoritesScreenLayout(
                     viewModel = viewModel,
                     themeColors = themeColors,
-                    onBackClick = { viewModel.navigateToScreen(AppScreens.USER_BROWSE) }
+                    onBackClick = { viewModel.goBack() }
                 )
                 AppScreens.URGENT_REQUEST_DETAILS -> UrgentRequestDetailsScreen(
                     requestId = viewModel.selectedRequestId,
@@ -389,14 +389,14 @@ fun AppNavigator(
                     RegisterScreen(
                         viewModel = viewModel,
                         themeColors = themeColors,
-                        onBackClick = { viewModel.navigateToScreen(AppScreens.USER_BROWSE) }
+                        onBackClick = { viewModel.goBack() }
                     )
                 }
                 AppScreens.PASSWORD_RESET_WAITING -> {
                     com.example.ui.screens.register.PasswordResetWaitingScreen(
                         viewModel = viewModel,
                         themeColors = themeColors,
-                        onBackClick = { viewModel.navigateToScreen(AppScreens.USER_BROWSE) }
+                        onBackClick = { viewModel.goBack() }
                     )
                 }
                 AppScreens.ABOUT_APP -> {
@@ -409,7 +409,7 @@ fun AppNavigator(
                     com.example.ui.screens.notifications.UserNotificationsScreen(
                         viewModel = viewModel,
                         themeColors = themeColors,
-                        onBack = { viewModel.navigateToScreen(AppScreens.USER_BROWSE) }
+                        onBack = { viewModel.goBack() }
                     )
                 }
                 AppScreens.SMART_ASSISTANT -> {
@@ -417,7 +417,7 @@ fun AppNavigator(
                         viewModel = viewModel,
                         settings = settingsState,
                         themeColors = themeColors,
-                        onDismiss = { viewModel.navigateToScreen(AppScreens.USER_BROWSE) },
+                        onDismiss = { viewModel.goBack() },
                         onChatOpen = { viewModel.openSupportChat() },
                         onRequestQuickService = {
                             viewModel.navigateToScreen(AppScreens.QUICK_SERVICE_REQUEST)
@@ -431,7 +431,7 @@ fun AppNavigator(
                     QuickServiceRequestDialog(
                         viewModel = viewModel,
                         themeColors = themeColors,
-                        onDismiss = { viewModel.navigateToScreen(AppScreens.USER_BROWSE) },
+                        onDismiss = { viewModel.goBack() },
                         onRequestCreated = { viewModel.navigateToScreen(AppScreens.ORDERS_VIEW) }
                     )
                 }
@@ -439,7 +439,7 @@ fun AppNavigator(
                     UnifiedGlobalSearchScreen(
                         viewModel = viewModel,
                         themeColors = themeColors,
-                        onBackClick = { viewModel.navigateToScreen(AppScreens.USER_BROWSE) }
+                        onBackClick = { viewModel.goBack() }
                     )
                 }
                 else -> {

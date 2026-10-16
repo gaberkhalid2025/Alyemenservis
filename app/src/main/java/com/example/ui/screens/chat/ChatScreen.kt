@@ -67,8 +67,17 @@ fun ChatScreen(
     chatViewModel: ChatViewModel = hiltViewModel(),
     onBackClick: () -> Unit
 ) {
-    val effectiveUserId = currentUserId.ifBlank { "guest_user" }
-    val effectiveUserName = currentUserName.ifBlank { "أنا" }
+    if (currentUserId.isBlank()) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(themeColors.background),
+            contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator(color = themeColors.accent)
+        }
+        return
+    }
 
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -118,12 +127,12 @@ fun ChatScreen(
     // Initialize Channel
     LaunchedEffect(channel, channelId, targetUserId, relatedEntityId, relatedEntityType) {
         if (channel != null) {
-            chatViewModel.openChannel(channel, effectiveUserId)
+            chatViewModel.openChannel(channel, currentUserId)
         } else if (!channelId.isNullOrBlank()) {
             chatViewModel.openChannelById(
                 channelId = channelId,
-                currentUserId = effectiveUserId,
-                currentUserName = effectiveUserName,
+                currentUserId = currentUserId,
+                currentUserName = currentUserName,
                 fallbackTargetUserId = targetUserId,
                 fallbackUserName = targetUserName,
                 relatedEntityId = relatedEntityId,
@@ -131,8 +140,8 @@ fun ChatScreen(
             )
         } else if (!targetUserId.isNullOrBlank()) {
             chatViewModel.startDirectChat(
-                currentUserId = effectiveUserId,
-                currentUserName = effectiveUserName,
+                currentUserId = currentUserId,
+                currentUserName = currentUserName,
                 currentUserPhoto = currentUserPhoto,
                 otherUserId = targetUserId,
                 otherUserName = targetUserName ?: "مستخدم",
@@ -558,21 +567,23 @@ fun ChatScreen(
                     onCancelEdit = { editingMessage = null },
                     onSendMessage = { text, mediaType, mediaUrl ->
                         chatViewModel.sendMessage(
-                            senderId = effectiveUserId,
-                            senderName = effectiveUserName,
+                            senderId = currentUserId,
+                            senderName = currentUserName,
                             text = text,
                             mediaType = mediaType,
-                            mediaUrl = mediaUrl
+                            mediaUrl = mediaUrl,
+                            explicitChannelId = activeChannel?.id ?: channelId
                         )
                     },
                     onSendAudioMessage = { text, mediaUrl, waveform ->
                         chatViewModel.sendMessage(
-                            senderId = effectiveUserId,
-                            senderName = effectiveUserName,
+                            senderId = currentUserId,
+                            senderName = currentUserName,
                             text = text,
                             mediaType = MediaType.AUDIO,
                             mediaUrl = mediaUrl,
-                            audioWaveform = waveform
+                            audioWaveform = waveform,
+                            explicitChannelId = activeChannel?.id ?: channelId
                         )
                     },
                     onEditMessage = { messageId, newText ->
@@ -580,7 +591,7 @@ fun ChatScreen(
                         editingMessage = null
                     },
                     onTyping = { text ->
-                        chatViewModel.onUserTyping(effectiveUserId, text)
+                        chatViewModel.onUserTyping(currentUserId, text)
                     },
                     themeColors = themeColors
                 )
