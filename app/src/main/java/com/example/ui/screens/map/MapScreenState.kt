@@ -20,7 +20,8 @@ class MapScreenState(
     selectedCategory: String = "ALL",
     selectedCity: String = "الكل",
     searchQuery: String = "",
-    maxRangeKm: Float = 25.0f
+    maxRangeKm: Float = 25.0f,
+    currentLayer: String = "satellite"
 ) {
     var isRadarMode by mutableStateOf(isRadarMode)
     var isHeatmapActive by mutableStateOf(isHeatmapActive)
@@ -28,6 +29,10 @@ class MapScreenState(
     var selectedCity by mutableStateOf(selectedCity)
     var searchQuery by mutableStateOf(searchQuery)
     var maxRangeKm by mutableFloatStateOf(maxRangeKm)
+    var currentLayer by mutableStateOf(currentLayer)
+
+    var showLayerSelector by mutableStateOf(false)
+    var showInfoDialog by mutableStateOf(false)
 
     var zoomScale by mutableFloatStateOf(1.0f)
     var panOffset by mutableStateOf(androidx.compose.ui.geometry.Offset.Zero)
@@ -48,7 +53,7 @@ class MapScreenState(
 
     companion object {
         val Saver: Saver<MapScreenState, *> = listSaver(
-            save = { listOf(it.isRadarMode, it.isHeatmapActive, it.selectedCategory, it.selectedCity, it.searchQuery, it.maxRangeKm) },
+            save = { listOf(it.isRadarMode, it.isHeatmapActive, it.selectedCategory, it.selectedCity, it.searchQuery, it.maxRangeKm, it.currentLayer) },
             restore = {
                 MapScreenState(
                     isRadarMode = it[0] as Boolean,
@@ -56,7 +61,8 @@ class MapScreenState(
                     selectedCategory = it[2] as String,
                     selectedCity = it[3] as String,
                     searchQuery = it[4] as String,
-                    maxRangeKm = (it[5] as Number).toFloat()
+                    maxRangeKm = (it[5] as Number).toFloat(),
+                    currentLayer = if (it.size > 6) (it[6] as String) else "satellite"
                 )
             }
         )

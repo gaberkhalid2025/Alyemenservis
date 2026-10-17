@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>خريطة دليل خدمات اليمن</title>
+    <title>خريطة Vela Map - اليمن</title>
     <link rel="stylesheet" href="leaflet.css" />
     <link rel="stylesheet" href="MarkerCluster.css" />
     <link rel="stylesheet" href="MarkerCluster.Default.css" />
@@ -17,7 +17,7 @@
         html, body, #map {
             width: 100%;
             height: 100%;
-            background-color: #0F172A;
+            background-color: #0B111E;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Cairo", Tahoma, sans-serif;
             overflow: hidden;
         }
@@ -29,6 +29,10 @@
             align-items: center;
             cursor: pointer;
             transform: translate(-50%, -100%);
+            transition: transform 0.15s ease-out;
+        }
+        .custom-pin-container:active {
+            transform: translate(-50%, -100%) scale(1.15);
         }
         .custom-pin-head {
             width: 38px;
@@ -40,11 +44,7 @@
             font-size: 19px;
             color: #ffffff;
             border: 2.5px solid #ffffff;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.45);
-            transition: transform 0.2s ease;
-        }
-        .custom-pin-head:active {
-            transform: scale(1.18);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.6);
         }
         .custom-pin-arrow {
             width: 0;
@@ -53,10 +53,10 @@
             border-right: 7px solid transparent;
             border-top: 8px solid #ffffff;
             margin-top: -1px;
-            filter: drop-shadow(0 2px 2px rgba(0,0,0,0.3));
+            filter: drop-shadow(0 2px 3px rgba(0,0,0,0.4));
         }
         .custom-pin-label {
-            background: rgba(15, 23, 42, 0.90);
+            background: rgba(15, 23, 42, 0.94);
             color: #ffffff;
             font-size: 11px;
             font-weight: 700;
@@ -64,103 +64,85 @@
             border-radius: 10px;
             margin-top: 3px;
             white-space: nowrap;
-            max-width: 130px;
+            max-width: 140px;
             overflow: hidden;
             text-overflow: ellipsis;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.5);
-            border: 1px solid rgba(255,255,255,0.25);
+            box-shadow: 0 3px 8px rgba(0,0,0,0.6);
+            border: 1px solid rgba(255,255,255,0.3);
             pointer-events: none;
         }
 
-        /* User GPS Location Marker */
+        /* User GPS Location Marker with Pulse */
         .user-pulse-marker {
             position: relative;
-            width: 22px;
-            height: 22px;
+            width: 26px;
+            height: 26px;
         }
         .user-dot {
             width: 16px;
             height: 16px;
             background: #00E5FF;
-            border: 2.5px solid #ffffff;
+            border: 3px solid #ffffff;
             border-radius: 50%;
             position: absolute;
-            top: 3px;
-            left: 3px;
-            box-shadow: 0 0 10px #00E5FF;
+            top: 5px;
+            left: 5px;
+            box-shadow: 0 0 12px #00E5FF;
             z-index: 2;
         }
         .user-pulse {
-            width: 36px;
-            height: 36px;
-            background: rgba(0, 229, 255, 0.40);
+            width: 44px;
+            height: 44px;
+            background: rgba(0, 229, 255, 0.35);
             border-radius: 50%;
             position: absolute;
-            top: -7px;
-            left: -7px;
+            top: -9px;
+            left: -9px;
             animation: userPulsing 2s infinite ease-out;
             z-index: 1;
         }
         @keyframes userPulsing {
-            0% { transform: scale(0.5); opacity: 0.9; }
-            100% { transform: scale(1.8); opacity: 0; }
+            0% { transform: scale(0.4); opacity: 0.9; }
+            100% { transform: scale(1.9); opacity: 0; }
         }
 
-        /* Layer Switcher Pill at Top-Left */
-        .map-layer-switch {
+        /* Animated Radar Scan Ring */
+        .radar-scan-ring {
+            width: 90px;
+            height: 90px;
+            border: 2px solid rgba(0, 229, 255, 0.7);
+            border-radius: 50%;
             position: absolute;
-            top: 14px;
-            left: 14px;
-            z-index: 1000;
-            background: rgba(15, 23, 42, 0.92);
-            border: 1px solid #334155;
-            border-radius: 20px;
-            padding: 4px;
-            display: flex;
-            gap: 4px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            top: -32px;
+            left: -32px;
+            animation: radarRing 2.4s infinite linear;
+            pointer-events: none;
         }
-        .layer-btn {
-            background: transparent;
-            border: none;
-            color: #94A3B8;
-            font-size: 11px;
-            font-weight: 700;
-            padding: 5px 10px;
-            border-radius: 14px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        .layer-btn.active {
-            background: #00E5FF;
-            color: #0F172A;
-            box-shadow: 0 2px 6px rgba(0,229,255,0.4);
+        @keyframes radarRing {
+            0% { transform: scale(0.3); opacity: 0.85; border-color: #00E5FF; }
+            50% { opacity: 0.45; }
+            100% { transform: scale(2.8); opacity: 0; border-color: #38BDF8; }
         }
 
         /* Leaflet Controls Customization */
         .leaflet-control-zoom {
-            display: none !important; /* Managed via Native Compose Buttons */
+            display: none !important;
         }
         .leaflet-control-attribution {
-            background: rgba(15, 23, 42, 0.75) !important;
+            background: rgba(15, 23, 42, 0.85) !important;
             color: #94A3B8 !important;
             font-size: 9px !important;
-            padding: 2px 6px !important;
+            padding: 2px 8px !important;
+            border-radius: 4px;
         }
         .leaflet-control-attribution a {
             color: #38BDF8 !important;
+            text-decoration: none;
         }
     </style>
 </head>
 <body>
     <div id="map"></div>
-
-    <!-- Quick Map Type Switcher -->
-    <div class="map-layer-switch">
-        <button id="btnOSM" class="layer-btn active" onclick="switchLayer('osm')">خريطة OSM الحية</button>
-        <button id="btnGoogleRoads" class="layer-btn" onclick="switchLayer('google_roads')">شوارع</button>
-        <button id="btnGoogleSat" class="layer-btn" onclick="switchLayer('google_satellite')">قمر صناعي</button>
-    </div>
 
     <script src="leaflet.js"></script>
     <script src="leaflet.markercluster.js"></script>
@@ -170,49 +152,63 @@
         var markerClusterGroup;
         var userMarker = null;
         var userAccuracyCircle = null;
+        var radarPulseMarker = null;
         var userLat = 15.3694;
         var userLng = 44.1910;
-        var activeLayerKey = 'osm';
+        var activeLayerKey = 'satellite';
 
-        // Tile Providers (100% Free OpenStreetMap TileSource MAPNIK with Arabic support)
+        // 100% Free Tile Providers (Zero API Keys required)
         var tileProviders = {
-            // [تعديل] تفعيل خوادم OpenStreetMap الرسمية مع التوزيع عبر خوادم البلاطات الثلاثة a,b,c لدعم السرعة القصوى
+            // 🛰️ صور الأقمار الصناعية (Satellite) - Google Hybrid with Arabic Street Labels & Esri fallback
+            'satellite': L.tileLayer('https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}&hl=ar', {
+                subdomains: ['0', '1', '2', '3'],
+                minZoom: 3,
+                maxZoom: 20,
+                attribution: '© Google & Esri Satellite'
+            }),
+            // 🌍 OpenStreetMap Standard (الرسمية)
             'osm': L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 subdomains: ['a', 'b', 'c'],
-                minZoom: 4,
-                maxZoom: 20,
+                minZoom: 3,
+                maxZoom: 19,
                 attribution: '© OpenStreetMap contributors'
             }),
-            // Google Maps Roadmap in Arabic fallback
-            'google_roads': L.tileLayer('https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}&hl=ar', {
-                subdomains: ['0', '1', '2', '3'],
-                minZoom: 4,
-                maxZoom: 20,
-                attribution: '© Google Maps'
+            // 🏙️ (HOT) خريطة الشوارع الحيوية
+            'hot': L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
+                subdomains: ['a', 'b', 'c'],
+                minZoom: 3,
+                maxZoom: 19,
+                attribution: '© OSM Humanitarian'
             }),
-            // Google Maps Hybrid/Satellite
-            'google_satellite': L.tileLayer('https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}&hl=ar', {
-                subdomains: ['0', '1', '2', '3'],
-                minZoom: 4,
-                maxZoom: 20,
-                attribution: '© Google Satellite'
+            // 🗺️ (Topo) خريطة العالم والتضاريس
+            'topo': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
+                minZoom: 3,
+                maxZoom: 19,
+                attribution: '© Esri World Topo'
+            }),
+            // 🌌 Dark Matter Radar
+            'dark': L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                subdomains: ['a', 'b', 'c', 'd'],
+                minZoom: 3,
+                maxZoom: 19,
+                attribution: '© CartoDB Dark'
             })
         };
 
         function initMap() {
             try {
-                // Initialize map centered on Sana'a by default with minZoom 4 and maxZoom 20
+                // Initialize map centered on Sana'a by default
                 map = L.map('map', {
                     center: [userLat, userLng],
                     zoom: 15,
-                    minZoom: 4,
+                    minZoom: 3,
                     maxZoom: 20,
                     zoomControl: false,
                     attributionControl: true
                 });
 
-                // Attach default OpenStreetMap MAPNIK layer
-                currentTileLayer = tileProviders['osm'].addTo(map);
+                // Attach default Satellite layer (images from space)
+                currentTileLayer = tileProviders['satellite'].addTo(map);
 
                 // Cluster group with custom styling
                 markerClusterGroup = L.markerClusterGroup({
@@ -223,47 +219,48 @@
                 });
                 map.addLayer(markerClusterGroup);
 
-                // Click event on map background
+                // Map background click dismisses selection
                 map.on('click', function(e) {
                     if (window.AndroidBridge && window.AndroidBridge.onMapClicked) {
                         window.AndroidBridge.onMapClicked();
                     }
                 });
 
-                // Notify native Android
+                // Notify native Android host
                 if (window.AndroidBridge && window.AndroidBridge.onMapReady) {
                     window.AndroidBridge.onMapReady();
                 }
             } catch(e) {
-                console.error("Map init error:", e);
+                console.error("Vela Map init error:", e);
             }
         }
 
+        // Switch active map layer dynamically
         function switchLayer(layerKey) {
-            if (!tileProviders[layerKey]) return;
-            if (currentTileLayer) {
-                map.removeLayer(currentTileLayer);
+            if (!tileProviders[layerKey] || !map) return;
+            try {
+                if (currentTileLayer) {
+                    map.removeLayer(currentTileLayer);
+                }
+                currentTileLayer = tileProviders[layerKey].addTo(map);
+                currentTileLayer.bringToBack();
+                activeLayerKey = layerKey;
+            } catch(e) {
+                console.error("switchLayer error:", e);
             }
-            currentTileLayer = tileProviders[layerKey].addTo(map);
-            currentTileLayer.bringToBack();
-            activeLayerKey = layerKey;
-
-            document.getElementById('btnGoogleRoads').className = 'layer-btn' + (layerKey === 'google_roads' ? ' active' : '');
-            document.getElementById('btnGoogleSat').className = 'layer-btn' + (layerKey === 'google_satellite' ? ' active' : '');
-            document.getElementById('btnOSM').className = 'layer-btn' + (layerKey === 'osm' ? ' active' : '');
         }
 
         // Called by Android to update User GPS position
         function updateUserLocation(lat, lng, accuracy, shouldPan) {
-            if (!lat || !lng || isNaN(lat) || isNaN(lng)) return;
+            if (!lat || !lng || isNaN(lat) || isNaN(lng) || !map) return;
             userLat = lat;
             userLng = lng;
 
             var userIcon = L.divIcon({
                 className: '',
-                html: '<div class="user-pulse-marker"><div class="user-pulse"></div><div class="user-dot"></div></div>',
-                iconSize: [22, 22],
-                iconAnchor: [11, 11]
+                html: '<div class="user-pulse-marker"><div class="user-pulse"></div><div class="user-dot"></div><div class="radar-scan-ring"></div></div>',
+                iconSize: [26, 26],
+                iconAnchor: [13, 13]
             });
 
             if (!userMarker) {
@@ -280,9 +277,9 @@
                     userAccuracyCircle = L.circle([lat, lng], {
                         radius: accuracy,
                         color: '#00E5FF',
-                        weight: 1,
+                        weight: 1.5,
                         fillColor: '#00E5FF',
-                        fillOpacity: 0.10
+                        fillOpacity: 0.08
                     }).addTo(map);
                 } else {
                     userAccuracyCircle.setLatLng([lat, lng]);
@@ -290,7 +287,7 @@
                 }
             }
 
-            if (shouldPan && map) {
+            if (shouldPan) {
                 map.panTo([lat, lng], { animate: true });
             }
         }
@@ -307,7 +304,7 @@
                 items.forEach(function(item) {
                     if (!item.lat || !item.lng || item.lat === 0.0 || item.lng === 0.0) return;
 
-                    var pinBg = item.badgeColor || '#00E5FF';
+                    var pinBg = item.badgeColor || '#0284C7';
                     var emoji = item.emoji || '📍';
                     var displayName = item.name || '';
                     if (displayName.length > 18) {
@@ -343,18 +340,22 @@
             }
         }
 
-        // Center on selected City
+        // Center on selected City with smooth fly-to
         function setCity(cityName, lat, lng, zoomLevel) {
             if (map && lat && lng) {
-                map.setView([lat, lng], zoomLevel || 14, { animate: true });
+                map.flyTo([lat, lng], zoomLevel || 14, {
+                    animate: true,
+                    duration: 1.2
+                });
             }
         }
 
-        // Zoom Controls
+        // Zoom In
         function zoomIn() {
             if (map) map.zoomIn();
         }
 
+        // Zoom Out
         function zoomOut() {
             if (map) map.zoomOut();
         }
@@ -362,7 +363,10 @@
         // Recenter on user GPS
         function recenterUser() {
             if (map && userLat && userLng) {
-                map.setView([userLat, userLng], 16, { animate: true });
+                map.flyTo([userLat, userLng], 16, {
+                    animate: true,
+                    duration: 1.0
+                });
             }
         }
 

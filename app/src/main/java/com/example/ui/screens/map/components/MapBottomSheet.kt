@@ -48,6 +48,7 @@ fun MapBottomSheet(
     onDismiss: () -> Unit,
     onRequestBooking: (Any) -> Unit,
     onOpenDetails: (Any) -> Unit,
+    onOpenChat: ((Any) -> Unit)? = null,
     themeColors: VisualThemePalette,
     modifier: Modifier = Modifier
 ) {
@@ -318,7 +319,111 @@ fun MapBottomSheet(
                 }
             }
 
-            // Action Buttons
+            // 1. Direct Contact & Quick Actions Row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Call Action
+                if (phone.isNotBlank()) {
+                    OutlinedButton(
+                        onClick = {
+                            try {
+                                val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone"))
+                                context.startActivity(intent)
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+                        },
+                        shape = RoundedCornerShape(10.dp),
+                        border = BorderStroke(1.dp, Color(0xFF38BDF8)),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF38BDF8)),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(38.dp)
+                            .testTag("call_action_btn")
+                    ) {
+                        Icon(Icons.Default.Phone, contentDescription = null, modifier = Modifier.size(14.dp))
+                        Spacer(Modifier.width(3.dp))
+                        Text("اتصال", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+
+                    // WhatsApp Action
+                    OutlinedButton(
+                        onClick = {
+                            try {
+                                val cleanPhone = phone.replace("+", "").replace(" ", "").trim()
+                                val yemenPhone = if (cleanPhone.startsWith("7") && cleanPhone.length == 9) "967$cleanPhone" else cleanPhone
+                                val waIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://api.whatsapp.com/send?phone=$yemenPhone"))
+                                context.startActivity(waIntent)
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+                        },
+                        shape = RoundedCornerShape(10.dp),
+                        border = BorderStroke(1.dp, Color(0xFF22C55E)),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF22C55E)),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
+                        modifier = Modifier
+                            .weight(1.1f)
+                            .height(38.dp)
+                            .testTag("whatsapp_action_btn")
+                    ) {
+                        Icon(Icons.Default.ChatBubbleOutline, contentDescription = null, modifier = Modifier.size(14.dp))
+                        Spacer(Modifier.width(3.dp))
+                        Text("واتساب", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                // In-App Chat Action
+                if (onOpenChat != null) {
+                    OutlinedButton(
+                        onClick = { onOpenChat(entity) },
+                        shape = RoundedCornerShape(10.dp),
+                        border = BorderStroke(1.dp, Color(0xFF00E5FF)),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF00E5FF)),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(38.dp)
+                            .testTag("chat_action_btn")
+                    ) {
+                        Icon(Icons.Default.Email, contentDescription = null, modifier = Modifier.size(14.dp))
+                        Spacer(Modifier.width(3.dp))
+                        Text("دردشة", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                // Copy GPS Coordinates Action
+                OutlinedButton(
+                    onClick = {
+                        try {
+                            val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
+                            val clip = android.content.ClipData.newPlainText("GPS", "$lat,$lng")
+                            clipboard?.setPrimaryClip(clip)
+                            android.widget.Toast.makeText(context, "تم نسخ إحداثيات GPS بنجاح ✓", android.widget.Toast.LENGTH_SHORT).show()
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                    },
+                    shape = RoundedCornerShape(10.dp),
+                    border = BorderStroke(1.dp, Color(0xFFA855F7)),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFA855F7)),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
+                    modifier = Modifier
+                        .weight(1.1f)
+                        .height(38.dp)
+                        .testTag("copy_gps_btn")
+                ) {
+                    Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(14.dp))
+                    Spacer(Modifier.width(3.dp))
+                    Text("نسخ GPS", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+
+            // 2. Primary Navigation & Booking Row
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -333,38 +438,13 @@ fun MapBottomSheet(
                         contentColor = Color(0xFF0F172A)
                     ),
                     modifier = Modifier
-                        .weight(1.2f)
+                        .weight(1.1f)
                         .height(44.dp)
                         .testTag("view_details_action_btn")
                 ) {
                     Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(4.dp))
                     Text("التفاصيل", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                }
-
-                // Call Action
-                if (phone.isNotBlank()) {
-                    OutlinedButton(
-                        onClick = {
-                            try {
-                                val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone"))
-                                context.startActivity(intent)
-                            } catch (e: Exception) {
-                                e.printStackTrace()
-                            }
-                        },
-                        shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, Color(0xFF38BDF8)),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF38BDF8)),
-                        modifier = Modifier
-                            .weight(0.9f)
-                            .height(44.dp)
-                            .testTag("call_action_btn")
-                    ) {
-                        Icon(Icons.Default.Phone, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(Modifier.width(4.dp))
-                        Text("اتصال", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    }
                 }
 
                 // Booking / Request Action for ALL entity types
@@ -391,7 +471,7 @@ fun MapBottomSheet(
                         contentColor = Color.White
                     ),
                     modifier = Modifier
-                        .weight(1.1f)
+                        .weight(1.3f)
                         .height(44.dp)
                         .testTag("book_entity_btn")
                 ) {

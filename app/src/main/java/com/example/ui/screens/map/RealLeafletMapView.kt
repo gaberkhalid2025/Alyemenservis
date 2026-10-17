@@ -43,6 +43,7 @@ fun RealLeafletMapView(
     nearbyProperties: List<PropertyEntity>,
     dynamicOffsets: Map<String, Pair<Double, Double>>,
     selectedCity: String = "الكل",
+    currentLayer: String = "satellite",
     zoomScale: Float = 1.0f,
     onZoomScaleChange: (Float) -> Unit = {},
     panOffset: Offset = Offset.Zero,
@@ -119,6 +120,13 @@ fun RealLeafletMapView(
         }
     }
 
+    // تبديل طبقة الخريطة تلقائياً عند تغيير الطبقة المختارة
+    LaunchedEffect(isMapReady, currentLayer) {
+        if (isMapReady && webViewRef != null) {
+            webViewRef?.evaluateJavascript("if (window.switchLayer) { window.switchLayer('$currentLayer'); }", null)
+        }
+    }
+
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -139,7 +147,7 @@ fun RealLeafletMapView(
                             domStorageEnabled = true
                             databaseEnabled = true
                             cacheMode = WebSettings.LOAD_DEFAULT
-                            userAgentString = "AlYemenServicesApp/1.0 (Android; OpenStreetMap)"
+                            userAgentString = "Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Mobile Safari/537.36 AlYemenServicesApp/1.0 (Android; VelaMap)"
                             setSupportZoom(true)
                             builtInZoomControls = false
                             displayZoomControls = false
@@ -147,6 +155,7 @@ fun RealLeafletMapView(
                             useWideViewPort = true
                             allowFileAccess = true
                             allowContentAccess = true
+                            mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
                         }
 
                         // جسر التواصل بين JavaScript في Leaflet وكود Kotlin الأصلي

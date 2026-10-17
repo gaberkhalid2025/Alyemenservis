@@ -121,6 +121,75 @@ fun AdminMapPanel(
             }
         }
 
+        // Vela Map Layer Settings Card
+        val adminSettings by viewModel.settings.collectAsState()
+        var selectedLayer by remember(adminSettings.defaultMapLayer) {
+            mutableStateOf(adminSettings.defaultMapLayer.ifBlank { "satellite" })
+        }
+
+        Card(
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+            border = BorderStroke(1.dp, Color(0xFF334155)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "🗺️ نوع خريطة Vela Map الافتراضي",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp,
+                        color = Color(0xFF00E5FF)
+                    )
+                    Button(
+                        onClick = {
+                            viewModel.updateAdminSettings(adminSettings.copy(defaultMapLayer = selectedLayer))
+                            Toast.makeText(context, "تم حفظ نوع الخريطة الافتراضي بنجاح ✓", Toast.LENGTH_SHORT).show()
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                    ) {
+                        Text("حفظ", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    }
+                }
+
+                Text(
+                    text = "حدد نوع الخريطة المعتمد عالمياً ليفتح عليه التطبيق للمستخدمين (بدون أي مفاتيح API مجانية 100%):",
+                    fontSize = 10.5.sp,
+                    color = Color.LightGray
+                )
+
+                val mapLayers = listOf(
+                    Pair("satellite", "🛰️ صور الأقمار الصناعية (Satellite)"),
+                    Pair("osm", "🌍 OpenStreetMap Standard (الرسمية)"),
+                    Pair("hot", "🏙️ (HOT) خريطة الشوارع الحيوية"),
+                    Pair("topo", "🗺️ (Topo) خريطة العالم والتضاريس")
+                )
+
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    items(mapLayers) { (layerKey, layerTitle) ->
+                        FilterChip(
+                            selected = selectedLayer == layerKey,
+                            onClick = { selectedLayer = layerKey },
+                            label = { Text(layerTitle, fontSize = 10.5.sp) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = Color(0xFF0284C7),
+                                selectedLabelColor = Color.White
+                            )
+                        )
+                    }
+                }
+            }
+        }
+
         // City Filters
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(6.dp),

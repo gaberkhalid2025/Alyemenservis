@@ -299,7 +299,9 @@ data class AdminSettingsEntity(
     val appLanguage: String = "ar",
     val hideTopHeaderBar: Boolean = false,
     val customAppName: String = "",
-    val showClientIdentityToProviders: Boolean = true
+    val showClientIdentityToProviders: Boolean = true,
+    val defaultMapLayer: String = "satellite", // "satellite", "osm", "hot", "topo", "dark"
+    val defaultMapMode: String = "MAP" // "MAP" (Vela Map) or "RADAR"
 )
 
 @Keep
