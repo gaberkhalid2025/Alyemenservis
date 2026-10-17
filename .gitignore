@@ -1,13 +1,24 @@
--e .gradle/
+# Build and Cache
+.gradle/
 build/
 app/build/
-.gradle/
 .build-outputs/
-app/google-services.json
+*.apk
+*.aab
+
+# Keys and Secrets
 debug.keystore
 debug.keystore.base64
-*.zip
-errors.txt
 local.properties
+.env
+.env.*
+!.env.example
 
-**/google-services.json
+# Temporary and Stray Dirs/Files
+errors.txt
+*.txt
+workspace/
+app/applet/
+*.zip
+
+# Note: google-services.json is explicitly allowed to sync with repository as requested
