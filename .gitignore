@@ -43,15 +43,15 @@ output-metadata.json
 errors.txt
 
 # Temporary batching for GitHub push - Kotlin source files
-# Batch 2: Reveal data, di, domain, security packages
+# Batch 3: Reveal ui directory
 
-# Ignore the rest
-app/src/main/java/com/example/sync/
-app/src/main/java/com/example/ui/
-app/src/main/java/com/example/utils/
-app/src/main/java/com/example/FCMService.kt
-app/src/main/java/com/example/MainActivity.kt
-app/src/main/java/com/example/MyApplication.kt
-app/src/main/java/com/example/NetworkUtils.kt
-app/src/main/java/com/example/VoiceManager.kt
+# Ignore everything in java except our target
+app/src/main/java/com/example/*
+!app/src/main/java/com/example/data/
+!app/src/main/java/com/example/di/
+!app/src/main/java/com/example/domain/
+!app/src/main/java/com/example/security/
+!app/src/main/java/com/example/ui/
+
+# Ignore test
 app/src/test/
