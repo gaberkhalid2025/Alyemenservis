@@ -42,6 +42,18 @@ output-metadata.json
 *.zip
 errors.txt
 
-# Batch Sync - Step 2: Un-ignoring non-UI source directories (~163 files)
-app/src/main/java/com/example/ui/
-app/src/main/java/com/example/domain/
+# Batch Sync - Step 3: Un-ignoring domain and base UI (~175 files)
+app/src/main/java/com/example/ui/screens/admin/
+app/src/main/java/com/example/ui/screens/register/
+app/src/main/java/com/example/ui/screens/map/
+app/src/main/java/com/example/ui/screens/chat/
+app/src/main/java/com/example/ui/screens/entities/
+app/src/main/java/com/example/ui/screens/home/
+app/src/main/java/com/example/ui/screens/bookings/
+app/src/main/java/com/example/ui/screens/urgent/
+app/src/main/java/com/example/ui/screens/notifications/
+app/src/main/java/com/example/ui/screens/status/
+app/src/main/java/com/example/ui/screens/owner/
+app/src/main/java/com/example/ui/screens/assistant/
+app/src/main/java/com/example/ui/screens/about/
+app/src/main/java/com/example/ui/screens/payments/
