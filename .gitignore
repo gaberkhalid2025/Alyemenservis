@@ -42,11 +42,6 @@ output-metadata.json
 *.zip
 errors.txt
 
-# Batch Sync - Step 1: Ignore large source directories
+# Batch Sync - Step 2: Un-ignoring non-UI source directories (~163 files)
 app/src/main/java/com/example/ui/
-app/src/main/java/com/example/utils/
-app/src/main/java/com/example/data/
 app/src/main/java/com/example/domain/
-app/src/main/java/com/example/security/
-app/src/main/java/com/example/sync/
-app/src/main/java/com/example/di/
