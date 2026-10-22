@@ -42,5 +42,4 @@ output-metadata.json
 *.zip
 errors.txt
 
-# Batch Sync - Step 4: Un-ignoring remaining UI screens except Admin (~159 files)
-app/src/main/java/com/example/ui/screens/admin/
+# Batch Sync - Final Step: All files are now un-ignored
