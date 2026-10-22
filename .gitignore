@@ -42,16 +42,11 @@ output-metadata.json
 *.zip
 errors.txt
 
-# Temporary batching for GitHub push - Kotlin source files
-# Batch 3: Reveal ui directory
-
-# Ignore everything in java except our target
-app/src/main/java/com/example/*
-!app/src/main/java/com/example/data/
-!app/src/main/java/com/example/di/
-!app/src/main/java/com/example/domain/
-!app/src/main/java/com/example/security/
-!app/src/main/java/com/example/ui/
-
-# Ignore test
-app/src/test/
+# Batch Sync - Step 1: Ignore large source directories
+app/src/main/java/com/example/ui/
+app/src/main/java/com/example/utils/
+app/src/main/java/com/example/data/
+app/src/main/java/com/example/domain/
+app/src/main/java/com/example/security/
+app/src/main/java/com/example/sync/
+app/src/main/java/com/example/di/
