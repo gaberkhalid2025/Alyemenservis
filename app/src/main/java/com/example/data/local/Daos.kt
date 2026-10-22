@@ -1,0 +1,180 @@
+package com.example.data.local
+
+import androidx.room.*
+import kotlinx.coroutines.flow.Flow
+
+@Dao
+interface ChatDao {
+    @Query("SELECT * FROM chat_channels ORDER BY lastMessageTime DESC")
+    fun getAllChannelsFlow(): Flow<List<ChatChannelRoomEntity>>
+
+    @Query("SELECT * FROM chat_channels WHERE id = :channelId")
+    suspend fun getChannelById(channelId: String): ChatChannelRoomEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertChannels(channels: List<ChatChannelRoomEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertChannel(channel: ChatChannelRoomEntity)
+
+    @Query("SELECT * FROM chat_messages WHERE channelId = :channelId ORDER BY timestamp ASC LIMIT :limit OFFSET :offset")
+    fun getMessagesPaged(channelId: String, limit: Int, offset: Int): Flow<List<ChatMessageRoomEntity>>
+
+    @Query("SELECT * FROM chat_messages WHERE channelId = :channelId ORDER BY timestamp ASC")
+    fun getMessagesFlow(channelId: String): Flow<List<ChatMessageRoomEntity>>
+
+    @Query("SELECT * FROM chat_messages WHERE channelId = :channelId ORDER BY timestamp ASC")
+    suspend fun getMessagesList(channelId: String): List<ChatMessageRoomEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertMessages(messages: List<ChatMessageRoomEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertMessage(message: ChatMessageRoomEntity)
+
+    @Query("UPDATE chat_messages SET status = :status WHERE id = :messageId")
+    suspend fun updateMessageStatus(messageId: String, status: String)
+
+    @Query("UPDATE chat_messages SET syncStatus = :syncStatus WHERE id = :messageId")
+    suspend fun updateMessageSyncStatus(messageId: String, syncStatus: String)
+
+    @Query("DELETE FROM chat_messages WHERE id = :messageId")
+    suspend fun deleteMessage(messageId: String)
+
+    @Query("DELETE FROM chat_messages WHERE channelId = :channelId")
+    suspend fun clearChannelMessages(channelId: String)
+
+    @Query("DELETE FROM chat_channels WHERE id = :channelId")
+    suspend fun deleteChannel(channelId: String)
+
+    @Query("DELETE FROM chat_channels")
+    suspend fun deleteAllChannels()
+
+    @Query("DELETE FROM chat_messages")
+    suspend fun deleteAllMessages()
+
+    @Query("DELETE FROM chat_messages WHERE timestamp < :cutoffTimestamp AND syncStatus = 'SYNCED'")
+    suspend fun deleteStaleMessages(cutoffTimestamp: Long)
+
+    @Query("SELECT * FROM chat_channels ORDER BY lastMessageTime DESC")
+    suspend fun getAllChannelsList(): List<ChatChannelRoomEntity>
+
+    @Query("DELETE FROM chat_messages WHERE channelId = :channelId")
+    suspend fun deleteMessagesByChannel(channelId: String)
+
+    @Query("SELECT * FROM chat_messages WHERE syncStatus = :syncStatus OR status = :status ORDER BY timestamp ASC")
+    suspend fun getPendingMessagesList(syncStatus: String = "PENDING_UPLOAD", status: String = "PENDING"): List<ChatMessageRoomEntity>
+
+    @Transaction
+    suspend fun replaceChannelWithMessages(channel: ChatChannelRoomEntity, messages: List<ChatMessageRoomEntity>) {
+        insertChannel(channel)
+        insertMessages(messages)
+    }
+
+    @Transaction
+    suspend fun replaceMessagesForChannel(channelId: String, messages: List<ChatMessageRoomEntity>) {
+        deleteMessagesByChannel(channelId)
+        if (messages.isNotEmpty()) {
+            insertMessages(messages)
+        }
+    }
+
+    @Transaction
+    suspend fun replaceAllChannelsAtomic(channels: List<ChatChannelRoomEntity>) {
+        val existingIds = getAllChannelsList().map { it.id }.toSet()
+        val newIds = channels.map { it.id }.toSet()
+        insertChannels(channels)
+        for (removedId in (existingIds - newIds)) {
+            deleteChannel(removedId)
+        }
+    }
+}
+
+@Dao
+interface BookingDao {
+    @Query("SELECT * FROM bookings ORDER BY createdAt DESC LIMIT :limit OFFSET :offset")
+    fun getBookingsPaged(limit: Int, offset: Int): Flow<List<BookingRoomEntity>>
+
+    @Query("SELECT * FROM bookings WHERE providerId = :providerId OR customerPhone = :phone ORDER BY createdAt DESC")
+    fun getBookingsForUser(providerId: String, phone: String): Flow<List<BookingRoomEntity>>
+
+    @Query("SELECT * FROM bookings WHERE id = :id")
+    suspend fun getBookingById(id: String): BookingRoomEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertBookings(bookings: List<BookingRoomEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertBooking(booking: BookingRoomEntity)
+
+    @Query("UPDATE bookings SET status = :status, updatedAt = :updatedAt WHERE id = :id")
+    suspend fun updateBookingStatus(id: String, status: String, updatedAt: Long = System.currentTimeMillis())
+
+    @Query("SELECT * FROM bookings ORDER BY createdAt DESC")
+    fun getAllBookings(): Flow<List<BookingRoomEntity>>
+
+    @Query("SELECT * FROM bookings ORDER BY createdAt DESC")
+    suspend fun getAllBookingsList(): List<BookingRoomEntity>
+
+    @Query("DELETE FROM bookings WHERE id = :id")
+    suspend fun deleteBooking(id: String)
+
+    @Query("DELETE FROM bookings")
+    suspend fun deleteAllBookings()
+
+    @Transaction
+    suspend fun replaceAllBookings(bookings: List<BookingRoomEntity>) {
+        deleteAllBookings()
+        if (bookings.isNotEmpty()) {
+            insertBookings(bookings)
+        }
+    }
+}
+
+@Dao
+interface RequestDao {
+    @Query("SELECT * FROM instant_requests ORDER BY createdAt DESC LIMIT :limit OFFSET :offset")
+    fun getRequestsPaged(limit: Int, offset: Int): Flow<List<InstantRequestRoomEntity>>
+
+    @Query("SELECT * FROM instant_requests WHERE userId = :userId ORDER BY createdAt DESC")
+    fun getRequestsForUser(userId: String): Flow<List<InstantRequestRoomEntity>>
+
+    @Query("SELECT * FROM instant_requests WHERE userId = :userId ORDER BY createdAt DESC")
+    suspend fun getRequestsListForUser(userId: String): List<InstantRequestRoomEntity>
+
+    @Query("SELECT * FROM instant_requests WHERE id = :id")
+    suspend fun getRequestById(id: String): InstantRequestRoomEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertRequests(requests: List<InstantRequestRoomEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertRequest(request: InstantRequestRoomEntity)
+
+    @Query("UPDATE instant_requests SET status = :status WHERE id = :id")
+    suspend fun updateRequestStatus(id: String, status: String)
+
+    @Query("DELETE FROM instant_requests WHERE id = :id")
+    suspend fun deleteRequest(id: String)
+}
+
+@Dao
+interface OfferDao {
+    @Query("SELECT * FROM request_offers WHERE requestId = :requestId ORDER BY createdAt DESC")
+    fun getOffersForRequest(requestId: String): Flow<List<RequestOfferRoomEntity>>
+
+    @Query("SELECT * FROM request_offers WHERE requestId = :requestId")
+    suspend fun getOffersListForRequest(requestId: String): List<RequestOfferRoomEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertOffers(offers: List<RequestOfferRoomEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertOffer(offer: RequestOfferRoomEntity)
+
+    @Query("UPDATE request_offers SET status = :status WHERE id = :id")
+    suspend fun updateOfferStatus(id: String, status: String)
+
+    @Query("DELETE FROM request_offers WHERE id = :id")
+    suspend fun deleteOffer(id: String)
+}

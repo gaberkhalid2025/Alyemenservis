@@ -1,0 +1,985 @@
+package com.example.data.repositories
+
+import android.content.Context
+import android.util.Log
+import com.example.data.local.ChatLocalDataSource
+import com.example.data.models.*
+import com.example.utils.AnalyticsEventsHelper
+import com.example.utils.AppError
+import com.example.utils.AppResult
+import com.google.firebase.firestore.FieldValue
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
+import com.google.firebase.firestore.Query
+import com.google.firebase.firestore.SetOptions
+import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.tasks.await
+
+/**
+ * 🚀 ChatRepository
+ * تطبيق مستودع المحادثات الشامل بنظام (Offline-First) والمزامنة الحية (Realtime Delta Sync)
+ * - قراءة فورية من التخزين المحلي المشفر
+ * - مزامنة تفاضلية ذكية مع Firebase Firestore
+ * - حل تعارضات تلقائي (Conflict Resolution)
+ * - إدارة دورة حياة المستمعات بدون تسريب للذاكرة
+ * - معالجة أخطاء موحدة عبر AppResult و AppError
+ */
+class ChatRepository(
+    private val context: Context? = null,
+    private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance(),
+    private val localDataSource: ChatLocalDataSource? = null
+) : IChatRepository {
+
+    private val local: ChatLocalDataSource? by lazy {
+        localDataSource ?: context?.let { ChatLocalDataSource.getInstance(it) }
+    }
+
+    private val channelsCollection = firestore.collection("chat_channels")
+    private val presenceCollection = firestore.collection("user_presence")
+    private val realtimeDb: com.google.firebase.database.FirebaseDatabase? by lazy {
+        try {
+            com.google.firebase.database.FirebaseDatabase.getInstance()
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    companion object {
+        const val SUPPORT_ADMIN_ID = "ADMIN"
+        const val SUPPORT_ADMIN_NAME = "الدعم الفني"
+    }
+
+    // =========================================================================
+    // 1. CHANNELS MANAGEMENT (OFFLINE-FIRST)
+    // =========================================================================
+
+
+    override suspend fun getOrCreateChannel(
+        currentUserId: String,
+        currentUserName: String,
+        currentUserPhoto: String,
+        otherUserId: String,
+        otherUserName: String,
+        otherUserPhoto: String,
+        type: ChannelType,
+        relatedEntityId: String?,
+        relatedEntityType: String?
+    ): AppResult<ChatChannel> = withContext(Dispatchers.IO) {
+        try {
+            val cleanCurrent = currentUserId.trim()
+            val cleanOther = if (type == ChannelType.SUPPORT) SUPPORT_ADMIN_ID else otherUserId.trim()
+            val finalOtherName = if (type == ChannelType.SUPPORT) SUPPORT_ADMIN_NAME else otherUserName
+            
+            if (cleanCurrent.isBlank()) {
+                return@withContext AppResult.Error(AppError.ValidationError("currentUserId", "معرف المستخدم الحالي فارغ"))
+            }
+
+            val sortedParticipants = listOf(cleanCurrent, cleanOther).filter { it.isNotBlank() }.sorted()
+            
+            var customChannelId: String? = null
+
+            if (type == ChannelType.SUPPORT) {
+                try {
+                    val existingSupportQuery = channelsCollection
+                        .whereArrayContains("participants", cleanCurrent)
+                        .get().await()
+                    
+                    val existingSupportDoc = existingSupportQuery.documents.find { doc ->
+                        val docType = doc.getString("type") ?: ""
+                        val docTitle = doc.getString("title") ?: ""
+                        val docId = doc.id
+                        docType.equals("SUPPORT", ignoreCase = true) || 
+                            docTitle == SUPPORT_ADMIN_NAME || 
+                            docId.startsWith("support_") ||
+                            docId == "channel_support_${cleanCurrent}"
+                    }
+                    
+                    if (existingSupportDoc != null) {
+                        customChannelId = existingSupportDoc.id
+                    }
+                } catch (e: Exception) {
+                    Log.w("ChatRepository", "Error searching existing support channel: ${e.message}")
+                }
+            }
+
+            val finalChannelId = customChannelId ?: when {
+                type == ChannelType.SUPPORT -> "channel_support_${cleanCurrent}"
+                sortedParticipants.size == 2 -> "channel_${sortedParticipants[0]}_${sortedParticipants[1]}"
+                relatedEntityId != null -> "channel_${type.name.lowercase()}_${relatedEntityId.trim()}_${cleanCurrent}"
+                else -> channelsCollection.document().id
+            }
+
+            val docRef = channelsCollection.document(finalChannelId)
+
+            val snapshot = docRef.get().await()
+
+            val channelToReturn = if (snapshot.exists()) {
+                val existing = snapshot.toObject(ChatChannel::class.java)?.copy(id = snapshot.id) ?: ChatChannel(id = finalChannelId)
+                val updatedNames = existing.participantNames.toMutableMap().apply {
+                    put(cleanCurrent, currentUserName)
+                    if (cleanOther.isNotBlank() && finalOtherName.isNotBlank()) put(cleanOther, finalOtherName)
+                }
+                val updatedPhotos = existing.participantPhotos.toMutableMap().apply {
+                    put(cleanCurrent, currentUserPhoto)
+                    if (cleanOther.isNotBlank() && otherUserPhoto.isNotBlank()) put(cleanOther, otherUserPhoto)
+                }
+                
+                val finalChannel = existing.copy(
+                    participantNames = updatedNames, 
+                    participantPhotos = updatedPhotos,
+                    type = if (type == ChannelType.SUPPORT) ChannelType.SUPPORT else existing.type,
+                    title = if (type == ChannelType.SUPPORT) "الدعم الفني" else existing.title
+                )
+                
+                if (updatedNames != existing.participantNames || updatedPhotos != existing.participantPhotos) {
+                    docRef.update(
+                        mapOf(
+                            "participantNames" to updatedNames,
+                            "participantPhotos" to updatedPhotos,
+                            "type" to finalChannel.type.name,
+                            "title" to finalChannel.title
+                        )
+                    ).await()
+                }
+                local?.saveOrUpdateChannel(finalChannel)
+                finalChannel
+            } else {
+                val newChannel = ChatChannel(
+                    id = finalChannelId,
+                    participants = listOf(cleanCurrent, cleanOther).filter { it.isNotBlank() },
+                    participantNames = mutableMapOf(cleanCurrent to currentUserName).apply {
+                        if (cleanOther.isNotBlank() && finalOtherName.isNotBlank()) put(cleanOther, finalOtherName)
+                    },
+                    participantPhotos = mutableMapOf(cleanCurrent to currentUserPhoto).apply {
+                        if (cleanOther.isNotBlank() && otherUserPhoto.isNotBlank()) put(cleanOther, otherUserPhoto)
+                    },
+                    type = type,
+                    title = if (type == ChannelType.SUPPORT) "الدعم الفني" else finalOtherName.ifBlank { "" },
+                    relatedEntityId = relatedEntityId,
+                    relatedEntityType = relatedEntityType,
+                    lastMessageTime = System.currentTimeMillis()
+                )
+                docRef.set(newChannel).await()
+                local?.saveOrUpdateChannel(newChannel)
+                newChannel
+            }
+            AnalyticsEventsHelper.logChatOpened(context, channelToReturn.id, otherUserId)
+            AppResult.Success(channelToReturn)
+        } catch (e: Exception) {
+            val cleanCurrent = currentUserId.trim()
+            val cleanOther = if (type == ChannelType.SUPPORT) SUPPORT_ADMIN_ID else otherUserId.trim()
+            val sortedParticipants = listOf(cleanCurrent, cleanOther).filter { it.isNotBlank() }.sorted()
+            val fallbackChannelId = when {
+                type == ChannelType.SUPPORT -> "channel_support_${cleanCurrent}"
+                sortedParticipants.size == 2 -> "channel_${sortedParticipants[0]}_${sortedParticipants[1]}"
+                relatedEntityId != null -> "channel_${type.name.lowercase()}_${relatedEntityId.trim()}_${cleanCurrent}"
+                else -> ""
+            }
+            val localChannel = if (fallbackChannelId.isNotBlank()) local?.getChannelById(fallbackChannelId) else null
+            if (localChannel != null && localChannel.participants.contains(cleanCurrent)) {
+                AppResult.Success(localChannel)
+            } else {
+                AppResult.Error(AppError.NetworkError(e))
+            }
+        }
+    }
+    override suspend fun getChannelById(channelId: String): AppResult<ChatChannel?> = withContext(Dispatchers.IO) {
+        if (channelId.isBlank()) return@withContext AppResult.Success(null)
+        try {
+            // Local first
+            val cached = local?.getChannelById(channelId)
+            if (cached != null) {
+                return@withContext AppResult.Success(cached)
+            }
+
+            // Remote fallback
+            val snapshot = channelsCollection.document(channelId).get().await()
+            if (snapshot.exists()) {
+                val channel = snapshot.toObject(ChatChannel::class.java)?.copy(id = snapshot.id)
+                if (channel != null) {
+                    local?.saveOrUpdateChannel(channel)
+                }
+                AppResult.Success(channel)
+            } else {
+                AppResult.Success(null)
+            }
+        } catch (e: Exception) {
+            val cached = local?.getChannelById(channelId)
+            if (cached != null) AppResult.Success(cached)
+            else AppResult.Error(AppError.NetworkError(e))
+        }
+    }
+
+    override fun getUserChannels(userId: String): Flow<List<ChatChannel>> = callbackFlow {
+        val cleanUserId = userId.trim()
+        if (cleanUserId.isBlank()) {
+            trySend(emptyList())
+            close()
+            return@callbackFlow
+        }
+
+        // 1. Emit local cache immediately for instant UI
+        local?.getChannels()?.let { cached ->
+            if (cached.isNotEmpty()) {
+                trySend(cached)
+            }
+        }
+
+        // 2. Attach Firestore Realtime Listener (Limited to 50 active channels to conserve Firestore quota)
+        val listener: ListenerRegistration = channelsCollection
+            .whereArrayContains("participants", cleanUserId)
+            .limit(50)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    Log.e("ChatRepository", "Firestore channels listener error: ${error.message}")
+                    return@addSnapshotListener
+                }
+
+                val allRemoteChannels = snapshot?.documents?.mapNotNull { doc ->
+                    doc.toObject(ChatChannel::class.java)?.copy(id = doc.id)
+                }?.sortedByDescending { it.lastMessageTime } ?: emptyList()
+
+                // For ADMIN: see all support channels from all users
+                // For Regular User: Deduplicate SUPPORT channels: keep only their own newest one
+                val remoteChannels = if (cleanUserId.equals("ADMIN", ignoreCase = true)) {
+                    allRemoteChannels
+                } else {
+                    val supportChannels = allRemoteChannels.filter { 
+                        it.type == ChannelType.SUPPORT || it.title == "الدعم الفني" || it.id.startsWith("support_") 
+                    }
+                    val otherChannels = allRemoteChannels.filter { 
+                        it.type != ChannelType.SUPPORT && it.title != "الدعم الفني" && !it.id.startsWith("support_") 
+                    }
+                    val latestSupport = supportChannels.maxByOrNull { it.lastMessageTime }
+                    (otherChannels + listOfNotNull(latestSupport)).sortedByDescending { it.lastMessageTime }
+                }
+
+                // Save to local cache & emit using callbackFlow scope
+                launch(Dispatchers.IO) {
+                    local?.saveChannels(remoteChannels)
+                }
+                trySend(remoteChannels)
+            }
+
+        awaitClose {
+            try {
+                listener.remove()
+            } catch (e: Exception) {
+                // تجاهل
+            }
+        }
+    }.flowOn(Dispatchers.IO)
+
+    // =========================================================================
+    // 2. MESSAGES MANAGEMENT (OFFLINE-FIRST & DELTA SYNC)
+    // =========================================================================
+
+    override fun getChannelMessages(channelId: String, currentUserId: String, limit: Int): Flow<List<ChatMessage>> = callbackFlow {
+        if (channelId.isBlank()) {
+            trySend(emptyList())
+            close()
+            return@callbackFlow
+        }
+
+        // 1. Emit local cache immediately from Room / SQLite
+        val cached = local?.getMessages(channelId) ?: emptyList()
+        val visibleCached = cached.filter { !it.isHiddenFor(currentUserId) }
+        trySend(visibleCached)
+
+        val lastLocalTimestamp = cached.maxOfOrNull { it.timestamp } ?: 0L
+
+        // 2. Real-time Firebase Listener with Delta Sync optimization (Spark Plan Saver)
+        val messagesRef = channelsCollection.document(channelId).collection("messages")
+        val query = if (lastLocalTimestamp > 0L) {
+            messagesRef.whereGreaterThan("timestamp", lastLocalTimestamp).orderBy("timestamp", Query.Direction.ASCENDING)
+        } else {
+            messagesRef.orderBy("timestamp", Query.Direction.ASCENDING).limitToLast(limit.coerceAtLeast(25).toLong())
+        }
+
+        val listener = query.addSnapshotListener { snapshot, error ->
+            if (error != null) {
+                Log.e("ChatRepository", "Messages listener error: ${error.message}")
+                return@addSnapshotListener
+            }
+
+            val remoteMessages = snapshot?.documents?.mapNotNull { doc ->
+                doc.toObject(ChatMessage::class.java)?.copy(id = doc.id)
+            } ?: emptyList()
+
+            launch(Dispatchers.IO) {
+                val currentLocal = local?.getMessages(channelId) ?: emptyList()
+                val pendingLocal = currentLocal.filter { it.status == MessageStatus.PENDING || it.status == MessageStatus.SENDING }
+
+                val mergedMap = LinkedHashMap<String, ChatMessage>()
+                for (localMsg in currentLocal) {
+                    mergedMap[localMsg.id] = localMsg
+                }
+                for (remote in remoteMessages) {
+                    mergedMap[remote.id] = remote
+                }
+                for (pending in pendingLocal) {
+                    if (!mergedMap.containsKey(pending.id)) {
+                        mergedMap[pending.id] = pending
+                    }
+                }
+
+                // Bound memory & storage to at most 150 messages
+                val mergedList = mergedMap.values.sortedBy { it.timestamp }.takeLast(150)
+                local?.saveMessages(channelId, mergedList)
+                local?.setLastSyncTimestamp(channelId, System.currentTimeMillis())
+
+                val visible = mergedList.filter { !it.isHiddenFor(currentUserId) }
+                trySend(visible)
+            }
+        }
+
+        awaitClose {
+            try {
+                listener.remove()
+            } catch (e: Exception) {
+                // Ignore cleanup error
+            }
+        }
+    }.flowOn(Dispatchers.IO)
+
+    override suspend fun sendMessage(
+        channelId: String,
+        senderId: String,
+        senderName: String,
+        messageText: String,
+        mediaType: MediaType,
+        mediaUrl: String,
+        replyToId: String?,
+        replyToText: String?,
+        attachment: ChatAttachment?,
+        audioWaveform: List<Int>
+    ): AppResult<ChatMessage> = sendMessageInternal(
+        channelId = channelId,
+        senderId = senderId,
+        senderName = senderName,
+        messageText = messageText,
+        mediaType = mediaType,
+        mediaUrl = mediaUrl,
+        replyToId = replyToId,
+        replyToText = replyToText,
+        attachment = attachment,
+        audioWaveform = audioWaveform,
+        existingMessageId = null,
+        existingTimestamp = null
+    )
+
+    private suspend fun sendMessageInternal(
+        channelId: String,
+        senderId: String,
+        senderName: String,
+        messageText: String,
+        mediaType: MediaType,
+        mediaUrl: String,
+        replyToId: String?,
+        replyToText: String?,
+        attachment: ChatAttachment?,
+        audioWaveform: List<Int> = emptyList(),
+        existingMessageId: String? = null,
+        existingTimestamp: Long? = null
+    ): AppResult<ChatMessage> = withContext(Dispatchers.IO) {
+        if (channelId.isBlank() || senderId.isBlank()) {
+            return@withContext AppResult.Error(AppError.ValidationError("message", "بيانات الرسالة غير مكتملة"))
+        }
+
+        val messageId = existingMessageId?.takeIf { it.isNotBlank() }
+            ?: channelsCollection.document(channelId).collection("messages").document().id
+        val now = existingTimestamp?.takeIf { it > 0L } ?: System.currentTimeMillis()
+
+        val initialMsg = ChatMessage(
+            id = messageId,
+            channelId = channelId,
+            senderId = senderId,
+            senderName = senderName,
+            message = messageText,
+            mediaType = mediaType,
+            mediaUrl = mediaUrl,
+            attachment = attachment,
+            replyToId = replyToId,
+            replyToText = replyToText,
+            status = MessageStatus.SENDING,
+            timestamp = now,
+            syncStatus = SyncStatus.PENDING_UPLOAD,
+            audioWaveform = audioWaveform
+        )
+
+        try {
+            // 1. Immediately store in local cache with SENDING state for instant UI
+            local?.insertOrUpdateMessage(initialMsg)
+
+            // 2. Attempt remote send
+            val channelRef = channelsCollection.document(channelId)
+            val channelSnapshot = channelRef.get().await()
+            val channel = channelSnapshot.toObject(ChatChannel::class.java)
+
+            if (channel != null && channel.isUserBlocked(senderId)) {
+                local?.updateMessageStatus(channelId, messageId, MessageStatus.FAILED)
+                local?.removePendingMessage(messageId)
+                return@withContext AppResult.Error(AppError.UnauthorizedError("لا يمكنك إرسال الرسالة لأنك محظور في هذه المحادثة."))
+            }
+
+            val confirmedMsg = initialMsg.copy(status = MessageStatus.SENT, syncStatus = SyncStatus.SYNCED)
+
+            val displayLast = when (mediaType) {
+                MediaType.IMAGE -> "📷 صورة"
+                MediaType.VIDEO -> "🎥 فيديو"
+                MediaType.AUDIO -> "🎤 تسجيل صوتي"
+                MediaType.FILE -> "📎 ${attachment?.fileName.orEmpty().ifBlank { "ملف مرفق" }}"
+                MediaType.LOCATION -> "📍 موقع جغرافي"
+                MediaType.CALL -> "📞 مكالمة صوتية"
+                MediaType.TEXT -> messageText
+            }
+
+            val updates = mutableMapOf<String, Any>(
+                "lastMessage" to displayLast,
+                "lastMessageTime" to now,
+                "lastMessageSenderId" to senderId,
+                "updatedAt" to System.currentTimeMillis()
+            )
+
+            channel?.participants?.forEach { pId ->
+                if (pId != senderId) {
+                    updates["unreadCount.$pId"] = com.google.firebase.firestore.FieldValue.increment(1)
+                }
+            }
+
+            // Write message and update channel atomically in a single batch
+            val batch = firestore.batch()
+            batch.set(channelRef.collection("messages").document(messageId), confirmedMsg)
+            batch.update(channelRef, updates)
+            batch.commit().await()
+
+            // Update local to SENT and remove from pending queue if present
+            local?.insertOrUpdateMessage(confirmedMsg)
+            local?.removePendingMessage(messageId)
+            AppResult.Success(confirmedMsg)
+        } catch (e: Exception) {
+            Log.e("ChatRepository", "sendMessage failed, saving to offline queue: ${e.message}")
+            // Fallback: Queue the same message ID offline without creating a duplicate record
+            val offlineMsg = initialMsg.copy(
+                status = MessageStatus.PENDING,
+                syncStatus = SyncStatus.PENDING_UPLOAD
+            )
+            local?.queuePendingMessage(offlineMsg)
+            AppResult.Success(offlineMsg)
+        }
+    }
+
+    // [إصلاح نهائي] تحديث رابط الوسائط وحالة الرسالة بعد اكتمال الرفع إلى Firebase Storage
+    override suspend fun updateMessageMediaUrl(
+        channelId: String,
+        messageId: String,
+        downloadUrl: String,
+        newStatus: MessageStatus
+    ): AppResult<Unit> = withContext(Dispatchers.IO) {
+        if (channelId.isBlank() || messageId.isBlank()) {
+            return@withContext AppResult.Error(AppError.ValidationError("message", "بيانات الرسالة غير صالحة"))
+        }
+        try {
+            // 1. تحديث الكاش المحلي و Room فوراً
+            local?.updateMessageMediaUrl(channelId, messageId, downloadUrl, newStatus)
+
+            // 2. تحديث السيرفر في Firestore
+            val msgRef = channelsCollection.document(channelId).collection("messages").document(messageId)
+            msgRef.update(
+                mapOf(
+                    "mediaUrl" to downloadUrl,
+                    "status" to newStatus.name,
+                    "syncStatus" to SyncStatus.SYNCED.name
+                )
+            ).await()
+            AppResult.Success(Unit)
+        } catch (e: Exception) {
+            Log.e("ChatRepository", "updateMessageMediaUrl failed: ${e.message}")
+            AppResult.Error(AppError.NetworkError(e))
+        }
+    }
+
+    // [إصلاح نهائي] تحديث حالة الرسالة محلياً وسحابياً
+    override suspend fun updateMessageStatus(
+        channelId: String,
+        messageId: String,
+        status: MessageStatus
+    ): AppResult<Unit> = withContext(Dispatchers.IO) {
+        try {
+            local?.updateMessageStatus(channelId, messageId, status)
+            val msgRef = channelsCollection.document(channelId).collection("messages").document(messageId)
+            msgRef.update("status", status.name).await()
+            AppResult.Success(Unit)
+        } catch (e: Exception) {
+            Log.e("ChatRepository", "updateMessageStatus failed: ${e.message}")
+            AppResult.Error(AppError.NetworkError(e))
+        }
+    }
+
+    override suspend fun retryPendingMessages(currentUserId: String): AppResult<Int> = withContext(Dispatchers.IO) {
+        try {
+            val pending = local?.getPendingMessages() ?: emptyList()
+            var successCount = 0
+
+            for (msg in pending) {
+                // Remove from pending queue first; sendMessageInternal will re-queue if it fails again
+                local?.removePendingMessage(msg.id)
+                val sendResult = sendMessageInternal(
+                    channelId = msg.channelId,
+                    senderId = msg.senderId,
+                    senderName = msg.senderName,
+                    messageText = msg.message,
+                    mediaType = msg.mediaType,
+                    mediaUrl = msg.mediaUrl,
+                    replyToId = msg.replyToId,
+                    replyToText = msg.replyToText,
+                    attachment = msg.attachment,
+                    existingMessageId = msg.id,
+                    existingTimestamp = msg.timestamp
+                )
+                if (sendResult is AppResult.Success && sendResult.data.status == MessageStatus.SENT) {
+                    successCount++
+                }
+            }
+            AppResult.Success(successCount)
+        } catch (e: Exception) {
+            AppResult.Error(AppError.NetworkError(e))
+        }
+    }
+
+    override suspend fun markChannelAsRead(channelId: String, currentUserId: String): AppResult<Unit> = withContext(Dispatchers.IO) {
+        if (channelId.isBlank() || currentUserId.isBlank()) return@withContext AppResult.Success(Unit)
+        try {
+            // Local update first
+            local?.markMessagesAsRead(channelId, currentUserId)
+
+            // Remote update
+            val channelRef = channelsCollection.document(channelId)
+            try {
+                channelRef.update("unreadCount.$currentUserId", 0).await()
+            } catch (e: Exception) {
+                // If field doesn't exist yet, ignore
+            }
+
+            // Update status of incoming messages to READ (query unread only with batch limit)
+            val unreadSnapshot = channelRef.collection("messages")
+                .whereEqualTo("isRead", false)
+                .limit(30)
+                .get().await()
+            val unreadDocs = unreadSnapshot.documents.filter { doc ->
+                val senderId = doc.getString("senderId") ?: ""
+                senderId != currentUserId
+            }
+
+            if (unreadDocs.isNotEmpty()) {
+                val batch = firestore.batch()
+                for (doc in unreadDocs) {
+                    batch.update(
+                        doc.reference,
+                        mapOf(
+                            "status" to MessageStatus.READ.name,
+                            "isRead" to true,
+                            "readAt" to System.currentTimeMillis()
+                        )
+                    )
+                }
+                batch.commit().await()
+            }
+            AppResult.Success(Unit)
+        } catch (e: Exception) {
+            Log.e("ChatRepository", "markChannelAsRead error: ${e.message}")
+            AppResult.Error(AppError.NetworkError(e))
+        }
+    }
+
+    override suspend fun setTyping(channelId: String, userId: String, isTyping: Boolean): AppResult<Unit> = withContext(Dispatchers.IO) {
+        if (channelId.isBlank() || userId.isBlank()) return@withContext AppResult.Success(Unit)
+        try {
+            try {
+                realtimeDb?.getReference("typing/$channelId/$userId")?.let { ref ->
+                    ref.setValue(isTyping)
+                    if (isTyping) {
+                        ref.onDisconnect().setValue(false)
+                    }
+                }
+            } catch (e: Exception) {
+                channelsCollection.document(channelId).update("isTyping.$userId", isTyping)
+            }
+            AppResult.Success(Unit)
+        } catch (e: Exception) {
+            AppResult.Error(AppError.NetworkError(e))
+        }
+    }
+
+    override suspend fun toggleBlockUser(channelId: String, userIdToBlock: String, isBlocked: Boolean): AppResult<Unit> = withContext(Dispatchers.IO) {
+        if (channelId.isBlank() || userIdToBlock.isBlank()) return@withContext AppResult.Success(Unit)
+        try {
+            channelsCollection.document(channelId).update("blockedUsers.$userIdToBlock", isBlocked).await()
+            val cached = local?.getChannelById(channelId)
+            if (cached != null) {
+                val updatedBlocked = cached.blockedUsers.toMutableMap().apply { put(userIdToBlock, isBlocked) }
+                local?.saveOrUpdateChannel(cached.copy(blockedUsers = updatedBlocked))
+            }
+            AppResult.Success(Unit)
+        } catch (e: Exception) {
+            AppResult.Error(AppError.NetworkError(e))
+        }
+    }
+
+    override suspend fun editMessage(
+        channelId: String,
+        messageId: String,
+        newText: String,
+        currentUserId: String
+    ): AppResult<Unit> = withContext(Dispatchers.IO) {
+        if (channelId.isBlank() || messageId.isBlank() || newText.isBlank()) return@withContext AppResult.Success(Unit)
+        try {
+            val resolvedUserId = currentUserId.trim().ifBlank {
+                try {
+                    com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid ?: ""
+                } catch (_: Exception) {
+                    ""
+                }
+            }
+            if (resolvedUserId.isBlank()) {
+                return@withContext AppResult.Error(AppError.ValidationError("currentUserId", "غير مصرح بتعديل الرسالة بدون معرف المستخدم"))
+            }
+            val msgRef = channelsCollection.document(channelId).collection("messages").document(messageId)
+            val snapshot = msgRef.get().await()
+            val message = snapshot.toObject(ChatMessage::class.java)
+            if (message == null || message.senderId != resolvedUserId) {
+                return@withContext AppResult.Error(AppError.ValidationError("senderId", "غير مصرح لك بتعديل هذه الرسالة (ليست من إرسالك)"))
+            }
+            val encryptedText = com.example.utils.ChatCryptoManager.encrypt(newText.trim())
+            msgRef.update(
+                mapOf(
+                    "message" to encryptedText,
+                    "isEdited" to true,
+                    "editTimestamp" to System.currentTimeMillis()
+                )
+            ).await()
+            AppResult.Success(Unit)
+        } catch (e: Exception) {
+            AppResult.Error(AppError.NetworkError(e))
+        }
+    }
+
+    override suspend fun deleteMessage(
+        channelId: String,
+        messageId: String,
+        forEveryone: Boolean,
+        currentUserId: String
+    ): AppResult<Unit> = withContext(Dispatchers.IO) {
+        if (channelId.isBlank() || messageId.isBlank()) return@withContext AppResult.Success(Unit)
+        try {
+            // Local update for immediate UI feedback
+            local?.deleteMessage(channelId, messageId)
+
+            // Remote update
+            val msgRef = channelsCollection.document(channelId).collection("messages").document(messageId)
+            if (forEveryone) {
+                msgRef.update(
+                    mapOf(
+                        "isDeleted" to true,
+                        "message" to "تم حذف هذه الرسالة"
+                    )
+                ).await()
+            } else {
+                msgRef.update("deletedForUsers", FieldValue.arrayUnion(currentUserId)).await()
+            }
+            AppResult.Success(Unit)
+        } catch (e: Exception) {
+            AppResult.Error(AppError.NetworkError(e))
+        }
+    }
+
+    override suspend fun toggleReaction(
+        channelId: String,
+        messageId: String,
+        userId: String,
+        emoji: String
+    ): AppResult<Unit> = withContext(Dispatchers.IO) {
+        val cleanChannelId = channelId.trim()
+        val cleanMessageId = messageId.trim()
+        val cleanUserId = userId.trim()
+        if (cleanChannelId.isBlank() || cleanMessageId.isBlank() || cleanUserId.isBlank()) {
+            return@withContext AppResult.Success(Unit)
+        }
+        try {
+            val msgRef = channelsCollection.document(cleanChannelId).collection("messages").document(cleanMessageId)
+            val snapshot = msgRef.get().await()
+            val currentReactions = snapshot.toObject(ChatMessage::class.java)?.reactions ?: emptyMap()
+
+            val newValue: Any = if (currentReactions[cleanUserId] == emoji || emoji.isBlank()) {
+                FieldValue.delete()
+            } else {
+                emoji
+            }
+
+            msgRef.update("reactions.$cleanUserId", newValue).await()
+            AppResult.Success(Unit)
+        } catch (e: Exception) {
+            AppResult.Error(AppError.NetworkError(e))
+        }
+    }
+
+    override suspend fun togglePinMessage(
+        channelId: String,
+        messageId: String,
+        isPinned: Boolean
+    ): AppResult<Unit> = withContext(Dispatchers.IO) {
+        val cleanChannelId = channelId.trim()
+        val cleanMessageId = messageId.trim()
+        if (cleanChannelId.isBlank() || cleanMessageId.isBlank()) return@withContext AppResult.Success(Unit)
+        try {
+            val msgRef = channelsCollection.document(cleanChannelId).collection("messages").document(cleanMessageId)
+            msgRef.update("isPinned", isPinned).await()
+            val cachedList = local?.getMessages(cleanChannelId)
+            if (cachedList != null) {
+                val updated = cachedList.map { if (it.id == cleanMessageId) it.copy(isPinned = isPinned) else it }
+                local?.saveMessages(cleanChannelId, updated)
+            }
+            AppResult.Success(Unit)
+        } catch (e: Exception) {
+            AppResult.Error(AppError.NetworkError(e))
+        }
+    }
+
+    override suspend fun deleteChannel(channelId: String): AppResult<Unit> = withContext(Dispatchers.IO) {
+        if (channelId.isBlank()) return@withContext AppResult.Success(Unit)
+        try {
+            local?.deleteChannel(channelId)
+            val channelDocRef = channelsCollection.document(channelId)
+            try {
+                // Bulk recursive delete via Cloud Function (avoids reading/deleting messages one-by-one on client)
+                com.google.firebase.functions.FirebaseFunctions.getInstance()
+                    .getHttpsCallable("deleteChatChannel")
+                    .call(mapOf("channelId" to channelId))
+                    .await()
+            } catch (_: Exception) {
+                // Deleting the channel document directly also triggers server-side onChatChannelDeleted (db.recursiveDelete)
+                channelDocRef.delete().await()
+            }
+            AppResult.Success(Unit)
+        } catch (e: Exception) {
+            Log.e("ChatRepository", "deleteChannel error: ${e.message}")
+            AppResult.Error(AppError.NetworkError(e))
+        }
+    }
+
+    override suspend fun deleteAllChannels(channelsList: List<ChatChannel>): AppResult<Unit> = withContext(Dispatchers.IO) {
+        if (channelsList.isEmpty()) return@withContext AppResult.Success(Unit)
+        try {
+            channelsList.forEach { ch ->
+                if (ch.id.isNotBlank()) {
+                    local?.deleteChannel(ch.id)
+                }
+            }
+            channelsList.chunked(400).forEach { chunk ->
+                val batch = firestore.batch()
+                chunk.forEach { ch ->
+                    if (ch.id.isNotBlank()) {
+                        // Deleting channel document triggers onChatChannelDeleted recursiveDelete on server
+                        batch.delete(channelsCollection.document(ch.id))
+                    }
+                }
+                batch.commit().await()
+            }
+            AppResult.Success(Unit)
+        } catch (e: Exception) {
+            AppResult.Error(AppError.NetworkError(e))
+        }
+    }
+
+    // =========================================================================
+    // 3. USER PRESENCE
+    // =========================================================================
+
+    override suspend fun setUserPresence(userId: String, isOnline: Boolean): AppResult<Unit> = withContext(Dispatchers.IO) {
+        if (userId.isBlank()) return@withContext AppResult.Success(Unit)
+        try {
+            val now = System.currentTimeMillis()
+            val presence = UserPresence(
+                userId = userId,
+                isOnline = isOnline,
+                lastSeen = now
+            )
+            local?.saveUserPresence(presence)
+
+            // 1. Primary: Realtime Database with onDisconnect support (Zero Spark Plan Firestore write quota)
+            try {
+                realtimeDb?.getReference("presence/$userId")?.let { ref ->
+                    val data = mapOf(
+                        "userId" to userId,
+                        "isOnline" to isOnline,
+                        "lastSeen" to now
+                    )
+                    ref.setValue(data)
+                    if (isOnline) {
+                        ref.child("isOnline").onDisconnect().setValue(false)
+                        ref.child("lastSeen").onDisconnect().setValue(com.google.firebase.database.ServerValue.TIMESTAMP)
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w("ChatRepository", "Realtime DB presence error: ${e.message}")
+            }
+
+            // 2. Sync to Firestore presence document
+            try {
+                presenceCollection.document(userId).set(presence, SetOptions.merge())
+            } catch (_: Exception) {}
+
+            AppResult.Success(Unit)
+        } catch (e: Exception) {
+            AppResult.Error(AppError.NetworkError(e))
+        }
+    }
+
+    override fun getUserPresence(userId: String): Flow<UserPresence?> = callbackFlow {
+        if (userId.isBlank()) {
+            trySend(null)
+            close()
+            return@callbackFlow
+        }
+
+        // Local cache emission first
+        val localJob = local?.observeUserPresence(userId)?.let { localFlow ->
+            launch(Dispatchers.IO) {
+                localFlow.collect { cached ->
+                    trySend(cached)
+                }
+            }
+        }
+
+        var rtdbListener: com.google.firebase.database.ValueEventListener? = null
+        val rtdbRef = try { realtimeDb?.getReference("presence/$userId") } catch (_: Exception) { null }
+        var firestoreListener: ListenerRegistration? = null
+
+        if (rtdbRef != null) {
+            rtdbListener = object : com.google.firebase.database.ValueEventListener {
+                override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
+                    val isOnline = snapshot.child("isOnline").getValue(Boolean::class.java) ?: false
+                    val lastSeen = snapshot.child("lastSeen").getValue(Long::class.java) ?: 0L
+                    val presence = UserPresence(userId = userId, isOnline = isOnline, lastSeen = lastSeen)
+                    launch(Dispatchers.IO) {
+                        local?.saveUserPresence(presence)
+                    }
+                    trySend(presence)
+                }
+
+                override fun onCancelled(error: com.google.firebase.database.DatabaseError) {
+                    if (firestoreListener == null) {
+                        firestoreListener = presenceCollection.document(userId).addSnapshotListener { snap, _ ->
+                            val p = snap?.toObject(UserPresence::class.java)
+                            if (p != null) {
+                                launch(Dispatchers.IO) { local?.saveUserPresence(p) }
+                            }
+                            trySend(p)
+                        }
+                    }
+                }
+            }
+            rtdbRef.addValueEventListener(rtdbListener)
+        } else {
+            firestoreListener = presenceCollection.document(userId).addSnapshotListener { snap, _ ->
+                val p = snap?.toObject(UserPresence::class.java)
+                if (p != null) {
+                    launch(Dispatchers.IO) { local?.saveUserPresence(p) }
+                }
+                trySend(p)
+            }
+        }
+
+        awaitClose {
+            try {
+                localJob?.cancel()
+                if (rtdbRef != null && rtdbListener != null) {
+                    rtdbRef.removeEventListener(rtdbListener)
+                }
+                firestoreListener?.remove()
+            } catch (_: Exception) {}
+        }
+    }.flowOn(Dispatchers.IO)
+
+    override fun getTypingStatus(channelId: String, userId: String): Flow<Boolean> = callbackFlow {
+        if (channelId.isBlank() || userId.isBlank()) {
+            trySend(false)
+            close()
+            return@callbackFlow
+        }
+
+        var rtdbListener: com.google.firebase.database.ValueEventListener? = null
+        val rtdbRef = try { realtimeDb?.getReference("typing/$channelId/$userId") } catch (_: Exception) { null }
+        var firestoreListener: ListenerRegistration? = null
+
+        if (rtdbRef != null) {
+            rtdbListener = object : com.google.firebase.database.ValueEventListener {
+                override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
+                    val isTyping = snapshot.getValue(Boolean::class.java) ?: false
+                    trySend(isTyping)
+                }
+
+                override fun onCancelled(error: com.google.firebase.database.DatabaseError) {
+                    if (firestoreListener == null) {
+                        firestoreListener = channelsCollection.document(channelId).addSnapshotListener { snap, _ ->
+                            val isTypingMap = snap?.get("isTyping") as? Map<*, *>
+                            val isTyping = (isTypingMap?.get(userId) as? Boolean) ?: false
+                            trySend(isTyping)
+                        }
+                    }
+                }
+            }
+            rtdbRef.addValueEventListener(rtdbListener)
+        } else {
+            firestoreListener = channelsCollection.document(channelId).addSnapshotListener { snap, _ ->
+                val isTypingMap = snap?.get("isTyping") as? Map<*, *>
+                val isTyping = (isTypingMap?.get(userId) as? Boolean) ?: false
+                trySend(isTyping)
+            }
+        }
+
+        awaitClose {
+            try {
+                if (rtdbRef != null && rtdbListener != null) {
+                    rtdbRef.removeEventListener(rtdbListener)
+                }
+                firestoreListener?.remove()
+            } catch (_: Exception) {}
+        }
+    }.flowOn(Dispatchers.IO)
+
+    // =========================================================================
+    // 4. DELTA SYNC IMPLEMENTATION
+    // =========================================================================
+
+    override suspend fun syncChannelDelta(channelId: String): AppResult<Int> = withContext(Dispatchers.IO) {
+        if (channelId.isBlank()) return@withContext AppResult.Success(0)
+        try {
+            val lastSync = local?.getLastSyncTimestamp(channelId) ?: 0L
+            val messagesRef = channelsCollection.document(channelId).collection("messages")
+
+            val snapshot = if (lastSync > 0) {
+                messagesRef.whereGreaterThan("timestamp", lastSync).limit(100).get().await()
+            } else {
+                messagesRef.orderBy("timestamp", Query.Direction.DESCENDING).limit(50).get().await()
+            }
+
+            val newMessages = snapshot.documents.mapNotNull { doc ->
+                doc.toObject(ChatMessage::class.java)?.copy(id = doc.id)
+            }
+
+            if (newMessages.isNotEmpty()) {
+                val current = local?.getMessages(channelId) ?: emptyList()
+                val merged = (current + newMessages).distinctBy { it.id }.sortedBy { it.timestamp }
+                local?.saveMessages(channelId, merged)
+                local?.setLastSyncTimestamp(channelId, System.currentTimeMillis())
+            }
+
+            AppResult.Success(newMessages.size)
+        } catch (e: Exception) {
+            AppResult.Error(AppError.NetworkError(e))
+        }
+    }
+}
