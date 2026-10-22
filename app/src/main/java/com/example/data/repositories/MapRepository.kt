@@ -10,7 +10,6 @@ import kotlinx.coroutines.tasks.await
 
 class MapRepository(context: Context) {
     private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance()
-    private val mapDatabase: MapDatabase = MapDatabase.getInstance(context)
 
     suspend fun getProviders(): List<ProviderEntity> {
         return try {
@@ -28,13 +27,11 @@ class MapRepository(context: Context) {
                     .get()
                     .await()
             }
-            val list = snapshot.documents.mapNotNull { doc ->
+            snapshot.documents.mapNotNull { doc ->
                 doc.toObject(ProviderEntity::class.java)?.copy(id = doc.id)
             }
-            mapDatabase.mapDao.saveProviders(list)
-            list
         } catch (e: Exception) {
-            mapDatabase.mapDao.getProviders()
+            emptyList()
         }
     }
 
@@ -54,13 +51,11 @@ class MapRepository(context: Context) {
                     .get()
                     .await()
             }
-            val list = snapshot.documents.mapNotNull { doc ->
+            snapshot.documents.mapNotNull { doc ->
                 doc.toObject(StoreEntity::class.java)?.copy(id = doc.id)
             }
-            mapDatabase.mapDao.saveStores(list)
-            list
         } catch (e: Exception) {
-            mapDatabase.mapDao.getStores()
+            emptyList()
         }
     }
 
@@ -80,13 +75,11 @@ class MapRepository(context: Context) {
                     .get()
                     .await()
             }
-            val list = snapshot.documents.mapNotNull { doc ->
+            snapshot.documents.mapNotNull { doc ->
                 doc.toObject(PropertyEntity::class.java)?.copy(id = doc.id)
             }
-            mapDatabase.mapDao.saveProperties(list)
-            list
         } catch (e: Exception) {
-            mapDatabase.mapDao.getProperties()
+            emptyList()
         }
     }
 }

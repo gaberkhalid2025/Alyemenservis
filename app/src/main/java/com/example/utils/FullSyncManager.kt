@@ -69,33 +69,8 @@ class FullSyncManager @Inject constructor(
      * لا يقوم بالكتابة على Firestore، مما يحمي إعدادات الأدمن ويتجنب أخطاء PERMISSION_DENIED لدى العملاء.
      */
     suspend fun pullRemoteSettingsToLocalCache(): Boolean = withContext(Dispatchers.IO) {
-        _isSyncing.value = true
-        try {
-            val remoteData = restoreAllSettings()
-            val now = System.currentTimeMillis()
-            if (remoteData != null) {
-                val safeMap = remoteData.mapValues { (_, v) ->
-                    when (v) {
-                        null, is Boolean, is Number, is String -> v
-                        else -> v.toString()
-                    }
-                }
-                val jsonStr = org.json.JSONObject(safeMap).toString()
-                prefs.edit()
-                    .putString(KEY_LOCAL_SETTINGS_CACHE, jsonStr)
-                    .putLong(KEY_LAST_SYNC_TS, now)
-                    .apply()
-            } else {
-                prefs.edit().putLong(KEY_LAST_SYNC_TS, now).apply()
-            }
-            _lastSyncTimestamp.value = now
-            true
-        } catch (e: Exception) {
-            Log.w(TAG, "Background pullRemoteSettingsToLocalCache note: ${e.message}")
-            false
-        } finally {
-            _isSyncing.value = false
-        }
+        // [DISABLED] for pure Firestore sync
+        true
     }
 
     fun stopAutoSync() {

@@ -22,22 +22,22 @@ class LocalAppCacheManager @Inject constructor(
 
     private val prefs: SharedPreferences = context.getSharedPreferences("YS_Local_App_Cache_v2026", Context.MODE_PRIVATE)
 
-    // 1. Save & Load Cached Providers
+    // 1. Save & Load Cached Providers (DISABLED for Direct Firestore)
     fun saveProvidersCache(rawJsonString: String) {
-        prefs.edit().putString("KEY_PROVIDERS_CACHE", rawJsonString).putLong("KEY_PROVIDERS_TIME", System.currentTimeMillis()).apply()
+        // [DISABLED] prefs.edit().putString("KEY_PROVIDERS_CACHE", rawJsonString).putLong("KEY_PROVIDERS_TIME", System.currentTimeMillis()).apply()
     }
 
     fun getProvidersCacheRaw(): String {
-        return prefs.getString("KEY_PROVIDERS_CACHE", "[]") ?: "[]"
+        return "[]" // Always return empty for pure Firestore sync
     }
 
-    // 2. Save & Load Cached Stores
+    // 2. Save & Load Cached Stores (DISABLED for Direct Firestore)
     fun saveStoresCache(rawJsonString: String) {
-        prefs.edit().putString("KEY_STORES_CACHE", rawJsonString).putLong("KEY_STORES_TIME", System.currentTimeMillis()).apply()
+        // [DISABLED] prefs.edit().putString("KEY_STORES_CACHE", rawJsonString).putLong("KEY_STORES_TIME", System.currentTimeMillis()).apply()
     }
 
     fun getStoresCacheRaw(): String {
-        return prefs.getString("KEY_STORES_CACHE", "[]") ?: "[]"
+        return "[]" // Always return empty for pure Firestore sync
     }
 
     // 3. Bookings Cache -> Delegated exclusively to Room Database (AppDatabase.bookingDao())
@@ -48,45 +48,42 @@ class LocalAppCacheManager @Inject constructor(
     }
 
     fun saveOffersCache(rawJsonString: String) {
-        prefs.edit().putString("KEY_OFFERS_CACHE", rawJsonString).putLong("KEY_OFFERS_TIME", System.currentTimeMillis()).apply()
+        // [DISABLED] prefs.edit().putString("KEY_OFFERS_CACHE", rawJsonString).putLong("KEY_OFFERS_TIME", System.currentTimeMillis()).apply()
     }
 
     fun getOffersCacheRaw(): String {
-        return prefs.getString("KEY_OFFERS_CACHE", "[]") ?: "[]"
+        return "[]"
     }
 
     fun getOffersCacheTime(): Long {
-        return prefs.getLong("KEY_OFFERS_TIME", 0L)
+        return 0L
     }
 
-    // 4. Save & Load Cached Categories
+    // 4. Save & Load Cached Categories (DISABLED for Direct Firestore)
     fun saveCategoriesCache(rawJsonString: String) {
-        prefs.edit()
-            .putString("KEY_CATEGORIES_CACHE", rawJsonString)
-            .putLong("KEY_CATEGORIES_TIME", System.currentTimeMillis())
-            .apply()
+        // [DISABLED]
     }
 
     fun getCategoriesCacheRaw(): String {
-        return prefs.getString("KEY_CATEGORIES_CACHE", "[]") ?: "[]"
+        return "[]"
     }
 
-    // 4.1 Save & Load Cached Jobs
+    // 4.1 Save & Load Cached Jobs (DISABLED for Direct Firestore)
     fun saveJobsCache(ownerId: String, rawJsonString: String) {
-        prefs.edit().putString("KEY_JOBS_CACHE_$ownerId", rawJsonString).apply()
+        // [DISABLED]
     }
 
     fun getJobsCacheRaw(ownerId: String): String {
-        return prefs.getString("KEY_JOBS_CACHE_$ownerId", "[]") ?: "[]"
+        return "[]"
     }
 
-    // 4.2 Save & Load Cached Doctors
+    // 4.2 Save & Load Cached Doctors (DISABLED for Direct Firestore)
     fun saveDoctorsCache(ownerId: String, rawJsonString: String) {
-        prefs.edit().putString("KEY_DOCTORS_CACHE_$ownerId", rawJsonString).apply()
+        // [DISABLED]
     }
 
     fun getDoctorsCacheRaw(ownerId: String): String {
-        return prefs.getString("KEY_DOCTORS_CACHE_$ownerId", "[]") ?: "[]"
+        return "[]"
     }
 
     // 5. Offline Queue Operations (When user creates booking or sends message offline)

@@ -19,27 +19,6 @@ captures/
 local.properties
 
 # Firebase & Google Services
-app/google-services.json
-**/google-services.json
-firebase_applet_config.xml
+# Removed ignore for google-services.json as requested
 
-# Keystores & Signing
-*.jks
-*.keystore
-debug.keystore
-debug.keystore.base64
-my-release-key.jks
-release.keystore
-
-# APKs & Binaries
-*.apk
-*.aab
-*.ap_
-output-metadata.json
-
-# Temporary files & logs
-*.log
-*.zip
-errors.txt
-
-# Batch Sync - Final Step: All files are now un-ignored
+# Batch Sync - Completed
