@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>خريطة Vela العالمية المفتوحة</title>
+    <link rel="stylesheet" href="leaflet.css" />
+    <link rel="stylesheet" href="MarkerCluster.css" />
+    <link rel="stylesheet" href="MarkerCluster.Default.css" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        html, body {
+            width: 100%;
+            height: 100%;
+            background-color: #0B1120;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Cairo", Tahoma, sans-serif;
+            overflow: hidden;
+        }
+        #map-container {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            overflow: hidden;
+            perspective: 1000px;
+        }
+        #map {
+            width: 100%;
+            height: 100%;
+            background-color: #0B1120;
+            transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+            transform-origin: 50% 70%;
+        }
+        /* 🏙️ Vela 3D Tilt View */
+        #map.vela-3d-tilt {
+            transform: rotateX(32deg) scale(1.08);
+        }
+
+        /* Marker Badge Design */
+        .custom-pin-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+            transform: translate(-50%, -100%);
+            filter: drop-shadow(0 4px 8px rgba(0,0,0,0.6));
+        }
+        .custom-pin-head {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            color: #ffffff;
+            border: 2.5px solid #ffffff;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.55);
+            transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .custom-pin-head:active {
+            transform: scale(1.22);
+        }
+        .custom-pin-arrow {
+            width: 0;
+            height: 0;
+            border-left: 7px solid transparent;
+            border-right: 7px solid transparent;
+            border-top: 8px solid #ffffff;
+            margin-top: -1px;
+            filter: drop-shadow(0 2px 2px rgba(0,0,0,0.4));
+        }
+        .custom-pin-label {
+            background: rgba(15, 23, 42, 0.95);
+            color: #ffffff;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 3px 8px;
+            border-radius: 12px;
+            margin-top: 3px;
+            white-space: nowrap;
+            max-width: 135px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            box-shadow: 0 3px 8px rgba(0,0,0,0.6);
+            border: 1px solid rgba(0, 229, 255, 0.4);
+            pointer-events: none;
+        }
+
+        /* User GPS Location Marker */
+        .user-pulse-marker {
+            position: relative;
+            width: 24px;
+            height: 24px;
+        }
+        .user-dot {
+            width: 16px;
+            height: 16px;
+            background: #00E5FF;
+            border: 3px solid #ffffff;
+            border-radius: 50%;
+            position: absolute;
+            top: 4px;
+            left: 4px;
+            box-shadow: 0 0 14px #00E5FF;
+            z-index: 2;
+        }
+        .user-pulse {
+            width: 40px;
+            height: 40px;
+            background: rgba(0, 229, 255, 0.35);
+            border-radius: 50%;
+            position: absolute;
+            top: -8px;
+            left: -8px;
+            animation: userPulsing 2s infinite ease-out;
+            z-index: 1;
+        }
+        @keyframes userPulsing {
+            0% { transform: scale(0.4); opacity: 0.95; }
+            100% { transform: scale(1.9); opacity: 0; }
+        }
+
+        /* 3D Mode Floating Indicator */
+        .mode-indicator {
+            position: absolute;
+            top: 14px;
+            right: 14px;
+            z-index: 1000;
+            background: rgba(15, 23, 42, 0.90);
+            border: 1px solid rgba(0, 229, 255, 0.4);
+            border-radius: 20px;
+            padding: 4px 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: #00E5FF;
+            font-size: 11px;
+            font-weight: 700;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.5);
+            pointer-events: none;
+        }
+
+        /* Leaflet Controls Customization */
+        .leaflet-control-zoom {
+            display: none !important;
+        }
+        /* [إصلاح نهائي] تصغير نص الإسناد ومنع النقر أو التنقل منه نهائياً */
+        .leaflet-control-attribution {
+            background: rgba(15, 23, 42, 0.65) !important;
+            color: #64748B !important;
+            font-size: 7.5px !important;
+            padding: 1px 6px !important;
+            border-radius: 6px 0 0 0;
+            line-height: 10px !important;
+            user-select: none !important;
+            -webkit-user-select: none !important;
+            pointer-events: none !important;
+        }
+        .leaflet-control-attribution a,
+        .leaflet-control-attribution span {
+            color: #64748B !important;
+            text-decoration: none !important;
+            pointer-events: none !important;
+            cursor: default !important;
+        }
+    </style>
+</head>
+<body>
+    <div id="map-container">
+        <div id="map"></div>
+        <div id="modeIndicator" class="mode-indicator">
+            <span id="modeIcon">🛰️</span>
+            <span id="modeTitle">الأقمار الاصطناعية (OAM)</span>
+        </div>
+    </div>
+
+    <script src="leaflet.js"></script>
+    <script src="leaflet.markercluster.js"></script>
+    <script>
+        var map;
+        var currentBaseLayer;
+        var currentLabelsLayer = null;
+        var markerClusterGroup;
+        var userMarker = null;
+        var userAccuracyCircle = null;
+        var userLat = 15.3694;
+        var userLng = 44.1910;
+        var activeMode = 'AERIAL_OAM';
+
+        // 🛰️ Free Global Tile Providers (No API Keys Required - Watermark Free)
+        var providers = {
+            // 1. OpenStreetMap Standard (الرسمية)
+            'osm': {
+                base: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    subdomains: ['a', 'b', 'c'],
+                    minZoom: 3,
+                    maxZoom: 20,
+                    attribution: '© OpenStreetMap Standard'
+                }),
+                labels: null
+            },
+            // 2. خريطة الشوارع الحيوية (HOT)
+            'hot': {
+                base: L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
+                    minZoom: 3,
+                    maxZoom: 20,
+                    attribution: '© OpenStreetMap HOT'
+                }),
+                labels: null
+            },
+            // 3. خريطة العالم والتضاريس (Topo)
+            'topo': {
+                base: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+                    minZoom: 3,
+                    maxZoom: 17,
+                    attribution: '© OpenTopoMap'
+                }),
+                labels: null
+            },
+            // 4. صور الأقمار الصناعية (Satellite)
+            'satellite': {
+                base: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                    minZoom: 3,
+                    maxZoom: 19,
+                    attribution: '© Esri World Imagery'
+                }),
+                labels: L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
+                    minZoom: 3,
+                    maxZoom: 19,
+                    attribution: ''
+                })
+            },
+            // 5. Vela 3D (خريطة ثلاثية الأبعاد تفاعلية)
+            'vela_3d': {
+                base: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    subdomains: ['a', 'b', 'c'],
+                    minZoom: 3,
+                    maxZoom: 20,
+                    attribution: '© OpenStreetMap 3D'
+                }),
+                labels: null
+            }
+        };
+
+        function initMap() {
+            try {
+                // Initialize map centered on Sana'a by default
+                map = L.map('map', {
+                    center: [userLat, userLng],
+                    zoom: 15,
+                    minZoom: 3,
+                    maxZoom: 20,
+                    zoomControl: false,
+                    attributionControl: true
+                });
+
+                // [إصلاح نهائي] إزالة رابط البادئة من نص الإسناد لمنع أي نقر أو انتقال خارجي
+                if (map.attributionControl) {
+                    map.attributionControl.setPrefix('');
+                }
+
+                // 🛰️ Default: Open with Satellite mode directly
+                currentBaseLayer = providers['satellite'].base.addTo(map);
+                if (providers['satellite'].labels) {
+                    currentLabelsLayer = providers['satellite'].labels.addTo(map);
+                }
+
+                // Marker Cluster Group with custom styling
+                markerClusterGroup = L.markerClusterGroup({
+                    maxClusterRadius: 36,
+                    spiderfyOnMaxZoom: true,
+                    showCoverageOnHover: false,
+                    zoomToBoundsOnClick: true
+                });
+                map.addLayer(markerClusterGroup);
+
+                // Map background click
+                map.on('click', function(e) {
+                    if (window.AndroidBridge && window.AndroidBridge.onMapClicked) {
+                        window.AndroidBridge.onMapClicked();
+                    }
+                });
+
+                if (window.AndroidBridge && window.AndroidBridge.onMapReady) {
+                    window.AndroidBridge.onMapReady();
+                }
+            } catch(e) {
+                console.error("Map init error:", e);
+            }
+        }
+
+        // 🔄 Switch Modes: 'OSM', 'HOT', 'TOPO', 'SATELLITE', 'VELA_3D'
+        // [إصلاح نهائي] واجهة برمجية للتبديل بين الطبقات الأربعة الرسمية للخريطة
+        function switchMapMode(modeKey) {
+            activeMode = modeKey;
+            var mapEl = document.getElementById('map');
+            var modeIcon = document.getElementById('modeIcon');
+            var modeTitle = document.getElementById('modeTitle');
+
+            // Remove existing layers
+            if (currentBaseLayer) map.removeLayer(currentBaseLayer);
+            if (currentLabelsLayer) map.removeLayer(currentLabelsLayer);
+
+            var key = (modeKey || 'SATELLITE').toUpperCase();
+            if (key === 'VELA_3D') {
+                currentBaseLayer = providers['vela_3d'].base.addTo(map);
+                currentLabelsLayer = null;
+                currentBaseLayer.bringToBack();
+                mapEl.classList.add('vela-3d-tilt');
+                modeIcon.innerText = '🏙️';
+                modeTitle.innerText = 'Vela 3D (مباني ثلاثية الأبعاد)';
+            } else if (key === 'OSM') {
+                currentBaseLayer = providers['osm'].base.addTo(map);
+                currentLabelsLayer = null;
+                currentBaseLayer.bringToBack();
+                mapEl.classList.remove('vela-3d-tilt');
+                modeIcon.innerText = '🌐';
+                modeTitle.innerText = 'OpenStreetMap Standard';
+            } else if (key === 'HOT') {
+                currentBaseLayer = providers['hot'].base.addTo(map);
+                currentLabelsLayer = null;
+                currentBaseLayer.bringToBack();
+                mapEl.classList.remove('vela-3d-tilt');
+                modeIcon.innerText = '🗺️';
+                modeTitle.innerText = 'خريطة الشوارع الحيوية (HOT)';
+            } else if (key === 'TOPO') {
+                currentBaseLayer = providers['topo'].base.addTo(map);
+                currentLabelsLayer = null;
+                currentBaseLayer.bringToBack();
+                mapEl.classList.remove('vela-3d-tilt');
+                modeIcon.innerText = '⛰️';
+                modeTitle.innerText = 'خريطة التضاريس (Topo)';
+            } else {
+                // Default: SATELLITE
+                currentBaseLayer = providers['satellite'].base.addTo(map);
+                if (providers['satellite'].labels) {
+                    currentLabelsLayer = providers['satellite'].labels.addTo(map);
+                }
+                currentBaseLayer.bringToBack();
+                mapEl.classList.remove('vela-3d-tilt');
+                modeIcon.innerText = '🛰️';
+                modeTitle.innerText = 'صور الأقمار الصناعية (Satellite)';
+            }
+
+            if (window.AndroidBridge && window.AndroidBridge.onMapModeChanged) {
+                window.AndroidBridge.onMapModeChanged(key);
+            }
+        }
+        window.switchMapMode = switchMapMode;
+
+        // Update GPS Location
+        function updateUserLocation(lat, lng, accuracy, shouldPan) {
+            if (!lat || !lng || isNaN(lat) || isNaN(lng)) return;
+            userLat = lat;
+            userLng = lng;
+
+            var userIcon = L.divIcon({
+                className: '',
+                html: '<div class="user-pulse-marker"><div class="user-pulse"></div><div class="user-dot"></div></div>',
+                iconSize: [24, 24],
+                iconAnchor: [12, 12]
+            });
+
+            if (!userMarker) {
+                userMarker = L.marker([lat, lng], {
+                    icon: userIcon,
+                    zIndexOffset: 1000
+                }).addTo(map);
+            } else {
+                userMarker.setLatLng([lat, lng]);
+            }
+
+            if (accuracy && accuracy > 0 && accuracy < 3000) {
+                if (!userAccuracyCircle) {
+                    userAccuracyCircle = L.circle([lat, lng], {
+                        radius: accuracy,
+                        color: '#00E5FF',
+                        weight: 1.5,
+                        fillColor: '#00E5FF',
+                        fillOpacity: 0.12
+                    }).addTo(map);
+                } else {
+                    userAccuracyCircle.setLatLng([lat, lng]);
+                    userAccuracyCircle.setRadius(accuracy);
+                }
+            }
+
+            if (shouldPan && map) {
+                map.panTo([lat, lng], { animate: true });
+            }
+        }
+
+        // Markers Population with Rich Category Styling
+        function setMarkers(markersJsonStr) {
+            try {
+                if (!markerClusterGroup) return;
+                markerClusterGroup.clearLayers();
+                var items = (typeof markersJsonStr === 'string') ? JSON.parse(markersJsonStr) : markersJsonStr;
+                if (!items || !items.length) return;
+
+                items.forEach(function(item) {
+                    if (!item.lat || !item.lng || item.lat === 0.0 || item.lng === 0.0) return;
+                    var pinBg = item.badgeColor || '#00E5FF';
+                    var emoji = item.emoji || '📍';
+                    var displayName = item.name || '';
+                    if (displayName.length > 20) {
+                        displayName = displayName.substring(0, 19) + '…';
+                    }
+
+                    var iconHtml = '<div class="custom-pin-container">' +
+                        '<div class="custom-pin-head" style="background-color: ' + pinBg + ';">' + emoji + '</div>' +
+                        '<div class="custom-pin-arrow" style="border-top-color: ' + pinBg + ';"></div>' +
+                        (displayName ? '<div class="custom-pin-label">' + displayName + '</div>' : '') +
+                        '</div>';
+
+                    var customIcon = L.divIcon({
+                        className: '',
+                        html: iconHtml,
+                        iconSize: [42, 62],
+                        iconAnchor: [21, 52]
+                    });
+
+                    var marker = L.marker([item.lat, item.lng], { icon: customIcon });
+                    marker.on('click', function(e) {
+                        L.DomEvent.stopPropagation(e);
+                        if (window.AndroidBridge && window.AndroidBridge.onMarkerClicked) {
+                            window.AndroidBridge.onMarkerClicked(item.id, item.type);
+                        }
+                    });
+                    markerClusterGroup.addLayer(marker);
+                });
+            } catch(e) {
+                console.error("Error setting markers:", e);
+            }
+        }
+
+        function setCity(cityName, lat, lng, zoomLevel) {
+            if (map && lat && lng) {
+                map.setView([lat, lng], zoomLevel || 15, { animate: true });
+            }
+        }
+
+        function zoomIn() {
+            if (map) map.zoomIn();
+        }
+
+        function zoomOut() {
+            if (map) map.zoomOut();
+        }
+
+        function recenterUser() {
+            if (map && userLat && userLng) {
+                map.setView([userLat, userLng], 16, { animate: true });
+            }
+        }
+
+        window.onload = function() {
+            initMap();
+        };
+    </script>
+</body>
+</html>

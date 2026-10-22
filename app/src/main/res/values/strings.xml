@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">AlYemenServices</string>
+    <!-- [FIX-CRITICAL] تم حذف default_web_client_id الوهمي — Firebase يستخدم google-services.json -->
+    <string name="location_permission_granted">تم منح إذن الموقع</string>
+    <string name="location_permission_denied">تم رفض إذن الموقع</string>
+    <string name="location_fetched_successfully">تم جلب الإحداثيات بنجاح</string>
+</resources>
