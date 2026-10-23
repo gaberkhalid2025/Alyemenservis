@@ -412,9 +412,19 @@
         }
 
         // Markers Population with Rich Category Styling
+        var activeMarkers = [];
         function setMarkers(markersJsonStr) {
             try {
                 if (!markerClusterGroup) return;
+                // [إصلاح تسريب الذاكرة] فصل كافة مستمعي الأحداث قبل تفريغ العلامات
+                if (activeMarkers && activeMarkers.length > 0) {
+                    for (var i = 0; i < activeMarkers.length; i++) {
+                        if (activeMarkers[i] && activeMarkers[i].off) {
+                            activeMarkers[i].off();
+                        }
+                    }
+                    activeMarkers = [];
+                }
                 markerClusterGroup.clearLayers();
                 var items = (typeof markersJsonStr === 'string') ? JSON.parse(markersJsonStr) : markersJsonStr;
                 if (!items || !items.length) return;
@@ -448,6 +458,7 @@
                             window.AndroidBridge.onMarkerClicked(item.id, item.type);
                         }
                     });
+                    activeMarkers.push(marker);
                     markerClusterGroup.addLayer(marker);
                 });
             } catch(e) {

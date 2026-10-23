@@ -40,7 +40,9 @@ fun MapControls(
     isGpsActive: Boolean,
     themeColors: VisualThemePalette,
     modifier: Modifier = Modifier,
-    currentMapMode: com.example.ui.screens.map.MapMode = com.example.ui.screens.map.MapMode.SATELLITE
+    currentMapMode: com.example.ui.screens.map.MapMode = com.example.ui.screens.map.MapMode.SATELLITE,
+    isOfflineCached: Boolean = true,
+    onToggleOfflineCache: () -> Unit = {}
 ) {
     Column(
         modifier = modifier
@@ -156,11 +158,34 @@ fun MapControls(
             }
         }
 
-        // 5. Cloud Offline Cache Indicator Button (حفظ الأوفلاين)
+        // 5. Cloud Offline Cache Indicator Button (حفظ الأوفلاين الفعلي)
         Surface(
             shape = CircleShape,
             color = Color(0xFF1E293B),
-            border = BorderStroke(1.dp, Color(0xFF334155)),
+            border = BorderStroke(1.dp, if (isOfflineCached) Color(0xFF00E5FF) else Color(0xFF334155)),
+            shadowElevation = 6.dp,
+            modifier = Modifier.size(46.dp)
+        ) {
+            IconButton(
+                onClick = onToggleOfflineCache,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .testTag("map_offline_cache_btn")
+            ) {
+                Icon(
+                    imageVector = if (isOfflineCached) Icons.Default.CloudDone else Icons.Default.CloudDownload,
+                    contentDescription = "التخزين المحلي للأوفلاين",
+                    tint = if (isOfflineCached) Color(0xFF00E5FF) else Color(0xFF94A3B8),
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+
+        // 6. Heatmap Density Indicator Button (الخريطة الحرارية للكثافة)
+        Surface(
+            shape = CircleShape,
+            color = Color(0xFF1E293B),
+            border = BorderStroke(1.dp, if (isHeatmapActive) Color(0xFFF97316) else Color(0xFF334155)),
             shadowElevation = 6.dp,
             modifier = Modifier.size(46.dp)
         ) {
@@ -168,12 +193,12 @@ fun MapControls(
                 onClick = onToggleHeatmap,
                 modifier = Modifier
                     .fillMaxSize()
-                    .testTag("map_offline_cache_btn")
+                    .testTag("map_heatmap_btn")
             ) {
                 Icon(
-                    imageVector = if (isHeatmapActive) Icons.Default.CloudDone else Icons.Default.CloudDownload,
-                    contentDescription = "التخزين المحلي للأوفلاين",
-                    tint = if (isHeatmapActive) Color(0xFF00E5FF) else Color(0xFF94A3B8),
+                    imageVector = Icons.Default.Whatshot,
+                    contentDescription = "الخريطة الحرارية",
+                    tint = if (isHeatmapActive) Color(0xFFF97316) else Color(0xFF94A3B8),
                     modifier = Modifier.size(20.dp)
                 )
             }

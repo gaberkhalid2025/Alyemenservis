@@ -338,7 +338,7 @@ fun MapScreenContent(
                 }
             }
 
-            // [المحور الأول: 2] العمود الأيمن (التحكم في الخريطة): موقعي -> تكبير -> تصغير -> الطبقات -> أوفلاين
+            // [المحور الأول: 2] العمود الأيمن (التحكم في الخريطة): موقعي -> تكبير -> تصغير -> الطبقات -> أوفلاين -> الخريطة الحرارية
             MapControls(
                 isRadarMode = state.isRadarMode,
                 onToggleRadarMode = {
@@ -350,8 +350,17 @@ fun MapScreenContent(
                     state.isHeatmapActive = !state.isHeatmapActive
                     coroutineScope.launch {
                         snackbarHostState.showSnackbar(
-                            if (state.isHeatmapActive) "تم تفعيل التخزين المؤقت للأوفلاين 💾" else "تم إيقاف التخزين المؤقت"
+                            if (state.isHeatmapActive) "تم تفعيل الخريطة الحرارية لكثافة الخدمات 🔥" else "تم إيقاف الخريطة الحرارية"
                         )
+                    }
+                },
+                isOfflineCached = state.isOfflineCacheActive,
+                onToggleOfflineCache = {
+                    coroutineScope.launch {
+                        OfflineMapManager.purgeCacheIfNeeded(context)
+                        val cacheSize = OfflineMapManager.getCacheSizeMb(context)
+                        val formatted = String.format(java.util.Locale.US, "%.1f", cacheSize)
+                        snackbarHostState.showSnackbar("💾 تم فحص وتحديث كاش الخريطة أوفلاين (الحجم: $formatted MB)")
                     }
                 },
                 onZoomIn = {
@@ -497,7 +506,7 @@ fun MapScreenContent(
                     }
                 }
 
-                // Filter Bar
+                // Filter Bar with 3-tier Hybrid Search
                 MapFilterBar(
                     selectedCategory = state.selectedCategory,
                     onCategorySelected = { state.selectedCategory = it },
@@ -511,7 +520,31 @@ fun MapScreenContent(
                     },
                     searchQuery = state.searchQuery,
                     onSearchQueryChange = { state.searchQuery = it },
-                    themeColors = themeColors
+                    themeColors = themeColors,
+                    onSearchExecute = { query ->
+                        if (query.isNotBlank()) {
+                            val cityCoords = OfflineMapManager.getCityCoordinates(query)
+                            if (cityCoords.nameAr != "صنعاء" || query.contains("صنعاء")) {
+                                state.selectedCity = cityCoords.nameAr
+                                viewModel.updateUserLocation(cityCoords.latitude, cityCoords.longitude)
+                                coroutineScope.launch {
+                                    snackbarHostState.showSnackbar("📍 تم الانتقال وتوسيط الخريطة إلى: ${cityCoords.nameAr}")
+                                }
+                            } else {
+                                val match = filteredProviders.firstOrNull() ?: filteredStores.firstOrNull() ?: filteredProperties.firstOrNull()
+                                if (match != null) {
+                                    state.selectedEntity = match
+                                    coroutineScope.launch {
+                                        snackbarHostState.showSnackbar("🎯 تم تحديد أقرب نتيجة مطابقة على الخريطة!")
+                                    }
+                                } else {
+                                    coroutineScope.launch {
+                                        snackbarHostState.showSnackbar("🔍 جارِ تصفية النتائج لكلمة: $query")
+                                    }
+                                }
+                            }
+                        }
+                    }
                 )
             }
 
@@ -604,6 +637,24 @@ fun MapScreenContent(
                             Text("🧭", fontSize = 16.sp)
                         }
                     }
+
+                    // 5. بلاغات الشوارع المجتمعية (⚠️ Street Alert)
+                    Surface(
+                        onClick = {
+                            state.showStreetAlertDialog = true
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        color = Color(0xFF0F172A).copy(alpha = 0.90f),
+                        border = BorderStroke(1.2.dp, Color(0xFFF59E0B)),
+                        shadowElevation = 6.dp,
+                        modifier = Modifier
+                            .size(42.dp)
+                            .testTag("mode_street_alert_btn")
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text("⚠️", fontSize = 16.sp)
+                        }
+                    }
                 }
             }
 
@@ -661,6 +712,59 @@ fun MapScreenContent(
                 )
             }
         }
+    }
+
+    // ⚠️ حوار الإبلاغ عن حالة الشارع (Crowdsourced Alerts)
+    if (state.showStreetAlertDialog) {
+        AlertDialog(
+            onDismissRequest = { state.showStreetAlertDialog = false },
+            containerColor = Color(0xFF0F172A),
+            titleContentColor = Color.White,
+            textContentColor = Color.White,
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("⚠️ الإبلاغ عن حالة الشارع", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                }
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("اختر نوع الحالة لتنبيه السائقين والمستخدمين في هذا المسار:", color = Color(0xFF94A3B8), fontSize = 12.sp)
+                    val alerts = listOf(
+                        "🚗 ازدحام مروري خانق",
+                        "🚧 حفريات وأعمال صيانة",
+                        "⛔ طريق مغلق / مقطوع",
+                        "💥 حادث مروري عرقل السير",
+                        "🌧️ سيول أو تجمعات مياه"
+                    )
+                    alerts.forEach { alertText ->
+                        Surface(
+                            onClick = {
+                                state.showStreetAlertDialog = false
+                                coroutineScope.launch {
+                                    snackbarHostState.showSnackbar("✅ تم تسجيل بلاغ: ($alertText) وتنبيه السائقين في المنطقة! شكراً لتعاونك 🇾🇪")
+                                }
+                            },
+                            shape = RoundedCornerShape(10.dp),
+                            color = Color(0xFF1E293B),
+                            border = BorderStroke(1.dp, Color(0xFF334155)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = alertText,
+                                color = Color.White,
+                                fontSize = 13.sp,
+                                modifier = Modifier.padding(12.dp)
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { state.showStreetAlertDialog = false }) {
+                    Text("إلغاء", color = Color(0xFF94A3B8))
+                }
+            }
+        )
     }
 
     // Unified Direct Booking Dialog

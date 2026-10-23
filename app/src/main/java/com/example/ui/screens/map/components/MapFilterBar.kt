@@ -37,7 +37,8 @@ fun MapFilterBar(
     searchQuery: String,
     onSearchQueryChange: (String) -> Unit,
     themeColors: VisualThemePalette,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onSearchExecute: (String) -> Unit = {}
 ) {
     val categories = remember {
         listOf(
@@ -105,6 +106,12 @@ fun MapFilterBar(
                         cursorColor = Color(0xFF00E5FF)
                     ),
                     singleLine = true,
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                        imeAction = androidx.compose.ui.text.input.ImeAction.Search
+                    ),
+                    keyboardActions = androidx.compose.foundation.text.KeyboardActions(
+                        onSearch = { onSearchExecute(searchQuery) }
+                    ),
                     modifier = Modifier
                         .weight(1f)
                         .testTag("map_search_input")

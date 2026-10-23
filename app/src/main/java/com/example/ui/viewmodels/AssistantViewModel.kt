@@ -369,6 +369,108 @@ class AssistantViewModel : ViewModel() {
         return response
     }
 
+    data class DiyGuide(
+        val keywords: List<String>,
+        val title: String,
+        val steps: List<String>,
+        val preventiveTip: String? = null,
+        val estimatedCost: String? = null,
+        val targetCategory: String = "سباكة"
+    )
+
+    private val diyGuides = listOf(
+        DiyGuide(
+            keywords = listOf("دينمو", "ماطور", "ماطور ماء", "دينمو يزن", "ما يرفعش ماء", "تنفيس"),
+            title = "حل مشكلة تنفيس ماطور الماء وعدم رفع المياه",
+            steps = listOf(
+                "افصل كهرباء الدينمو وتأكد من توقف المروحة تماماً.",
+                "افتح برغي التنفيس العلوي في رأس الطرمبة لتفريغ الهواء المحبوس.",
+                "اسكب ماء نظيف داخل فتحة التنفيس حتى يمتلئ بالكامل ثم أعد ربط البرغي بإحكام.",
+                "شغل الدينمو وتحقق من صوت سحب الماء وصعوده للخزان."
+            ),
+            preventiveTip = "احرص على تركيب صمام عدم رجوع (رداد/Check Valve) إيطالي أصلي عند مدخل السحب لتجنب تفريغ الماء.",
+            estimatedCost = "2,500 - 5,000 ريال يمني",
+            targetCategory = "سباكة"
+        ),
+        DiyGuide(
+            keywords = listOf("بزبوز", "حنفية", "صنبور", "يقطر", "تنقيط ماء", "جلبة", "واشر"),
+            title = "إصلاح تنقيط وتسريب البزبوز (الحنفية)",
+            steps = listOf(
+                "أغلق محبس الزاوية الموجود أسفل المغسلة.",
+                "فك غطاء مقبض البزبوز واستخرج البرغي الداخلي باستخدام مفك صليبة.",
+                "استخرج قلب الحنفية النحاسي وافحص الجلدة المطاطية (الواشر).",
+                "استبدل الواشر التالف بجديد مع لف شريط تفلون أبيض على السن."
+            ),
+            preventiveTip = "لا تبالغ في شد البزبوز بقوة عند الإغلاق لتجنب تلف الجلبة الداخلية بسرعة.",
+            estimatedCost = "1,500 - 3,000 ريال يمني",
+            targetCategory = "سباكة"
+        ),
+        DiyGuide(
+            keywords = listOf("عوامة", "عوامة الخزان", "الخزان يفيض", "السطح غرقان", "محبس العوامة"),
+            title = "علاج فيضان خزان السطح وعطل العوامة الميكانيكية والكهربائية",
+            steps = listOf(
+                "أغلق خط التغذية الصاعد للخزان فوراً لمنع هدر المياه.",
+                "افحص ذراع العوامة النحاسي أو البلاستيكي وتأكد من عدم ثقب الكرة العائمة.",
+                "إذا كانت العوامة كهربائية، تأكد من سلامة الثقالات والأسلاك المعزولة المقاومة للشمس.",
+                "قم بوزن مستوى الإيقاف ليكون أقل من فوهة الفايظ بـ 10 سم."
+            ),
+            preventiveTip = "استخدم عوامات نحاسية معتمدة مع حماية سلك العوامة الكهربائية بجرجور عازل.",
+            estimatedCost = "3,000 - 6,000 ريال يمني",
+            targetCategory = "سباكة"
+        ),
+        DiyGuide(
+            keywords = listOf("انسداد", "مجاري", "بالوعة", "تصريف مسدود", "مغسلة مسدودة", "ريحة مجاري"),
+            title = "تسليك انسداد بالوعة الحمام أو المطبخ",
+            steps = listOf(
+                "اسكب نصف كوب من بيكربونات الصوديوم متبوعاً بكوب خل أبيض داخل الفتحة.",
+                "اترك المزيج يتفاعل لمدة 15 دقيقة لتفكيك الدهون والرواسب.",
+                "اسكب كمية وافرة من الماء المغلي ببطء لطرد الرواسب خارج الماسورة.",
+                "استخدم سلك التسليك المرن (الزنبرك) إذا كان الانسداد عميقاً."
+            ),
+            preventiveTip = "تجنب سكب زيوت القلي أو الشحوم في أحواض الغسيل نهائياً واستخدم مصفاة شعر.",
+            estimatedCost = "3,000 - 7,000 ريال يمني",
+            targetCategory = "سباكة"
+        ),
+        DiyGuide(
+            keywords = listOf("مكيف", "تبريد", "ما يبردش", "حار", "كمبروسر", "فريون", "مكيف يقطر"),
+            title = "تشخيص ضعف التبريد وتسريب ماء المكيف",
+            steps = listOf(
+                "تأكد من ضبط الريموت على وضع التبريد (Cool ❄️) وحرارة بين 22-24.",
+                "فك فلاتر الهواء الأمامية واغسلها بالماء وجففها جيداً.",
+                "افحص مجرى تصريف الماء الخلفي وتأكد من عدم انسداده بالأتربة.",
+                "إذا استمر ضعف التبريد مع صوت ونين، قد يحتاج المكيف لإعادة تعبئة غاز الفريون."
+            ),
+            preventiveTip = "قم بتنظيف الفلاتر كل أسبوعين لتوفير استهلاك الكهرباء وإطالة عمر الكمبروسر.",
+            estimatedCost = "5,000 - 12,000 ريال يمني",
+            targetCategory = "تكييف"
+        ),
+        DiyGuide(
+            keywords = listOf("طاقة شمسية", "الواح", "انفرتر", "انفيرتر", "بطارية", "القاطع نزل", "التماس", "فولتية"),
+            title = "فحص منظومة الطاقة الشمسية والبطاريات",
+            steps = listOf(
+                "افحص شاشة جهاز الانفرتر وسجل كود الخطأ (Fault Code).",
+                "تأكد من نظافة زجاج الألواح الشمسية من الغبار المتراكم الذي يقلل الإنتاج بنسبة 40%.",
+                "افحص سلامة أقطاب البطاريات وعدم وجود أملاح بيضاء متأكسدة (نظفها بماء دافئ).",
+                "في حال نزول القاطع الرئيسي، افصل الأجهزة الكبيرة ثم ارفع القاطع تدريجياً لتحديد العطل."
+            ),
+            preventiveTip = "لا تفرغ بطاريات الجل أو الليثيوم لأقل من 30% من سعتها للحفاظ على عمرها الافتراضي.",
+            estimatedCost = "4,000 - 8,000 ريال يمني",
+            targetCategory = "كهرباء"
+        ),
+        DiyGuide(
+            keywords = listOf("بنشر", "تاير", "كفر", "بطارية سيارة", "ما تدقش سلف", "عطلان في الطريق", "ميكانيكي", "سطحة"),
+            title = "طوارئ السيارات والبنشر والشحن",
+            steps = listOf(
+                "أوقف المركبة في مسار آمن تماماً وشغل إشارات الانتظار الرباعية.",
+                "في حال البطارية، استخدم كابل اشتراك أصلي مع سيارة أخرى وتأكد من تطابق الأقطاب (+ مع +).",
+                "في حال البنشر، ارفع الهاندبريك وضع حجر خلف الإطار المعاكس قبل استخدام الرافعة (الجك)."
+            ),
+            preventiveTip = "تأكد دورياً من ضغط الهواء في الإطار الاحتياطي (السبير) وتوفر مفتاح العجل والجك.",
+            estimatedCost = "3,000 - 10,000 ريال يمني",
+            targetCategory = "سيارات"
+        )
+    )
+
     fun generateLocalOfflineResponse(prompt: String, viewModel: MainViewModel): Pair<String, List<Any>> {
         val qNormalized = normalizeArabic(prompt)
         val providers = viewModel.providers.value
@@ -376,6 +478,28 @@ class AssistantViewModel : ViewModel() {
         val properties = viewModel.properties.value
         val categories = viewModel.categories.value
         val settings = viewModel.settings.value
+
+        // [المحور الرابع] فحص أدلة الصيانة الذكية وخطوات DIY أولاً
+        val matchedDiyGuide = diyGuides.firstOrNull { guide ->
+            guide.keywords.any { kw -> qNormalized.contains(kw) }
+        }
+        if (matchedDiyGuide != null) {
+            val sb = StringBuilder()
+            sb.append("🛠️ *${matchedDiyGuide.title}*\n\n")
+            sb.append("📋 خطوات الفحص والإصلاح السريع (DIY):\n")
+            matchedDiyGuide.steps.forEachIndexed { i, step -> sb.append("${i + 1}. $step\n") }
+            matchedDiyGuide.preventiveTip?.let { sb.append("\n💡 نصيحة وقائية: $it\n") }
+            matchedDiyGuide.estimatedCost?.let { sb.append("\n💰 التكلفة التقديرية: $it\n") }
+            sb.append("\nيمكنك أيضاً طلب فني معتمد فوراً من القائمة أدناه 👇")
+
+            val relatedProviders = providers.filter { p ->
+                val pProf = normalizeArabic(p.profession)
+                val pSpec = normalizeArabic(p.specialization)
+                val cat = normalizeArabic(matchedDiyGuide.targetCategory)
+                pProf.contains(cat) || pSpec.contains(cat)
+            }.take(3)
+            return Pair(sb.toString(), relatedProviders)
+        }
 
         val isSupportContact = qNormalized.contains("رقم") || qNormalized.contains("اتصال") || 
                                 qNormalized.contains("دعم") || qNormalized.contains("تواصل") || 
