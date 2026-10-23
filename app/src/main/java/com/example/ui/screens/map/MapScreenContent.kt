@@ -302,8 +302,16 @@ fun MapScreenContent(
                             .size(8.dp)
                             .background(Color(0xFF10B981), androidx.compose.foundation.shape.CircleShape)
                     )
+                    val modeLabel = when {
+                        state.isRadarMode -> "رادار كشف الخدمات"
+                        state.currentMapMode == MapMode.SATELLITE -> "الأقمار الاصطناعية (عربي)"
+                        state.currentMapMode == MapMode.VELA_3D -> "Vela 3D"
+                        state.currentMapMode == MapMode.HOT -> "شوارع HOT"
+                        state.currentMapMode == MapMode.TOPO -> "تضاريس Topo"
+                        else -> "OpenStreetMap"
+                    }
                     Text(
-                        text = if (state.isRadarMode) "رادار كشف الخدمات · ${radarPoints.size} نقطة مكتشفة" else "OpenStreetMap · ${radarPoints.size} نقطة مكتشفة",
+                        text = "$modeLabel · ${radarPoints.size} متوفر",
                         color = Color.White,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Medium
@@ -412,10 +420,10 @@ fun MapScreenContent(
                     text = {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             val layers = listOf(
+                                Triple(MapMode.SATELLITE, "🛰️ صور الأقمار الصناعية (الافتراضية - عربي)", "صور جوية عالية الدقة للمدن اليمنية والشوارع باللغة العربية"),
                                 Triple(MapMode.OSM, "🌐 OpenStreetMap Standard (الرسمية)", "الخريطة القياسية المفصلة"),
                                 Triple(MapMode.HOT, "🗺️ خريطة الشوارع الحيوية (HOT)", "مثالية للملاحة والشوارع الفرعية"),
-                                Triple(MapMode.TOPO, "⛰️ خريطة العالم والتضاريس (Topo)", "إظهار المعالم والارتفاعات الجغرافية"),
-                                Triple(MapMode.SATELLITE, "🛰️ صور الأقمار الصناعية (Satellite)", "صور جوية عالية الدقة للمدن اليمنية")
+                                Triple(MapMode.TOPO, "⛰️ خريطة العالم والتضاريس (Topo)", "إظهار المعالم والارتفاعات الجغرافية")
                             )
 
                             layers.forEach { (mode, title, desc) ->

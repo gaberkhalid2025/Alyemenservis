@@ -40,54 +40,55 @@
             transform: rotateX(32deg) scale(1.08);
         }
 
-        /* Marker Badge Design */
+        /* Marker Badge Design - مطابق للصورة 3 تماماً */
+        .custom-leaflet-marker {
+            background: transparent !important;
+            border: none !important;
+            overflow: visible !important;
+        }
         .custom-pin-container {
             display: flex;
             flex-direction: column;
             align-items: center;
+            justify-content: center;
             cursor: pointer;
-            transform: translate(-50%, -100%);
-            filter: drop-shadow(0 4px 8px rgba(0,0,0,0.6));
+            filter: drop-shadow(0 4px 8px rgba(0,0,0,0.7));
+            user-select: none;
+            -webkit-user-select: none;
+            width: 145px;
         }
         .custom-pin-head {
-            width: 40px;
-            height: 40px;
+            width: 38px;
+            height: 38px;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 20px;
+            font-size: 19px;
             color: #ffffff;
             border: 2.5px solid #ffffff;
-            box-shadow: 0 4px 14px rgba(0,0,0,0.55);
+            box-shadow: 0 4px 14px rgba(0,0,0,0.6);
             transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
+        .custom-pin-head:hover,
         .custom-pin-head:active {
-            transform: scale(1.22);
-        }
-        .custom-pin-arrow {
-            width: 0;
-            height: 0;
-            border-left: 7px solid transparent;
-            border-right: 7px solid transparent;
-            border-top: 8px solid #ffffff;
-            margin-top: -1px;
-            filter: drop-shadow(0 2px 2px rgba(0,0,0,0.4));
+            transform: scale(1.18);
         }
         .custom-pin-label {
             background: rgba(15, 23, 42, 0.95);
             color: #ffffff;
             font-size: 11px;
             font-weight: 700;
-            padding: 3px 8px;
+            padding: 2.5px 8px;
             border-radius: 12px;
             margin-top: 3px;
             white-space: nowrap;
-            max-width: 135px;
+            max-width: 140px;
             overflow: hidden;
             text-overflow: ellipsis;
-            box-shadow: 0 3px 8px rgba(0,0,0,0.6);
-            border: 1px solid rgba(0, 229, 255, 0.4);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.7);
+            border: 1px solid rgba(0, 229, 255, 0.55);
+            text-align: center;
             pointer-events: none;
         }
 
@@ -222,20 +223,31 @@
                 }),
                 labels: null
             },
-            // 4. صور الأقمار الصناعية (Satellite)
+            // 4. صور الأقمار الصناعية الهجينة باللغة العربية (Satellite Hybrid in Arabic)
             'satellite': {
+                base: L.tileLayer('https://mt{s}.google.com/vt/lyrs=y&hl=ar&x={x}&y={y}&z={z}', {
+                    subdomains: ['0', '1', '2', '3'],
+                    minZoom: 3,
+                    maxZoom: 20,
+                    attribution: '© صور الأقمار الصناعية'
+                }),
+                labels: null
+            },
+            // 5. صور الأقمار الصناعية البديلة (Esri)
+            'esri': {
                 base: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
                     minZoom: 3,
                     maxZoom: 19,
-                    attribution: '© Esri World Imagery'
+                    attribution: '© Esri Satellite'
                 }),
-                labels: L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
+                labels: L.tileLayer('https://mt{s}.google.com/vt/lyrs=h&hl=ar&x={x}&y={y}&z={z}', {
+                    subdomains: ['0', '1', '2', '3'],
                     minZoom: 3,
-                    maxZoom: 19,
+                    maxZoom: 20,
                     attribution: ''
                 })
             },
-            // 5. Vela 3D (خريطة ثلاثية الأبعاد تفاعلية)
+            // 6. Vela 3D (خريطة ثلاثية الأبعاد تفاعلية)
             'vela_3d': {
                 base: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                     subdomains: ['a', 'b', 'c'],
@@ -245,7 +257,7 @@
                 }),
                 labels: null
             },
-            // 6. صور OpenAerialMap الجوية عالية الدقة (OAM)
+            // 7. صور OpenAerialMap الجوية عالية الدقة (OAM)
             'oam': {
                 base: L.tileLayer('https://tiles.openaerialmap.org/{z}/{x}/{y}.png', {
                     minZoom: 3,
@@ -279,9 +291,10 @@
                     currentLabelsLayer = providers['satellite'].labels.addTo(map);
                 }
 
-                // Marker Cluster Group with custom styling
+                // Marker Cluster Group with custom styling and individual pins on city zoom
                 markerClusterGroup = L.markerClusterGroup({
-                    maxClusterRadius: 36,
+                    maxClusterRadius: 20,
+                    disableClusteringAtZoom: 13,
                     spiderfyOnMaxZoom: true,
                     showCoverageOnHover: false,
                     zoomToBoundsOnClick: true
@@ -440,15 +453,14 @@
 
                     var iconHtml = '<div class="custom-pin-container">' +
                         '<div class="custom-pin-head" style="background-color: ' + pinBg + ';">' + emoji + '</div>' +
-                        '<div class="custom-pin-arrow" style="border-top-color: ' + pinBg + ';"></div>' +
                         (displayName ? '<div class="custom-pin-label">' + displayName + '</div>' : '') +
                         '</div>';
 
                     var customIcon = L.divIcon({
-                        className: '',
+                        className: 'custom-leaflet-marker',
                         html: iconHtml,
-                        iconSize: [42, 62],
-                        iconAnchor: [21, 52]
+                        iconSize: [145, 66],
+                        iconAnchor: [72.5, 19]
                     });
 
                     var marker = L.marker([item.lat, item.lng], { icon: customIcon });
@@ -465,6 +477,18 @@
                 console.error("Error setting markers:", e);
             }
         }
+
+        // [دعم Base64 لمنع أي مشاكل تشفير للنصوص العربية والإيموجي]
+        function setMarkersBase64(b64Str) {
+            try {
+                var jsonStr = decodeURIComponent(escape(window.atob(b64Str)));
+                setMarkers(jsonStr);
+            } catch(e) {
+                console.error("Base64 error", e);
+                setMarkers(b64Str);
+            }
+        }
+        window.setMarkersBase64 = setMarkersBase64;
 
         function setCity(cityName, lat, lng, zoomLevel) {
             if (map && lat && lng) {

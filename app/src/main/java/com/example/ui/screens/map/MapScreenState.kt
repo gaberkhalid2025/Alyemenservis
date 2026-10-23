@@ -38,7 +38,7 @@ class MapScreenState(
     selectedCity: String = "الكل",
     searchQuery: String = "",
     maxRangeKm: Float = 25.0f,
-    initialMapMode: MapMode = MapMode.OSM
+    initialMapMode: MapMode = MapMode.SATELLITE
 ) {
     var isRadarMode by mutableStateOf(isRadarMode)
     var isHeatmapActive by mutableStateOf(isHeatmapActive)
@@ -82,9 +82,9 @@ class MapScreenState(
             },
             restore = {
                 val mode = try {
-                    MapMode.valueOf(it.getOrNull(6) as? String ?: "OSM")
+                    MapMode.valueOf(it.getOrNull(6) as? String ?: "SATELLITE")
                 } catch (e: Exception) {
-                    MapMode.OSM
+                    MapMode.SATELLITE
                 }
                 MapScreenState(
                     isRadarMode = it[0] as Boolean,

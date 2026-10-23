@@ -63,10 +63,10 @@ fun RealLeafletMapView(
     var webViewRef by remember { mutableStateOf<WebView?>(null) }
     var hasLoadError by remember { mutableStateOf(false) }
 
-    // [المحور الثالث] حماية الشاشة السوداء: مؤقت 3 ثوانٍ. إذا لم تصل إشارة onMapReady يتم التحويل تلقائياً لـ OfflineInteractiveMap
+    // [المحور الثالث] حماية الشاشة السوداء: مؤقت 6 ثوانٍ. إذا لم تصل إشارة onMapReady يتم التحويل تلقائياً لـ OfflineInteractiveMap
     LaunchedEffect(isMapReady) {
         if (!isMapReady) {
-            kotlinx.coroutines.delay(3000L)
+            kotlinx.coroutines.delay(6000L)
             if (!isMapReady) {
                 hasLoadError = true
                 onMapLoadFailed?.invoke()
@@ -86,10 +86,11 @@ fun RealLeafletMapView(
         )
     }
 
-    // إرسال العلامات للخريطة عند اكتمال الجاهزية أو تغير البيانات
+    // إرسال العلامات للخريطة عند اكتمال الجاهزية أو تغير البيانات بأمان تام عبر Base64
     LaunchedEffect(isMapReady, markersJson) {
-        if (isMapReady && webViewRef != null) {
-            val script = "if (window.setMarkers) { window.setMarkers('$markersJson'); }"
+        if (isMapReady && webViewRef != null && markersJson.isNotBlank()) {
+            val b64 = android.util.Base64.encodeToString(markersJson.toByteArray(Charsets.UTF_8), android.util.Base64.NO_WRAP)
+            val script = "if (window.setMarkersBase64) { window.setMarkersBase64('$b64'); } else if (window.setMarkers) { window.setMarkers('$markersJson'); }"
             webViewRef?.evaluateJavascript(script, null)
         }
     }
