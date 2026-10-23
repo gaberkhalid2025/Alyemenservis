@@ -50,6 +50,7 @@ fun MapBottomSheet(
     onOpenDetails: (Any) -> Unit,
     themeColors: VisualThemePalette,
     onAskAleph: ((Any) -> Unit)? = null,
+    onStartNavigation: ((Any) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -324,6 +325,24 @@ fun MapBottomSheet(
                         fontSize = 11.sp
                     )
                 }
+            }
+
+            // 🧭 زر الملاحة الحقيقية البارز (المحور الثاني: بدء الملاحة المباشرة)
+            Button(
+                onClick = { onStartNavigation?.invoke(entity) },
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF0284C7),
+                    contentColor = Color.White
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(44.dp)
+                    .testTag("start_navigation_btn")
+            ) {
+                Icon(Icons.Default.Navigation, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("🧭 بدء الملاحة إلى هنا", fontSize = 13.sp, fontWeight = FontWeight.Bold)
             }
 
             // Action Buttons

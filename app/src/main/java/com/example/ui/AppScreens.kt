@@ -16,6 +16,7 @@ object AppScreens {
     const val INSTANT_REQUESTS_VIEW = "INSTANT_REQUESTS_VIEW"
     const val ORDERS_VIEW = "ORDERS_VIEW"
     const val MAP_VIEW = "MAP_VIEW"
+    const val MAP_NAVIGATION = "MAP_NAVIGATION"
     const val CATEGORIES_VIEW = "CATEGORIES_VIEW"
     const val STORES_VIEW = "STORES_VIEW"
     const val MEDICAL_VIEW = "MEDICAL_VIEW"

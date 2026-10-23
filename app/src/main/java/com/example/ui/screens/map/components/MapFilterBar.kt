@@ -57,23 +57,24 @@ fun MapFilterBar(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .background(Color(0xFF0F172A))
-            .padding(horizontal = 10.dp, vertical = 6.dp),
+            .background(Color(0xFF0F172A).copy(alpha = 0.95f))
+            .padding(vertical = 6.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        // 1. Search Bar with Quick Action Lightning Button
+        // 1. Search Bar with Glassmorphic modern look
         Surface(
             shape = RoundedCornerShape(16.dp),
-            color = Color(0xFF1E293B),
-            border = BorderStroke(1.dp, Color(0xFF334155)),
+            color = Color(0xFF1E293B).copy(alpha = 0.85f),
+            border = BorderStroke(1.dp, Color(0xFF334155).copy(alpha = 0.8f)),
             modifier = Modifier
                 .fillMaxWidth()
+                .padding(horizontal = 16.dp)
                 .height(52.dp)
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 10.dp),
+                    .padding(horizontal = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
@@ -95,7 +96,6 @@ fun MapFilterBar(
                             color = Color(0xFF94A3B8)
                         )
                     },
-                    // [تعديل] تحديد لون وحجم النص المكتوب صراحة ليظهر باللون الأبيض الناصع
                     textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontSize = 13.sp),
                     colors = TextFieldDefaults.colors(
                         focusedContainerColor = Color.Transparent,
@@ -123,22 +123,22 @@ fun MapFilterBar(
                         )
                     }
                 }
-                // [تعديل] حذف الزر الأحمر (البرق) نهائياً بناءً على طلب المستخدم
             }
         }
 
-        // 2. Category Filter Chips (Row 1)
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        // 2. Category Filter Chips (Row 1) with 16.dp content padding
+        androidx.compose.foundation.lazy.LazyRow(
+            modifier = Modifier.fillMaxWidth(),
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            categories.forEach { (catKey, catLabel, _) ->
+            items(categories.size) { index ->
+                val (catKey, catLabel, _) = categories[index]
                 val isSelected = selectedCategory == catKey
                 Surface(
+                    onClick = { onCategorySelected(catKey) },
                     shape = RoundedCornerShape(20.dp),
-                    color = if (isSelected) Color(0xFF2563EB) else Color(0xFF1E293B),
+                    color = if (isSelected) Color(0xFF2563EB) else Color(0xFF1E293B).copy(alpha = 0.85f),
                     border = BorderStroke(
                         1.dp,
                         if (isSelected) Color(0xFF60A5FA) else Color(0xFF334155)
@@ -153,35 +153,33 @@ fun MapFilterBar(
                             .padding(horizontal = 12.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        androidx.compose.foundation.text.ClickableText(
-                            text = androidx.compose.ui.text.AnnotatedString(catLabel),
-                            style = androidx.compose.ui.text.TextStyle(
-                                color = if (isSelected) Color.White else Color(0xFFCBD5E1),
-                                fontSize = 11.5.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                            ),
-                            onClick = { onCategorySelected(catKey) }
+                        Text(
+                            text = catLabel,
+                            color = if (isSelected) Color.White else Color(0xFFCBD5E1),
+                            fontSize = 11.5.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                         )
                     }
                 }
             }
         }
 
-        // 3. Governorate Selector Chips (Row 2 - كالصورة المرفقة)
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        // 3. Governorate Selector Chips (Row 2) with 16.dp content padding
+        androidx.compose.foundation.lazy.LazyRow(
+            modifier = Modifier.fillMaxWidth(),
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            governorates.forEach { gov ->
+            items(governorates.size) { index ->
+                val gov = governorates[index]
                 val isSelected = (gov == "الكل" && (selectedCity == "الكل" || selectedCity.isBlank())) ||
                         selectedCity == gov
                 val label = if (gov == "الكل") "كل المحافظات 📍" else gov
 
                 Surface(
+                    onClick = { onCitySelected(gov) },
                     shape = RoundedCornerShape(14.dp),
-                    color = if (isSelected) Color(0xFF0F766E) else Color(0xFF1E293B),
+                    color = if (isSelected) Color(0xFF0F766E) else Color(0xFF1E293B).copy(alpha = 0.85f),
                     border = BorderStroke(
                         1.dp,
                         if (isSelected) Color(0xFF14B8A6) else Color(0xFF334155)
@@ -196,14 +194,11 @@ fun MapFilterBar(
                             .padding(horizontal = 10.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        androidx.compose.foundation.text.ClickableText(
-                            text = androidx.compose.ui.text.AnnotatedString(label),
-                            style = androidx.compose.ui.text.TextStyle(
-                                color = if (isSelected) Color.White else Color(0xFF94A3B8),
-                                fontSize = 11.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                            ),
-                            onClick = { onCitySelected(gov) }
+                        Text(
+                            text = label,
+                            color = if (isSelected) Color.White else Color(0xFF94A3B8),
+                            fontSize = 11.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                         )
                     }
                 }

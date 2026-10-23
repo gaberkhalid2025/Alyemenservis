@@ -244,6 +244,15 @@
                     attribution: '© OpenStreetMap 3D'
                 }),
                 labels: null
+            },
+            // 6. صور OpenAerialMap الجوية عالية الدقة (OAM)
+            'oam': {
+                base: L.tileLayer('https://tiles.openaerialmap.org/{z}/{x}/{y}.png', {
+                    minZoom: 3,
+                    maxZoom: 20,
+                    attribution: '© OpenAerialMap'
+                }),
+                labels: null
             }
         };
 
@@ -335,6 +344,13 @@
                 mapEl.classList.remove('vela-3d-tilt');
                 modeIcon.innerText = '⛰️';
                 modeTitle.innerText = 'خريطة التضاريس (Topo)';
+            } else if (key === 'OAM') {
+                currentBaseLayer = providers['oam'].base.addTo(map);
+                currentLabelsLayer = null;
+                currentBaseLayer.bringToBack();
+                mapEl.classList.remove('vela-3d-tilt');
+                modeIcon.innerText = '📷';
+                modeTitle.innerText = 'صور OpenAerialMap الجوية';
             } else {
                 // Default: SATELLITE
                 currentBaseLayer = providers['satellite'].base.addTo(map);

@@ -7,6 +7,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -14,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.Place
+import androidx.compose.material.icons.filled.Radar
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -73,7 +75,9 @@ fun MapScreenContent(
     var mapRetryCount by remember { mutableIntStateOf(0) }
 
     androidx.activity.compose.BackHandler(enabled = true) {
-        if (state.selectedEntity != null) {
+        if (state.isNavigating) {
+            state.isNavigating = false
+        } else if (state.selectedEntity != null) {
             state.resetSelection()
         } else {
             onBackClick()
@@ -122,8 +126,8 @@ fun MapScreenContent(
         }
     }
 
-    // [تحسين مدمج] ربط الكيان المختار من المساعد الذكي أو القوائم مباشرة بالخريطة وفتح بطاقة التفاصيل
-    LaunchedEffect(Unit) {
+    // [المحور الثالث: مزامنة التحديد الفوري من المساعد الذكي أو القوائم إلى الخريطة]
+    LaunchedEffect(viewModel.selectedProvider, viewModel.selectedStore, viewModel.selectedProperty) {
         val targetEntity = viewModel.selectedProvider ?: viewModel.selectedStore ?: viewModel.selectedProperty
         if (targetEntity != null) {
             state.selectedEntity = targetEntity
@@ -165,6 +169,18 @@ fun MapScreenContent(
     LaunchedEffect(state.selectedCity) {
         state.panOffset = Offset.Zero
         state.zoomScale = 1.0f
+    }
+
+    // 🧭 وضع الملاحة الحية المستقلة (المحور الثاني)
+    if (state.isNavigating) {
+        NavigationScreen(
+            targetEntity = state.selectedEntity,
+            userLat = safeUserLat,
+            userLng = safeUserLng,
+            onFinishNavigation = { state.isNavigating = false },
+            modifier = Modifier.fillMaxSize()
+        )
+        return
     }
 
     Scaffold(
@@ -270,11 +286,11 @@ fun MapScreenContent(
             Surface(
                 shape = RoundedCornerShape(20.dp),
                 color = Color(0xFF0F172A).copy(alpha = 0.88f),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF334155)),
+                border = BorderStroke(1.dp, Color(0xFF334155)),
                 modifier = Modifier
                     .align(Alignment.BottomStart)
                     .navigationBarsPadding()
-                    .padding(start = 16.dp, bottom = if (state.selectedEntity != null) 220.dp else 24.dp)
+                    .padding(start = 16.dp, bottom = if (state.selectedEntity != null) 300.dp else 24.dp)
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
@@ -295,15 +311,15 @@ fun MapScreenContent(
                 }
             }
 
-            // [تعديل] الزر الدائري الأحمر العائم في الأسفل يميناً كالصورة المرفقة (تبديل الرادار والخريطة الحية)
+            // [المحور الأول: 4] الزر الدائري الأحمر العائم في الأسفل يميناً (تبديل الرادار والخريطة الحية) مع أيقونة Radar
             Surface(
                 shape = androidx.compose.foundation.shape.CircleShape,
-                color = Color(0xFFDC2626), // Red circle as in screenshot
+                color = Color(0xFFDC2626),
                 shadowElevation = 8.dp,
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .navigationBarsPadding()
-                    .padding(end = 16.dp, bottom = if (state.selectedEntity != null) 220.dp else 24.dp)
+                    .padding(end = 16.dp, bottom = if (state.selectedEntity != null) 300.dp else 24.dp)
                     .size(54.dp)
             ) {
                 IconButton(
@@ -314,7 +330,7 @@ fun MapScreenContent(
                     modifier = Modifier.fillMaxSize().testTag("floating_radar_fab")
                 ) {
                     Icon(
-                        imageVector = if (state.isRadarMode) Icons.Default.Place else Icons.Default.Navigation,
+                        imageVector = if (state.isRadarMode) Icons.Default.Place else Icons.Default.Radar,
                         contentDescription = "رادار الخدمات",
                         tint = Color.White,
                         modifier = Modifier.size(26.dp)
@@ -322,7 +338,7 @@ fun MapScreenContent(
                 }
             }
 
-            // 🎛️ MapControls (GPS, Zoom In, Zoom Out, Layers, Offline) على الجانب الأيسر كالصورة المرفقة تماماً
+            // [المحور الأول: 2] العمود الأيمن (التحكم في الخريطة): موقعي -> تكبير -> تصغير -> الطبقات -> أوفلاين
             MapControls(
                 isRadarMode = state.isRadarMode,
                 onToggleRadarMode = {
@@ -367,9 +383,9 @@ fun MapScreenContent(
                 themeColors = themeColors,
                 currentMapMode = state.currentMapMode,
                 modifier = Modifier
-                    .align(Alignment.CenterStart)
+                    .align(Alignment.CenterEnd)
                     .navigationBarsPadding()
-                    .padding(bottom = if (state.selectedEntity != null) 200.dp else 20.dp)
+                    .padding(end = 12.dp, bottom = if (state.selectedEntity != null) 300.dp else 20.dp)
             )
 
             // 🗺️ Layer Selection Dialog (الخيارات الأربعة كالصورة الثانية)
@@ -499,17 +515,18 @@ fun MapScreenContent(
                 )
             }
 
-            // 🎛️ Special Mode Buttons (Vela 3D, AR, Aleph) على الجانب الأيمن
+            // [المحور الأول: 3] العمود الأيسر (الأوضاع المتقدمة): Vela 3D -> AR VPS -> Aleph -> الملاحة
             if (state.currentMapMode != MapMode.AR_VPS) {
                 Column(
                     modifier = Modifier
-                        .align(Alignment.CenterEnd)
-                        .padding(end = 14.dp)
+                        .align(Alignment.CenterStart)
+                        .padding(start = 12.dp, bottom = if (state.selectedEntity != null) 300.dp else 20.dp)
                         .navigationBarsPadding(),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // 1. Vela 3D (الخرائط ثلاثية الأبعاد) // [تحسين مستقبلي: MapLibre FillExtrusion للمباني ثلاثية الأبعاد]
-                    FloatingActionButton(
+                    // 1. Vela 3D (الخرائط ثلاثية الأبعاد)
+                    val isVelaActive = state.currentMapMode == MapMode.VELA_3D && !state.isRadarMode
+                    Surface(
                         onClick = {
                             state.currentMapMode = MapMode.VELA_3D
                             state.isRadarMode = false
@@ -517,47 +534,75 @@ fun MapScreenContent(
                                 snackbarHostState.showSnackbar("تم تفعيل خريطة Vela 3D ثلاثية الأبعاد 🏙️")
                             }
                         },
-                        containerColor = if (state.currentMapMode == MapMode.VELA_3D && !state.isRadarMode) Color(0xFF00E5FF) else Color(0xFF0F172A).copy(alpha = 0.90f),
-                        contentColor = if (state.currentMapMode == MapMode.VELA_3D && !state.isRadarMode) Color(0xFF0F172A) else Color.White,
-                        shape = RoundedCornerShape(14.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (isVelaActive) Color(0xFF00E5FF) else Color(0xFF0F172A).copy(alpha = 0.90f),
+                        border = BorderStroke(1.2.dp, Color(0xFF00E5FF)),
+                        shadowElevation = 6.dp,
                         modifier = Modifier
-                            .size(46.dp)
-                            .testTag("mode_vela3d_fab")
+                            .size(42.dp)
+                            .testTag("mode_vela3d_btn")
                     ) {
-                        Text("🏙️", fontSize = 18.sp)
+                        Box(contentAlignment = Alignment.Center) {
+                            Text("🏙️", fontSize = 16.sp)
+                        }
                     }
 
                     // 2. VPS AR Mode (كاميرا الواقع المعزز)
-                    FloatingActionButton(
+                    val isArActive = state.currentMapMode == MapMode.AR_VPS
+                    Surface(
                         onClick = {
                             state.currentMapMode = MapMode.AR_VPS
                             coroutineScope.launch {
                                 snackbarHostState.showSnackbar("جاري تشغيل كاميرا الواقع المعزز (VPS) 📷")
                             }
                         },
-                        containerColor = if (state.currentMapMode == MapMode.AR_VPS) Color(0xFF00E5FF) else Color(0xFF0F172A).copy(alpha = 0.90f),
-                        contentColor = if (state.currentMapMode == MapMode.AR_VPS) Color(0xFF0F172A) else Color.White,
-                        shape = RoundedCornerShape(14.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (isArActive) Color(0xFF00E5FF) else Color(0xFF0F172A).copy(alpha = 0.90f),
+                        border = BorderStroke(1.2.dp, Color(0xFF00E5FF)),
+                        shadowElevation = 6.dp,
                         modifier = Modifier
-                            .size(46.dp)
-                            .testTag("mode_ar_vps_fab")
+                            .size(42.dp)
+                            .testTag("mode_ar_vps_btn")
                     ) {
-                        Text("📷", fontSize = 18.sp)
+                        Box(contentAlignment = Alignment.Center) {
+                            Text("📷", fontSize = 16.sp)
+                        }
                     }
 
                     // 3. المساعد البصري الذكي (Aleph)
-                    FloatingActionButton(
+                    Surface(
                         onClick = {
                             state.isAlephAssistantOpen = true
                         },
-                        containerColor = if (state.isAlephAssistantOpen) Color(0xFF10B981) else Color(0xFF0F172A).copy(alpha = 0.90f),
-                        contentColor = Color.White,
-                        shape = RoundedCornerShape(14.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (state.isAlephAssistantOpen) Color(0xFF10B981) else Color(0xFF0F172A).copy(alpha = 0.90f),
+                        border = BorderStroke(1.2.dp, Color(0xFF00E5FF)),
+                        shadowElevation = 6.dp,
                         modifier = Modifier
-                            .size(46.dp)
-                            .testTag("mode_aleph_fab")
+                            .size(42.dp)
+                            .testTag("mode_aleph_btn")
                     ) {
-                        Text("👁️", fontSize = 18.sp)
+                        Box(contentAlignment = Alignment.Center) {
+                            Text("👁️", fontSize = 16.sp)
+                        }
+                    }
+
+                    // 4. الملاحة الحية المباشرة (🧭 Navigation - جديد)
+                    Surface(
+                        onClick = {
+                            state.isNavigating = true
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        color = Color(0xFF0F172A).copy(alpha = 0.90f),
+                        border = BorderStroke(1.2.dp, Color(0xFF00E5FF)),
+                        shadowElevation = 6.dp,
+                        modifier = Modifier
+                            .size(42.dp)
+                            .testTag("mode_navigation_btn")
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text("🧭", fontSize = 16.sp)
+                        }
                     }
                 }
             }
@@ -594,6 +639,9 @@ fun MapScreenContent(
                     },
                     themeColors = themeColors,
                     onAskAleph = { state.isAlephAssistantOpen = true },
+                    onStartNavigation = { target ->
+                        state.isNavigating = true
+                    },
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .navigationBarsPadding()

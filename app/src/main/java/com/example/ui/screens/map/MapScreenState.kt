@@ -53,6 +53,7 @@ class MapScreenState(
     var panOffset by mutableStateOf(androidx.compose.ui.geometry.Offset.Zero)
     var selectedEntity by mutableStateOf<Any?>(null)
     var bookingProviderTarget by mutableStateOf<ProviderEntity?>(null)
+    var isNavigating by mutableStateOf(false)
     val dynamicOffsets = mutableStateMapOf<String, Pair<Double, Double>>()
 
     fun resetSelection() {

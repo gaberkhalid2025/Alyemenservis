@@ -63,6 +63,17 @@ fun RealLeafletMapView(
     var webViewRef by remember { mutableStateOf<WebView?>(null) }
     var hasLoadError by remember { mutableStateOf(false) }
 
+    // [المحور الثالث] حماية الشاشة السوداء: مؤقت 3 ثوانٍ. إذا لم تصل إشارة onMapReady يتم التحويل تلقائياً لـ OfflineInteractiveMap
+    LaunchedEffect(isMapReady) {
+        if (!isMapReady) {
+            kotlinx.coroutines.delay(3000L)
+            if (!isMapReady) {
+                hasLoadError = true
+                onMapLoadFailed?.invoke()
+            }
+        }
+    }
+
     // تحويل البيانات إلى JSON مهيأ للبلاطات والعلامات
     val markersJson = remember(nearbyProviders, nearbyStores, nearbyProperties, selectedCity) {
         MapJsonBuilder.buildMarkersJson(
