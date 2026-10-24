@@ -173,11 +173,13 @@ fun MapScreenContent(
 
     // 🧭 وضع الملاحة الحية المستقلة (المحور الثاني)
     if (state.isNavigating) {
+        val downloadUrl = remember { viewModel.preferenceHelper.getValhallaTilesUrl(context) }
         NavigationScreen(
             targetEntity = state.selectedEntity,
             userLat = safeUserLat,
             userLng = safeUserLng,
             onFinishNavigation = { state.isNavigating = false },
+            downloadUrl = downloadUrl,
             modifier = Modifier.fillMaxSize()
         )
         return
