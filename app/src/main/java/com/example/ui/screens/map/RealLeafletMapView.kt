@@ -63,10 +63,10 @@ fun RealLeafletMapView(
     var webViewRef by remember { mutableStateOf<WebView?>(null) }
     var hasLoadError by remember { mutableStateOf(false) }
 
-    // [المحور الثالث] حماية الشاشة السوداء: مؤقت 15 ثانية. إذا لم تصل إشارة onMapReady يتم التحويل تلقائياً لـ OfflineInteractiveMap
+    // [المحور الثالث] حماية الشاشة السوداء: مؤقت 6 ثوانٍ. إذا لم تصل إشارة onMapReady يتم التحويل تلقائياً لـ OfflineInteractiveMap
     LaunchedEffect(isMapReady) {
         if (!isMapReady) {
-            kotlinx.coroutines.delay(15000L)
+            kotlinx.coroutines.delay(6000L)
             if (!isMapReady) {
                 hasLoadError = true
                 onMapLoadFailed?.invoke()

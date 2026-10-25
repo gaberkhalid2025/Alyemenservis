@@ -89,7 +89,6 @@ data class AdminSettingsEntity(
 
     // Map feature switches
     val isMapFeatureEnabled: Boolean = true,
-    val allowUserMapDownload: Boolean = true,
     val mapProvider: String = "MAPLIBRE", // "MAPLIBRE", "GOOGLE", "MAPBOX"
     val mapDefaultZoom: Float = 14f,
     val mapMaxDistanceKm: Int = 20,
@@ -300,7 +299,8 @@ data class AdminSettingsEntity(
     val appLanguage: String = "ar",
     val hideTopHeaderBar: Boolean = false,
     val customAppName: String = "",
-    val showClientIdentityToProviders: Boolean = true
+    val showClientIdentityToProviders: Boolean = true,
+    val valhallaTilesDownloadUrl: String = "https://github.com/maher202021/Vela2026/releases/download/yemen-valhalla-1/yemen_valhalla_tiles.zip"
 )
 
 @Keep

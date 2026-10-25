@@ -11,8 +11,9 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
+
     <application
-        android:name="com.example.MyApplication"
+        android:name=".MyApplication"
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -22,9 +23,10 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.AlYemenServices"
         android:networkSecurityConfig="@xml/network_security_config">
+        <!-- [FIX-CRITICAL] ربط سياسة أمان الشبكة -->
 
         <activity
-            android:name="com.example.MainActivity"
+            android:name=".MainActivity"
             android:exported="true"
             android:icon="@mipmap/ic_launcher"
             android:roundIcon="@mipmap/ic_launcher_round"
@@ -37,17 +39,19 @@
         </activity>
 
         <service
-            android:name="com.example.FCMService"
+            android:name=".FCMService"
             android:exported="false"
             android:foregroundServiceType="dataSync">
+            <!-- [FIX-MEDIUM] نوع الخدمة الأمامية لـ Android 14+ -->
             <intent-filter>
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>
         </service>
 
+        <!-- [FIX-CRITICAL] FileProvider لمشاركة الملفات -->
         <provider
             android:name="androidx.core.content.FileProvider"
-            android:authorities="com.alyemenservices.fileprovider"
+            android:authorities="${applicationId}.fileprovider"
             android:exported="false"
             android:grantUriPermissions="true">
             <meta-data

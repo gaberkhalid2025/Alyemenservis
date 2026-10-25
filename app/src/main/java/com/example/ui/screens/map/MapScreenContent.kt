@@ -173,29 +173,13 @@ fun MapScreenContent(
 
     // 🧭 وضع الملاحة الحية المستقلة (المحور الثاني)
     if (state.isNavigating) {
-        val downloadUrl = remember { viewModel.preferenceHelper.getValhallaTilesUrl(context) }
+        val settingsState by viewModel.settings.collectAsState()
         NavigationScreen(
             targetEntity = state.selectedEntity,
             userLat = safeUserLat,
             userLng = safeUserLng,
             onFinishNavigation = { state.isNavigating = false },
-            downloadUrl = downloadUrl,
-            modifier = Modifier.fillMaxSize()
-        )
-        return
-    }
-
-    if (state.currentMapMode == MapMode.AR_VPS) {
-        ArVpsCameraOverlay(
-            nearbyProviders = filteredProviders,
-            nearbyStores = filteredStores,
-            nearbyProperties = filteredProperties,
-            userLat = safeUserLat,
-            userLng = safeUserLng,
-            onProviderSelected = { state.selectedEntity = it },
-            onStoreSelected = { state.selectedEntity = it },
-            onPropertySelected = { state.selectedEntity = it },
-            onCloseAr = { state.currentMapMode = MapMode.SATELLITE },
+            downloadUrl = settingsState.valhallaTilesDownloadUrl,
             modifier = Modifier.fillMaxSize()
         )
         return
@@ -222,8 +206,21 @@ fun MapScreenContent(
                 .background(Color(0xFF0F172A))
                 .padding(paddingValues)
         ) {
-            // Main Map / Radar View
-            if (state.isRadarMode) {
+            // Main Map / AR View
+            if (state.currentMapMode == MapMode.AR_VPS) {
+                ArVpsCameraOverlay(
+                    nearbyProviders = filteredProviders,
+                    nearbyStores = filteredStores,
+                    nearbyProperties = filteredProperties,
+                    userLat = safeUserLat,
+                    userLng = safeUserLng,
+                    onProviderSelected = { state.selectedEntity = it },
+                    onStoreSelected = { state.selectedEntity = it },
+                    onPropertySelected = { state.selectedEntity = it },
+                    onCloseAr = { state.currentMapMode = MapMode.SATELLITE },
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else if (state.isRadarMode) {
                 Box(modifier = Modifier.fillMaxSize()) {
                     RadarRenderer(
                         items = radarPoints,

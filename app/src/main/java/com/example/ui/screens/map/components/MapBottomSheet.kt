@@ -107,18 +107,6 @@ fun MapBottomSheet(
             lat = entity.latitude
             lng = entity.longitude
         }
-        is com.example.ui.screens.map.SearchResultPin -> {
-            title = entity.title
-            subtitle = entity.description.ifEmpty { entity.address.ifEmpty { "موقع تم البحث عنه على الخريطة" } }
-            categoryLabel = "📍 موقع جغرافي مكتشف"
-            badgeColor = Color(0xFF00E5FF)
-            rating = 5.0
-            phone = ""
-            imageUrl = ""
-            isAvailable = true
-            lat = entity.latitude
-            lng = entity.longitude
-        }
     }
 
     val distanceMeters = MapDistanceCalculator.calculateDistanceMeters(userLat, userLng, lat, lng)

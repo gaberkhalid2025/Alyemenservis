@@ -94,19 +94,6 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
             }
         }
 
-        // 1.1 Navigation Settings (Sync download URL without modifying AdminSettingsEntity)
-        db.collection("settings").document("navigation_settings").addSnapshotListenerReg { snapshot, _ ->
-            if (snapshot != null && snapshot.exists()) {
-                val url = snapshot.getString("valhallaTilesDownloadUrl")
-                if (!url.isNullOrBlank()) {
-                    val ctx = com.example.MyApplication.instance
-                    if (ctx != null) {
-                        com.example.ui.helpers.AppPreferenceHelper().setValhallaTilesUrl(ctx, url)
-                    }
-                }
-            }
-        }
-
         // 2. Categories (Listener 2)
         db.collection("categories").addSnapshotListenerReg { snapshot, error ->
             if (error != null) {

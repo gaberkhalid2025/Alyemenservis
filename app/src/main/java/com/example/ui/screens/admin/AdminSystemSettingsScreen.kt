@@ -59,8 +59,8 @@ fun AdminSystemSettingsScreenContent(
     var updateDownloadUrl by remember(settingsState.appDownloadUrl) {
         mutableStateOf(if (settingsState.appDownloadUrl.isNotBlank()) settingsState.appDownloadUrl else "https://yemen-services.app/download")
     }
-    var valhallaTilesUrl by remember {
-        mutableStateOf(viewModel.preferenceHelper.getValhallaTilesUrl(context))
+    var valhallaTilesUrl by remember(settingsState.valhallaTilesDownloadUrl) {
+        mutableStateOf(if (settingsState.valhallaTilesDownloadUrl.isNotBlank()) settingsState.valhallaTilesDownloadUrl else com.example.utils.ValhallaTileDownloader.DEFAULT_DOWNLOAD_URL)
     }
 
     var defaultLanguage by remember { mutableStateOf("العربية") }
@@ -260,11 +260,6 @@ fun AdminSystemSettingsScreenContent(
                     st.chatHidden, st.chatSize, st.maxSearchRadiusKm, st.isSpeechSearchEnabled,
                     false, 90
                 )
-                viewModel.preferenceHelper.setValhallaTilesUrl(context, valhallaTilesUrl)
-                viewModel.db.collection("settings").document("navigation_settings").set(
-                    mapOf("valhallaTilesDownloadUrl" to valhallaTilesUrl, "updatedAt" to System.currentTimeMillis()),
-                    com.google.firebase.firestore.SetOptions.merge()
-                )
                 viewModel.db.collection("settings").document("main_settings").set(
                     mapOf(
                         "appVersion" to systemVersion,
@@ -275,6 +270,7 @@ fun AdminSystemSettingsScreenContent(
                         "showLangIcon" to showLanguageToggle,
                         "defaultCurrency" to defaultCurrency,
                         "defaultThemeMode" to defaultThemeMode,
+                        "valhallaTilesDownloadUrl" to valhallaTilesUrl,
                         "updatedAt" to System.currentTimeMillis()
                     ),
                     com.google.firebase.firestore.SetOptions.merge()

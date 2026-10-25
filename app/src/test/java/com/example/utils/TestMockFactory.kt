@@ -165,8 +165,6 @@ class FakeChatRepository : IChatRepository {
     override fun getUserPresence(userId: String): Flow<UserPresence?> = flowOf(null)
     override fun getTypingStatus(channelId: String, userId: String): Flow<Boolean> = flowOf(false)
     override suspend fun syncChannelDelta(channelId: String): AppResult<Int> = AppResult.Success(0)
-    override suspend fun updateMessageMediaUrl(channelId: String, messageId: String, downloadUrl: String, newStatus: MessageStatus): AppResult<Unit> = AppResult.Success(Unit)
-    override suspend fun updateMessageStatus(channelId: String, messageId: String, status: MessageStatus): AppResult<Unit> = AppResult.Success(Unit)
 }
 
 /**
