@@ -59,9 +59,6 @@ fun AdminSystemSettingsScreenContent(
     var updateDownloadUrl by remember(settingsState.appDownloadUrl) {
         mutableStateOf(if (settingsState.appDownloadUrl.isNotBlank()) settingsState.appDownloadUrl else "https://yemen-services.app/download")
     }
-    var valhallaTilesUrl by remember(settingsState.valhallaTilesDownloadUrl) {
-        mutableStateOf(if (settingsState.valhallaTilesDownloadUrl.isNotBlank()) settingsState.valhallaTilesDownloadUrl else com.example.utils.ValhallaTileDownloader.DEFAULT_DOWNLOAD_URL)
-    }
 
     var defaultLanguage by remember { mutableStateOf("العربية") }
     var showLanguageToggle by remember(settingsState.showLangIcon) { mutableStateOf(settingsState.showLangIcon) }
@@ -121,16 +118,6 @@ fun AdminSystemSettingsScreenContent(
                     value = updateDownloadUrl,
                     onValueChange = { updateDownloadUrl = it },
                     label = { Text("رابط تنزيل التحديث المباشر (APK / Store URL)") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(10.dp),
-                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
-                )
-
-                OutlinedTextField(
-                    value = valhallaTilesUrl,
-                    onValueChange = { valhallaTilesUrl = it },
-                    label = { Text("🗺️ رابط حزمة خرائط الملاحة الأوفلاين (Valhalla Tiles ZIP)") },
-                    placeholder = { Text("https://github.com/.../yemen_valhalla_tiles.zip") },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(10.dp),
                     colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
@@ -270,7 +257,6 @@ fun AdminSystemSettingsScreenContent(
                         "showLangIcon" to showLanguageToggle,
                         "defaultCurrency" to defaultCurrency,
                         "defaultThemeMode" to defaultThemeMode,
-                        "valhallaTilesDownloadUrl" to valhallaTilesUrl,
                         "updatedAt" to System.currentTimeMillis()
                     ),
                     com.google.firebase.firestore.SetOptions.merge()

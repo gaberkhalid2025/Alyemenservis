@@ -299,8 +299,7 @@ data class AdminSettingsEntity(
     val appLanguage: String = "ar",
     val hideTopHeaderBar: Boolean = false,
     val customAppName: String = "",
-    val showClientIdentityToProviders: Boolean = true,
-    val valhallaTilesDownloadUrl: String = "https://github.com/maher202021/Vela2026/releases/download/yemen-valhalla-1/yemen_valhalla_tiles.zip"
+    val showClientIdentityToProviders: Boolean = true
 )
 
 @Keep
