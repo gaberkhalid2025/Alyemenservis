@@ -185,6 +185,22 @@ fun MapScreenContent(
         return
     }
 
+    if (state.currentMapMode == MapMode.AR_VPS) {
+        ArVpsCameraOverlay(
+            nearbyProviders = filteredProviders,
+            nearbyStores = filteredStores,
+            nearbyProperties = filteredProperties,
+            userLat = safeUserLat,
+            userLng = safeUserLng,
+            onProviderSelected = { state.selectedEntity = it },
+            onStoreSelected = { state.selectedEntity = it },
+            onPropertySelected = { state.selectedEntity = it },
+            onCloseAr = { state.currentMapMode = MapMode.SATELLITE },
+            modifier = Modifier.fillMaxSize()
+        )
+        return
+    }
+
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         containerColor = Color(0xFF0F172A),
@@ -206,21 +222,8 @@ fun MapScreenContent(
                 .background(Color(0xFF0F172A))
                 .padding(paddingValues)
         ) {
-            // Main Map / AR View
-            if (state.currentMapMode == MapMode.AR_VPS) {
-                ArVpsCameraOverlay(
-                    nearbyProviders = filteredProviders,
-                    nearbyStores = filteredStores,
-                    nearbyProperties = filteredProperties,
-                    userLat = safeUserLat,
-                    userLng = safeUserLng,
-                    onProviderSelected = { state.selectedEntity = it },
-                    onStoreSelected = { state.selectedEntity = it },
-                    onPropertySelected = { state.selectedEntity = it },
-                    onCloseAr = { state.currentMapMode = MapMode.SATELLITE },
-                    modifier = Modifier.fillMaxSize()
-                )
-            } else if (state.isRadarMode) {
+            // Main Map / Radar View
+            if (state.isRadarMode) {
                 Box(modifier = Modifier.fillMaxSize()) {
                     RadarRenderer(
                         items = radarPoints,

@@ -89,6 +89,7 @@ data class AdminSettingsEntity(
 
     // Map feature switches
     val isMapFeatureEnabled: Boolean = true,
+    val allowUserMapDownload: Boolean = true,
     val mapProvider: String = "MAPLIBRE", // "MAPLIBRE", "GOOGLE", "MAPBOX"
     val mapDefaultZoom: Float = 14f,
     val mapMaxDistanceKm: Int = 20,
