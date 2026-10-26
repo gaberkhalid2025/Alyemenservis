@@ -44,6 +44,8 @@ fun MapControls(
     onZoomOut: () -> Unit,
     onRecenterLocation: () -> Unit,
     onOpenLayerDialog: () -> Unit,
+    isNavigationActive: Boolean,
+    onToggleNavigation: () -> Unit,
     isGpsActive: Boolean,
     themeColors: VisualThemePalette,
     modifier: Modifier = Modifier,
@@ -80,6 +82,26 @@ fun MapControls(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
+            // 0. Navigation Toggle (Top-most)
+            IconButton(
+                onClick = onToggleNavigation,
+                modifier = Modifier
+                    .size(40.dp)
+                    .testTag("map_nav_toggle_btn")
+            ) {
+                Icon(
+                    imageVector = if (isNavigationActive) Icons.Default.Navigation else Icons.Default.Map,
+                    contentDescription = "بدء الملاحة",
+                    tint = if (isNavigationActive) Color(0xFF38BDF8) else Color.White,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            HorizontalDivider(
+                modifier = Modifier.width(26.dp),
+                color = Color.White.copy(alpha = 0.08f)
+            )
+
             // 1. GPS Button (Glows green #10B981 when active)
             IconButton(
                 onClick = onRecenterLocation,

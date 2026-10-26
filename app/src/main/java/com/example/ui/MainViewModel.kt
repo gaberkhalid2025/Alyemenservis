@@ -99,6 +99,12 @@ class MainViewModel @Inject constructor(
     val showBackdoorDialog get() = authViewModel.showBackdoorDialog
     val _categories get() = homeViewModel._categories
     val categories get() = homeViewModel.categories
+    fun updateAdminSettings(settings: AdminSettingsEntity) = settingsViewModel.updateAdminSettings(settings)
+    fun saveCustomProfileTab(tab: CustomProfileTabEntity) = adminViewModel.saveCustomProfileTab(tab)
+    fun deleteCustomProfileTab(tabId: String) = adminViewModel.deleteCustomProfileTab(tabId)
+    fun toggleCustomProfileTab(tabId: String) = adminViewModel.toggleCustomProfileTab(tabId)
+    fun addNewCategory(nameAr: String, nameEn: String, icon: String, description: String, parentId: String = "", isMainCategory: Boolean = true) = 
+        adminViewModel.addNewCategory(nameAr, nameEn, icon, description, parentId, isMainCategory)
     val _providers get() = homeViewModel._providers
     val providers get() = homeViewModel.providers
     val _filteredProviders get() = homeViewModel._filteredProviders

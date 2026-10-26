@@ -437,6 +437,16 @@ fun MapScreenContent(
                     }
                 },
                 onOpenLayerDialog = { state.showLayerDialog = true },
+                isNavigationActive = state.isNavigating,
+                onToggleNavigation = {
+                    if (state.selectedEntity != null) {
+                        state.isNavigating = true
+                    } else {
+                        coroutineScope.launch {
+                            snackbarHostState.showSnackbar("📍 اختر وجهة أولاً لبدء الملاحة")
+                        }
+                    }
+                },
                 isGpsActive = viewModel.isGpsTrackingActive.collectAsState().value,
                 themeColors = themeColors,
                 currentMapMode = state.currentMapMode,
