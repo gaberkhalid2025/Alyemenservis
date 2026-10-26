@@ -141,4 +141,14 @@ class AppPreferenceHelper {
     fun normalizePhoneNumber(phone: String): String {
         return Companion.normalizePhoneNumber(phone)
     }
+
+    // --- Offline Navigation Valhalla Tiles URL ---
+    fun getValhallaTilesUrl(context: Context): String {
+        val url = getAppPrefs(context).getString("valhalla_tiles_url", null)
+        return if (!url.isNullOrBlank()) url else com.example.utils.ValhallaTileDownloader.DEFAULT_DOWNLOAD_URL
+    }
+
+    fun setValhallaTilesUrl(context: Context, url: String) {
+        getAppPrefs(context).edit().putString("valhalla_tiles_url", url).apply()
+    }
 }

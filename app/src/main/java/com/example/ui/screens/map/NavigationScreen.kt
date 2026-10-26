@@ -1,5 +1,6 @@
 package com.example.ui.screens.map
 
+import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -16,6 +17,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -26,15 +29,18 @@ import com.example.data.ProviderEntity
 import com.example.data.StoreEntity
 import com.example.ui.screens.map.components.OfflineInteractiveMap
 import com.example.ui.screens.map.utils.MapDistanceCalculator
+import com.example.utils.MockValhallaNavigator
+import com.example.utils.ValhallaTileDownloader
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /**
  * 🧭 NavigationScreen
- * شاشة الملاحة الحقيقية التفاعلية (المحور الثاني):
- * - واجهة ملاحة كاملة تعمل محلياً ومستقلة 100% بدون أي مفاتيح API مدفوعة
- * - لوحة علوية ذكية لإرشادات المسار التفصيلية (اسحب يساراً، ثم يميناً)
- * - خريطة توجيه تفاعلية وتتبع مباشر لنظام تحديد المواقع (GPS)
- * - شريط سفلي لعرض المسافة المتبقية، والوقت المتوقع، وزر إنهاء الملاحة
+ * شاشة الملاحة اليمنية التفاعلية الذكية:
+ * - تدعم التبديل الذكي التلقائي بين "محاكي الملاحة السريعة" و"حزمة الملاحة الأوفلاين الدقيقة"
+ * - حساب دقيق لمسافات الطرق بين المدن اليمنية (صنعاء، عدن، تعز، الحديدة، إب، ذمار، مأرب، حضرموت...)
+ * - خيار تحميل حزمة الـ 25 ميجابايت داخل التطبيق مع شريط تقدم مباشر
+ * - توجيهات الشوارع خطوة بخطوة باللغة العربية
  */
 @Composable
 fun NavigationScreen(
@@ -42,9 +48,13 @@ fun NavigationScreen(
     userLat: Double,
     userLng: Double,
     onFinishNavigation: () -> Unit,
+    downloadUrl: String = ValhallaTileDownloader.DEFAULT_DOWNLOAD_URL,
     modifier: Modifier = Modifier
 ) {
-    // استخراج بيانات الوجهة
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+
+    // استخراج بيانات الوجهة بدقة
     val targetName = when (targetEntity) {
         is ProviderEntity -> targetEntity.name
         is StoreEntity -> targetEntity.name
@@ -66,38 +76,66 @@ fun NavigationScreen(
         else -> 44.1910
     }
 
-    val totalDistanceMeters = remember(userLat, userLng, targetLat, targetLng) {
-        MapDistanceCalculator.calculateDistanceMeters(userLat, userLng, targetLat, targetLng)
+    // 1. التحقق من وجود حزمة الملاحة الدقيقة (المرحلة الثالثة: التبديل التلقائي)
+    var isTilesDownloaded by remember {
+        mutableStateOf(ValhallaTileDownloader.isTilesDownloaded(context))
     }
 
-    var remainingMeters by remember { mutableDoubleStateOf(totalDistanceMeters) }
-    var currentSpeedKmh by remember { mutableIntStateOf(42) }
-    var currentStepIndex by remember { mutableIntStateOf(0) }
-
-    val instructions = remember {
-        listOf(
-            Triple("اتجه شمالاً نحو الشارع الرئيسي", "250 م", Icons.Default.Straight),
-            Triple("انعطف يساراً عند التقاطع القادم", "400 م", Icons.Default.TurnLeft),
-            Triple("تابع السير للأمام مباشرة", "850 م", Icons.Default.Straight),
-            Triple("انعطف يميناً نحو وجهتك", "150 م", Icons.Default.TurnRight),
-            Triple("لقد وصلت إلى وجهتك المقصودة", "0 م", Icons.Default.CheckCircle)
+    // 2. حساب المسار عبر المحاكي المتقدم أو المحرك الدقيق (المرحلة الأولى)
+    val routeResult = remember(userLat, userLng, targetLat, targetLng, targetName, isTilesDownloaded) {
+        MockValhallaNavigator.calculateRoute(
+            context = context,
+            startLat = userLat,
+            startLng = userLng,
+            destLat = targetLat,
+            destLng = targetLng,
+            destName = targetName
         )
     }
 
+    val totalDistanceMeters = routeResult.totalDistanceMeters.coerceAtLeast(350.0)
+    var remainingMeters by remember(routeResult) { mutableDoubleStateOf(totalDistanceMeters) }
+    var currentSpeedKmh by remember { mutableIntStateOf(55) }
+    var currentStepIndex by remember(routeResult) { mutableIntStateOf(0) }
+
+    val steps = routeResult.steps.ifEmpty {
+        listOf(
+            MockValhallaNavigator.NavigationStep("اتجه مباشرة نحو الوجهة", "300 م", 300.0, "STRAIGHT"),
+            MockValhallaNavigator.NavigationStep("لقد وصلت إلى $targetName", "0 م", 0.0, "DESTINATION")
+        )
+    }
+
+    // حالة نافذة تحميل الحزمة (المرحلة الثانية)
+    var showDownloadDialog by remember { mutableStateOf(false) }
+    var isDownloading by remember { mutableStateOf(false) }
+    var downloadProgress by remember { mutableFloatStateOf(0f) }
+    var downloadStatusText by remember { mutableStateOf("") }
+
     // محاكاة التقدم في الملاحة اللحظية
-    LaunchedEffect(Unit) {
-        while (remainingMeters > 50) {
+    LaunchedEffect(routeResult) {
+        while (remainingMeters > 40) {
             delay(1500L)
-            remainingMeters = (remainingMeters - 120).coerceAtLeast(30.0)
-            if (currentStepIndex < instructions.size - 1 && remainingMeters < totalDistanceMeters * (1.0 - (currentStepIndex + 1) * 0.22)) {
+            remainingMeters = (remainingMeters - 180).coerceAtLeast(20.0)
+            val progressFraction = 1.0 - (remainingMeters / totalDistanceMeters)
+            val stepThreshold = (currentStepIndex + 1).toDouble() / steps.size.toDouble()
+            if (progressFraction >= stepThreshold && currentStepIndex < steps.size - 1) {
                 currentStepIndex++
             }
         }
     }
 
-    val progress = (1.0 - (remainingMeters / totalDistanceMeters.coerceAtLeast(100.0))).toFloat().coerceIn(0.05f, 1.0f)
+    val progress = (1.0 - (remainingMeters / totalDistanceMeters)).toFloat().coerceIn(0.05f, 1.0f)
     val remainingDistanceText = MapDistanceCalculator.formatDistance(remainingMeters)
     val remainingEtaText = MapDistanceCalculator.computeEta(remainingMeters)
+
+    val currentStep = steps.getOrNull(currentStepIndex) ?: steps.last()
+    val stepIcon = when (currentStep.iconType) {
+        "LEFT" -> Icons.Default.TurnLeft
+        "RIGHT" -> Icons.Default.TurnRight
+        "HIGHWAY" -> Icons.Default.DirectionsCar
+        "DESTINATION" -> Icons.Default.CheckCircle
+        else -> Icons.Default.Straight
+    }
 
     Box(
         modifier = modifier
@@ -133,11 +171,60 @@ fun NavigationScreen(
                 .align(Alignment.TopCenter)
                 .fillMaxWidth()
                 .statusBarsPadding()
-                .padding(horizontal = 16.dp, vertical = 8.dp)
+                .padding(horizontal = 14.dp, vertical = 6.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            // شارة حالة وضع الملاحة وزر التنزيل
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = Color(0xFF0F172A).copy(alpha = 0.95f),
+                border = BorderStroke(1.dp, if (isTilesDownloaded) Color(0xFF10B981) else Color(0xFFF59E0B)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Surface(
+                            shape = CircleShape,
+                            color = if (isTilesDownloaded) Color(0xFF10B981) else Color(0xFFF59E0B),
+                            modifier = Modifier.size(8.dp)
+                        ) {}
+                        Text(
+                            text = if (isTilesDownloaded) "🌟 ملاحة أوفلاين دقيقة (Valhalla 🇾🇪)" else "⚡ محاكي الملاحة السريع (${routeResult.routeTitle})",
+                            color = Color.White,
+                            fontSize = 11.5.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    if (!isTilesDownloaded) {
+                        Button(
+                            onClick = { showDownloadDialog = true },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0284C7)),
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                            modifier = Modifier.height(30.dp)
+                        ) {
+                            Icon(Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.White)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("تحميل الخرائط (25MB)", fontSize = 10.5.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+
+            // بطاقة التوجيه الرئيسي خطوة بخطوة
             Surface(
                 shape = RoundedCornerShape(20.dp),
-                color = Color(0xFF0F172A).copy(alpha = 0.94f),
+                color = Color(0xFF0F172A).copy(alpha = 0.95f),
                 border = BorderStroke(1.5.dp, Color(0xFF00E5FF)),
                 shadowElevation = 12.dp,
                 modifier = Modifier.fillMaxWidth()
@@ -145,7 +232,7 @@ fun NavigationScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp),
+                        .padding(14.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
@@ -157,7 +244,7 @@ fun NavigationScreen(
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
-                                imageVector = instructions[currentStepIndex].third,
+                                imageVector = stepIcon,
                                 contentDescription = "توجيه المسار",
                                 tint = Color.White,
                                 modifier = Modifier.size(30.dp)
@@ -171,7 +258,7 @@ fun NavigationScreen(
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             Text(
-                                text = "بعد ${instructions[currentStepIndex].second}",
+                                text = "بعد ${currentStep.distanceText}",
                                 color = Color(0xFF00E5FF),
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold
@@ -184,23 +271,25 @@ fun NavigationScreen(
                         }
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = instructions[currentStepIndex].first,
+                            text = currentStep.instruction,
                             color = Color.White,
-                            fontSize = 15.sp,
+                            fontSize = 14.5.sp,
                             fontWeight = FontWeight.Bold
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = "نحو: $targetName",
+                            text = "نحو: $targetName (إجمالي: ${routeResult.formattedDistance})",
                             color = Color(0xFFCBD5E1),
-                            fontSize = 12.sp
+                            fontSize = 11.5.sp
                         )
                     }
 
-                    // زر الخروج / الرجوع
+                    // زر إنهاء / خروج
                     IconButton(
                         onClick = onFinishNavigation,
-                        modifier = Modifier.size(36.dp).testTag("exit_navigation_btn")
+                        modifier = Modifier
+                            .size(36.dp)
+                            .testTag("exit_navigation_btn")
                     ) {
                         Icon(
                             imageVector = Icons.Default.Close,
@@ -223,7 +312,7 @@ fun NavigationScreen(
         ) {
             Surface(
                 shape = RoundedCornerShape(20.dp),
-                color = Color(0xFF0F172A).copy(alpha = 0.94f),
+                color = Color(0xFF0F172A).copy(alpha = 0.95f),
                 border = BorderStroke(1.dp, Color(0xFF334155)),
                 shadowElevation = 14.dp,
                 modifier = Modifier.fillMaxWidth()
@@ -244,7 +333,7 @@ fun NavigationScreen(
                             Text(
                                 text = remainingEtaText,
                                 color = Color(0xFF10B981),
-                                fontSize = 22.sp,
+                                fontSize = 21.sp,
                                 fontWeight = FontWeight.ExtraBold
                             )
                             Text(
@@ -299,6 +388,107 @@ fun NavigationScreen(
                     }
                 }
             }
+        }
+
+        // 3. نافذة تحميل الملاحة الكاملة (المرحلة الثانية)
+        if (showDownloadDialog) {
+            AlertDialog(
+                onDismissRequest = {
+                    if (!isDownloading) showDownloadDialog = false
+                },
+                icon = {
+                    Icon(
+                        imageVector = Icons.Default.CloudDownload,
+                        contentDescription = null,
+                        tint = Color(0xFF00E5FF),
+                        modifier = Modifier.size(36.dp)
+                    )
+                },
+                title = {
+                    Text(
+                        text = "تحميل حزمة الملاحة الكاملة (أوفلاين)",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        textAlign = TextAlign.Center
+                    )
+                },
+                text = {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Text(
+                            text = "لتفعيل الملاحة الدقيقة خطوة بخطوة داخل الشوارع والأزقة اليمنية بدون إنترنت، يحتاج التطبيق إلى تحميل ملف الخرائط (25 ميجابايت). يُنصح باستخدام اتصال Wi-Fi.",
+                            fontSize = 13.sp,
+                            color = Color(0xFFCBD5E1),
+                            lineHeight = 20.sp
+                        )
+
+                        if (isDownloading) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            LinearProgressIndicator(
+                                progress = { downloadProgress },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(8.dp)
+                                    .clip(RoundedCornerShape(4.dp)),
+                                color = Color(0xFF10B981),
+                                trackColor = Color(0xFF334155)
+                            )
+                            Text(
+                                text = downloadStatusText,
+                                fontSize = 11.5.sp,
+                                color = Color(0xFF10B981),
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+                },
+                confirmButton = {
+                    if (!isDownloading) {
+                        Button(
+                            onClick = {
+                                isDownloading = true
+                                coroutineScope.launch {
+                                    val result = ValhallaTileDownloader.downloadAndExtractTiles(
+                                        context = context,
+                                        downloadUrl = downloadUrl,
+                                        onProgress = { p, status ->
+                                            downloadProgress = p
+                                            downloadStatusText = status
+                                        }
+                                    )
+                                    isDownloading = false
+                                    if (result.isSuccess) {
+                                        isTilesDownloaded = true
+                                        showDownloadDialog = false
+                                        Toast.makeText(context, "✅ تم تثبيت حزمة الملاحة الأوفلاين بنجاح! 🇾🇪", Toast.LENGTH_LONG).show()
+                                    } else {
+                                        val err = result.exceptionOrNull()?.localizedMessage ?: "خطأ في الاتصال"
+                                        Toast.makeText(context, "❌ فشل التحميل: $err", Toast.LENGTH_LONG).show()
+                                    }
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0284C7)),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text("تحميل الآن (25 MB)", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                },
+                dismissButton = {
+                    if (!isDownloading) {
+                        TextButton(
+                            onClick = { showDownloadDialog = false }
+                        ) {
+                            Text("لاحقاً", color = Color(0xFF94A3B8))
+                        }
+                    }
+                },
+                containerColor = Color(0xFF0F172A),
+                shape = RoundedCornerShape(18.dp)
+            )
         }
     }
 }

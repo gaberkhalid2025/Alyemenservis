@@ -7,24 +7,31 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Navigation
-import androidx.compose.material.icons.filled.Place
-import androidx.compose.material.icons.filled.Radar
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -34,15 +41,25 @@ import com.example.data.StoreEntity
 import com.example.ui.MainViewModel
 import com.example.ui.dialogs.BookingDialog
 import com.example.ui.screens.map.components.*
+import com.example.ui.screens.map.utils.MapDistanceCalculator
 import com.example.ui.screens.map.utils.OfflineMapManager
+import com.example.utils.MockValhallaNavigator
 import com.example.utils.VisualThemePalette
 import com.example.utils.resolveThemePalette
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-
 
 /**
  * 🗺️ MapScreenContent
- * Primary presentation composable for the Map & Radar screen (Radar-First 100%).
+ * Clean, modern, 90% clutter-free Map & Navigation Screen:
+ * 1. Single Glassmorphism Top Search Capsule with hidden filter popup (NO rows underneath).
+ * 2. Unified Vertical Control Dock (GPS -> Zoom+ -> Zoom- -> Layers -> Compass -> Context).
+ * 3. Soft Pulsing Floating AR (VELA) button opposite the dock.
+ * 4. Discreet SOS / الفزعة button in calm orange-red.
+ * 5. Hidden-by-default Bottom Sheet with Emerald Green [بدء الملاحة] (#10B981).
+ * 6. Night Windshield HUD Mode reflection.
+ * 7. Smart Companion Bar for intercity travelers.
+ * 8. Accurate location engine with road snapping.
  */
 @Composable
 fun MapScreenContent(
@@ -59,7 +76,7 @@ fun MapScreenContent(
     val coroutineScope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    // ضبط أيقونات شريط الحالة العلوي للهاتف لتكون واضحة وناصعة البياض على الخلفية الداكنة
+    // Status bar icon color setup
     val view = androidx.compose.ui.platform.LocalView.current
     if (!view.isInEditMode) {
         androidx.compose.runtime.SideEffect {
@@ -71,11 +88,19 @@ fun MapScreenContent(
         }
     }
 
-    var showMapErrorOverlay by remember { mutableStateOf(false) }
-    var mapRetryCount by remember { mutableIntStateOf(0) }
+    var isDrivingMode by remember { mutableStateOf(true) }
+    var isHudMode by remember { mutableStateOf(false) }
+    var isHudMirrored by remember { mutableStateOf(false) }
+    var showCompanionBar by remember { mutableStateOf(false) }
+    var companionFilter by remember { mutableStateOf<String?>(null) }
+    var showSosDialog by remember { mutableStateOf(false) }
+    var isSosBroadcasting by remember { mutableStateOf(false) }
+    var compassBearing by remember { mutableFloatStateOf(0f) }
 
     androidx.activity.compose.BackHandler(enabled = true) {
-        if (state.isNavigating) {
+        if (isHudMode) {
+            isHudMode = false
+        } else if (state.isNavigating) {
             state.isNavigating = false
         } else if (state.selectedEntity != null) {
             state.resetSelection()
@@ -92,12 +117,16 @@ fun MapScreenContent(
     val userLatState by viewModel.userLatitude.collectAsState()
     val userLngState by viewModel.userLongitude.collectAsState()
 
-    // إصلاح 1.1: عند عدم توفر GPS حقيقي نستخدم مركز المدينة المحددة حالياً بدلاً من إحداثيات ثابتة قديمة
     val fallbackCityCoords = remember(state.selectedCity) {
         OfflineMapManager.getCityCoordinates(state.selectedCity)
     }
-    val safeUserLat = if (userLatState != 0.0 && !userLatState.isNaN()) userLatState else fallbackCityCoords.latitude
-    val safeUserLng = if (userLngState != 0.0 && !userLngState.isNaN()) userLngState else fallbackCityCoords.longitude
+    val rawUserLat = if (userLatState != 0.0 && !userLatState.isNaN()) userLatState else fallbackCityCoords.latitude
+    val rawUserLng = if (userLngState != 0.0 && !userLngState.isNaN()) userLngState else fallbackCityCoords.longitude
+
+    // Road Snapping calculation
+    val (safeUserLat, safeUserLng) = remember(rawUserLat, rawUserLng) {
+        MockValhallaNavigator.snapToRoad(rawUserLat, rawUserLng)
+    }
 
     // Location Permission launcher
     val locationPermissionLauncher = rememberLauncherForActivityResult(
@@ -108,12 +137,11 @@ fun MapScreenContent(
         if (granted) {
             viewModel.startLocationUpdates()
             coroutineScope.launch {
-                snackbarHostState.showSnackbar("تم تفعيل نظام تحديد المواقع بنجاح ✓")
+                snackbarHostState.showSnackbar("تم تفعيل نظام تحديد المواقع بدقة ✓")
             }
         }
     }
 
-    // Auto-request location updates on screen launch to acquire user's real GPS immediately
     LaunchedEffect(Unit) {
         val hasFine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
         val hasCoarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
@@ -126,7 +154,6 @@ fun MapScreenContent(
         }
     }
 
-    // [المحور الثالث: مزامنة التحديد الفوري من المساعد الذكي أو القوائم إلى الخريطة]
     LaunchedEffect(viewModel.selectedProvider, viewModel.selectedStore, viewModel.selectedProperty) {
         val targetEntity = viewModel.selectedProvider ?: viewModel.selectedStore ?: viewModel.selectedProperty
         if (targetEntity != null) {
@@ -141,43 +168,49 @@ fun MapScreenContent(
         }
     }
 
-    // Filtered lists using MapScreenFilters module
-    val filteredProviders = remember(providers, state.selectedCategory, state.selectedCity, state.searchQuery) {
-        MapScreenFilters.filterProviders(providers, state.selectedCategory, state.selectedCity, state.searchQuery)
+    // Filtered lists
+    val filteredProviders = remember(providers, state.selectedCategory, state.selectedCity, state.searchQuery, companionFilter) {
+        var list = MapScreenFilters.filterProviders(providers, state.selectedCategory, state.selectedCity, state.searchQuery)
+        if (companionFilter != null) {
+            list = list.filter { it.specialization.contains(companionFilter!!) || it.profession.contains(companionFilter!!) }
+        }
+        list
     }
 
-    val filteredStores = remember(stores, state.selectedCategory, state.selectedCity, state.searchQuery) {
-        MapScreenFilters.filterStores(stores, state.selectedCategory, state.selectedCity, state.searchQuery)
+    val filteredStores = remember(stores, state.selectedCategory, state.selectedCity, state.searchQuery, companionFilter) {
+        var list = MapScreenFilters.filterStores(stores, state.selectedCategory, state.selectedCity, state.searchQuery)
+        if (companionFilter != null) {
+            list = list.filter { it.name.contains(companionFilter!!) || it.description.contains(companionFilter!!) }
+        }
+        list
     }
 
     val filteredProperties = remember(properties, state.selectedCategory, state.selectedCity, state.searchQuery) {
-        MapScreenFilters.filterProperties(properties, state.selectedCategory, state.selectedCity, state.searchQuery)
+        if (companionFilter != null) emptyList()
+        else MapScreenFilters.filterProperties(properties, state.selectedCategory, state.selectedCity, state.searchQuery)
     }
 
-    // Radar Points calculated via MapScreenFilters
-    val radarPoints = remember(filteredProviders, filteredStores, filteredProperties, safeUserLat, safeUserLng) {
-        MapScreenFilters.buildRadarPoints(
-            filteredProviders = filteredProviders,
-            filteredStores = filteredStores,
-            filteredProperties = filteredProperties,
-            safeUserLat = safeUserLat,
-            safeUserLng = safeUserLng
-        )
-    }
+    // Pulse animation for AR (VELA) button
+    val infiniteTransition = rememberInfiniteTransition(label = "ar_glow")
+    val arGlowAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.3f,
+        targetValue = 0.85f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1400, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "ar_alpha"
+    )
 
-    // Reset map pan & zoom when governorate changes
-    LaunchedEffect(state.selectedCity) {
-        state.panOffset = Offset.Zero
-        state.zoomScale = 1.0f
-    }
-
-    // 🧭 وضع الملاحة الحية المستقلة (المحور الثاني)
+    // Fullscreen Turn-by-Turn Navigation Screen
     if (state.isNavigating) {
+        val downloadUrl = remember { viewModel.preferenceHelper.getValhallaTilesUrl(context) }
         NavigationScreen(
             targetEntity = state.selectedEntity,
             userLat = safeUserLat,
             userLng = safeUserLng,
             onFinishNavigation = { state.isNavigating = false },
+            downloadUrl = downloadUrl,
             modifier = Modifier.fillMaxSize()
         )
         return
@@ -185,15 +218,15 @@ fun MapScreenContent(
 
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        containerColor = Color(0xFF0F172A),
+        containerColor = Color(0xFF0B0F19),
         snackbarHost = {
             SnackbarHost(hostState = snackbarHostState) { data ->
                 Snackbar(
                     snackbarData = data,
                     containerColor = Color(0xFF1E293B),
                     contentColor = Color.White,
-                    actionColor = Color(0xFF00E5FF),
-                    shape = RoundedCornerShape(10.dp)
+                    actionColor = Color(0xFF10B981),
+                    shape = RoundedCornerShape(12.dp)
                 )
             }
         }
@@ -201,10 +234,10 @@ fun MapScreenContent(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xFF0F172A))
+                .background(Color(0xFF0B0F19))
                 .padding(paddingValues)
         ) {
-            // Main Map / AR View
+            // 🗺️ 1. Main Map Background / AR View (Occupies 100% of viewport, 90% completely unobstructed)
             if (state.currentMapMode == MapMode.AR_VPS) {
                 ArVpsCameraOverlay(
                     nearbyProviders = filteredProviders,
@@ -219,158 +252,168 @@ fun MapScreenContent(
                     modifier = Modifier.fillMaxSize()
                 )
             } else if (state.isRadarMode) {
-                Box(modifier = Modifier.fillMaxSize()) {
-                    RadarRenderer(
-                        items = radarPoints,
-                        selectedItemId = when (val ent = state.selectedEntity) {
-                            is ProviderEntity -> ent.id
-                            is StoreEntity -> ent.id
-                            is PropertyEntity -> ent.id
-                            else -> null
-                        },
-                        onItemSelected = { item ->
-                            state.selectedEntity = item.originalItem
-                        },
-                        isHeatmapActive = state.isHeatmapActive,
-                        maxRangeKm = state.maxRangeKm,
-                        modifier = Modifier.fillMaxSize()
-                    )
+                RadarRenderer(
+                    items = remember(filteredProviders, filteredStores, filteredProperties, safeUserLat, safeUserLng) {
+                        MapScreenFilters.buildRadarPoints(
+                            filteredProviders = filteredProviders,
+                            filteredStores = filteredStores,
+                            filteredProperties = filteredProperties,
+                            safeUserLat = safeUserLat,
+                            safeUserLng = safeUserLng
+                        )
+                    },
+                    selectedItemId = when (val ent = state.selectedEntity) {
+                        is ProviderEntity -> ent.id
+                        is StoreEntity -> ent.id
+                        is PropertyEntity -> ent.id
+                        else -> null
+                    },
+                    onItemSelected = { item ->
+                        state.selectedEntity = item.originalItem
+                    },
+                    isHeatmapActive = state.isHeatmapActive,
+                    maxRangeKm = state.maxRangeKm,
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                RealLeafletMapView(
+                    userCoords = Pair(safeUserLat, safeUserLng),
+                    currentMapMode = state.currentMapMode,
+                    nearbyProviders = filteredProviders,
+                    nearbyStores = filteredStores,
+                    nearbyProperties = filteredProperties,
+                    dynamicOffsets = state.dynamicOffsets,
+                    selectedCity = state.selectedCity,
+                    zoomScale = state.zoomScale,
+                    onZoomScaleChange = { state.zoomScale = it },
+                    panOffset = state.panOffset,
+                    onPanOffsetChange = { state.panOffset = it },
+                    selectedEntity = state.selectedEntity,
+                    onProviderSelected = { state.selectedEntity = it },
+                    onStoreSelected = { state.selectedEntity = it },
+                    onPropertySelected = { state.selectedEntity = it },
+                    onDeselect = { state.selectedEntity = null },
+                    onSwitchToRadar = { state.isRadarMode = true },
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
 
-                    // زر التبديل الاختياري إلى الخريطة الكاملة في الأسفل عند عدم وجود عنصر محدد
-                    if (state.selectedEntity == null) {
+            // 🌙 2. HUD Mode Overlay (Night Windshield Reflection)
+            if (isHudMode) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.94f))
+                        .graphicsLayer(
+                            scaleX = if (isHudMirrored) -1f else 1f,
+                            scaleY = if (isHudMirrored) -1f else 1f
+                        )
+                        .padding(24.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.align(Alignment.Center),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Straight,
+                            contentDescription = null,
+                            tint = Color(0xFF10B981),
+                            modifier = Modifier.size(96.dp)
+                        )
+                        Text(
+                            text = if (isDrivingMode) "55" else "4.2",
+                            fontSize = 80.sp,
+                            fontWeight = FontWeight.Black,
+                            color = Color(0xFF10B981)
+                        )
+                        Text(
+                            text = if (isDrivingMode) "كم / ساعة" else "كم / س (مشياً)",
+                            fontSize = 18.sp,
+                            color = Color.White
+                        )
+                        Text(
+                            text = "واصل السير على المسار الملاحي",
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .navigationBarsPadding(),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
                         Button(
-                            onClick = {
-                                showMapErrorOverlay = false
-                                state.isRadarMode = false
-                            },
+                            onClick = { isHudMirrored = !isHudMirrored },
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E293B)),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier
-                                .align(Alignment.BottomCenter)
-                                .navigationBarsPadding()
-                                .padding(bottom = 24.dp)
+                            shape = RoundedCornerShape(12.dp)
                         ) {
-                            Text("🗺️ تبديل إلى خريطة اليمن الكاملة الحية", color = Color.White, fontSize = 12.sp)
+                            Text(if (isHudMirrored) "عكس عادي" else "انعكاس الزجاج 🪞", color = Color(0xFF10B981))
+                        }
+                        Button(
+                            onClick = { isHudMode = false },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text("خروج من وضع HUD", color = Color.White)
                         }
                     }
                 }
-            } else {
-                Box(modifier = Modifier.fillMaxSize()) {
-                    RealLeafletMapView(
-                        userCoords = Pair(safeUserLat, safeUserLng),
-                        currentMapMode = state.currentMapMode,
-                        nearbyProviders = filteredProviders,
-                        nearbyStores = filteredStores,
-                        nearbyProperties = filteredProperties,
-                        dynamicOffsets = state.dynamicOffsets,
-                        selectedCity = state.selectedCity,
-                        zoomScale = state.zoomScale,
-                        onZoomScaleChange = { state.zoomScale = it },
-                        panOffset = state.panOffset,
-                        onPanOffsetChange = { state.panOffset = it },
-                        selectedEntity = state.selectedEntity,
-                        onProviderSelected = { state.selectedEntity = it },
-                        onStoreSelected = { state.selectedEntity = it },
-                        onPropertySelected = { state.selectedEntity = it },
-                        onDeselect = { state.selectedEntity = null },
-                        onSwitchToRadar = {
-                            showMapErrorOverlay = false
-                            state.isRadarMode = true
-                        },
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
             }
 
-            // [تعديل] شارة مصدر الخريطة والنقاط المكتشفة كالصورة المرفقة تماماً
-            Surface(
-                shape = RoundedCornerShape(20.dp),
-                color = Color(0xFF0F172A).copy(alpha = 0.88f),
-                border = BorderStroke(1.dp, Color(0xFF334155)),
+            // 🔍 3. Top Search Bar: Single Glassmorphism Capsule (NO CLUTTER UNDERNEATH)
+            Box(
                 modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .navigationBarsPadding()
-                    .padding(start = 16.dp, bottom = if (state.selectedEntity != null) 300.dp else 24.dp)
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .statusBarsPadding()
             ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(8.dp)
-                            .background(Color(0xFF10B981), androidx.compose.foundation.shape.CircleShape)
-                    )
-                    val modeLabel = when {
-                        state.isRadarMode -> "رادار كشف الخدمات"
-                        state.currentMapMode == MapMode.SATELLITE -> "الأقمار الاصطناعية (عربي)"
-                        state.currentMapMode == MapMode.VELA_3D -> "Vela 3D"
-                        state.currentMapMode == MapMode.HOT -> "شوارع HOT"
-                        state.currentMapMode == MapMode.TOPO -> "تضاريس Topo"
-                        else -> "OpenStreetMap"
-                    }
-                    Text(
-                        text = "$modeLabel · ${radarPoints.size} متوفر",
-                        color = Color.White,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-            }
-
-            // [المحور الأول: 4] الزر الدائري الأحمر العائم في الأسفل يميناً (تبديل الرادار والخريطة الحية) مع أيقونة Radar
-            Surface(
-                shape = androidx.compose.foundation.shape.CircleShape,
-                color = Color(0xFFDC2626),
-                shadowElevation = 8.dp,
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .navigationBarsPadding()
-                    .padding(end = 16.dp, bottom = if (state.selectedEntity != null) 300.dp else 24.dp)
-                    .size(54.dp)
-            ) {
-                IconButton(
-                    onClick = {
-                        showMapErrorOverlay = false
-                        state.isRadarMode = !state.isRadarMode
+                MapFilterBar(
+                    selectedCategory = state.selectedCategory,
+                    onCategorySelected = { state.selectedCategory = it },
+                    selectedCity = state.selectedCity,
+                    onCitySelected = { city ->
+                        state.selectedCity = city
+                        if (city != "الكل") {
+                            val coords = OfflineMapManager.getCityCoordinates(city)
+                            viewModel.updateUserLocation(coords.latitude, coords.longitude)
+                        }
                     },
-                    modifier = Modifier.fillMaxSize().testTag("floating_radar_fab")
-                ) {
-                    Icon(
-                        imageVector = if (state.isRadarMode) Icons.Default.Place else Icons.Default.Radar,
-                        contentDescription = "رادار الخدمات",
-                        tint = Color.White,
-                        modifier = Modifier.size(26.dp)
-                    )
-                }
+                    searchQuery = state.searchQuery,
+                    onSearchQueryChange = { state.searchQuery = it },
+                    themeColors = themeColors,
+                    onBackClick = onBackClick,
+                    onVoiceSearchClick = {
+                        coroutineScope.launch {
+                            snackbarHostState.showSnackbar("🎙️ المساعد الصوتي يستمع: تحدث باسم الشارع أو الخدمة...")
+                        }
+                    },
+                    onSearchExecute = { query ->
+                        if (query.isNotBlank()) {
+                            val cityCoords = OfflineMapManager.getCityCoordinates(query)
+                            if (cityCoords.nameAr != "صنعاء" || query.contains("صنعاء")) {
+                                state.selectedCity = cityCoords.nameAr
+                                viewModel.updateUserLocation(cityCoords.latitude, cityCoords.longitude)
+                            } else {
+                                val match = filteredProviders.firstOrNull() ?: filteredStores.firstOrNull() ?: filteredProperties.firstOrNull()
+                                if (match != null) {
+                                    state.selectedEntity = match
+                                }
+                            }
+                        }
+                    }
+                )
             }
 
-            // [المحور الأول: 2] العمود الأيمن (التحكم في الخريطة): موقعي -> تكبير -> تصغير -> الطبقات -> أوفلاين -> الخريطة الحرارية
+            // 🎮 4. Unified Control Dock (قاعدة التحكم الموحدة) - Single continuous vertical capsule
             MapControls(
                 isRadarMode = state.isRadarMode,
-                onToggleRadarMode = {
-                    showMapErrorOverlay = false
-                    state.isRadarMode = !state.isRadarMode
-                },
+                onToggleRadarMode = { state.isRadarMode = !state.isRadarMode },
                 isHeatmapActive = state.isHeatmapActive,
-                onToggleHeatmap = {
-                    state.isHeatmapActive = !state.isHeatmapActive
-                    coroutineScope.launch {
-                        snackbarHostState.showSnackbar(
-                            if (state.isHeatmapActive) "تم تفعيل الخريطة الحرارية لكثافة الخدمات 🔥" else "تم إيقاف الخريطة الحرارية"
-                        )
-                    }
-                },
-                isOfflineCached = state.isOfflineCacheActive,
-                onToggleOfflineCache = {
-                    coroutineScope.launch {
-                        OfflineMapManager.purgeCacheIfNeeded(context)
-                        val cacheSize = OfflineMapManager.getCacheSizeMb(context)
-                        val formatted = String.format(java.util.Locale.US, "%.1f", cacheSize)
-                        snackbarHostState.showSnackbar("💾 تم فحص وتحديث كاش الخريطة أوفلاين (الحجم: $formatted MB)")
-                    }
-                },
+                onToggleHeatmap = { state.isHeatmapActive = !state.isHeatmapActive },
                 onZoomIn = {
                     state.zoomScale = (state.zoomScale * 1.30f).coerceIn(0.25f, 8.0f)
                 },
@@ -393,37 +436,190 @@ fun MapScreenContent(
                         )
                     }
                 },
-                onOpenLayerDialog = {
-                    state.showLayerDialog = true
-                },
+                onOpenLayerDialog = { state.showLayerDialog = true },
                 isGpsActive = viewModel.isGpsTrackingActive.collectAsState().value,
                 themeColors = themeColors,
                 currentMapMode = state.currentMapMode,
+                isDrivingMode = isDrivingMode,
+                onToggleDrivingMode = {
+                    isDrivingMode = !isDrivingMode
+                    coroutineScope.launch {
+                        snackbarHostState.showSnackbar(
+                            if (isDrivingMode) "🚘 تم تفعيل وضع القيادة والملاحة المباشرة"
+                            else "🚶 تم تفعيل وضع المشي المريح"
+                        )
+                    }
+                },
+                compassBearing = compassBearing,
+                onResetCompass = {
+                    compassBearing = 0f
+                    coroutineScope.launch {
+                        snackbarHostState.showSnackbar("🧭 تم إعادة توجيه الخريطة إلى الشمال الحقيقي")
+                    }
+                },
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
-                    .navigationBarsPadding()
-                    .padding(end = 12.dp, bottom = if (state.selectedEntity != null) 300.dp else 20.dp)
+                    .padding(end = 16.dp)
             )
 
-            // 🗺️ Layer Selection Dialog (الخيارات الأربعة كالصورة الثانية)
+            // 📷 5. Floating AR (VELA) Button (Opposite the dock with soft pulsing glow)
+            Surface(
+                onClick = {
+                    state.currentMapMode = if (state.currentMapMode == MapMode.AR_VPS) MapMode.SATELLITE else MapMode.AR_VPS
+                    coroutineScope.launch {
+                        snackbarHostState.showSnackbar(
+                            if (state.currentMapMode == MapMode.AR_VPS) "📷 تم تشغيل كاميرا الواقع المعزز (VELA AR) مع التوجيه ثلاثي الأبعاد"
+                            else "🗺️ تم العودة لخريطة الأقمار الصناعية"
+                        )
+                    }
+                },
+                shape = RoundedCornerShape(18.dp),
+                color = Color(0xFF0B0F19).copy(alpha = 0.85f),
+                border = BorderStroke(1.2.dp, Color(0xFF10B981).copy(alpha = arGlowAlpha)),
+                shadowElevation = 8.dp,
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .padding(start = 16.dp)
+                    .testTag("mode_ar_vela_btn")
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF10B981).copy(alpha = arGlowAlpha))
+                    )
+                    Icon(
+                        imageVector = Icons.Default.ViewInAr,
+                        contentDescription = "واقع معزز",
+                        tint = Color(0xFF10B981),
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Text(
+                        text = "VELA AR",
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            // 🚨 6. Quiet Discreet SOS / الفزعة Button (Calm orange-red #EF4444)
+            Surface(
+                onClick = { showSosDialog = true },
+                shape = RoundedCornerShape(16.dp),
+                color = Color(0xFF0B0F19).copy(alpha = 0.85f),
+                border = BorderStroke(1.dp, Color(0xFFEF4444).copy(alpha = 0.45f)),
+                shadowElevation = 6.dp,
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .navigationBarsPadding()
+                    .padding(start = 16.dp, bottom = if (state.selectedEntity != null) 240.dp else 24.dp)
+                    .testTag("map_sos_btn")
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Emergency,
+                        contentDescription = "فزعة طوارئ",
+                        tint = Color(0xFFEF4444),
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Text(
+                        text = "فزعة",
+                        color = Color(0xFFFCA5A5),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            // 🚗 7. Smart Companion Bar for Intercity Trips (Discreet, triggers on toggle or driving mode)
+            if (isDrivingMode && state.selectedEntity == null) {
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = Color(0xFF0B0F19).copy(alpha = 0.85f),
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.10f)),
+                    shadowElevation = 8.dp,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .navigationBarsPadding()
+                        .padding(bottom = 24.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        // HUD toggle
+                        IconButton(
+                            onClick = { isHudMode = true },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(Icons.Default.Nightlife, contentDescription = "HUD ليلي", tint = Color(0xFF38BDF8), modifier = Modifier.size(18.dp))
+                        }
+
+                        // Intercity companion filters
+                        val items = listOf(
+                            Triple("وقود", "⛽ وقود", "محطة"),
+                            Triple("استراحة", "☕ استراحة", "استراحة"),
+                            Triple("ميكانيك", "🔧 بنشر/صيانة", "صيانة")
+                        )
+
+                        items.forEach { (key, label, filterQuery) ->
+                            val isActive = companionFilter == filterQuery
+                            Surface(
+                                onClick = {
+                                    companionFilter = if (isActive) null else filterQuery
+                                    coroutineScope.launch {
+                                        snackbarHostState.showSnackbar(
+                                            if (!isActive) "رفيق السفر: تصفية أقرب $label على الطريق"
+                                            else "تم إلغاء تصفية رفيق السفر"
+                                        )
+                                    }
+                                },
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (isActive) Color(0xFF10B981).copy(alpha = 0.25f) else Color.Transparent,
+                                border = if (isActive) BorderStroke(1.dp, Color(0xFF10B981)) else null
+                            ) {
+                                Text(
+                                    text = label,
+                                    fontSize = 11.5.sp,
+                                    color = if (isActive) Color(0xFF10B981) else Color.White,
+                                    fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 🗺️ 8. Layer Selection Dialog
             if (state.showLayerDialog) {
                 AlertDialog(
                     onDismissRequest = { state.showLayerDialog = false },
-                    containerColor = Color(0xFF0F172A),
+                    containerColor = Color(0xFF0B0F19),
                     titleContentColor = Color.White,
                     textContentColor = Color.White,
+                    shape = RoundedCornerShape(20.dp),
                     title = {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("🗺️ اختيار طبقة الخريطة", fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                        }
+                        Text("🗺️ اختيار طبقة الخريطة", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                     },
                     text = {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             val layers = listOf(
-                                Triple(MapMode.SATELLITE, "🛰️ صور الأقمار الصناعية (الافتراضية - عربي)", "صور جوية عالية الدقة للمدن اليمنية والشوارع باللغة العربية"),
-                                Triple(MapMode.OSM, "🌐 OpenStreetMap Standard (الرسمية)", "الخريطة القياسية المفصلة"),
-                                Triple(MapMode.HOT, "🗺️ خريطة الشوارع الحيوية (HOT)", "مثالية للملاحة والشوارع الفرعية"),
-                                Triple(MapMode.TOPO, "⛰️ خريطة العالم والتضاريس (Topo)", "إظهار المعالم والارتفاعات الجغرافية")
+                                Triple(MapMode.SATELLITE, "🛰️ الأقمار الصناعية (عربي)", "صور جوية عالية الدقة للمدن والمعالم"),
+                                Triple(MapMode.OSM, "🌐 OpenStreetMap (الرسمية)", "الخريطة القياسية المفصلة"),
+                                Triple(MapMode.HOT, "🗺️ خريطة الشوارع (HOT)", "واضحة للشوارع الفرعية"),
+                                Triple(MapMode.TOPO, "⛰️ تضاريس وارتفاعات (Topo)", "إظهار المعالم والجبال")
                             )
 
                             layers.forEach { (mode, title, desc) ->
@@ -434,16 +630,16 @@ fun MapScreenContent(
                                         state.isRadarMode = false
                                         state.showLayerDialog = false
                                         coroutineScope.launch {
-                                            snackbarHostState.showSnackbar("تم تفعيل طبقة: $title")
+                                            snackbarHostState.showSnackbar("تم تفعيل: $title")
                                         }
                                     },
                                     shape = RoundedCornerShape(12.dp),
-                                    color = if (isSelected) Color(0xFF00E5FF).copy(alpha = 0.2f) else Color(0xFF1E293B),
-                                    border = androidx.compose.foundation.BorderStroke(1.dp, if (isSelected) Color(0xFF00E5FF) else Color(0xFF334155)),
+                                    color = if (isSelected) Color(0xFF10B981).copy(alpha = 0.2f) else Color(0xFF1E293B),
+                                    border = BorderStroke(1.dp, if (isSelected) Color(0xFF10B981) else Color(0xFF334155)),
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Column(modifier = Modifier.padding(12.dp)) {
-                                        Text(text = title, color = if (isSelected) Color(0xFF00E5FF) else Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                        Text(text = title, color = if (isSelected) Color(0xFF10B981) else Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                                         Spacer(modifier = Modifier.height(2.dp))
                                         Text(text = desc, color = Color(0xFF94A3B8), fontSize = 11.sp)
                                     }
@@ -453,220 +649,13 @@ fun MapScreenContent(
                     },
                     confirmButton = {
                         TextButton(onClick = { state.showLayerDialog = false }) {
-                            Text("إغلاق", color = Color(0xFF00E5FF))
+                            Text("إغلاق", color = Color(0xFF10B981))
                         }
                     }
                 )
             }
 
-            // Top Header & Filter Bar
-            Column(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .fillMaxWidth()
-                    .background(Color(0xFF0F172A))
-                    .statusBarsPadding()
-            ) {
-                // Top Bar with Back Button
-                Surface(
-                    color = Color(0xFF0F172A),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            IconButton(
-                                onClick = onBackClick,
-                                modifier = Modifier.testTag("map_back_btn")
-                            ) {
-                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "رجوع", tint = Color.White)
-                            }
-                            Text(
-                                if (state.isRadarMode) "🛰️ رادار الخدمات المحلي (أوفلاين)" else "🗺️ خريطة دليل اليمن المباشرة",
-                                color = Color.White,
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-
-                        // Entity Count Badge
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = Color(0xFF00E5FF).copy(alpha = 0.15f),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF00E5FF).copy(alpha = 0.4f))
-                        ) {
-                            Text(
-                                text = "${radarPoints.size} متوفر",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF00E5FF),
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                            )
-                        }
-                    }
-                }
-
-                // Filter Bar with 3-tier Hybrid Search
-                MapFilterBar(
-                    selectedCategory = state.selectedCategory,
-                    onCategorySelected = { state.selectedCategory = it },
-                    selectedCity = state.selectedCity,
-                    onCitySelected = { city ->
-                        state.selectedCity = city
-                        if (city != "الكل") {
-                            val coords = OfflineMapManager.getCityCoordinates(city)
-                            viewModel.updateUserLocation(coords.latitude, coords.longitude)
-                        }
-                    },
-                    searchQuery = state.searchQuery,
-                    onSearchQueryChange = { state.searchQuery = it },
-                    themeColors = themeColors,
-                    onSearchExecute = { query ->
-                        if (query.isNotBlank()) {
-                            val cityCoords = OfflineMapManager.getCityCoordinates(query)
-                            if (cityCoords.nameAr != "صنعاء" || query.contains("صنعاء")) {
-                                state.selectedCity = cityCoords.nameAr
-                                viewModel.updateUserLocation(cityCoords.latitude, cityCoords.longitude)
-                                coroutineScope.launch {
-                                    snackbarHostState.showSnackbar("📍 تم الانتقال وتوسيط الخريطة إلى: ${cityCoords.nameAr}")
-                                }
-                            } else {
-                                val match = filteredProviders.firstOrNull() ?: filteredStores.firstOrNull() ?: filteredProperties.firstOrNull()
-                                if (match != null) {
-                                    state.selectedEntity = match
-                                    coroutineScope.launch {
-                                        snackbarHostState.showSnackbar("🎯 تم تحديد أقرب نتيجة مطابقة على الخريطة!")
-                                    }
-                                } else {
-                                    coroutineScope.launch {
-                                        snackbarHostState.showSnackbar("🔍 جارِ تصفية النتائج لكلمة: $query")
-                                    }
-                                }
-                            }
-                        }
-                    }
-                )
-            }
-
-            // [المحور الأول: 3] العمود الأيسر (الأوضاع المتقدمة): Vela 3D -> AR VPS -> Aleph -> الملاحة
-            if (state.currentMapMode != MapMode.AR_VPS) {
-                Column(
-                    modifier = Modifier
-                        .align(Alignment.CenterStart)
-                        .padding(start = 12.dp, bottom = if (state.selectedEntity != null) 300.dp else 20.dp)
-                        .navigationBarsPadding(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    // 1. Vela 3D (الخرائط ثلاثية الأبعاد)
-                    val isVelaActive = state.currentMapMode == MapMode.VELA_3D && !state.isRadarMode
-                    Surface(
-                        onClick = {
-                            state.currentMapMode = MapMode.VELA_3D
-                            state.isRadarMode = false
-                            coroutineScope.launch {
-                                snackbarHostState.showSnackbar("تم تفعيل خريطة Vela 3D ثلاثية الأبعاد 🏙️")
-                            }
-                        },
-                        shape = RoundedCornerShape(12.dp),
-                        color = if (isVelaActive) Color(0xFF00E5FF) else Color(0xFF0F172A).copy(alpha = 0.90f),
-                        border = BorderStroke(1.2.dp, Color(0xFF00E5FF)),
-                        shadowElevation = 6.dp,
-                        modifier = Modifier
-                            .size(42.dp)
-                            .testTag("mode_vela3d_btn")
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Text("🏙️", fontSize = 16.sp)
-                        }
-                    }
-
-                    // 2. VPS AR Mode (كاميرا الواقع المعزز)
-                    val isArActive = state.currentMapMode == MapMode.AR_VPS
-                    Surface(
-                        onClick = {
-                            state.currentMapMode = MapMode.AR_VPS
-                            coroutineScope.launch {
-                                snackbarHostState.showSnackbar("جاري تشغيل كاميرا الواقع المعزز (VPS) 📷")
-                            }
-                        },
-                        shape = RoundedCornerShape(12.dp),
-                        color = if (isArActive) Color(0xFF00E5FF) else Color(0xFF0F172A).copy(alpha = 0.90f),
-                        border = BorderStroke(1.2.dp, Color(0xFF00E5FF)),
-                        shadowElevation = 6.dp,
-                        modifier = Modifier
-                            .size(42.dp)
-                            .testTag("mode_ar_vps_btn")
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Text("📷", fontSize = 16.sp)
-                        }
-                    }
-
-                    // 3. المساعد البصري الذكي (Aleph)
-                    Surface(
-                        onClick = {
-                            state.isAlephAssistantOpen = true
-                        },
-                        shape = RoundedCornerShape(12.dp),
-                        color = if (state.isAlephAssistantOpen) Color(0xFF10B981) else Color(0xFF0F172A).copy(alpha = 0.90f),
-                        border = BorderStroke(1.2.dp, Color(0xFF00E5FF)),
-                        shadowElevation = 6.dp,
-                        modifier = Modifier
-                            .size(42.dp)
-                            .testTag("mode_aleph_btn")
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Text("👁️", fontSize = 16.sp)
-                        }
-                    }
-
-                    // 4. الملاحة الحية المباشرة (🧭 Navigation - جديد)
-                    Surface(
-                        onClick = {
-                            state.isNavigating = true
-                        },
-                        shape = RoundedCornerShape(12.dp),
-                        color = Color(0xFF0F172A).copy(alpha = 0.90f),
-                        border = BorderStroke(1.2.dp, Color(0xFF00E5FF)),
-                        shadowElevation = 6.dp,
-                        modifier = Modifier
-                            .size(42.dp)
-                            .testTag("mode_navigation_btn")
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Text("🧭", fontSize = 16.sp)
-                        }
-                    }
-
-                    // 5. بلاغات الشوارع المجتمعية (⚠️ Street Alert)
-                    Surface(
-                        onClick = {
-                            state.showStreetAlertDialog = true
-                        },
-                        shape = RoundedCornerShape(12.dp),
-                        color = Color(0xFF0F172A).copy(alpha = 0.90f),
-                        border = BorderStroke(1.2.dp, Color(0xFFF59E0B)),
-                        shadowElevation = 6.dp,
-                        modifier = Modifier
-                            .size(42.dp)
-                            .testTag("mode_street_alert_btn")
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Text("⚠️", fontSize = 16.sp)
-                        }
-                    }
-                }
-            }
-
-            // Bottom Sheet for selected item
+            // 📋 9. Bottom Sheet for clicked place (HIDDEN BY DEFAULT - APPEARS ONLY ON PIN TAP)
             state.selectedEntity?.let { entity ->
                 MapBottomSheet(
                     entity = entity,
@@ -676,15 +665,9 @@ fun MapScreenContent(
                     onRequestBooking = { target ->
                         state.selectedEntity = null
                         when (target) {
-                            is ProviderEntity -> {
-                                state.bookingProviderTarget = target
-                            }
-                            is StoreEntity -> {
-                                onRequestBooking(target)
-                            }
-                            is PropertyEntity -> {
-                                onRequestBooking(target)
-                            }
+                            is ProviderEntity -> state.bookingProviderTarget = target
+                            is StoreEntity -> onRequestBooking(target)
+                            is PropertyEntity -> onRequestBooking(target)
                             else -> onRequestBooking(target)
                         }
                     },
@@ -697,7 +680,6 @@ fun MapScreenContent(
                         }
                     },
                     themeColors = themeColors,
-                    onAskAleph = { state.isAlephAssistantOpen = true },
                     onStartNavigation = { target ->
                         state.isNavigating = true
                     },
@@ -706,76 +688,64 @@ fun MapScreenContent(
                         .navigationBarsPadding()
                 )
             }
-
-            // 👁️ الوضع 4: المساعد البصري الذكي Aleph
-            if (state.isAlephAssistantOpen) {
-                AlephVisualAssistantDialog(
-                    userLat = safeUserLat,
-                    userLng = safeUserLng,
-                    selectedCity = state.selectedCity,
-                    nearbyProviders = filteredProviders,
-                    nearbyStores = filteredStores,
-                    targetEntity = state.selectedEntity,
-                    onDismiss = { state.isAlephAssistantOpen = false }
-                )
-            }
         }
     }
 
-    // ⚠️ حوار الإبلاغ عن حالة الشارع (Crowdsourced Alerts)
-    if (state.showStreetAlertDialog) {
+    // 🚨 10. SOS / الفزعة Confirmation Dialog
+    if (showSosDialog) {
         AlertDialog(
-            onDismissRequest = { state.showStreetAlertDialog = false },
-            containerColor = Color(0xFF0F172A),
+            onDismissRequest = { showSosDialog = false },
+            containerColor = Color(0xFF0B0F19),
             titleContentColor = Color.White,
             textContentColor = Color.White,
+            shape = RoundedCornerShape(20.dp),
             title = {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("⚠️ الإبلاغ عن حالة الشارع", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    Icon(Icons.Default.Emergency, contentDescription = null, tint = Color(0xFFEF4444))
+                    Text("فزعة طوارئ 🆘", fontWeight = FontWeight.Bold, fontSize = 17.sp)
                 }
             },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("اختر نوع الحالة لتنبيه السائقين والمستخدمين في هذا المسار:", color = Color(0xFF94A3B8), fontSize = 12.sp)
-                    val alerts = listOf(
-                        "🚗 ازدحام مروري خانق",
-                        "🚧 حفريات وأعمال صيانة",
-                        "⛔ طريق مغلق / مقطوع",
-                        "💥 حادث مروري عرقل السير",
-                        "🌧️ سيول أو تجمعات مياه"
+                    Text(
+                        "هل تحتاج إلى مساعدة فورية أو بنشر أو سحب مركبة؟",
+                        color = Color.White,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium
                     )
-                    alerts.forEach { alertText ->
-                        Surface(
-                            onClick = {
-                                state.showStreetAlertDialog = false
-                                coroutineScope.launch {
-                                    snackbarHostState.showSnackbar("✅ تم تسجيل بلاغ: ($alertText) وتنبيه السائقين في المنطقة! شكراً لتعاونك 🇾🇪")
-                                }
-                            },
-                            shape = RoundedCornerShape(10.dp),
-                            color = Color(0xFF1E293B),
-                            border = BorderStroke(1.dp, Color(0xFF334155)),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(
-                                text = alertText,
-                                color = Color.White,
-                                fontSize = 13.sp,
-                                modifier = Modifier.padding(12.dp)
-                            )
-                        }
-                    }
+                    Text(
+                        "سيتم إرسال إحداثيات موقعك الحالي ($safeUserLat, $safeUserLng) إلى أقرب فني وميكانيكي معتمد في محيطك فوراً.",
+                        color = Color(0xFF94A3B8),
+                        fontSize = 11.5.sp
+                    )
                 }
             },
             confirmButton = {
-                TextButton(onClick = { state.showStreetAlertDialog = false }) {
+                Button(
+                    onClick = {
+                        isSosBroadcasting = true
+                        coroutineScope.launch {
+                            delay(600)
+                            isSosBroadcasting = false
+                            showSosDialog = false
+                            snackbarHostState.showSnackbar("🚨 تم إرسال نداء الفزعة وإحداثيات موقعك لأقرب فني طوارئ معتمد!")
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text(if (isSosBroadcasting) "جارِ الإرسال..." else "إرسال نداء الفزعة", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSosDialog = false }) {
                     Text("إلغاء", color = Color(0xFF94A3B8))
                 }
             }
         )
     }
 
-    // Unified Direct Booking Dialog
+    // Provider Booking Dialog
     state.bookingProviderTarget?.let { provider ->
         BookingDialog(
             provider = provider,

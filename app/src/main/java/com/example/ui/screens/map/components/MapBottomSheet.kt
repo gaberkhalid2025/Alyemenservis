@@ -1,12 +1,10 @@
 package com.example.ui.screens.map.components
 
 import android.content.Intent
-import com.example.ui.*
 import android.net.Uri
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -35,10 +33,12 @@ import com.example.utils.VisualThemePalette
 
 /**
  * 📋 MapBottomSheet
- * Modern Material 3 Bottom Sheet Card displaying full details of the clicked entity:
- * - Real-time ETA and exact distance calculation
- * - Direct Call, WhatsApp, Navigation, and Booking actions
- * - Distinct category badge colors (#00E5FF, #10B981, #F59E0B, #EC4899)
+ * Hidden by default, appears only upon tapping a place/pin:
+ * - Accurate road-snapped distance & ETA
+ * - Emerald Green [بدء الملاحة] button (#10B981)
+ * - [اتصال] (Call)
+ * - [حجز] (Book)
+ * - Glassmorphism dark styling (#0B0F19)
  */
 @Composable
 fun MapBottomSheet(
@@ -55,11 +55,10 @@ fun MapBottomSheet(
 ) {
     val context = LocalContext.current
 
-    // Extract standardized information
     var title by remember { mutableStateOf("") }
     var subtitle by remember { mutableStateOf("") }
     var categoryLabel by remember { mutableStateOf("") }
-    var badgeColor by remember { mutableStateOf(Color(0xFF00E5FF)) }
+    var badgeColor by remember { mutableStateOf(Color(0xFF10B981)) }
     var rating by remember { mutableDoubleStateOf(5.0) }
     var phone by remember { mutableStateOf("") }
     var imageUrl by remember { mutableStateOf("") }
@@ -72,7 +71,7 @@ fun MapBottomSheet(
             title = entity.name
             subtitle = entity.customCategoryName.ifEmpty { entity.specialization.ifEmpty { entity.profession } }
             categoryLabel = "👷 فني صيانة معتمد"
-            badgeColor = Color(0xFF00E5FF)
+            badgeColor = Color(0xFF10B981)
             rating = entity.rating.toDouble()
             phone = entity.phone
             imageUrl = entity.profileImage.ifEmpty { entity.coverImage }
@@ -115,8 +114,8 @@ fun MapBottomSheet(
 
     Surface(
         shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-        color = Color(0xFF0F172A),
-        border = BorderStroke(1.dp, Color(0xFF1E293B)),
+        color = Color(0xFF0B0F19).copy(alpha = 0.94f),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.10f)),
         shadowElevation = 16.dp,
         modifier = modifier
             .fillMaxWidth()
@@ -124,7 +123,7 @@ fun MapBottomSheet(
     ) {
         Column(
             modifier = Modifier
-                .padding(horizontal = 16.dp, vertical = 14.dp)
+                .padding(horizontal = 16.dp, vertical = 12.dp)
                 .fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
@@ -133,7 +132,7 @@ fun MapBottomSheet(
                 modifier = Modifier
                     .size(36.dp, 4.dp)
                     .clip(CircleShape)
-                    .background(Color(0xFF334155))
+                    .background(Color.White.copy(alpha = 0.2f))
                     .align(Alignment.CenterHorizontally)
             )
 
@@ -143,12 +142,11 @@ fun MapBottomSheet(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // Image / Icon Avatar
                 Surface(
                     shape = RoundedCornerShape(14.dp),
                     color = Color(0xFF1E293B),
-                    border = BorderStroke(2.dp, badgeColor.copy(alpha = 0.6f)),
-                    modifier = Modifier.size(54.dp)
+                    border = BorderStroke(1.5.dp, badgeColor.copy(alpha = 0.6f)),
+                    modifier = Modifier.size(50.dp)
                 ) {
                     if (imageUrl.isNotBlank()) {
                         AsyncImage(
@@ -161,28 +159,36 @@ fun MapBottomSheet(
                         Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                             Text(
                                 text = if (entity is ProviderEntity) "👷" else if (entity is StoreEntity) "🏪" else "🏠",
-                                fontSize = 24.sp
+                                fontSize = 22.sp
                             )
                         }
                     }
                 }
 
-                // Title & Category
                 Column(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = badgeColor.copy(alpha = 0.15f),
-                        modifier = Modifier.padding(bottom = 2.dp)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = badgeColor.copy(alpha = 0.15f)
+                        ) {
+                            Text(
+                                text = categoryLabel,
+                                color = badgeColor,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
                         Text(
-                            text = categoryLabel,
-                            color = badgeColor,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            text = if (isAvailable) "متاح 🟢" else "غير متاح 🔴",
+                            color = if (isAvailable) Color(0xFF10B981) else Color(0xFFEF4444),
+                            fontSize = 10.sp
                         )
                     }
 
@@ -204,172 +210,74 @@ fun MapBottomSheet(
                     )
                 }
 
-                // Close & Share & Navigation Row
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    // Share Location
-                    IconButton(
-                        onClick = {
-                            try {
-                                val mapUrl = "https://www.google.com/maps/search/?api=1&query=$lat,$lng"
-                                val shareText = "📍 $title\n$subtitle\nالموقع على الخريطة:\n$mapUrl"
-                                val intent = Intent(Intent.ACTION_SEND).apply {
-                                    type = "text/plain"
-                                    putExtra(Intent.EXTRA_TEXT, shareText)
-                                }
-                                context.startActivity(Intent.createChooser(intent, "مشاركة الموقع"))
-                            } catch (e: Exception) {
-                                e.printStackTrace()
-                            }
-                        },
-                        modifier = Modifier.size(32.dp).testTag("share_location_btn")
-                    ) {
-                        Icon(Icons.Default.Share, contentDescription = "مشاركة الموقع", tint = Color(0xFF38BDF8), modifier = Modifier.size(18.dp))
-                    }
-
-                    // Google Maps Navigation
-                    IconButton(
-                        onClick = {
-                            try {
-                                val uri = Uri.parse("geo:$lat,$lng?q=$lat,$lng($title)")
-                                val mapIntent = Intent(Intent.ACTION_VIEW, uri)
-                                mapIntent.setPackage("com.google.android.apps.maps")
-                                if (mapIntent.resolveActivity(context.packageManager) != null) {
-                                    context.startActivity(mapIntent)
-                                } else {
-                                    val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com/maps/search/?api=1&query=$lat,$lng"))
-                                    context.startActivity(browserIntent)
-                                }
-                            } catch (e: Exception) {
-                                val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com/maps/search/?api=1&query=$lat,$lng"))
-                                context.startActivity(browserIntent)
-                            }
-                        },
-                        modifier = Modifier.size(32.dp).testTag("google_maps_nav_btn")
-                    ) {
-                        Icon(Icons.Default.LocationOn, contentDescription = "فتح في خرائط جوجل", tint = Color(0xFF10B981), modifier = Modifier.size(18.dp))
-                    }
-
-                    // Share Button (زر مشاركة البيانات)
-                    IconButton(
-                        onClick = {
-                            try {
-                                val shareText = "📍 $title\n🏷️ $subtitle ($categoryLabel)\n📞 الهاتف: $phone\n🗺️ تمت المشاركة عبر تطبيق دليل خدمات اليمن"
-                                val sendIntent = Intent().apply {
-                                    action = Intent.ACTION_SEND
-                                    putExtra(Intent.EXTRA_TEXT, shareText)
-                                    type = "text/plain"
-                                }
-                                context.startActivity(Intent.createChooser(sendIntent, "مشاركة بيانات الخدمة"))
-                            } catch (e: Exception) {
-                                e.printStackTrace()
-                            }
-                        },
-                        modifier = Modifier.size(32.dp).testTag("share_entity_btn")
-                    ) {
-                        Icon(Icons.Default.Share, contentDescription = "مشاركة", tint = Color(0xFF38BDF8), modifier = Modifier.size(18.dp))
-                    }
-
-                    // 👁️ Aleph Visual Assistant Quick Button
-                    IconButton(
-                        onClick = { onAskAleph?.invoke(entity) },
-                        modifier = Modifier.size(32.dp).testTag("aleph_entity_btn")
-                    ) {
-                        Text("👁️", fontSize = 16.sp)
-                    }
-                    // Close Button
-                    IconButton(
-                        onClick = onDismiss,
-                        modifier = Modifier.size(32.dp).testTag("close_bottom_sheet_btn")
-                    ) {
-                        Icon(Icons.Default.Close, contentDescription = "إغلاق", tint = Color(0xFF94A3B8), modifier = Modifier.size(20.dp))
-                    }
+                // Close Button
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.size(32.dp).testTag("close_bottom_sheet_btn")
+                ) {
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = "إغلاق",
+                        tint = Color(0xFF94A3B8),
+                        modifier = Modifier.size(20.dp)
+                    )
                 }
             }
 
-            HorizontalDivider(color = Color(0xFF1E293B))
-
-            // Meta Info: Distance + ETA + Rating + Status
+            // Distance & ETA Row
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFF111827), RoundedCornerShape(10.dp))
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Distance & ETA
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Icon(Icons.Default.Place, contentDescription = null, tint = Color(0xFF00E5FF), modifier = Modifier.size(16.dp))
+                    Icon(Icons.Default.Place, contentDescription = null, tint = Color(0xFF10B981), modifier = Modifier.size(16.dp))
                     Text(
-                        text = "$distanceText ($etaText)",
-                        color = Color(0xFF00E5FF),
+                        text = "المسافة: $distanceText",
+                        color = Color.White,
                         fontSize = 11.5.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
-
-                // Rating & Status
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Text(
-                        text = "⭐ $rating",
-                        color = Color(0xFFFFD700),
-                        fontSize = 11.5.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = if (isAvailable) "متاح 🟢" else "غير متاح 🔴",
-                        color = if (isAvailable) Color(0xFF10B981) else Color(0xFFEF4444),
-                        fontSize = 11.sp
-                    )
-                }
+                Text(
+                    text = etaText,
+                    color = Color(0xFF10B981),
+                    fontSize = 11.5.sp,
+                    fontWeight = FontWeight.Bold
+                )
             }
 
-            // 🧭 زر الملاحة الحقيقية البارز (المحور الثاني: بدء الملاحة المباشرة)
-            Button(
-                onClick = { onStartNavigation?.invoke(entity) },
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF0284C7),
-                    contentColor = Color.White
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(44.dp)
-                    .testTag("start_navigation_btn")
-            ) {
-                Icon(Icons.Default.Navigation, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("🧭 بدء الملاحة إلى هنا", fontSize = 13.sp, fontWeight = FontWeight.Bold)
-            }
-
-            // Action Buttons
+            // Action Buttons: [بدء الملاحة] Emerald Green + [اتصال] + [حجز]
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Primary Action: View Details
+                // 1. [بدء الملاحة] Emerald Green (#10B981)
                 Button(
-                    onClick = { onOpenDetails(entity) },
+                    onClick = { onStartNavigation?.invoke(entity) },
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = badgeColor,
-                        contentColor = Color(0xFF0F172A)
+                        containerColor = Color(0xFF10B981),
+                        contentColor = Color.White
                     ),
                     modifier = Modifier
-                        .weight(1.2f)
+                        .weight(1.3f)
                         .height(44.dp)
-                        .testTag("view_details_action_btn")
+                        .testTag("start_navigation_btn")
                 ) {
-                    Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("التفاصيل", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Icon(Icons.Default.Navigation, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("بدء الملاحة", fontSize = 12.5.sp, fontWeight = FontWeight.Bold)
                 }
 
-                // Call Action
+                // 2. [اتصال] Call Action
                 if (phone.isNotBlank()) {
                     OutlinedButton(
                         onClick = {
@@ -394,16 +302,16 @@ fun MapBottomSheet(
                     }
                 }
 
-                // Booking / Request Action for ALL entity types
+                // 3. [حجز] Booking Action
                 val bookingBtnText = when (entity) {
-                    is ProviderEntity -> "حجز فوري"
+                    is ProviderEntity -> "حجز"
                     is StoreEntity -> {
-                        val isMedical = entity.sectionId.contains("medical") || entity.categoryId.contains("medical") || entity.name.contains("طبي") || entity.name.contains("عياد")
-                        val isRestaurant = entity.sectionId.contains("restaurant") || entity.categoryId.contains("restaurant") || entity.name.contains("مطعم") || entity.name.contains("كافيه")
+                        val isMedical = entity.sectionId.contains("medical") || entity.categoryId.contains("medical") || entity.name.contains("طبي")
+                        val isRestaurant = entity.sectionId.contains("restaurant") || entity.categoryId.contains("restaurant") || entity.name.contains("مطعم")
                         when {
-                            isMedical -> "حجز موعد"
-                            isRestaurant -> "حجز طاولة"
-                            else -> "طلب متجر"
+                            isMedical -> "موعد"
+                            isRestaurant -> "طاولة"
+                            else -> "طلب"
                         }
                     }
                     is PropertyEntity -> "معاينة"
@@ -414,11 +322,12 @@ fun MapBottomSheet(
                     onClick = { onRequestBooking(entity) },
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF10B981),
+                        containerColor = Color(0xFF1E293B),
                         contentColor = Color.White
                     ),
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)),
                     modifier = Modifier
-                        .weight(1.1f)
+                        .weight(0.9f)
                         .height(44.dp)
                         .testTag("book_entity_btn")
                 ) {
