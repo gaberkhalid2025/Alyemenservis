@@ -18,6 +18,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -326,8 +327,9 @@ fun NavigationScreen(
                             override fun onPageFinished(view: WebView?, url: String?) {
                                 super.onPageFinished(view, url)
                                 isMapReady = true
-                                // تمركز الخريطة ورسم المسار
+                                // تمركز الخريطة ورسم المسار وتحديث الحجم
                                 evaluateJavascript("if (window.updateUserLocation) { window.updateUserLocation($userLat, $userLng, 25, true); }", null)
+                                evaluateJavascript("if (window.map) { window.map.invalidateSize(); }", null)
                                 sendRouteToMap(routeResult)
                             }
                         }
@@ -488,6 +490,101 @@ fun NavigationScreen(
                         .fillMaxWidth()
                         .testTag("nav_search_input")
                 )
+
+                // 📍 قائمة أفقية (LazyRow) تعرض الفنيين والمتاجر القريبة لاختيار أي منها كوجهة فورية
+                if (searchQuery.isEmpty() && (nearbyProviders.isNotEmpty() || nearbyStores.isNotEmpty())) {
+                    LazyRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        contentPadding = PaddingValues(horizontal = 2.dp)
+                    ) {
+                        items(nearbyProviders) { provider ->
+                            val dist = MapDistanceCalculator.calculateDistanceMeters(userLat, userLng, provider.latitude, provider.longitude)
+                            val distText = if (dist < 1000) "${dist.toInt()} م" else "${String.format(Locale.US, "%.1f", dist / 1000.0)} كم"
+                            Surface(
+                                shape = RoundedCornerShape(14.dp),
+                                color = Color(0xFF0F172A).copy(alpha = 0.92f),
+                                border = BorderStroke(1.dp, Color(0xFF00E5FF).copy(alpha = 0.35f)),
+                                modifier = Modifier.clickable {
+                                    val newWp = RealValhallaNavigator.NavigationWaypoint(
+                                        id = "provider_${provider.id}",
+                                        name = provider.name,
+                                        latitude = provider.latitude,
+                                        longitude = provider.longitude
+                                    )
+                                    waypoints = listOf(waypoints.first(), newWp)
+                                    speak("تم تحديد الوجهة: ${provider.name}")
+                                }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Text("🔧", fontSize = 14.sp)
+                                    Column {
+                                        Text(
+                                            text = provider.name,
+                                            color = Color.White,
+                                            fontSize = 11.5.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            text = "${provider.specialization} · $distText",
+                                            color = Color(0xFF00E5FF),
+                                            fontSize = 9.5.sp
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        items(nearbyStores) { store ->
+                            val dist = MapDistanceCalculator.calculateDistanceMeters(userLat, userLng, store.latitude, store.longitude)
+                            val distText = if (dist < 1000) "${dist.toInt()} م" else "${String.format(Locale.US, "%.1f", dist / 1000.0)} كم"
+                            Surface(
+                                shape = RoundedCornerShape(14.dp),
+                                color = Color(0xFF0F172A).copy(alpha = 0.92f),
+                                border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.35f)),
+                                modifier = Modifier.clickable {
+                                    val newWp = RealValhallaNavigator.NavigationWaypoint(
+                                        id = "store_${store.id}",
+                                        name = store.name,
+                                        latitude = store.latitude,
+                                        longitude = store.longitude
+                                    )
+                                    waypoints = listOf(waypoints.first(), newWp)
+                                    speak("تم تحديد الوجهة: ${store.name}")
+                                }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Text("🏪", fontSize = 14.sp)
+                                    Column {
+                                        Text(
+                                            text = store.name,
+                                            color = Color.White,
+                                            fontSize = 11.5.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            text = "${store.categoryId} · $distText",
+                                            color = Color(0xFF10B981),
+                                            fontSize = 9.5.sp
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
 
                 // نتائج البحث المنسدلة
                 if (searchQuery.trim().length >= 2) {
