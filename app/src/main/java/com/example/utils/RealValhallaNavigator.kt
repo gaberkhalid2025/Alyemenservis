@@ -14,18 +14,20 @@ import java.io.InputStreamReader
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
-import java.util.Locale
 import java.util.UUID
 
 /**
  * 🧭 RealValhallaNavigator
- * محرك الملاحة الهجين فائق الدقة لليمن:
- * 1. ملاحة مباشرة متصلة (100% عبر OSRM العالمي باللغة العربية والشوارع الدقيقة).
- * 2. ملاحة أوفلاين (عند تحميل ملف 25MB الخاص بـ Valhalla أو انقطاع الإنترنت).
- * 3. دعم المحطات ونقاط التوقف المتعددة (Multi-Waypoints).
- * 4. بحث ذكي شامل عن الشوارع والمحلات والعناوين (عبر OSM Nominatim + قاعدة البيانات المحلية).
+ * محرك الملاحة الهجين فائق الدقة لليمن مع دعم محطات التوقف المتعددة (Multi-Stop Navigation).
  */
 object RealValhallaNavigator {
+
+    data class Waypoint(
+        val name: String,
+        val lat: Double,
+        val lng: Double,
+        val id: String = UUID.randomUUID().toString()
+    )
 
     data class NavigationWaypoint(
         val id: String = UUID.randomUUID().toString(),
@@ -33,7 +35,9 @@ object RealValhallaNavigator {
         val latitude: Double,
         val longitude: Double,
         var isReached: Boolean = false
-    )
+    ) {
+        fun toWaypoint(): Waypoint = Waypoint(name, latitude, longitude, id)
+    }
 
     data class NavigationStep(
         val instruction: String,
@@ -44,6 +48,21 @@ object RealValhallaNavigator {
         val targetWaypointName: String = ""
     )
 
+    data class RouteLeg(
+        val fromName: String,
+        val toName: String,
+        val distanceKm: Double,
+        val timeMinutes: Double,
+        val instructions: List<NavigationStep>
+    )
+
+    sealed class RouteError {
+        object EmptyWaypoints : RouteError()
+        object InvalidCoordinates : RouteError()
+        object MissingTiles : RouteError()
+        data class EngineFailure(val message: String) : RouteError()
+    }
+
     data class NavigationRouteResult(
         val totalDistanceMeters: Double,
         val totalDurationSeconds: Int,
@@ -53,7 +72,11 @@ object RealValhallaNavigator {
         val coordinates: List<Pair<Double, Double>> = emptyList(),
         val isOffline: Boolean = false,
         val source: String = "OSRM 🌐",
-        val waypoints: List<NavigationWaypoint> = emptyList()
+        val waypoints: List<NavigationWaypoint> = emptyList(),
+        val totalDistanceKm: Double = totalDistanceMeters / 1000.0,
+        val totalTimeMinutes: Double = totalDurationSeconds / 60.0,
+        val legs: List<RouteLeg> = emptyList(),
+        val error: RouteError? = null
     )
 
     data class SearchAddressResult(
@@ -61,23 +84,22 @@ object RealValhallaNavigator {
         val shortName: String,
         val latitude: Double,
         val longitude: Double,
-        val type: String, // "street", "place", "store", "provider"
+        val type: String,
         val icon: String
     )
 
-    /**
-     * التحقق من وجود ملف خرائط الملاحة الأوفلاين (25MB)
-     */
     fun isReady(context: Context): Boolean {
-        val valhallaDir = File(context.filesDir, "valhalla")
-        val tileFile = File(valhallaDir, "valhalla_tiles.tar")
-        val markerFile = File(valhallaDir, "is_valhalla_downloaded.txt")
-        return (tileFile.exists() && tileFile.length() > 500 * 1024) || markerFile.exists()
+        return try {
+            val valhallaDir = File(context.filesDir, "valhalla")
+            val tileFile = File(valhallaDir, "valhalla_tiles.tar")
+            val markerFile = File(valhallaDir, "is_valhalla_downloaded.txt")
+            (tileFile.exists() && tileFile.length() > 500 * 1024) || markerFile.exists()
+        } catch (e: Exception) {
+            false
+        }
     }
 
-    /**
-     * حساب المسار المباشر بين نقطتين (مع دعم التبديل التلقائي أونلاين/أوفلاين)
-     */
+    // Backward compatibility for single destination
     suspend fun calculateRoute(
         context: Context,
         startLat: Double,
@@ -86,20 +108,20 @@ object RealValhallaNavigator {
         destLng: Double,
         destName: String
     ): NavigationRouteResult = withContext(Dispatchers.IO) {
-        val startPoint = NavigationWaypoint("start", "موقعي الحالي", startLat, startLng)
-        val endPoint = NavigationWaypoint("end", destName, destLat, destLng)
-        calculateRouteWithWaypoints(context, listOf(startPoint, endPoint))
+        val origin = Waypoint("موقعي الحالي", startLat, startLng)
+        val destination = Waypoint(destName, destLat, destLng)
+        calculateRoute(context, origin, listOf(destination))
     }
 
-    /**
-     * حساب المسار المتقدم متعدد المحطات (Multi-Waypoints)
-     */
-    suspend fun calculateRouteWithWaypoints(
+    // Multi-stop calculateRoute receiving origin and list of waypoints
+    suspend fun calculateRoute(
         context: Context,
-        waypoints: List<NavigationWaypoint>
+        origin: Waypoint,
+        waypoints: List<Waypoint>
     ): NavigationRouteResult = withContext(Dispatchers.IO) {
-        if (waypoints.size < 2) {
-            val fallback = NavigationRouteResult(
+        val allWaypoints = listOf(origin) + waypoints
+        if (allWaypoints.size < 2) {
+            return@withContext NavigationRouteResult(
                 totalDistanceMeters = 0.0,
                 totalDurationSeconds = 0,
                 formattedDistance = "0 م",
@@ -108,14 +130,14 @@ object RealValhallaNavigator {
                 coordinates = emptyList(),
                 isOffline = true,
                 source = "غير محدد",
-                waypoints = waypoints
+                waypoints = allWaypoints.map { NavigationWaypoint(it.id, it.name, it.lat, it.lng) },
+                error = RouteError.EmptyWaypoints
             )
-            return@withContext fallback
         }
 
-        // محاولة جلب المسار الحي الدقيق عبر شبكة الطرق العالمية OSRM
         try {
-            val coordsParam = waypoints.joinToString(";") { "${it.longitude},${it.latitude}" }
+            // Build one route request containing origin + all waypoints (each acts as a break stop)
+            val coordsParam = allWaypoints.joinToString(";") { "${it.lng},${it.lat}" }
             val urlString = "https://router.project-osrm.org/route/v1/driving/$coordsParam?overview=full&geometries=geojson&steps=true"
             val url = URL(urlString)
             val connection = (url.openConnection() as HttpURLConnection).apply {
@@ -139,7 +161,6 @@ object RealValhallaNavigator {
                         val totalDistance = route.optDouble("distance", 0.0)
                         val totalDuration = route.optDouble("duration", 0.0).toInt()
 
-                        // استخراج إحداثيات رسم المسار على الخريطة (Polyline)
                         val coordsList = mutableListOf<Pair<Double, Double>>()
                         val geometry = route.optJSONObject("geometry")
                         if (geometry != null) {
@@ -147,20 +168,24 @@ object RealValhallaNavigator {
                             if (coordsArr != null) {
                                 for (i in 0 until coordsArr.length()) {
                                     val pt = coordsArr.getJSONArray(i)
-                                    val lng = pt.getDouble(0)
-                                    val lat = pt.getDouble(1)
-                                    coordsList.add(Pair(lat, lng))
+                                    coordsList.add(Pair(pt.getDouble(1), pt.getDouble(0)))
                                 }
                             }
                         }
 
-                        // استخراج خطوات التوجيه خطوة بخطوة باللغة العربية
                         val stepsList = mutableListOf<NavigationStep>()
+                        val legsList = mutableListOf<RouteLeg>()
                         val legs = route.optJSONArray("legs")
+                        
                         if (legs != null) {
                             for (legIdx in 0 until legs.length()) {
                                 val leg = legs.getJSONObject(legIdx)
-                                val destWp = waypoints.getOrNull(legIdx + 1) ?: waypoints.last()
+                                val fromWp = allWaypoints.getOrNull(legIdx) ?: allWaypoints.first()
+                                val toWp = allWaypoints.getOrNull(legIdx + 1) ?: allWaypoints.last()
+                                val legDist = leg.optDouble("distance", 0.0)
+                                val legDur = leg.optDouble("duration", 0.0)
+
+                                val legSteps = mutableListOf<NavigationStep>()
                                 val steps = leg.optJSONArray("steps")
                                 if (steps != null) {
                                     for (stepIdx in 0 until steps.length()) {
@@ -175,22 +200,31 @@ object RealValhallaNavigator {
                                             type = type,
                                             modifier = modifier,
                                             streetName = streetName,
-                                            destName = destWp.name,
+                                            destName = toWp.name,
                                             isLastStep = (legIdx == legs.length() - 1 && stepIdx == steps.length() - 1)
                                         )
 
-                                        stepsList.add(
-                                            NavigationStep(
-                                                instruction = instruction,
-                                                distanceText = MapDistanceCalculator.formatDistance(stepDist),
-                                                distanceMeters = stepDist,
-                                                iconType = iconType,
-                                                streetName = streetName,
-                                                targetWaypointName = destWp.name
-                                            )
+                                        val navStep = NavigationStep(
+                                            instruction = instruction,
+                                            distanceText = MapDistanceCalculator.formatDistance(stepDist),
+                                            distanceMeters = stepDist,
+                                            iconType = iconType,
+                                            streetName = streetName,
+                                            targetWaypointName = toWp.name
                                         )
+                                        legSteps.add(navStep)
+                                        stepsList.add(navStep)
                                     }
                                 }
+                                legsList.add(
+                                    RouteLeg(
+                                        fromName = fromWp.name,
+                                        toName = toWp.name,
+                                        distanceKm = legDist / 1000.0,
+                                        timeMinutes = legDur / 60.0,
+                                        instructions = legSteps
+                                    )
+                                )
                             }
                         }
 
@@ -203,113 +237,103 @@ object RealValhallaNavigator {
                             totalDurationSeconds = totalDuration,
                             formattedDistance = formattedDist,
                             formattedDuration = formattedDur,
-                            steps = stepsList.ifEmpty { buildDefaultSteps(waypoints, totalDistance) },
+                            steps = stepsList.ifEmpty { buildDefaultSteps(allWaypoints.map { NavigationWaypoint(it.id, it.name, it.lat, it.lng) }, totalDistance) },
                             coordinates = coordsList,
                             isOffline = false,
-                            source = "شبكة الطرق المباشرة 🌐 (OSRM)",
-                            waypoints = waypoints
+                            source = "شبكة الطرق المتعددة 🌐 (OSRM)",
+                            waypoints = allWaypoints.map { NavigationWaypoint(it.id, it.name, it.lat, it.lng) },
+                            totalDistanceKm = totalDistance / 1000.0,
+                            totalTimeMinutes = totalDuration / 60.0,
+                            legs = legsList
                         )
                     }
                 }
             }
         } catch (e: Exception) {
-            // في حالة انقطاع الإنترنت أو بطء الاستجابة، يتم التحويل تلقائياً للأوفلاين
+            // Fallback to offline
         }
 
-        // المسار الاحتياطي / أوفلاين فائق الدقة
-        calculateOfflineRoute(context, waypoints)
+        calculateOfflineRoute(context, allWaypoints)
     }
 
-    /**
-     * المسار الأوفلاين الاحتياطي فائق الدقة لليمن
-     */
-    private fun calculateOfflineRoute(
+    // Overload for NavigationWaypoint list
+    suspend fun calculateRouteWithWaypoints(
         context: Context,
         waypoints: List<NavigationWaypoint>
+    ): NavigationRouteResult = withContext(Dispatchers.IO) {
+        if (waypoints.isEmpty()) {
+            return@withContext NavigationRouteResult(
+                totalDistanceMeters = 0.0,
+                totalDurationSeconds = 0,
+                formattedDistance = "0 م",
+                formattedDuration = "0 دقيقة",
+                steps = listOf(NavigationStep("حدد وجهتك لبدء الملاحة", "0 م", 0.0, "STRAIGHT")),
+                coordinates = emptyList(),
+                isOffline = true,
+                source = "غير محدد",
+                waypoints = waypoints,
+                error = RouteError.EmptyWaypoints
+            )
+        }
+        val origin = waypoints.first().toWaypoint()
+        val rest = waypoints.drop(1).map { it.toWaypoint() }
+        calculateRoute(context, origin, rest)
+    }
+
+    private fun calculateOfflineRoute(
+        context: Context,
+        allWaypoints: List<Waypoint>
     ): NavigationRouteResult {
         var totalDistance = 0.0
         val coordsList = mutableListOf<Pair<Double, Double>>()
         val stepsList = mutableListOf<NavigationStep>()
+        val legsList = mutableListOf<RouteLeg>()
 
-        for (i in 0 until waypoints.size - 1) {
-            val from = waypoints[i]
-            val to = waypoints[i + 1]
+        for (i in 0 until allWaypoints.size - 1) {
+            val from = allWaypoints[i]
+            val to = allWaypoints[i + 1]
 
             val directDist = MapDistanceCalculator.calculateDistanceMeters(
-                from.latitude, from.longitude, to.latitude, to.longitude
+                from.lat, from.lng, to.lat, to.lng
             )
-            // معامل انحناء الطرق الجبلية والحضرية في اليمن 1.25x
             val roadDist = (directDist * 1.26).coerceAtLeast(250.0)
             totalDistance += roadDist
 
-            // نقاط وسيطة لإنشاء مسار بصري على الخريطة
-            coordsList.add(Pair(from.latitude, from.longitude))
-            val midLat = (from.latitude + to.latitude) / 2.0
-            val midLng = (from.longitude + to.longitude) / 2.0
-            coordsList.add(Pair(midLat, midLng))
-            coordsList.add(Pair(to.latitude, to.longitude))
+            coordsList.add(Pair(from.lat, from.lng))
+            coordsList.add(Pair((from.lat + to.lat) / 2.0, (from.lng + to.lng) / 2.0))
+            coordsList.add(Pair(to.lat, to.lng))
 
+            val legSteps = mutableListOf<NavigationStep>()
             if (roadDist < 1500) {
-                stepsList.add(
-                    NavigationStep(
-                        instruction = "انطلق على الشارع الرئيسي نحو ${to.name}",
-                        distanceText = MapDistanceCalculator.formatDistance(roadDist * 0.7),
-                        distanceMeters = roadDist * 0.7,
-                        iconType = "STRAIGHT",
-                        targetWaypointName = to.name
-                    )
-                )
-                stepsList.add(
-                    NavigationStep(
-                        instruction = "انعطف نحو المدخل المباشر",
-                        distanceText = MapDistanceCalculator.formatDistance(roadDist * 0.3),
-                        distanceMeters = roadDist * 0.3,
-                        iconType = "RIGHT",
-                        targetWaypointName = to.name
-                    )
-                )
+                val s1 = NavigationStep("انطلق نحو ${to.name}", MapDistanceCalculator.formatDistance(roadDist * 0.7), roadDist * 0.7, "STRAIGHT", targetWaypointName = to.name)
+                val s2 = NavigationStep("انعطف نحو الوجهة", MapDistanceCalculator.formatDistance(roadDist * 0.3), roadDist * 0.3, "RIGHT", targetWaypointName = to.name)
+                legSteps.add(s1)
+                legSteps.add(s2)
+                stepsList.add(s1)
+                stepsList.add(s2)
             } else {
-                stepsList.add(
-                    NavigationStep(
-                        instruction = "انطلق على الطريق السريع/الرئيسي نحو ${to.name}",
-                        distanceText = MapDistanceCalculator.formatDistance(roadDist * 0.4),
-                        distanceMeters = roadDist * 0.4,
-                        iconType = "HIGHWAY",
-                        targetWaypointName = to.name
-                    )
-                )
-                stepsList.add(
-                    NavigationStep(
-                        instruction = "ادخل الدوار وواصل السير في المخرج الثاني",
-                        distanceText = MapDistanceCalculator.formatDistance(roadDist * 0.3),
-                        distanceMeters = roadDist * 0.3,
-                        iconType = "ROUNDABOUT",
-                        targetWaypointName = to.name
-                    )
-                )
-                stepsList.add(
-                    NavigationStep(
-                        instruction = "واصل السير المباشر حتى الوصول إلى ${to.name}",
-                        distanceText = MapDistanceCalculator.formatDistance(roadDist * 0.3),
-                        distanceMeters = roadDist * 0.3,
-                        iconType = "STRAIGHT",
-                        targetWaypointName = to.name
-                    )
-                )
+                val s1 = NavigationStep("انطلق على الطريق السريع نحو ${to.name}", MapDistanceCalculator.formatDistance(roadDist * 0.5), roadDist * 0.5, "HIGHWAY", targetWaypointName = to.name)
+                val s2 = NavigationStep("واصل السير حتى الوصول إلى ${to.name}", MapDistanceCalculator.formatDistance(roadDist * 0.5), roadDist * 0.5, "STRAIGHT", targetWaypointName = to.name)
+                legSteps.add(s1)
+                legSteps.add(s2)
+                stepsList.add(s1)
+                stepsList.add(s2)
             }
+            val arrivalStep = NavigationStep("وصلت إلى: ${to.name}", "0 م", 0.0, "DESTINATION", targetWaypointName = to.name)
+            legSteps.add(arrivalStep)
+            stepsList.add(arrivalStep)
 
-            stepsList.add(
-                NavigationStep(
-                    instruction = "وصلت إلى: ${to.name}",
-                    distanceText = "0 م",
-                    distanceMeters = 0.0,
-                    iconType = "DESTINATION",
-                    targetWaypointName = to.name
+            legsList.add(
+                RouteLeg(
+                    fromName = from.name,
+                    toName = to.name,
+                    distanceKm = roadDist / 1000.0,
+                    timeMinutes = (roadDist / 1000.0) / 45.0 * 60.0,
+                    instructions = legSteps
                 )
             )
         }
 
-        // تقدير الوقت بناءً على سرعة وسطية 45 كم/س في المدن و70 كم/س بين المحافظات
         val avgSpeedKmh = if (totalDistance > 15000) 65.0 else 40.0
         val durationSeconds = ((totalDistance / 1000.0) / avgSpeedKmh * 3600).toInt().coerceAtLeast(60)
 
@@ -329,7 +353,10 @@ object RealValhallaNavigator {
             coordinates = coordsList,
             isOffline = true,
             source = sourceLabel,
-            waypoints = waypoints
+            waypoints = allWaypoints.map { NavigationWaypoint(it.id, it.name, it.lat, it.lng) },
+            totalDistanceKm = totalDistance / 1000.0,
+            totalTimeMinutes = durationSeconds / 60.0,
+            legs = legsList
         )
     }
 
@@ -377,9 +404,6 @@ object RealValhallaNavigator {
         )
     }
 
-    /**
-     * 🔍 بحث ذكي فائق الدقة عن أي شارع أو منزل أو محل أو عنوان في اليمن
-     */
     suspend fun searchAddressAndPlaces(
         query: String,
         nearbyProviders: List<ProviderEntity> = emptyList(),
@@ -390,7 +414,6 @@ object RealValhallaNavigator {
 
         val results = mutableListOf<SearchAddressResult>()
 
-        // 1. بحث محلي فوري من قاعدة بيانات التطبيق (فنيين ومتاجر ومراكز)
         nearbyProviders.filter {
             it.name.contains(cleanQuery, ignoreCase = true) ||
             it.specialization.contains(cleanQuery, ignoreCase = true) ||
@@ -426,7 +449,6 @@ object RealValhallaNavigator {
             )
         }
 
-        // 2. بحث OpenStreetMap Nominatim الحي للشوارع والأحياء اليمنية
         try {
             val encoded = URLEncoder.encode(cleanQuery, "UTF-8")
             val urlString = "https://nominatim.openstreetmap.org/search?format=json&q=$encoded&countrycodes=ye&accept-language=ar&limit=8&addressdetails=1"
@@ -476,7 +498,6 @@ object RealValhallaNavigator {
                 }
             }
         } catch (e: Exception) {
-            // تجاهل خطأ الشبكة والاعتماد على النتائج المحلية
         }
 
         results.distinctBy { "${it.latitude.toLong()}_${it.longitude.toLong()}_${it.shortName}" }

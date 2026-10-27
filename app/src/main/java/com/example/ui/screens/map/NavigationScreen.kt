@@ -1,10 +1,15 @@
 package com.example.ui.screens.map
 
+import android.content.Context
+import android.speech.tts.TextToSpeech
 import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -15,9 +20,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -30,17 +33,18 @@ import com.example.data.StoreEntity
 import com.example.ui.screens.map.components.OfflineInteractiveMap
 import com.example.ui.screens.map.utils.MapDistanceCalculator
 import com.example.utils.MockValhallaNavigator
+import com.example.utils.RealValhallaNavigator
 import com.example.utils.ValhallaTileDownloader
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.util.Locale
 
 /**
  * 🧭 NavigationScreen
- * شاشة الملاحة اليمنية التفاعلية الذكية:
- * - تدعم التبديل الذكي التلقائي بين "محاكي الملاحة السريعة" و"حزمة الملاحة الأوفلاين الدقيقة"
- * - حساب دقيق لمسافات الطرق بين المدن اليمنية (صنعاء، عدن، تعز، الحديدة، إب، ذمار، مأرب، حضرموت...)
- * - خيار تحميل حزمة الـ 25 ميجابايت داخل التطبيق مع شريط تقدم مباشر
- * - توجيهات الشوارع خطوة بخطوة باللغة العربية
+ * شاشة الملاحة اليمنية التفاعلية الذكية مع دعم محطات التوقف المتعددة (Multi-Stop Navigation)
+ * والنطق الصوتي (TextToSpeech) والتخطيط الهجين (RealValhallaNavigator vs MockValhallaNavigator).
  */
 @Composable
 fun NavigationScreen(
@@ -49,93 +53,132 @@ fun NavigationScreen(
     userLng: Double,
     onFinishNavigation: () -> Unit,
     downloadUrl: String = ValhallaTileDownloader.DEFAULT_DOWNLOAD_URL,
+    nearbyProviders: List<ProviderEntity> = emptyList(),
+    nearbyStores: List<StoreEntity> = emptyList(),
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
-    // استخراج بيانات الوجهة بدقة
-    val targetName = when (targetEntity) {
+    // Initialize TextToSpeech for voice announcements upon reaching stops
+    var tts by remember { mutableStateOf<TextToSpeech?>(null) }
+    DisposableEffect(context) {
+        var textToSpeechInstance: TextToSpeech? = null
+        textToSpeechInstance = TextToSpeech(context) { status ->
+            if (status == TextToSpeech.SUCCESS) {
+                textToSpeechInstance?.language = Locale("ar")
+            }
+        }
+        tts = textToSpeechInstance
+        onDispose {
+            textToSpeechInstance?.stop()
+            textToSpeechInstance?.shutdown()
+        }
+    }
+
+    // Initial destination setup
+    val initialName = when (targetEntity) {
         is ProviderEntity -> targetEntity.name
         is StoreEntity -> targetEntity.name
         is PropertyEntity -> targetEntity.title
         else -> "الوجهة المحددة"
     }
-
-    val targetLat = when (targetEntity) {
+    val initialLat = when (targetEntity) {
         is ProviderEntity -> targetEntity.latitude
         is StoreEntity -> targetEntity.latitude
         is PropertyEntity -> targetEntity.latitude
         else -> 15.3694
     }
-
-    val targetLng = when (targetEntity) {
+    val initialLng = when (targetEntity) {
         is ProviderEntity -> targetEntity.longitude
         is StoreEntity -> targetEntity.longitude
         is PropertyEntity -> targetEntity.longitude
         else -> 44.1910
     }
 
-    // 1. التحقق من وجود حزمة الملاحة الدقيقة (المرحلة الثالثة: التبديل التلقائي)
+    // Multi-stop waypoints list state
+    val waypoints = remember {
+        mutableStateListOf(
+            RealValhallaNavigator.NavigationWaypoint(
+                name = initialName,
+                latitude = initialLat,
+                longitude = initialLng
+            )
+        )
+    }
+
+    // Add extra stop dialog state
+    var showAddStopDialog by remember { mutableStateOf(false) }
+    var stopSearchQuery by remember { mutableStateOf("") }
+    var searchResults by remember { mutableStateOf<List<RealValhallaNavigator.SearchAddressResult>>(emptyList()) }
+
     var isTilesDownloaded by remember {
         mutableStateOf(ValhallaTileDownloader.isTilesDownloaded(context))
     }
 
-    // 2. حساب المسار عبر المحاكي المتقدم أو المحرك الدقيق (المرحلة الأولى)
-    val routeResult = remember(userLat, userLng, targetLat, targetLng, targetName, isTilesDownloaded) {
-        MockValhallaNavigator.calculateRoute(
-            context = context,
-            startLat = userLat,
-            startLng = userLng,
-            destLat = targetLat,
-            destLng = targetLng,
-            destName = targetName
-        )
+    // Hybrid Route Result State (Real vs Mock)
+    var routeResult by remember {
+        mutableStateOf<RealValhallaNavigator.NavigationRouteResult?>(null)
+    }
+    var mockRouteResult by remember {
+        mutableStateOf<MockValhallaNavigator.RouteResult?>(null)
+    }
+    var isLoadingRoute by remember { mutableStateOf(true) }
+
+    // Fetch route asynchronously
+    LaunchedEffect(waypoints.toList(), isTilesDownloaded, userLat, userLng) {
+        isLoadingRoute = true
+        if (RealValhallaNavigator.isReady(context) || isTilesDownloaded) {
+            val realWps = waypoints.map { RealValhallaNavigator.NavigationWaypoint(it.id, it.name, it.latitude, it.longitude, it.isReached) }
+            val originWp = RealValhallaNavigator.Waypoint("موقعي الحالي", userLat, userLng)
+            val restWps = realWps.map { RealValhallaNavigator.Waypoint(it.name, it.latitude, it.longitude, it.id) }
+            routeResult = RealValhallaNavigator.calculateRoute(context, originWp, restWps)
+        } else {
+            val mockWps = waypoints.map { MockValhallaNavigator.Waypoint(it.name, it.latitude, it.longitude, it.id) }
+            val originMock = MockValhallaNavigator.Waypoint("موقعي الحالي", userLat, userLng)
+            mockRouteResult = MockValhallaNavigator.calculateRoute(context, originMock, mockWps)
+        }
+        isLoadingRoute = false
     }
 
-    val totalDistanceMeters = routeResult.totalDistanceMeters.coerceAtLeast(350.0)
-    var remainingMeters by remember(routeResult) { mutableDoubleStateOf(totalDistanceMeters) }
-    var currentSpeedKmh by remember { mutableIntStateOf(55) }
-    var currentStepIndex by remember(routeResult) { mutableIntStateOf(0) }
+    val totalDistanceMeters = routeResult?.totalDistanceMeters ?: mockRouteResult?.totalDistanceMeters ?: 1000.0
+    var remainingMeters by remember(totalDistanceMeters) { mutableDoubleStateOf(totalDistanceMeters) }
+    var currentSpeedKmh by remember { mutableIntStateOf(50) }
+    var currentStepIndex by remember { mutableIntStateOf(0) }
 
-    val steps = routeResult.steps.ifEmpty {
-        listOf(
-            MockValhallaNavigator.NavigationStep("اتجه مباشرة نحو الوجهة", "300 م", 300.0, "STRAIGHT"),
-            MockValhallaNavigator.NavigationStep("لقد وصلت إلى $targetName", "0 م", 0.0, "DESTINATION")
-        )
-    }
-
-    // حالة نافذة تحميل الحزمة (المرحلة الثانية)
+    // Download dialog state
     var showDownloadDialog by remember { mutableStateOf(false) }
     var isDownloading by remember { mutableStateOf(false) }
     var downloadProgress by remember { mutableFloatStateOf(0f) }
     var downloadStatusText by remember { mutableStateOf("") }
 
-    // محاكاة التقدم في الملاحة اللحظية
-    LaunchedEffect(routeResult) {
-        while (remainingMeters > 40) {
+    // Navigation simulation & voice announcements
+    LaunchedEffect(totalDistanceMeters) {
+        while (remainingMeters > 30) {
             delay(1500L)
-            remainingMeters = (remainingMeters - 180).coerceAtLeast(20.0)
-            val progressFraction = 1.0 - (remainingMeters / totalDistanceMeters)
-            val stepThreshold = (currentStepIndex + 1).toDouble() / steps.size.toDouble()
-            if (progressFraction >= stepThreshold && currentStepIndex < steps.size - 1) {
-                currentStepIndex++
+            remainingMeters = (remainingMeters - 150).coerceAtLeast(10.0)
+            val currentStepsList = routeResult?.steps ?: emptyList()
+            if (currentStepsList.isNotEmpty()) {
+                val stepFrac = 1.0 - (remainingMeters / totalDistanceMeters)
+                val newIdx = (stepFrac * currentStepsList.size).toInt().coerceIn(0, currentStepsList.size - 1)
+                if (newIdx != currentStepIndex) {
+                    currentStepIndex = newIdx
+                    val instruction = currentStepsList[currentStepIndex].instruction
+                    tts?.speak(instruction, TextToSpeech.QUEUE_FLUSH, null, null)
+                }
             }
         }
+        // Reached destination voice announcement
+        tts?.speak("لقد وصلت إلى وجهتك النهائية بنجاح", TextToSpeech.QUEUE_FLUSH, null, null)
     }
 
     val progress = (1.0 - (remainingMeters / totalDistanceMeters)).toFloat().coerceIn(0.05f, 1.0f)
     val remainingDistanceText = MapDistanceCalculator.formatDistance(remainingMeters)
     val remainingEtaText = MapDistanceCalculator.computeEta(remainingMeters)
 
-    val currentStep = steps.getOrNull(currentStepIndex) ?: steps.last()
-    val stepIcon = when (currentStep.iconType) {
-        "LEFT" -> Icons.Default.TurnLeft
-        "RIGHT" -> Icons.Default.TurnRight
-        "HIGHWAY" -> Icons.Default.DirectionsCar
-        "DESTINATION" -> Icons.Default.CheckCircle
-        else -> Icons.Default.Straight
-    }
+    val currentStepText = routeResult?.steps?.getOrNull(currentStepIndex)?.instruction 
+        ?: mockRouteResult?.steps?.getOrNull(currentStepIndex)?.instruction 
+        ?: "اتجه نحو الوجهة المحددة"
 
     Box(
         modifier = modifier
@@ -145,12 +188,12 @@ fun NavigationScreen(
         var zoomScale by remember { mutableFloatStateOf(1.2f) }
         var panOffset by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
 
-        // خلفية الخريطة الحية للملاحة
+        // Interactive Map
         OfflineInteractiveMap(
             userCoords = Pair(userLat, userLng),
-            nearbyProviders = emptyList<ProviderEntity>(),
-            nearbyStores = emptyList<StoreEntity>(),
-            nearbyProperties = emptyList<PropertyEntity>(),
+            nearbyProviders = nearbyProviders,
+            nearbyStores = nearbyStores,
+            nearbyProperties = emptyList(),
             dynamicOffsets = emptyMap(),
             selectedCity = "الكل",
             zoomScale = zoomScale,
@@ -158,14 +201,20 @@ fun NavigationScreen(
             panOffset = panOffset,
             onPanOffsetChange = { panOffset = it },
             selectedEntity = targetEntity,
-            onProviderSelected = {},
-            onStoreSelected = {},
+            onProviderSelected = { p ->
+                waypoints.add(RealValhallaNavigator.NavigationWaypoint(name = p.name, latitude = p.latitude, longitude = p.longitude))
+                Toast.makeText(context, "➕ تمت إضافة المحطة: ${p.name}", Toast.LENGTH_SHORT).show()
+            },
+            onStoreSelected = { s ->
+                waypoints.add(RealValhallaNavigator.NavigationWaypoint(name = s.name, latitude = s.latitude, longitude = s.longitude))
+                Toast.makeText(context, "➕ تمت إضافة المحطة: ${s.name}", Toast.LENGTH_SHORT).show()
+            },
             onPropertySelected = {},
             onDeselect = {},
             modifier = Modifier.fillMaxSize()
         )
 
-        // 1. لوحة الإرشادات العلوية (Turn-by-turn Navigation Instruction Header)
+        // Top Header & Waypoints bar
         Column(
             modifier = Modifier
                 .align(Alignment.TopCenter)
@@ -174,7 +223,7 @@ fun NavigationScreen(
                 .padding(horizontal = 14.dp, vertical = 6.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // شارة حالة وضع الملاحة وزر التنزيل
+            // Status & Download Banner
             Surface(
                 shape = RoundedCornerShape(14.dp),
                 color = Color(0xFF0F172A).copy(alpha = 0.95f),
@@ -198,30 +247,75 @@ fun NavigationScreen(
                             modifier = Modifier.size(8.dp)
                         ) {}
                         Text(
-                            text = if (isTilesDownloaded) "🌟 ملاحة أوفلاين دقيقة (Valhalla 🇾🇪)" else "⚡ محاكي الملاحة السريع (${routeResult.routeTitle})",
+                            text = if (isTilesDownloaded) "🌟 ملاحة أوفلاين متعددة المحطات (Valhalla 🇾🇪)" else "⚡ ملاحة هجينة ذكية متعددة المحطات",
                             color = Color.White,
-                            fontSize = 11.5.sp,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }
 
-                    if (!isTilesDownloaded) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         Button(
-                            onClick = { showDownloadDialog = true },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0284C7)),
+                            onClick = { showAddStopDialog = true },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
                             shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
                             modifier = Modifier.height(30.dp)
                         ) {
-                            Icon(Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.White)
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("تحميل الخرائط (25MB)", fontSize = 10.5.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.White)
+                            Spacer(modifier = Modifier.width(2.dp))
+                            Text("إضافة محطة", fontSize = 10.sp, color = Color.White)
+                        }
+
+                        if (!isTilesDownloaded) {
+                            Button(
+                                onClick = { showDownloadDialog = true },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0284C7)),
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                modifier = Modifier.height(30.dp)
+                            ) {
+                                Icon(Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.White)
+                                Spacer(modifier = Modifier.width(2.dp))
+                                Text("تحميل (25MB)", fontSize = 10.sp, color = Color.White)
+                            }
                         }
                     }
                 }
             }
 
-            // بطاقة التوجيه الرئيسي خطوة بخطوة
+            // Horizontal Waypoints Chips Row
+            LazyRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(waypoints) { wp ->
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = Color(0xFF1E293B).copy(alpha = 0.95f),
+                        border = BorderStroke(1.dp, Color(0xFF00E5FF).copy(alpha = 0.5f))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(Icons.Default.Place, contentDescription = null, tint = Color(0xFF00E5FF), modifier = Modifier.size(14.dp))
+                            Text(wp.name, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            if (waypoints.size > 1) {
+                                IconButton(
+                                    onClick = { waypoints.remove(wp) },
+                                    modifier = Modifier.size(16.dp)
+                                ) {
+                                    Icon(Icons.Default.Close, contentDescription = "حذف", tint = Color(0xFFEF4444), modifier = Modifier.size(12.dp))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Turn-by-Turn Instruction Card
             Surface(
                 shape = RoundedCornerShape(20.dp),
                 color = Color(0xFF0F172A).copy(alpha = 0.95f),
@@ -236,7 +330,6 @@ fun NavigationScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    // أيقونة التوجيه المضيئة
                     Surface(
                         shape = CircleShape,
                         color = Color(0xFF0284C7),
@@ -244,10 +337,10 @@ fun NavigationScreen(
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
-                                imageVector = stepIcon,
-                                contentDescription = "توجيه المسار",
+                                imageVector = Icons.Default.Navigation,
+                                contentDescription = null,
                                 tint = Color.White,
-                                modifier = Modifier.size(30.dp)
+                                modifier = Modifier.size(28.dp)
                             )
                         }
                     }
@@ -258,9 +351,9 @@ fun NavigationScreen(
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             Text(
-                                text = "بعد ${currentStep.distanceText}",
+                                text = "توجيه صوتي مفعل 🔊",
                                 color = Color(0xFF00E5FF),
-                                fontSize = 13.sp,
+                                fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
@@ -271,20 +364,19 @@ fun NavigationScreen(
                         }
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = currentStep.instruction,
+                            text = currentStepText,
                             color = Color.White,
-                            fontSize = 14.5.sp,
+                            fontSize = 14.sp,
                             fontWeight = FontWeight.Bold
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = "نحو: $targetName (إجمالي: ${routeResult.formattedDistance})",
+                            text = "عدد المحطات: ${waypoints.size} | المسافة الكلية: ${routeResult?.formattedDistance ?: mockRouteResult?.formattedDistance ?: "0 م"}",
                             color = Color(0xFFCBD5E1),
-                            fontSize = 11.5.sp
+                            fontSize = 11.sp
                         )
                     }
 
-                    // زر إنهاء / خروج
                     IconButton(
                         onClick = onFinishNavigation,
                         modifier = Modifier
@@ -293,7 +385,7 @@ fun NavigationScreen(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Close,
-                            contentDescription = "إنهاء الملاحة",
+                            contentDescription = "إنهاء",
                             tint = Color(0xFF94A3B8)
                         )
                     }
@@ -301,7 +393,7 @@ fun NavigationScreen(
             }
         }
 
-        // 2. الشريط السفلي لمؤشرات الملاحة والوقت والمسافة المتبقية
+        // Bottom Dashboard Bar
         Column(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
@@ -323,7 +415,6 @@ fun NavigationScreen(
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    // تفاصيل الوقت والمسافة
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -333,7 +424,7 @@ fun NavigationScreen(
                             Text(
                                 text = remainingEtaText,
                                 color = Color(0xFF10B981),
-                                fontSize = 21.sp,
+                                fontSize = 20.sp,
                                 fontWeight = FontWeight.ExtraBold
                             )
                             Text(
@@ -358,7 +449,6 @@ fun NavigationScreen(
                         }
                     }
 
-                    // شريط التقدم المرئي
                     LinearProgressIndicator(
                         progress = { progress },
                         modifier = Modifier
@@ -369,7 +459,6 @@ fun NavigationScreen(
                         trackColor = Color(0xFF334155)
                     )
 
-                    // زر إنهاء الملاحة
                     Button(
                         onClick = onFinishNavigation,
                         colors = ButtonDefaults.buttonColors(
@@ -384,64 +473,110 @@ fun NavigationScreen(
                     ) {
                         Icon(Icons.Default.Stop, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("إنهاء الملاحة والعودة للخريطة", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        Text("إنهاء الملاحة متعددة المحطات", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
         }
 
-        // 3. نافذة تحميل الملاحة الكاملة (المرحلة الثانية)
-        if (showDownloadDialog) {
+        // Add Stop Search Dialog
+        if (showAddStopDialog) {
             AlertDialog(
-                onDismissRequest = {
-                    if (!isDownloading) showDownloadDialog = false
-                },
-                icon = {
-                    Icon(
-                        imageVector = Icons.Default.CloudDownload,
-                        contentDescription = null,
-                        tint = Color(0xFF00E5FF),
-                        modifier = Modifier.size(36.dp)
-                    )
-                },
-                title = {
-                    Text(
-                        text = "تحميل حزمة الملاحة الكاملة (أوفلاين)",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                        textAlign = TextAlign.Center
-                    )
-                },
+                onDismissRequest = { showAddStopDialog = false },
+                containerColor = Color(0xFF0F172A),
+                title = { Text("إضافة محطة توقف جديدة", color = Color.White, fontWeight = FontWeight.Bold) },
                 text = {
                     Column(
                         modifier = Modifier.fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Text(
-                            text = "لتفعيل الملاحة الدقيقة خطوة بخطوة داخل الشوارع والأزقة اليمنية بدون إنترنت، يحتاج التطبيق إلى تحميل ملف الخرائط (25 ميجابايت). يُنصح باستخدام اتصال Wi-Fi.",
-                            fontSize = 13.sp,
-                            color = Color(0xFFCBD5E1),
-                            lineHeight = 20.sp
+                        OutlinedTextField(
+                            value = stopSearchQuery,
+                            onValueChange = {
+                                stopSearchQuery = it
+                                coroutineScope.launch {
+                                    searchResults = RealValhallaNavigator.searchAddressAndPlaces(it, nearbyProviders, nearbyStores)
+                                }
+                            },
+                            placeholder = { Text("ابحث عن شارع، محل، أو فني...", color = Color(0xFF94A3B8)) },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White,
+                                focusedBorderColor = Color(0xFF00E5FF),
+                                unfocusedBorderColor = Color(0xFF334155)
+                            ),
+                            modifier = Modifier.fillMaxWidth()
                         )
 
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(200.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            items(searchResults) { res ->
+                                Surface(
+                                    onClick = {
+                                        waypoints.add(
+                                            RealValhallaNavigator.NavigationWaypoint(
+                                                name = res.shortName,
+                                                latitude = res.latitude,
+                                                longitude = res.longitude
+                                            )
+                                        )
+                                        showAddStopDialog = false
+                                        stopSearchQuery = ""
+                                        Toast.makeText(context, "✅ تمت إضافة المحطة: ${res.shortName}", Toast.LENGTH_SHORT).show()
+                                    },
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = Color(0xFF1E293B),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(10.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Text(res.icon, fontSize = 16.sp)
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(res.shortName, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                            Text(res.displayName, color = Color(0xFF94A3B8), fontSize = 10.sp, maxLines = 1)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { showAddStopDialog = false }) {
+                        Text("إغلاق", color = Color(0xFF00E5FF))
+                    }
+                },
+                shape = RoundedCornerShape(18.dp)
+            )
+        }
+
+        // Download Dialog
+        if (showDownloadDialog) {
+            AlertDialog(
+                onDismissRequest = { if (!isDownloading) showDownloadDialog = false },
+                icon = { Icon(Icons.Default.CloudDownload, contentDescription = null, tint = Color(0xFF00E5FF), modifier = Modifier.size(36.dp)) },
+                title = { Text("تحميل حزمة الملاحة الكاملة (أوفلاين)", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White, textAlign = TextAlign.Center) },
+                text = {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Text("لتفعيل الملاحة الدقيقة خطوة بخطوة بدون إنترنت، يحتاج التطبيق إلى تحميل ملف الخرائط (25 ميجابايت).", fontSize = 13.sp, color = Color(0xFFCBD5E1))
                         if (isDownloading) {
-                            Spacer(modifier = Modifier.height(4.dp))
                             LinearProgressIndicator(
                                 progress = { downloadProgress },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(8.dp)
-                                    .clip(RoundedCornerShape(4.dp)),
+                                modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
                                 color = Color(0xFF10B981),
                                 trackColor = Color(0xFF334155)
                             )
-                            Text(
-                                text = downloadStatusText,
-                                fontSize = 11.5.sp,
-                                color = Color(0xFF10B981),
-                                fontWeight = FontWeight.SemiBold
-                            )
+                            Text(downloadStatusText, fontSize = 11.5.sp, color = Color(0xFF10B981), fontWeight = FontWeight.SemiBold)
                         }
                     }
                 },
@@ -465,8 +600,7 @@ fun NavigationScreen(
                                         showDownloadDialog = false
                                         Toast.makeText(context, "✅ تم تثبيت حزمة الملاحة الأوفلاين بنجاح! 🇾🇪", Toast.LENGTH_LONG).show()
                                     } else {
-                                        val err = result.exceptionOrNull()?.localizedMessage ?: "خطأ في الاتصال"
-                                        Toast.makeText(context, "❌ فشل التحميل: $err", Toast.LENGTH_LONG).show()
+                                        Toast.makeText(context, "❌ فشل التحميل", Toast.LENGTH_LONG).show()
                                     }
                                 }
                             },
@@ -479,9 +613,7 @@ fun NavigationScreen(
                 },
                 dismissButton = {
                     if (!isDownloading) {
-                        TextButton(
-                            onClick = { showDownloadDialog = false }
-                        ) {
+                        TextButton(onClick = { showDownloadDialog = false }) {
                             Text("لاحقاً", color = Color(0xFF94A3B8))
                         }
                     }
