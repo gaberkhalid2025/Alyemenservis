@@ -1,6 +1,7 @@
 package com.example.utils
 
 import android.content.Context
+import android.os.Environment
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.BufferedInputStream
@@ -11,7 +12,10 @@ import java.util.zip.ZipInputStream
 
 /**
  * 📦 ValhallaTileDownloader
- * Manager for downloading and validating offline navigation map packages and tiles for Yemen
+ * إدارة تحميل وتثبيت حزمة خرائط الملاحة (Yemen Valhalla Tiles)
+ * - تحميل، فك ضغط، وحفظ الملف في الذاكرة الداخلية.
+ * - منع التحميل المتكرر عبر ملف علامة (Marker).
+ * - دعم الاستيراد اليدوي من مجلد التنزيلات.
  */
 object ValhallaTileDownloader {
 
@@ -19,31 +23,114 @@ object ValhallaTileDownloader {
     private const val MARKER_FILE_NAME = "is_valhalla_downloaded.txt"
     private const val VALHALLA_DIR_NAME = "valhalla"
     private const val TILE_FILE_NAME = "valhalla_tiles.tar"
+    private const val LOCAL_ZIP_NAME = "yemen_valhalla_tiles.zip"
 
-    fun isTilesDownloaded(context: Context): Boolean {
-        val markerFile = File(context.filesDir, MARKER_FILE_NAME)
-        return markerFile.exists()
+    /**
+     * الحصول على مجلد التخزين الداخلي الخاص بالخرائط
+     */
+    private fun getValhallaDir(context: Context): File {
+        val dir = File(context.filesDir, VALHALLA_DIR_NAME)
+        if (!dir.exists()) {
+            dir.mkdirs()
+        }
+        return dir
     }
 
+    /**
+     * التحقق مما إذا كانت الخرائط محملة ومثبتة بنجاح
+     */
+    fun isTilesDownloaded(context: Context): Boolean {
+        val valhallaDir = getValhallaDir(context)
+        val markerFile = File(valhallaDir, MARKER_FILE_NAME)
+        val tileFile = File(valhallaDir, TILE_FILE_NAME)
+        return markerFile.exists() && tileFile.exists() && tileFile.length() > 1024 * 1024 // أكبر من 1 ميجا
+    }
+
+    /**
+     * تحميل الحزمة من الإنترنت وفك ضغطها
+     */
     suspend fun downloadAndExtractTiles(
         context: Context,
         downloadUrl: String = DEFAULT_DOWNLOAD_URL,
         onProgress: (Float, String) -> Unit
     ): Result<Boolean> = withContext(Dispatchers.IO) {
         try {
-            onProgress(0.1f, "الاتصال بخادم الخرائط...")
-            val valhallaDir = File(context.filesDir, VALHALLA_DIR_NAME)
-            if (!valhallaDir.exists()) valhallaDir.mkdirs()
+            onProgress(0.05f, "بدء الاتصال بخادم الخرائط...")
+            val valhallaDir = getValhallaDir(context)
 
             val url = URL(downloadUrl)
             val connection = url.openConnection()
             connection.connect()
 
             val zipInputStream = ZipInputStream(BufferedInputStream(connection.getInputStream()))
-            
             var entry = zipInputStream.nextEntry
+            var extracted = false
+
             while (entry != null) {
-                if (entry.name == TILE_FILE_NAME) {
+                // البحث عن الملف الذي ينتهي بالاسم المطلوب
+                if (entry.name.endsWith(TILE_FILE_NAME)) {
+                    val outputFile = File(valhallaDir, TILE_FILE_NAME)
+                    FileOutputStream(outputFile).use { fos ->
+                        val buffer = ByteArray(8192)
+                        var length: Int
+                        var totalRead = 0L
+                        val totalSize = entry.size
+
+                        while (zipInputStream.read(buffer).also { length = it } != -1) {
+                            fos.write(buffer, 0, length)
+                            totalRead += length
+                            if (totalSize > 0) {
+                                val progress = 0.1f + (totalRead.toFloat() / totalSize) * 0.8f
+                                onProgress(progress, "جاري التثبيت... ${(progress * 100).toInt()}%")
+                            }
+                        }
+                    }
+                    extracted = true
+                    break
+                }
+                zipInputStream.closeEntry()
+                entry = zipInputStream.nextEntry
+            }
+            zipInputStream.close()
+
+            if (extracted) {
+                val markerFile = File(valhallaDir, MARKER_FILE_NAME)
+                markerFile.writeText("downloaded_${System.currentTimeMillis()}")
+                onProgress(1.0f, "تم اكتمال التثبيت بنجاح ✓")
+                Result.success(true)
+            } else {
+                Result.failure(Exception("لم يتم العثور على ملف الخرائط داخل الأرشيف."))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * استيراد يدوي للحزمة من مجلد التنزيلات
+     */
+    suspend fun importLocalTiles(
+        context: Context,
+        onProgress: (Float, String) -> Unit = { _, _ -> }
+    ): Result<Boolean> = withContext(Dispatchers.IO) {
+        try {
+            onProgress(0.1f, "البحث عن الملف في التنزيلات...")
+            val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+            val zipFile = File(downloadsDir, LOCAL_ZIP_NAME)
+
+            if (!zipFile.exists()) {
+                return@withContext Result.failure(Exception("الملف $LOCAL_ZIP_NAME غير موجود في التنزيلات."))
+            }
+
+            val valhallaDir = getValhallaDir(context)
+            onProgress(0.3f, "جاري فك الضغط...")
+
+            val zipInputStream = ZipInputStream(BufferedInputStream(zipFile.inputStream()))
+            var entry = zipInputStream.nextEntry
+            var extracted = false
+
+            while (entry != null) {
+                if (entry.name.endsWith(TILE_FILE_NAME)) {
                     val outputFile = File(valhallaDir, TILE_FILE_NAME)
                     FileOutputStream(outputFile).use { fos ->
                         val buffer = ByteArray(8192)
@@ -52,6 +139,7 @@ object ValhallaTileDownloader {
                             fos.write(buffer, 0, length)
                         }
                     }
+                    extracted = true
                     break
                 }
                 zipInputStream.closeEntry()
@@ -59,11 +147,13 @@ object ValhallaTileDownloader {
             }
             zipInputStream.close()
 
-            val markerFile = File(context.filesDir, MARKER_FILE_NAME)
-            markerFile.writeText("downloaded")
-            
-            onProgress(1.0f, "تم اكتمال التثبيت بنجاح ✓")
-            Result.success(true)
+            if (extracted) {
+                File(valhallaDir, MARKER_FILE_NAME).writeText("imported_${System.currentTimeMillis()}")
+                onProgress(1.0f, "تم الاستيراد بنجاح ✓")
+                Result.success(true)
+            } else {
+                Result.failure(Exception("الملف المضغوط لا يحتوي على الخرائط."))
+            }
         } catch (e: Exception) {
             Result.failure(e)
         }

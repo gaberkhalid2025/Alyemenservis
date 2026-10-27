@@ -204,14 +204,35 @@ fun MapScreenContent(
 
     // Fullscreen Turn-by-Turn Navigation Screen
     if (state.isNavigating) {
-        val downloadUrl = remember { viewModel.preferenceHelper.getValhallaTilesUrl(context) }
-        NavigationScreen(
-            targetEntity = state.selectedEntity,
+        val targetEntity = state.selectedEntity
+        val targetName = when (targetEntity) {
+            is ProviderEntity -> targetEntity.name
+            is StoreEntity -> targetEntity.name
+            is PropertyEntity -> targetEntity.title
+            else -> "وجهة مخصصة"
+        }
+        val targetLat = when (targetEntity) {
+            is ProviderEntity -> targetEntity.latitude
+            is StoreEntity -> targetEntity.latitude
+            is PropertyEntity -> targetEntity.latitude
+            else -> 15.3694
+        }
+        val targetLng = when (targetEntity) {
+            is ProviderEntity -> targetEntity.longitude
+            is StoreEntity -> targetEntity.longitude
+            is PropertyEntity -> targetEntity.longitude
+            else -> 44.1910
+        }
+
+        com.example.ui.screens.navigation.NavigationScreen(
             userLat = safeUserLat,
             userLng = safeUserLng,
-            onFinishNavigation = { state.isNavigating = false },
-            downloadUrl = downloadUrl,
-            modifier = Modifier.fillMaxSize()
+            targetName = targetName,
+            targetLat = targetLat,
+            targetLng = targetLng,
+            nearbyProviders = filteredProviders,
+            nearbyStores = filteredStores,
+            onBack = { state.isNavigating = false }
         )
         return
     }
@@ -439,13 +460,7 @@ fun MapScreenContent(
                 onOpenLayerDialog = { state.showLayerDialog = true },
                 isNavigationActive = state.isNavigating,
                 onToggleNavigation = {
-                    if (state.selectedEntity != null) {
-                        state.isNavigating = true
-                    } else {
-                        coroutineScope.launch {
-                            snackbarHostState.showSnackbar("📍 اختر وجهة أولاً لبدء الملاحة")
-                        }
-                    }
+                    state.isNavigating = true
                 },
                 isGpsActive = viewModel.isGpsTrackingActive.collectAsState().value,
                 themeColors = themeColors,

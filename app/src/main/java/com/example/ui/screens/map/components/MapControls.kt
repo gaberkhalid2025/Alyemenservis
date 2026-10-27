@@ -82,7 +82,7 @@ fun MapControls(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
-            // 0. Navigation Toggle (Top-most)
+            // 0. Navigation Toggle (Top-most - 🧭)
             IconButton(
                 onClick = onToggleNavigation,
                 modifier = Modifier
@@ -90,10 +90,10 @@ fun MapControls(
                     .testTag("map_nav_toggle_btn")
             ) {
                 Icon(
-                    imageVector = if (isNavigationActive) Icons.Default.Navigation else Icons.Default.Map,
+                    imageVector = Icons.Default.Explore,
                     contentDescription = "بدء الملاحة",
                     tint = if (isNavigationActive) Color(0xFF38BDF8) else Color.White,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(22.dp)
                 )
             }
 

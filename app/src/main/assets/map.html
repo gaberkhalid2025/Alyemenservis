@@ -506,9 +506,73 @@
 
         function recenterUser() {
             if (map && userLat && userLng) {
+                map.invalidateSize();
                 map.setView([userLat, userLng], 16, { animate: true });
             }
         }
+
+        // 🛣️ رسم مسار الملاحة المباشر بدقة الشوارع (Route Polyline)
+        var activeRoutePolyline = null;
+        var activeRouteBorder = null;
+        var routeWaypointMarkers = [];
+
+        function drawRoute(coordsJson, colorHex) {
+            try {
+                clearRoute();
+                if (!map || !coordsJson) return;
+                var pts = (typeof coordsJson === 'string') ? JSON.parse(coordsJson) : coordsJson;
+                if (!pts || !pts.length) return;
+
+                // رسم خط التوهج الخلفي (Outer Glow)
+                activeRouteBorder = L.polyline(pts, {
+                    color: '#0F172A',
+                    weight: 9,
+                    opacity: 0.7,
+                    lineJoin: 'round',
+                    lineCap: 'round'
+                }).addTo(map);
+
+                // رسم المسار الرئيسي المضيء (Neon Cyan / Emerald)
+                activeRoutePolyline = L.polyline(pts, {
+                    color: colorHex || '#00E5FF',
+                    weight: 5.5,
+                    opacity: 0.95,
+                    lineJoin: 'round',
+                    lineCap: 'round'
+                }).addTo(map);
+
+                // ضبط إطار الرؤية ليشمل كامل المسار مع هامش مريح
+                map.invalidateSize();
+                map.fitBounds(activeRoutePolyline.getBounds(), {
+                    padding: [60, 60],
+                    animate: true,
+                    maxZoom: 17
+                });
+            } catch(e) {
+                console.error("drawRoute error:", e);
+            }
+        }
+        window.drawRoute = drawRoute;
+
+        function clearRoute() {
+            try {
+                if (activeRouteBorder && map) {
+                    map.removeLayer(activeRouteBorder);
+                    activeRouteBorder = null;
+                }
+                if (activeRoutePolyline && map) {
+                    map.removeLayer(activeRoutePolyline);
+                    activeRoutePolyline = null;
+                }
+                if (routeWaypointMarkers && routeWaypointMarkers.length) {
+                    routeWaypointMarkers.forEach(function(m) { if (map) map.removeLayer(m); });
+                    routeWaypointMarkers = [];
+                }
+            } catch(e) {
+                console.error("clearRoute error:", e);
+            }
+        }
+        window.clearRoute = clearRoute;
 
         window.onload = function() {
             initMap();

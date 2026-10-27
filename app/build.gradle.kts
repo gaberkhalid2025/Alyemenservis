@@ -175,6 +175,11 @@ dependencies {
   implementation(libs.okhttp)
   implementation(libs.play.services.location)
   implementation(libs.retrofit)
+  
+  // 🗺️ Valhalla Offline Navigation Engine
+  implementation("io.github.rallista:valhalla-mobile:0.6.4")
+  implementation("io.github.rallista:valhalla-models:0.6.0")
+  implementation("io.github.rallista:valhalla-models-config:0.5.2")
   testImplementation(libs.androidx.compose.ui.test.junit4)
   testImplementation(libs.androidx.core)
   testImplementation(libs.androidx.junit)
