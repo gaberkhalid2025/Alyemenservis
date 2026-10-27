@@ -32,9 +32,7 @@ import com.example.data.ProviderEntity
 import com.example.data.StoreEntity
 import com.example.ui.screens.map.components.OfflineInteractiveMap
 import com.example.ui.screens.map.utils.MapDistanceCalculator
-import com.example.utils.MockValhallaNavigator
-import com.example.utils.RealValhallaNavigator
-import com.example.utils.ValhallaTileDownloader
+import com.example.utils.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -99,7 +97,7 @@ fun NavigationScreen(
     // Multi-stop waypoints list state
     val waypoints = remember {
         mutableStateListOf(
-            RealValhallaNavigator.NavigationWaypoint(
+            NavWaypoint(
                 name = initialName,
                 latitude = initialLat,
                 longitude = initialLng
@@ -116,32 +114,21 @@ fun NavigationScreen(
         mutableStateOf(ValhallaTileDownloader.isTilesDownloaded(context))
     }
 
-    // Hybrid Route Result State (Real vs Mock)
+    // Hybrid Route Result State
     var routeResult by remember {
-        mutableStateOf<RealValhallaNavigator.NavigationRouteResult?>(null)
-    }
-    var mockRouteResult by remember {
-        mutableStateOf<MockValhallaNavigator.RouteResult?>(null)
+        mutableStateOf<NavRouteResult?>(null)
     }
     var isLoadingRoute by remember { mutableStateOf(true) }
 
     // Fetch route asynchronously
     LaunchedEffect(waypoints.toList(), isTilesDownloaded, userLat, userLng) {
         isLoadingRoute = true
-        if (RealValhallaNavigator.isReady(context) || isTilesDownloaded) {
-            val realWps = waypoints.map { RealValhallaNavigator.NavigationWaypoint(it.id, it.name, it.latitude, it.longitude, it.isReached) }
-            val originWp = RealValhallaNavigator.Waypoint("موقعي الحالي", userLat, userLng)
-            val restWps = realWps.map { RealValhallaNavigator.Waypoint(it.name, it.latitude, it.longitude, it.id) }
-            routeResult = RealValhallaNavigator.calculateRoute(context, originWp, restWps)
-        } else {
-            val mockWps = waypoints.map { MockValhallaNavigator.Waypoint(it.name, it.latitude, it.longitude, it.id) }
-            val originMock = MockValhallaNavigator.Waypoint("موقعي الحالي", userLat, userLng)
-            mockRouteResult = MockValhallaNavigator.calculateRoute(context, originMock, mockWps)
-        }
+        val originWp = NavWaypoint(name = "موقعي الحالي", latitude = userLat, longitude = userLng, type = WaypointType.START)
+        routeResult = RealValhallaNavigator.calculateRoute(context, originWp, waypoints.toList())
         isLoadingRoute = false
     }
 
-    val totalDistanceMeters = routeResult?.totalDistanceMeters ?: mockRouteResult?.totalDistanceMeters ?: 1000.0
+    val totalDistanceMeters = routeResult?.totalDistanceMeters ?: 1000.0
     var remainingMeters by remember(totalDistanceMeters) { mutableDoubleStateOf(totalDistanceMeters) }
     var currentSpeedKmh by remember { mutableIntStateOf(50) }
     var currentStepIndex by remember { mutableIntStateOf(0) }
@@ -157,7 +144,7 @@ fun NavigationScreen(
         while (remainingMeters > 30) {
             delay(1500L)
             remainingMeters = (remainingMeters - 150).coerceAtLeast(10.0)
-            val currentStepsList = routeResult?.steps ?: emptyList()
+            val currentStepsList = routeResult?.getAllSteps() ?: emptyList()
             if (currentStepsList.isNotEmpty()) {
                 val stepFrac = 1.0 - (remainingMeters / totalDistanceMeters)
                 val newIdx = (stepFrac * currentStepsList.size).toInt().coerceIn(0, currentStepsList.size - 1)
@@ -176,8 +163,7 @@ fun NavigationScreen(
     val remainingDistanceText = MapDistanceCalculator.formatDistance(remainingMeters)
     val remainingEtaText = MapDistanceCalculator.computeEta(remainingMeters)
 
-    val currentStepText = routeResult?.steps?.getOrNull(currentStepIndex)?.instruction 
-        ?: mockRouteResult?.steps?.getOrNull(currentStepIndex)?.instruction 
+    val currentStepText = routeResult?.getAllSteps()?.getOrNull(currentStepIndex)?.instruction 
         ?: "اتجه نحو الوجهة المحددة"
 
     Box(
@@ -202,15 +188,16 @@ fun NavigationScreen(
             onPanOffsetChange = { panOffset = it },
             selectedEntity = targetEntity,
             onProviderSelected = { p ->
-                waypoints.add(RealValhallaNavigator.NavigationWaypoint(name = p.name, latitude = p.latitude, longitude = p.longitude))
+                waypoints.add(NavWaypoint(name = p.name, latitude = p.latitude, longitude = p.longitude))
                 Toast.makeText(context, "➕ تمت إضافة المحطة: ${p.name}", Toast.LENGTH_SHORT).show()
             },
             onStoreSelected = { s ->
-                waypoints.add(RealValhallaNavigator.NavigationWaypoint(name = s.name, latitude = s.latitude, longitude = s.longitude))
+                waypoints.add(NavWaypoint(name = s.name, latitude = s.latitude, longitude = s.longitude))
                 Toast.makeText(context, "➕ تمت إضافة المحطة: ${s.name}", Toast.LENGTH_SHORT).show()
             },
             onPropertySelected = {},
             onDeselect = {},
+            route = routeResult,
             modifier = Modifier.fillMaxSize()
         )
 
@@ -247,7 +234,7 @@ fun NavigationScreen(
                             modifier = Modifier.size(8.dp)
                         ) {}
                         Text(
-                            text = if (isTilesDownloaded) "🌟 ملاحة أوفلاين متعددة المحطات (Valhalla 🇾🇪)" else "⚡ ملاحة هجينة ذكية متعددة المحطات",
+                            text = if (isTilesDownloaded) "🌟 ملاحة أوفلاين (Valhalla 🇾🇪) | ${routeResult?.engineSource ?: ""}" else "⚡ ملاحة هجينة ذكية | ${routeResult?.engineSource ?: ""}",
                             color = Color.White,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold
@@ -371,7 +358,7 @@ fun NavigationScreen(
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = "عدد المحطات: ${waypoints.size} | المسافة الكلية: ${routeResult?.formattedDistance ?: mockRouteResult?.formattedDistance ?: "0 م"}",
+                            text = "عدد المحطات: ${waypoints.size} | المسافة الكلية: ${routeResult?.formattedDistance ?: "0 م"}",
                             color = Color(0xFFCBD5E1),
                             fontSize = 11.sp
                         )
@@ -518,7 +505,7 @@ fun NavigationScreen(
                                 Surface(
                                     onClick = {
                                         waypoints.add(
-                                            RealValhallaNavigator.NavigationWaypoint(
+                                            NavWaypoint(
                                                 name = res.shortName,
                                                 latitude = res.latitude,
                                                 longitude = res.longitude

@@ -1,83 +1,399 @@
 package com.example.utils
 
 import android.content.Context
-import com.example.data.ProviderEntity
-import com.example.data.StoreEntity
-import com.example.ui.screens.map.utils.MapDistanceCalculator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.json.JSONArray
-import org.json.JSONObject
-import java.io.BufferedReader
 import java.io.File
-import java.io.InputStreamReader
-import java.net.HttpURLConnection
-import java.net.URL
-import java.net.URLEncoder
-import java.util.UUID
+import java.util.Locale
 
 /**
  * 🧭 RealValhallaNavigator
- * محرك الملاحة الهجين فائق الدقة لليمن مع دعم محطات التوقف المتعددة (Multi-Stop Navigation).
+ * محرك الملاحة الرئيسي لليمن - ينسق بين الملاحة أونلاين (OSRM) وأوفلاين (Valhalla).
  */
 object RealValhallaNavigator {
 
-    data class Waypoint(
-        val name: String,
-        val lat: Double,
-        val lng: Double,
-        val id: String = UUID.randomUUID().toString()
-    )
-
-    data class NavigationWaypoint(
-        val id: String = UUID.randomUUID().toString(),
-        val name: String,
-        val latitude: Double,
-        val longitude: Double,
-        var isReached: Boolean = false
-    ) {
-        fun toWaypoint(): Waypoint = Waypoint(name, latitude, longitude, id)
+    /**
+     * التحقق من جاهزية الخرائط الأوفلاين
+     */
+    fun isReady(context: Context): Boolean {
+        return ValhallaTileDownloader.isTilesDownloaded(context)
     }
 
-    data class NavigationStep(
-        val instruction: String,
-        val distanceText: String,
-        val distanceMeters: Double,
-        val iconType: String, // "STRAIGHT", "LEFT", "RIGHT", "ROUNDABOUT", "HIGHWAY", "DESTINATION"
-        val streetName: String = "",
-        val targetWaypointName: String = ""
-    )
-
-    data class RouteLeg(
-        val fromName: String,
-        val toName: String,
-        val distanceKm: Double,
-        val timeMinutes: Double,
-        val instructions: List<NavigationStep>
-    )
-
-    sealed class RouteError {
-        object EmptyWaypoints : RouteError()
-        object InvalidCoordinates : RouteError()
-        object MissingTiles : RouteError()
-        data class EngineFailure(val message: String) : RouteError()
+    /**
+     * حساب المسار (دعم التوافقية مع الوجهة الواحدة)
+     */
+    suspend fun calculateRoute(
+        context: Context,
+        startLat: Double,
+        startLng: Double,
+        destLat: Double,
+        destLng: Double,
+        destName: String
+    ): NavRouteResult {
+        val origin = NavWaypoint(name = "موقعي الحالي", latitude = startLat, longitude = startLng, type = WaypointType.START)
+        val destination = NavWaypoint(name = destName, latitude = destLat, longitude = destLng, type = WaypointType.BREAK)
+        return calculateRoute(context, origin, listOf(destination))
     }
 
-    data class NavigationRouteResult(
-        val totalDistanceMeters: Double,
-        val totalDurationSeconds: Int,
-        val formattedDistance: String,
-        val formattedDuration: String,
-        val steps: List<NavigationStep>,
-        val coordinates: List<Pair<Double, Double>> = emptyList(),
-        val isOffline: Boolean = false,
-        val source: String = "OSRM 🌐",
-        val waypoints: List<NavigationWaypoint> = emptyList(),
-        val totalDistanceKm: Double = totalDistanceMeters / 1000.0,
-        val totalTimeMinutes: Double = totalDurationSeconds / 60.0,
-        val legs: List<RouteLeg> = emptyList(),
-        val error: RouteError? = null
-    )
+    /**
+     * المحرك الرئيسي لحساب المسارات المتعددة
+     */
+    suspend fun calculateRoute(
+        context: Context,
+        origin: NavWaypoint,
+        waypoints: List<NavWaypoint>
+    ): NavRouteResult = withContext(Dispatchers.Default) {
+        
+        // 1. المحاولة عبر الإنترنت (OSRM) أولاً لضمان أفضل دقة للطرق
+        val onlineResult = OnlineOsrmNavigator.calculateRoute(origin, waypoints)
+        if (onlineResult.error == null) {
+            return@withContext onlineResult
+        }
+
+        // 2. إذا فشل الأونلاين، ننتقل للأوفلاين (Valhalla Native أو المحاكي الدقيق)
+        return@withContext calculateOfflineRoute(context, origin, waypoints)
+    }
+
+    /**
+     * حساب المسار أوفلاين (دعم حقيقي عبر Valhalla Native إذا توفرت الخرائط)
+     */
+    private suspend fun calculateOfflineRoute(
+        context: Context,
+        origin: NavWaypoint,
+        waypoints: List<NavWaypoint>
+    ): NavRouteResult = withContext(Dispatchers.Default) {
+        val hasTiles = isReady(context)
+        
+        // 1. المحاولة عبر محرك Valhalla الحقيقي إذا كانت الخرائط موجودة
+        if (hasTiles) {
+            val nativeResult = tryRouteWithNativeValhalla(context, origin, waypoints)
+            if (nativeResult != null && nativeResult.error == null) {
+                return@withContext nativeResult
+            }
+        }
+
+        // 2. الرجوع للمحاكي الذكي (Simulation) في حال عدم وجود خرائط أو فشل المحرك
+        return@withContext calculateSimulatedRoute(context, origin, waypoints, hasTiles)
+    }
+
+    /**
+     * محاولة حساب المسار باستخدام مكتبة Valhalla الأصلية
+     */
+    private fun tryRouteWithNativeValhalla(
+        context: Context,
+        origin: NavWaypoint,
+        waypoints: List<NavWaypoint>
+    ): NavRouteResult? {
+        return try {
+            val valhallaDir = File(context.filesDir, NavConfig.VALHALLA_DIR)
+            val configFile = File(valhallaDir, "valhalla.json")
+            if (!configFile.exists()) return null
+
+            // ملاحظة للمطور: يتم استدعاء المكتبة عبر الانعكاس (Reflection) أو الاستيراد المباشر
+            // لضمان عدم توقف التطبيق في حال عدم اكتمال تحميل المكتبات البرمجية
+            val valhallaClass = Class.forName("io.github.rallista.valhalla.Valhalla")
+            val instanceMethod = valhallaClass.getMethod("instance", Context::class.java, String::class.java)
+            val valhallaInstance = instanceMethod.invoke(null, context, configFile.absolutePath)
+            
+            val routeMethod = valhallaClass.getMethod("route", String::class.java)
+            val requestJson = formatValhallaRequest(origin, waypoints)
+            val responseJson = routeMethod.invoke(valhallaInstance, requestJson) as String
+            
+            parseValhallaResponse(responseJson, origin, waypoints)
+        } catch (e: Exception) {
+            android.util.Log.e("ValhallaNav", "Native Valhalla failed: ${e.message}")
+            null
+        }
+    }
+
+    /**
+     * تنسيق طلب Valhalla بتنسيق JSON
+     */
+    private fun formatValhallaRequest(origin: NavWaypoint, waypoints: List<NavWaypoint>): String {
+        val locations = (listOf(origin) + waypoints).map { wp ->
+            org.json.JSONObject().apply {
+                put("lat", wp.latitude)
+                put("lon", wp.longitude)
+                put("type", if (wp.type == WaypointType.START) "break" else "break") // Valhalla uses break for stops
+                put("name", wp.name)
+            }
+        }
+        
+        return org.json.JSONObject().apply {
+            put("locations", org.json.JSONArray(locations))
+            put("costing", "auto")
+            put("directions_options", org.json.JSONObject().apply { put("units", "kilometers") })
+        }.toString()
+    }
+
+    /**
+     * تحليل استجابة Valhalla وتحويلها إلى نموذج NavRouteResult
+     */
+    private fun parseValhallaResponse(
+        json: String,
+        origin: NavWaypoint,
+        waypoints: List<NavWaypoint>
+    ): NavRouteResult {
+        val root = org.json.JSONObject(json)
+        val trip = root.getJSONObject("trip")
+        val summary = trip.getJSONObject("summary")
+        
+        val totalDist = summary.getDouble("length") * 1000.0 // تحويل لمتر
+        val totalDur = summary.getDouble("time")
+        
+        val allWaypoints = listOf(origin) + waypoints
+        val legsList = mutableListOf<NavLeg>()
+        val allCoords = mutableListOf<Pair<Double, Double>>()
+        
+        val legsArr = trip.getJSONArray("legs")
+        for (i in 0 until legsArr.length()) {
+            val legObj = legsArr.getJSONObject(i)
+            val legSummary = legObj.optJSONObject("summary")
+            val legDist = (legSummary?.optDouble("length", 0.0) ?: 0.0) * 1000.0
+            val legDur = legSummary?.optDouble("time", 0.0) ?: 0.0
+            
+            // Shape for this leg
+            val legShapeEncoded = legObj.getString("shape")
+            val legCoords = decodePolyline(legShapeEncoded)
+            val currentCoordOffset = allCoords.size
+            allCoords.addAll(legCoords)
+            
+            val legSteps = mutableListOf<NavStep>()
+            val maneuversArr = legObj.optJSONArray("maneuvers")
+            if (maneuversArr != null) {
+                for (j in 0 until maneuversArr.length()) {
+                    val manObj = maneuversArr.getJSONObject(j)
+                    val manTypeInt = manObj.optInt("type", 0)
+                    val manDist = manObj.optDouble("length", 0.0) * 1000.0
+                    val manDur = manObj.optDouble("time", 0.0)
+                    val instruction = manObj.optString("instruction", "")
+                    
+                    val streetNames = manObj.optJSONArray("street_names")
+                    val streetName = if (streetNames != null && streetNames.length() > 0) streetNames.getString(0) else ""
+                    
+                    val mType = mapValhallaManeuver(manTypeInt)
+                    
+                    // استخدام المنسق العربي الخاص بنا للحصول على توجيهات طبيعية وواضحة
+                    val finalInstruction = if (mType != ManeuverType.STRAIGHT || instruction.isEmpty()) {
+                        ArabicInstructionFormatter.format(
+                            mType, 
+                            streetName, 
+                            manDist, 
+                            if (i < waypoints.size) waypoints[i].name else "الوجهة"
+                        )
+                    } else {
+                        instruction // الرجوع لتعليمات Valhalla إذا كانت متوفرة
+                    }
+
+                    legSteps.add(NavStep(
+                        instruction = finalInstruction,
+                        distanceMeters = manDist,
+                        durationSeconds = manDur,
+                        maneuverType = mType,
+                        streetName = streetName,
+                        polylineIndex = currentCoordOffset + manObj.optInt("begin_shape_index", 0)
+                    ))
+                }
+            }
+            
+            legsList.add(NavLeg(
+                fromWaypointId = allWaypoints[i].id,
+                toWaypointId = allWaypoints[i+1].id,
+                distanceMeters = legDist,
+                durationSeconds = legDur,
+                steps = legSteps
+            ))
+        }
+
+        return NavRouteResult(
+            totalDistanceMeters = totalDist,
+            totalDurationSeconds = totalDur,
+            coordinates = allCoords,
+            legs = legsList,
+            waypoints = allWaypoints,
+            isOffline = true,
+            engineSource = "Valhalla Native 🇾🇪 (أوفلاين دقيق)"
+        )
+    }
+
+    /**
+     * خرائط مناورات Valhalla إلى النموذج الداخلي
+     */
+    private fun mapValhallaManeuver(type: Int): ManeuverType {
+        return when (type) {
+            1, 2, 3 -> ManeuverType.START
+            4, 5, 6 -> ManeuverType.DESTINATION
+            8, 22 -> ManeuverType.STRAIGHT
+            9 -> ManeuverType.SLIGHT_RIGHT
+            10 -> ManeuverType.RIGHT
+            11 -> ManeuverType.SHARP_RIGHT
+            12, 13 -> ManeuverType.UTURN
+            14 -> ManeuverType.SLIGHT_LEFT
+            15 -> ManeuverType.LEFT
+            16 -> ManeuverType.SHARP_LEFT
+            18, 20 -> ManeuverType.HIGHWAY_EXIT
+            25 -> ManeuverType.MERGE
+            in 26..34 -> ManeuverType.ROUNDABOUT
+            else -> ManeuverType.STRAIGHT
+        }
+    }
+
+    private fun decodePolyline(encoded: String): List<Pair<Double, Double>> {
+        val poly = mutableListOf<Pair<Double, Double>>()
+        var index = 0
+        val len = encoded.length
+        var lat = 0
+        var lng = 0
+
+        while (index < len) {
+            var b: Int
+            var shift = 0
+            var result = 0
+            do {
+                b = encoded[index++].code - 63
+                result = result or (b and 0x1f shl shift)
+                shift += 5
+            } while (b >= 0x20)
+            val dlat = if (result and 1 != 0) (result shr 1).inv() else result shr 1
+            lat += dlat
+
+            shift = 0
+            result = 0
+            do {
+                b = encoded[index++].code - 63
+                result = result or (b and 0x1f shl shift)
+                shift += 5
+            } while (b >= 0x20)
+            val dlng = if (result and 1 != 0) (result shr 1).inv() else result shr 1
+            lng += dlng
+
+            // Valhalla uses 6 decimal places
+            poly.add(Pair(lat.toDouble() / 1E6, lng.toDouble() / 1E6))
+        }
+        return poly
+    }
+
+    /**
+     * حساب المسار عبر المحاكي (Simulation)
+     */
+    private fun calculateSimulatedRoute(
+        context: Context,
+        origin: NavWaypoint,
+        waypoints: List<NavWaypoint>,
+        hasTiles: Boolean
+    ): NavRouteResult {
+        val allWaypoints = listOf(origin) + waypoints
+        var totalDistance = 0.0
+        var totalDuration = 0.0
+        val coordsList = mutableListOf<Pair<Double, Double>>()
+        val legs = mutableListOf<NavLeg>()
+
+        for (i in 0 until allWaypoints.size - 1) {
+            val from = allWaypoints[i]
+            val to = allWaypoints[i + 1]
+
+            val directDist = HaversinePrecisionNavigator.calculateDistance(from.latitude, from.longitude, to.latitude, to.longitude)
+            val roadDist = (directDist * 1.3).coerceAtLeast(100.0)
+            
+            totalDistance += roadDist
+            val legDuration = (roadDist / (40.0 * 1000.0 / 3600.0))
+            totalDuration += legDuration
+
+            coordsList.add(Pair(from.latitude, from.longitude))
+            coordsList.add(Pair((from.latitude + to.latitude) / 2.0, (from.longitude + to.longitude) / 2.0))
+            coordsList.add(Pair(to.latitude, to.longitude))
+
+            val legSteps = mutableListOf<NavStep>()
+            val startManeuver = if (i == 0) ManeuverType.START else ManeuverType.STRAIGHT
+            legSteps.add(NavStep(
+                instruction = ArabicInstructionFormatter.format(startManeuver, null, roadDist * 0.7, to.name),
+                distanceMeters = roadDist * 0.7,
+                durationSeconds = legDuration * 0.7,
+                maneuverType = startManeuver
+            ))
+
+            val endManeuver = if (i == allWaypoints.size - 2) ManeuverType.DESTINATION else ManeuverType.STRAIGHT
+            legSteps.add(NavStep(
+                instruction = ArabicInstructionFormatter.format(endManeuver, null, 0.0, to.name),
+                distanceMeters = 0.0,
+                durationSeconds = 0.0,
+                maneuverType = endManeuver
+            ))
+
+            legs.add(NavLeg(
+                fromWaypointId = from.id,
+                toWaypointId = to.id,
+                distanceMeters = roadDist,
+                durationSeconds = legDuration,
+                steps = legSteps
+            ))
+        }
+
+        val source = if (hasTiles) "Valhalla 🇾🇪 (أوفلاين - تقريبي)" else "محرك الملاحة الذكي (أوفلاين - تقريبي)"
+
+        return NavRouteResult(
+            totalDistanceMeters = totalDistance,
+            totalDurationSeconds = totalDuration,
+            coordinates = coordsList,
+            legs = legs,
+            waypoints = allWaypoints,
+            isOffline = true,
+            engineSource = source
+        )
+    }
+
+    /**
+     * البحث عن العناوين والأماكن
+     */
+    suspend fun searchAddressAndPlaces(
+        query: String,
+        nearbyProviders: List<com.example.data.ProviderEntity> = emptyList(),
+        nearbyStores: List<com.example.data.StoreEntity> = emptyList()
+    ): List<SearchAddressResult> = withContext(Dispatchers.IO) {
+        val cleanQuery = query.trim()
+        if (cleanQuery.length < 2) return@withContext emptyList()
+        val results = mutableListOf<SearchAddressResult>()
+
+        nearbyProviders.filter { it.name.contains(cleanQuery, true) || it.area.contains(cleanQuery, true) }
+            .take(5).forEach { p ->
+                results.add(SearchAddressResult("${p.name} - ${p.area}", p.name, p.latitude, p.longitude, "provider", "👷"))
+            }
+
+        nearbyStores.filter { it.name.contains(cleanQuery, true) || it.cityId.contains(cleanQuery, true) }
+            .take(5).forEach { s ->
+                results.add(SearchAddressResult("${s.name} - ${s.cityId}", s.name, s.latitude, s.longitude, "store", "🏪"))
+            }
+        
+        try {
+            val encoded = java.net.URLEncoder.encode(cleanQuery, "UTF-8")
+            val urlString = "${NavConfig.NOMINATIM_BASE_URL}?format=json&q=$encoded&countrycodes=ye&accept-language=ar&limit=10"
+            val url = java.net.URL(urlString)
+            val connection = url.openConnection() as java.net.HttpURLConnection
+            connection.setRequestProperty("User-Agent", "AlYemenServicesApp/1.0")
+            
+            if (connection.responseCode == 200) {
+                val response = connection.inputStream.bufferedReader().readText()
+                val jsonArr = org.json.JSONArray(response)
+                for (i in 0 until jsonArr.length()) {
+                    val obj = jsonArr.getJSONObject(i)
+                    val lat = obj.optDouble("lat", 0.0)
+                    val lon = obj.optDouble("lon", 0.0)
+                    if (lat != 0.0) {
+                        results.add(SearchAddressResult(
+                            displayName = obj.optString("display_name"),
+                            shortName = obj.optString("display_name").split(",").first(),
+                            latitude = lat,
+                            longitude = lon,
+                            type = "address",
+                            icon = "📍"
+                        ))
+                    }
+                }
+            }
+        } catch (e: Exception) {}
+        
+        results.distinctBy { "${it.latitude}_${it.longitude}" }
+    }
 
     data class SearchAddressResult(
         val displayName: String,
@@ -87,419 +403,4 @@ object RealValhallaNavigator {
         val type: String,
         val icon: String
     )
-
-    fun isReady(context: Context): Boolean {
-        return try {
-            val valhallaDir = File(context.filesDir, "valhalla")
-            val tileFile = File(valhallaDir, "valhalla_tiles.tar")
-            val markerFile = File(valhallaDir, "is_valhalla_downloaded.txt")
-            (tileFile.exists() && tileFile.length() > 500 * 1024) || markerFile.exists()
-        } catch (e: Exception) {
-            false
-        }
-    }
-
-    // Backward compatibility for single destination
-    suspend fun calculateRoute(
-        context: Context,
-        startLat: Double,
-        startLng: Double,
-        destLat: Double,
-        destLng: Double,
-        destName: String
-    ): NavigationRouteResult = withContext(Dispatchers.IO) {
-        val origin = Waypoint("موقعي الحالي", startLat, startLng)
-        val destination = Waypoint(destName, destLat, destLng)
-        calculateRoute(context, origin, listOf(destination))
-    }
-
-    // Multi-stop calculateRoute receiving origin and list of waypoints
-    suspend fun calculateRoute(
-        context: Context,
-        origin: Waypoint,
-        waypoints: List<Waypoint>
-    ): NavigationRouteResult = withContext(Dispatchers.IO) {
-        val allWaypoints = listOf(origin) + waypoints
-        if (allWaypoints.size < 2) {
-            return@withContext NavigationRouteResult(
-                totalDistanceMeters = 0.0,
-                totalDurationSeconds = 0,
-                formattedDistance = "0 م",
-                formattedDuration = "0 دقيقة",
-                steps = listOf(NavigationStep("حدد وجهتك لبدء الملاحة", "0 م", 0.0, "STRAIGHT")),
-                coordinates = emptyList(),
-                isOffline = true,
-                source = "غير محدد",
-                waypoints = allWaypoints.map { NavigationWaypoint(it.id, it.name, it.lat, it.lng) },
-                error = RouteError.EmptyWaypoints
-            )
-        }
-
-        try {
-            // Build one route request containing origin + all waypoints (each acts as a break stop)
-            val coordsParam = allWaypoints.joinToString(";") { "${it.lng},${it.lat}" }
-            val urlString = "https://router.project-osrm.org/route/v1/driving/$coordsParam?overview=full&geometries=geojson&steps=true"
-            val url = URL(urlString)
-            val connection = (url.openConnection() as HttpURLConnection).apply {
-                connectTimeout = 4500
-                readTimeout = 4500
-                requestMethod = "GET"
-                setRequestProperty("User-Agent", "AlYemenServicesApp/1.0 (Android; OpenStreetMap)")
-            }
-
-            if (connection.responseCode == 200) {
-                val reader = BufferedReader(InputStreamReader(connection.inputStream))
-                val response = reader.readText()
-                reader.close()
-                connection.disconnect()
-
-                val json = JSONObject(response)
-                if (json.optString("code") == "Ok") {
-                    val routes = json.getJSONArray("routes")
-                    if (routes.length() > 0) {
-                        val route = routes.getJSONObject(0)
-                        val totalDistance = route.optDouble("distance", 0.0)
-                        val totalDuration = route.optDouble("duration", 0.0).toInt()
-
-                        val coordsList = mutableListOf<Pair<Double, Double>>()
-                        val geometry = route.optJSONObject("geometry")
-                        if (geometry != null) {
-                            val coordsArr = geometry.optJSONArray("coordinates")
-                            if (coordsArr != null) {
-                                for (i in 0 until coordsArr.length()) {
-                                    val pt = coordsArr.getJSONArray(i)
-                                    coordsList.add(Pair(pt.getDouble(1), pt.getDouble(0)))
-                                }
-                            }
-                        }
-
-                        val stepsList = mutableListOf<NavigationStep>()
-                        val legsList = mutableListOf<RouteLeg>()
-                        val legs = route.optJSONArray("legs")
-                        
-                        if (legs != null) {
-                            for (legIdx in 0 until legs.length()) {
-                                val leg = legs.getJSONObject(legIdx)
-                                val fromWp = allWaypoints.getOrNull(legIdx) ?: allWaypoints.first()
-                                val toWp = allWaypoints.getOrNull(legIdx + 1) ?: allWaypoints.last()
-                                val legDist = leg.optDouble("distance", 0.0)
-                                val legDur = leg.optDouble("duration", 0.0)
-
-                                val legSteps = mutableListOf<NavigationStep>()
-                                val steps = leg.optJSONArray("steps")
-                                if (steps != null) {
-                                    for (stepIdx in 0 until steps.length()) {
-                                        val stepObj = steps.getJSONObject(stepIdx)
-                                        val stepDist = stepObj.optDouble("distance", 0.0)
-                                        val streetName = stepObj.optString("name", "").trim()
-                                        val maneuver = stepObj.optJSONObject("maneuver")
-                                        val type = maneuver?.optString("type", "") ?: ""
-                                        val modifier = maneuver?.optString("modifier", "") ?: ""
-
-                                        val (instruction, iconType) = translateManeuverToArabic(
-                                            type = type,
-                                            modifier = modifier,
-                                            streetName = streetName,
-                                            destName = toWp.name,
-                                            isLastStep = (legIdx == legs.length() - 1 && stepIdx == steps.length() - 1)
-                                        )
-
-                                        val navStep = NavigationStep(
-                                            instruction = instruction,
-                                            distanceText = MapDistanceCalculator.formatDistance(stepDist),
-                                            distanceMeters = stepDist,
-                                            iconType = iconType,
-                                            streetName = streetName,
-                                            targetWaypointName = toWp.name
-                                        )
-                                        legSteps.add(navStep)
-                                        stepsList.add(navStep)
-                                    }
-                                }
-                                legsList.add(
-                                    RouteLeg(
-                                        fromName = fromWp.name,
-                                        toName = toWp.name,
-                                        distanceKm = legDist / 1000.0,
-                                        timeMinutes = legDur / 60.0,
-                                        instructions = legSteps
-                                    )
-                                )
-                            }
-                        }
-
-                        val formattedDist = MapDistanceCalculator.formatDistance(totalDistance)
-                        val mins = (totalDuration / 60).coerceAtLeast(1)
-                        val formattedDur = if (mins >= 60) "${mins / 60} س و ${mins % 60} د" else "$mins دقيقة"
-
-                        return@withContext NavigationRouteResult(
-                            totalDistanceMeters = totalDistance,
-                            totalDurationSeconds = totalDuration,
-                            formattedDistance = formattedDist,
-                            formattedDuration = formattedDur,
-                            steps = stepsList.ifEmpty { buildDefaultSteps(allWaypoints.map { NavigationWaypoint(it.id, it.name, it.lat, it.lng) }, totalDistance) },
-                            coordinates = coordsList,
-                            isOffline = false,
-                            source = "شبكة الطرق المتعددة 🌐 (OSRM)",
-                            waypoints = allWaypoints.map { NavigationWaypoint(it.id, it.name, it.lat, it.lng) },
-                            totalDistanceKm = totalDistance / 1000.0,
-                            totalTimeMinutes = totalDuration / 60.0,
-                            legs = legsList
-                        )
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            // Fallback to offline
-        }
-
-        calculateOfflineRoute(context, allWaypoints)
-    }
-
-    // Overload for NavigationWaypoint list
-    suspend fun calculateRouteWithWaypoints(
-        context: Context,
-        waypoints: List<NavigationWaypoint>
-    ): NavigationRouteResult = withContext(Dispatchers.IO) {
-        if (waypoints.isEmpty()) {
-            return@withContext NavigationRouteResult(
-                totalDistanceMeters = 0.0,
-                totalDurationSeconds = 0,
-                formattedDistance = "0 م",
-                formattedDuration = "0 دقيقة",
-                steps = listOf(NavigationStep("حدد وجهتك لبدء الملاحة", "0 م", 0.0, "STRAIGHT")),
-                coordinates = emptyList(),
-                isOffline = true,
-                source = "غير محدد",
-                waypoints = waypoints,
-                error = RouteError.EmptyWaypoints
-            )
-        }
-        val origin = waypoints.first().toWaypoint()
-        val rest = waypoints.drop(1).map { it.toWaypoint() }
-        calculateRoute(context, origin, rest)
-    }
-
-    private fun calculateOfflineRoute(
-        context: Context,
-        allWaypoints: List<Waypoint>
-    ): NavigationRouteResult {
-        var totalDistance = 0.0
-        val coordsList = mutableListOf<Pair<Double, Double>>()
-        val stepsList = mutableListOf<NavigationStep>()
-        val legsList = mutableListOf<RouteLeg>()
-
-        for (i in 0 until allWaypoints.size - 1) {
-            val from = allWaypoints[i]
-            val to = allWaypoints[i + 1]
-
-            val directDist = MapDistanceCalculator.calculateDistanceMeters(
-                from.lat, from.lng, to.lat, to.lng
-            )
-            val roadDist = (directDist * 1.26).coerceAtLeast(250.0)
-            totalDistance += roadDist
-
-            coordsList.add(Pair(from.lat, from.lng))
-            coordsList.add(Pair((from.lat + to.lat) / 2.0, (from.lng + to.lng) / 2.0))
-            coordsList.add(Pair(to.lat, to.lng))
-
-            val legSteps = mutableListOf<NavigationStep>()
-            if (roadDist < 1500) {
-                val s1 = NavigationStep("انطلق نحو ${to.name}", MapDistanceCalculator.formatDistance(roadDist * 0.7), roadDist * 0.7, "STRAIGHT", targetWaypointName = to.name)
-                val s2 = NavigationStep("انعطف نحو الوجهة", MapDistanceCalculator.formatDistance(roadDist * 0.3), roadDist * 0.3, "RIGHT", targetWaypointName = to.name)
-                legSteps.add(s1)
-                legSteps.add(s2)
-                stepsList.add(s1)
-                stepsList.add(s2)
-            } else {
-                val s1 = NavigationStep("انطلق على الطريق السريع نحو ${to.name}", MapDistanceCalculator.formatDistance(roadDist * 0.5), roadDist * 0.5, "HIGHWAY", targetWaypointName = to.name)
-                val s2 = NavigationStep("واصل السير حتى الوصول إلى ${to.name}", MapDistanceCalculator.formatDistance(roadDist * 0.5), roadDist * 0.5, "STRAIGHT", targetWaypointName = to.name)
-                legSteps.add(s1)
-                legSteps.add(s2)
-                stepsList.add(s1)
-                stepsList.add(s2)
-            }
-            val arrivalStep = NavigationStep("وصلت إلى: ${to.name}", "0 م", 0.0, "DESTINATION", targetWaypointName = to.name)
-            legSteps.add(arrivalStep)
-            stepsList.add(arrivalStep)
-
-            legsList.add(
-                RouteLeg(
-                    fromName = from.name,
-                    toName = to.name,
-                    distanceKm = roadDist / 1000.0,
-                    timeMinutes = (roadDist / 1000.0) / 45.0 * 60.0,
-                    instructions = legSteps
-                )
-            )
-        }
-
-        val avgSpeedKmh = if (totalDistance > 15000) 65.0 else 40.0
-        val durationSeconds = ((totalDistance / 1000.0) / avgSpeedKmh * 3600).toInt().coerceAtLeast(60)
-
-        val formattedDist = MapDistanceCalculator.formatDistance(totalDistance)
-        val mins = (durationSeconds / 60).coerceAtLeast(1)
-        val formattedDur = if (mins >= 60) "${mins / 60} س و ${mins % 60} د" else "$mins دقيقة"
-
-        val hasTiles = isReady(context)
-        val sourceLabel = if (hasTiles) "خرائط Valhalla اليمنية 🇾🇪 (أوفلاين)" else "محاكي الطرق اليمني 🇾🇪 (أوفلاين)"
-
-        return NavigationRouteResult(
-            totalDistanceMeters = totalDistance,
-            totalDurationSeconds = durationSeconds,
-            formattedDistance = formattedDist,
-            formattedDuration = formattedDur,
-            steps = stepsList,
-            coordinates = coordsList,
-            isOffline = true,
-            source = sourceLabel,
-            waypoints = allWaypoints.map { NavigationWaypoint(it.id, it.name, it.lat, it.lng) },
-            totalDistanceKm = totalDistance / 1000.0,
-            totalTimeMinutes = durationSeconds / 60.0,
-            legs = legsList
-        )
-    }
-
-    private fun translateManeuverToArabic(
-        type: String,
-        modifier: String,
-        streetName: String,
-        destName: String,
-        isLastStep: Boolean
-    ): Pair<String, String> {
-        val streetPart = if (streetName.isNotBlank() && streetName != "unnamed") " إلى $streetName" else ""
-        val onStreetPart = if (streetName.isNotBlank() && streetName != "unnamed") " على $streetName" else ""
-
-        if (isLastStep || type == "arrive") {
-            return Pair("وصلت إلى وجهتك: $destName", "DESTINATION")
-        }
-
-        return when (type) {
-            "depart" -> Pair("انطلق$onStreetPart باتجاه $destName", "STRAIGHT")
-            "turn" -> when (modifier) {
-                "left" -> Pair("انعطف يساراً$streetPart", "LEFT")
-                "right" -> Pair("انعطف يميناً$streetPart", "RIGHT")
-                "sharp left" -> Pair("انعطف يساراً بحِدة$streetPart", "LEFT")
-                "sharp right" -> Pair("انعطف يميناً بحِدة$streetPart", "RIGHT")
-                "slight left" -> Pair("انحرف يساراً قليلاً$streetPart", "LEFT")
-                "slight right" -> Pair("انحرف يميناً قليلاً$streetPart", "RIGHT")
-                "uturn" -> Pair("قم بالدوران للخلف (U-Turn)$streetPart", "ROUNDABOUT")
-                else -> Pair("انعطف$streetPart", "STRAIGHT")
-            }
-            "new name", "continue" -> Pair("واصل السير$onStreetPart", "STRAIGHT")
-            "roundabout", "rotary" -> Pair("ادخل الدوار وسلك المخرج نحو$streetPart", "ROUNDABOUT")
-            "on ramp", "off ramp", "merge" -> Pair("اسلك المسار السريع$onStreetPart", "HIGHWAY")
-            else -> {
-                if (streetName.isNotBlank()) Pair("تابع السير$onStreetPart", "STRAIGHT")
-                else Pair("واصل السير باتجاه $destName", "STRAIGHT")
-            }
-        }
-    }
-
-    private fun buildDefaultSteps(waypoints: List<NavigationWaypoint>, totalDistance: Double): List<NavigationStep> {
-        val dest = waypoints.lastOrNull()?.name ?: "الوجهة"
-        return listOf(
-            NavigationStep("انطلق باتجاه $dest", MapDistanceCalculator.formatDistance(totalDistance * 0.8), totalDistance * 0.8, "STRAIGHT", targetWaypointName = dest),
-            NavigationStep("وصلت إلى: $dest", "0 م", 0.0, "DESTINATION", targetWaypointName = dest)
-        )
-    }
-
-    suspend fun searchAddressAndPlaces(
-        query: String,
-        nearbyProviders: List<ProviderEntity> = emptyList(),
-        nearbyStores: List<StoreEntity> = emptyList()
-    ): List<SearchAddressResult> = withContext(Dispatchers.IO) {
-        val cleanQuery = query.trim()
-        if (cleanQuery.length < 2) return@withContext emptyList()
-
-        val results = mutableListOf<SearchAddressResult>()
-
-        nearbyProviders.filter {
-            it.name.contains(cleanQuery, ignoreCase = true) ||
-            it.specialization.contains(cleanQuery, ignoreCase = true) ||
-            it.area.contains(cleanQuery, ignoreCase = true)
-        }.take(4).forEach { p ->
-            results.add(
-                SearchAddressResult(
-                    displayName = "${p.name} (${p.specialization}) - ${p.area}",
-                    shortName = p.name,
-                    latitude = p.latitude,
-                    longitude = p.longitude,
-                    type = "provider",
-                    icon = "👷"
-                )
-            )
-        }
-
-        nearbyStores.filter {
-            it.name.contains(cleanQuery, ignoreCase = true) ||
-            it.description.contains(cleanQuery, ignoreCase = true) ||
-            it.localNeighborhood.contains(cleanQuery, ignoreCase = true)
-        }.take(4).forEach { s ->
-            val storeArea = s.localNeighborhood.ifBlank { s.cityId }.ifBlank { "متجر معتمد" }
-            results.add(
-                SearchAddressResult(
-                    displayName = "${s.name} - $storeArea",
-                    shortName = s.name,
-                    latitude = s.latitude,
-                    longitude = s.longitude,
-                    type = "store",
-                    icon = "🏪"
-                )
-            )
-        }
-
-        try {
-            val encoded = URLEncoder.encode(cleanQuery, "UTF-8")
-            val urlString = "https://nominatim.openstreetmap.org/search?format=json&q=$encoded&countrycodes=ye&accept-language=ar&limit=8&addressdetails=1"
-            val url = URL(urlString)
-            val connection = (url.openConnection() as HttpURLConnection).apply {
-                connectTimeout = 3500
-                readTimeout = 3500
-                requestMethod = "GET"
-                setRequestProperty("User-Agent", "AlYemenServicesApp/1.0 (Android; OpenStreetMap)")
-            }
-
-            if (connection.responseCode == 200) {
-                val reader = BufferedReader(InputStreamReader(connection.inputStream))
-                val response = reader.readText()
-                reader.close()
-                connection.disconnect()
-
-                val jsonArray = JSONArray(response)
-                for (i in 0 until jsonArray.length()) {
-                    val obj = jsonArray.getJSONObject(i)
-                    val dispName = obj.optString("display_name", "")
-                    val name = obj.optString("name", "").ifBlank { dispName.split(",").firstOrNull() ?: cleanQuery }
-                    val lat = obj.optString("lat", "0").toDoubleOrNull() ?: 0.0
-                    val lon = obj.optString("lon", "0").toDoubleOrNull() ?: 0.0
-                    val type = obj.optString("type", "street")
-
-                    if (lat != 0.0 && lon != 0.0) {
-                        val icon = when {
-                            type.contains("road") || type.contains("highway") || type.contains("street") -> "🛣️"
-                            type.contains("residential") || type.contains("neighbourhood") || type.contains("suburb") -> "🏘️"
-                            type.contains("hospital") || type.contains("clinic") -> "🏥"
-                            type.contains("hotel") || type.contains("restaurant") -> "🏨"
-                            type.contains("shop") || type.contains("market") -> "🛍️"
-                            else -> "📍"
-                        }
-                        results.add(
-                            SearchAddressResult(
-                                displayName = dispName,
-                                shortName = name,
-                                latitude = lat,
-                                longitude = lon,
-                                type = "street",
-                                icon = icon
-                            )
-                        )
-                    }
-                }
-            }
-        } catch (e: Exception) {
-        }
-
-        results.distinctBy { "${it.latitude.toLong()}_${it.longitude.toLong()}_${it.shortName}" }
-    }
 }

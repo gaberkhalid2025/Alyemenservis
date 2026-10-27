@@ -69,6 +69,7 @@ fun OfflineInteractiveMap(
     onPropertySelected: (PropertyEntity) -> Unit,
     onDeselect: () -> Unit,
     onSwitchToRadar: (() -> Unit)? = null,
+    route: com.example.utils.NavRouteResult? = null,
     modifier: Modifier = Modifier
 ) {
     // [تعديل] استخدام إحداثيات GPS الحقيقية أو إحداثيات المدينة كبديل آمن ودقيق
@@ -382,6 +383,50 @@ fun OfflineInteractiveMap(
                     metersPerDegreeLat = metersPerDegreeLat,
                     metersPerDegreeLng = metersPerDegreeLng
                 )
+                
+                // 1.5. Draw Navigation Route Polyline
+                route?.let { res ->
+                    if (res.coordinates.size >= 2) {
+                        val routePath = Path()
+                        val startCoords = res.coordinates[0]
+                        val startX = safeCX + (((startCoords.second - originLng) * metersPerDegreeLng).toFloat() / safeMeters)
+                        val startY = safeCY + (((-(startCoords.first - originLat) * metersPerDegreeLat)).toFloat() / safeMeters)
+                        routePath.moveTo(startX, startY)
+                        
+                        for (i in 1 until res.coordinates.size) {
+                            val pt = res.coordinates[i]
+                            val px = safeCX + (((pt.second - originLng) * metersPerDegreeLng).toFloat() / safeMeters)
+                            val py = safeCY + (((-(pt.first - originLat) * metersPerDegreeLat)).toFloat() / safeMeters)
+                            routePath.lineTo(px, py)
+                        }
+                        
+                        // Outer glow for the route
+                        drawPath(
+                            path = routePath,
+                            color = Color(0xFF00E5FF).copy(alpha = 0.25f),
+                            style = Stroke(width = 12.dp.toPx() / safeZoom, cap = androidx.compose.ui.graphics.StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round)
+                        )
+                        // Main neon route line
+                        drawPath(
+                            path = routePath,
+                            color = Color(0xFF00E5FF),
+                            style = Stroke(width = 6.dp.toPx() / safeZoom, cap = androidx.compose.ui.graphics.StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round)
+                        )
+                        
+                        // Draw stop markers along the route
+                        res.waypoints.forEachIndexed { index, wp ->
+                            if (index > 0) { // Skip origin if it's the user's current location
+                                val wx = safeCX + (((wp.longitude - originLng) * metersPerDegreeLng).toFloat() / safeMeters)
+                                val wy = safeCY + (((-(wp.latitude - originLat) * metersPerDegreeLat)).toFloat() / safeMeters)
+                                val wpCenter = Offset(wx, wy)
+                                
+                                drawCircle(Color(0xFF0F172A), 10.dp.toPx() / safeZoom, wpCenter)
+                                drawCircle(Color(0xFF00E5FF), 8.dp.toPx() / safeZoom, wpCenter, style = Stroke(2.dp.toPx()))
+                                drawCircle(Color.White, 4.dp.toPx() / safeZoom, wpCenter)
+                            }
+                        }
+                    }
+                }
 
                 // 2. User GPS coordinates projection
                 val userXMeters = ((safeUserLng - originLng) * metersPerDegreeLng).toFloat()

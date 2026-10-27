@@ -1,7 +1,7 @@
 package com.example.ui.screens.map.utils
 
 import kotlin.math.*
-import com.example.ui.*
+import com.example.utils.HaversinePrecisionNavigator
 
 /**
  * 🚲 TransportMode - وسيلة التنقل لحساب وقت الوصول المتوقع
@@ -14,30 +14,21 @@ enum class TransportMode(val speedKmH: Double, val icon: String, val labelArabic
 
 /**
  * 🧭 MapDistanceCalculator
- * Precise Haversine distance calculator and ETA estimation (walking: 3.5 km/h, bicycle: 15 km/h, driving: 35 km/h)
+ * محول المسافات ومقدر وقت الوصول المتوقع (ETA) باستخدام المحرك الجيوديسي عالي الدقة.
  */
 object MapDistanceCalculator {
 
-    private const val EARTH_RADIUS_METERS = 6371000.0
-
     /**
-     * Compute Haversine distance in meters between two lat/lng points
+     * حساب المسافة بالامتار بين نقطتين (Haversine)
      */
     fun calculateDistanceMeters(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
         if (lat1 == 0.0 && lon1 == 0.0) return 0.0
         if (lat2 == 0.0 && lon2 == 0.0) return 0.0
-
-        val dLat = Math.toRadians(lat2 - lat1)
-        val dLon = Math.toRadians(lon2 - lon1)
-        val a = sin(dLat / 2) * sin(dLat / 2) +
-                cos(Math.toRadians(lat1)) * cos(Math.toRadians(lat2)) *
-                sin(dLon / 2) * sin(dLon / 2)
-        val c = 2 * atan2(sqrt(a), sqrt(1 - a))
-        return EARTH_RADIUS_METERS * c
+        return HaversinePrecisionNavigator.calculateDistance(lat1, lon1, lat2, lon2)
     }
 
     /**
-     * Format distance in meters to a clean Arabic string ("500 م" or "2.4 كم")
+     * تنسيق المسافة إلى نص عربي (مثلاً "500 م" أو "2.4 كم")
      */
     fun formatDistance(meters: Double): String {
         return if (meters < 1000) {
@@ -48,8 +39,7 @@ object MapDistanceCalculator {
     }
 
     /**
-     * Compute Estimated Time of Arrival (ETA) text with specified or auto transport mode:
-     * Walking speed: 3.5 km/h
+     * حساب وقت الوصول المتوقع (ETA)
      */
     fun computeEta(distanceMeters: Double, mode: TransportMode? = null): String {
         val distKm = distanceMeters / 1000.0

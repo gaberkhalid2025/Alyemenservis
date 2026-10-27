@@ -20,9 +20,9 @@ import java.util.zip.ZipInputStream
 object ValhallaTileDownloader {
 
     const val DEFAULT_DOWNLOAD_URL = "https://github.com/maher202021/Vela2026/releases/download/yemen-valhalla-1/yemen_valhalla_tiles.zip"
-    private const val MARKER_FILE_NAME = "is_valhalla_downloaded.txt"
-    private const val VALHALLA_DIR_NAME = "valhalla"
-    private const val TILE_FILE_NAME = "valhalla_tiles.tar"
+    private const val MARKER_FILE_NAME = NavConfig.VALHALLA_MARKER_FILE
+    private const val VALHALLA_DIR_NAME = NavConfig.VALHALLA_DIR
+    private const val TILE_FILE_NAME = NavConfig.VALHALLA_TILES_FILE
     private const val LOCAL_ZIP_NAME = "yemen_valhalla_tiles.zip"
 
     /**
@@ -94,6 +94,7 @@ object ValhallaTileDownloader {
             zipInputStream.close()
 
             if (extracted) {
+                createValhallaConfig(context)
                 val markerFile = File(valhallaDir, MARKER_FILE_NAME)
                 markerFile.writeText("downloaded_${System.currentTimeMillis()}")
                 onProgress(1.0f, "تم اكتمال التثبيت بنجاح ✓")
@@ -104,6 +105,30 @@ object ValhallaTileDownloader {
         } catch (e: Exception) {
             Result.failure(e)
         }
+    }
+
+
+    /**
+     * إنشاء ملف الإعدادات (valhalla.json) لمحرك الملاحة
+     */
+    private fun createValhallaConfig(context: Context) {
+        val valhallaDir = File(context.filesDir, NavConfig.VALHALLA_DIR)
+        val tilesFile = File(valhallaDir, NavConfig.VALHALLA_TILES_FILE)
+        val configFile = File(valhallaDir, "valhalla.json")
+
+        val configJson = """
+            {
+              "mjolnir": {
+                "tile_dir": "${valhallaDir.absolutePath}",
+                "tile_extract": "${tilesFile.absolutePath}"
+              },
+              "routing": {
+                "results_namespace": "valhalla"
+              }
+            }
+        """.trimIndent()
+
+        configFile.writeText(configJson)
     }
 
     /**
@@ -148,6 +173,7 @@ object ValhallaTileDownloader {
             zipInputStream.close()
 
             if (extracted) {
+                createValhallaConfig(context)
                 File(valhallaDir, MARKER_FILE_NAME).writeText("imported_${System.currentTimeMillis()}")
                 onProgress(1.0f, "تم الاستيراد بنجاح ✓")
                 Result.success(true)
