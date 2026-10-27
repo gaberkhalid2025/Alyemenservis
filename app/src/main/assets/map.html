@@ -311,6 +311,12 @@
                 if (window.AndroidBridge && window.AndroidBridge.onMapReady) {
                     window.AndroidBridge.onMapReady();
                 }
+                setTimeout(function() {
+                    if (map) map.invalidateSize();
+                }, 200);
+                window.addEventListener('resize', function() {
+                    if (map) map.invalidateSize();
+                });
             } catch(e) {
                 console.error("Map init error:", e);
             }

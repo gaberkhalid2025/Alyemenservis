@@ -22,6 +22,9 @@ android {
     versionName = "1.2.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    ndk {
+        abiFilters.addAll(listOf("arm64-v8a", "armeabi-v7a"))
+    }
     buildConfigField("String", "SIGNATURE_HASH", "\"\"")
     buildConfigField("boolean", "IS_PAYMENT_ENABLED", "false")
     val agoraProps = Properties()

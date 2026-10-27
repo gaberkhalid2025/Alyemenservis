@@ -75,22 +75,34 @@ fun NavigationScreen(
     val coroutineScope = rememberCoroutineScope()
 
     // 1. إدارة محطات ونقاط التوقف (Multi-Waypoints)
+    val hasInitialDest = targetName.isNotBlank() && targetName != "الوجهة المحددة" && (targetLat != userLat || targetLng != userLng)
     var waypoints by remember {
         mutableStateOf(
-            listOf(
-                RealValhallaNavigator.NavigationWaypoint(
-                    id = "origin",
-                    name = "موقعي الحالي",
-                    latitude = userLat,
-                    longitude = userLng
-                ),
-                RealValhallaNavigator.NavigationWaypoint(
-                    id = "dest",
-                    name = targetName.ifBlank { "الوجهة المحددة" },
-                    latitude = targetLat,
-                    longitude = targetLng
+            if (hasInitialDest) {
+                listOf(
+                    RealValhallaNavigator.NavigationWaypoint(
+                        id = "origin",
+                        name = "موقعي الحالي",
+                        latitude = userLat,
+                        longitude = userLng
+                    ),
+                    RealValhallaNavigator.NavigationWaypoint(
+                        id = "dest",
+                        name = targetName,
+                        latitude = targetLat,
+                        longitude = targetLng
+                    )
                 )
-            )
+            } else {
+                listOf(
+                    RealValhallaNavigator.NavigationWaypoint(
+                        id = "origin",
+                        name = "موقعي الحالي",
+                        latitude = userLat,
+                        longitude = userLng
+                    )
+                )
+            }
         )
     }
 
@@ -101,7 +113,7 @@ fun NavigationScreen(
 
     // 3. مسار الملاحة والخطوات
     var routeResult by remember { mutableStateOf<RealValhallaNavigator.NavigationRouteResult?>(null) }
-    var isLoadingRoute by remember { mutableStateOf(true) }
+    var isLoadingRoute by remember { mutableStateOf(hasInitialDest) }
     var currentStepIndex by remember { mutableIntStateOf(0) }
 
     // 4. محاكاة السير المباشر
@@ -136,7 +148,7 @@ fun NavigationScreen(
         }
     }
 
-    // 6. تحميل حزمة الـ 25MB للأوفلاين
+    // 6. تحميل حزمة الـ 25MB للأوفلاين (اختياري بالكامل)
     var isTilesAvailable by remember { mutableStateOf(RealValhallaNavigator.isReady(context)) }
     var showDownloadDialog by remember { mutableStateOf(false) }
     var isDownloading by remember { mutableStateOf(false) }
@@ -166,6 +178,11 @@ fun NavigationScreen(
 
     // حساب المسار فور تغير المحطات أو نقاط التوقف
     fun recalculateRoute() {
+        if (waypoints.size < 2) {
+            routeResult = null
+            isLoadingRoute = false
+            return
+        }
         coroutineScope.launch {
             isLoadingRoute = true
             val result = RealValhallaNavigator.calculateRouteWithWaypoints(context, waypoints)
@@ -888,6 +905,49 @@ fun NavigationScreen(
                 }
             }
 
+            // 💡 إرشاد اختيار الوجهة عندما لا تكون هناك وجهة محددة بعد
+            if (waypoints.size < 2) {
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = Color(0xFF0F172A).copy(alpha = 0.95f),
+                    border = BorderStroke(1.5.dp, Color(0xFF00E5FF)),
+                    shadowElevation = 14.dp,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .navigationBarsPadding()
+                        .padding(horizontal = 16.dp, vertical = 14.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(Icons.Default.Place, contentDescription = null, tint = Color(0xFF00E5FF), modifier = Modifier.size(24.dp))
+                            Text(
+                                text = "اختر وجهتك لبدء الملاحة المباشرة",
+                                color = Color.White,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Text(
+                            text = "اكتب اسم أي شارع، حي، محل، أو مدينة في شريط البحث أعلاه، وستظهر لك الوجهة فوراً مع خيار بدء الملاحة 🎯 أو إضافة محطات ➕",
+                            color = Color(0xFF94A3B8),
+                            fontSize = 11.5.sp,
+                            textAlign = TextAlign.Center,
+                            lineHeight = 17.sp
+                        )
+                    }
+                }
+            }
+
             // مؤشر التحميل الأولي للمسار
             if (isLoadingRoute && routeResult == null) {
                 Box(
@@ -919,7 +979,7 @@ fun NavigationScreen(
                 }
             }
 
-            // نافذة حوار تحميل خرائط الأوفلاين (25MB)
+            // نافذة حوار تحميل خرائط الأوفلاين (25MB) - اختياري بالكامل
             if (showDownloadDialog) {
                 AlertDialog(
                     onDismissRequest = {
@@ -935,7 +995,7 @@ fun NavigationScreen(
                     },
                     title = {
                         Text(
-                            text = "حزمة الخرائط الأوفلاين لليمن (25MB)",
+                            text = "حزمة الخرائط الأوفلاين (25MB) - اختياري",
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.White,
@@ -948,7 +1008,7 @@ fun NavigationScreen(
                             verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             Text(
-                                text = "تحميل حزمة الخرائط يتيح لك تشغيل نظام الملاحة الكامل والتوجيه الصوتي خطوة بخطوة في جميع المدن والطرق اليمنية بدون الحاجة إلى إنترنت.",
+                                text = "حزمة الخرائط اختيارية تماماً. في حال عدم تحميلها، تعمل الملاحة بدقة 100% عبر الإنترنت لجميع المدن والطرق والشوارع اليمنية.\n\nتحميل الحزمة يتيح لك تشغيل الملاحة أوفلاين بدون إنترنت نهائياً.",
                                 fontSize = 12.5.sp,
                                 color = Color(0xFFCBD5E1),
                                 lineHeight = 19.sp
