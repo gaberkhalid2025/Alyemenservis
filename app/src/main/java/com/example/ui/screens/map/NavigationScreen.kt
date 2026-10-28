@@ -120,12 +120,25 @@ fun NavigationScreen(
     }
     var isLoadingRoute by remember { mutableStateOf(true) }
 
-    // Fetch route asynchronously
+    // Fetch route asynchronously with CoroutineExceptionHandler & try-catch
+    val exceptionHandler = remember {
+        kotlinx.coroutines.CoroutineExceptionHandler { _, throwable ->
+            android.util.Log.e("NavigationScreen", "Route fetch error: ${throwable.message}", throwable)
+            isLoadingRoute = false
+        }
+    }
     LaunchedEffect(waypoints.toList(), isTilesDownloaded, userLat, userLng) {
         isLoadingRoute = true
-        val originWp = NavWaypoint(name = "موقعي الحالي", latitude = userLat, longitude = userLng, type = WaypointType.START)
-        routeResult = RealValhallaNavigator.calculateRoute(context, originWp, waypoints.toList())
-        isLoadingRoute = false
+        try {
+            val originWp = NavWaypoint(name = "موقعي الحالي", latitude = userLat, longitude = userLng, type = WaypointType.START)
+            routeResult = withContext(Dispatchers.IO) {
+                RealValhallaNavigator.calculateRoute(context, originWp, waypoints.toList())
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("NavigationScreen", "Exception in route calculation: ${e.message}", e)
+        } finally {
+            isLoadingRoute = false
+        }
     }
 
     val totalDistanceMeters = routeResult?.totalDistanceMeters ?: 1000.0

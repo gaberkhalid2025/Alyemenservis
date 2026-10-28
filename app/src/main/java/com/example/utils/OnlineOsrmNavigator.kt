@@ -1,5 +1,6 @@
 package com.example.utils
 
+import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -10,9 +11,11 @@ import java.net.URL
 
 /**
  * 🌐 OnlineOsrmNavigator
- * محرك الملاحة عبر الإنترنت باستخدام OSRM.
+ * محرك الملاحة عبر الإنترنت باستخدام OSRM مع مهام أمان وخووارزميات وقت المهلة (Timeouts).
  */
 object OnlineOsrmNavigator {
+
+    private const val TAG = "OnlineOsrmNavigator"
 
     suspend fun calculateRoute(
         origin: NavWaypoint,
@@ -37,8 +40,8 @@ object OnlineOsrmNavigator {
             val urlString = "${NavConfig.OSRM_BASE_URL}$coordsParam?overview=full&geometries=geojson&steps=true"
             val url = URL(urlString)
             val connection = (url.openConnection() as HttpURLConnection).apply {
-                connectTimeout = 5000
-                readTimeout = 5000
+                connectTimeout = 8000
+                readTimeout = 15000
                 requestMethod = "GET"
                 setRequestProperty("User-Agent", "AlYemenServicesApp/1.0")
             }
@@ -139,6 +142,7 @@ object OnlineOsrmNavigator {
                 error = NavError.RouteNotFound
             )
         } catch (e: Exception) {
+            Log.e(TAG, "OSRM exception: ${e.message}", e)
             return@withContext NavRouteResult(
                 totalDistanceMeters = 0.0,
                 totalDurationSeconds = 0.0,

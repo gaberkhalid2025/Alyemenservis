@@ -26,21 +26,15 @@
             height: 100%;
             position: relative;
             overflow: hidden;
-            perspective: 1200px;
         }
         #map {
             width: 100%;
             height: 100%;
             background-color: #0B1120;
-            transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-            transform-origin: 50% 65%;
-        }
-        /* 🏙️ Vela 3D Tilt & Rotation Perspective View */
-        #map.vela-3d-tilt {
-            transform: perspective(1200px) rotateX(35deg) rotateZ(0deg) scale(1.1);
+            transition: transform 0.3s ease;
         }
 
-        /* Marker Badge Design - مطابق للصورة 3 تماماً */
+        /* Marker Badge Design */
         .custom-leaflet-marker {
             background: transparent !important;
             border: none !important;
@@ -126,7 +120,6 @@
             100% { transform: scale(1.9); opacity: 0; }
         }
 
-        /* 3D Mode Floating Indicator */
         .mode-indicator {
             position: absolute;
             top: 14px;
@@ -146,11 +139,9 @@
             pointer-events: none;
         }
 
-        /* Leaflet Controls Customization */
         .leaflet-control-zoom {
             display: none !important;
         }
-        /* [إصلاح نهائي] تصغير نص الإسناد ومنع النقر أو التنقل منه نهائياً */
         .leaflet-control-attribution {
             background: rgba(15, 23, 42, 0.65) !important;
             color: #64748B !important;
@@ -185,360 +176,191 @@
     <script>
         var map;
         var currentBaseLayer;
-        var currentLabelsLayer = null;
         var markerClusterGroup;
         var userMarker = null;
         var userAccuracyCircle = null;
         var userLat = 15.3694;
         var userLng = 44.1910;
-        var activeMode = 'AERIAL_OAM';
+        var activeMode = 'SATELLITE';
 
-        // 🛰️ Free Global Tile Providers (Deep Zoom System: maxZoom 24, maxNativeZoom 20)
         var providers = {
-            // 1. OpenStreetMap Standard (الرسمية)
-            'osm': {
-                base: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    subdomains: ['a', 'b', 'c'],
-                    minZoom: 3,
-                    maxZoom: 24,
-                    maxNativeZoom: 20,
-                    attribution: '© OpenStreetMap Standard'
-                }),
-                labels: null
-            },
-            // 2. خريطة الشوارع الحية (HOT)
-            'hot': {
-                base: L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
-                    minZoom: 3,
-                    maxZoom: 24,
-                    maxNativeZoom: 20,
-                    attribution: '© OpenStreetMap HOT'
-                }),
-                labels: null
-            },
-            // 3. خريطة العالم والتضاريس (Topo)
-            'topo': {
-                base: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
-                    minZoom: 3,
-                    maxZoom: 24,
-                    maxNativeZoom: 20,
-                    attribution: '© OpenTopoMap'
-                }),
-                labels: null
-            },
-            // 4. صور الأقمار الصناعية الهجينة باللغة العربية (Satellite Hybrid in Arabic)
-            'satellite': {
-                base: L.tileLayer('https://mt{s}.google.com/vt/lyrs=y&hl=ar&x={x}&y={y}&z={z}', {
-                    subdomains: ['0', '1', '2', '3'],
-                    minZoom: 3,
-                    maxZoom: 24,
-                    maxNativeZoom: 20,
-                    attribution: '© صور الأقمار الصناعية'
-                }),
-                labels: null
-            },
-            // 5. صور الأقمار الصناعية البديلة (Esri)
-            'esri': {
-                base: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-                    minZoom: 3,
-                    maxZoom: 24,
-                    maxNativeZoom: 20,
-                    attribution: '© Esri Satellite'
-                }),
-                labels: L.tileLayer('https://mt{s}.google.com/vt/lyrs=h&hl=ar&x={x}&y={y}&z={z}', {
-                    subdomains: ['0', '1', '2', '3'],
-                    minZoom: 3,
-                    maxZoom: 24,
-                    maxNativeZoom: 20,
-                    attribution: ''
-                })
-            },
-            // 6. Vela 3D (خريطة ثلاثية الأبعاد تفاعلية)
-            'vela_3d': {
-                base: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    subdomains: ['a', 'b', 'c'],
-                    minZoom: 3,
-                    maxZoom: 24,
-                    maxNativeZoom: 20,
-                    attribution: '© OpenStreetMap 3D'
-                }),
-                labels: null
-            },
-            // 7. صور OpenAerialMap الجوية عالية الدقة (OAM)
-            'oam': {
-                base: L.tileLayer('https://tiles.openaerialmap.org/{z}/{x}/{y}.png', {
-                    minZoom: 3,
-                    maxZoom: 24,
-                    maxNativeZoom: 20,
-                    attribution: '© OpenAerialMap'
-                }),
-                labels: null
-            }
+            'osm': L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 24, maxNativeZoom: 19, subdomains: ['a', 'b', 'c'], attribution: 'OSM'
+            }),
+            'hot': L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
+                maxZoom: 24, maxNativeZoom: 19, subdomains: ['a', 'b', 'c'], attribution: 'HOT'
+            }),
+            'topo': L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+                maxZoom: 24, maxNativeZoom: 17, subdomains: ['a', 'b', 'c'], attribution: 'Topo'
+            }),
+            'satellite': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                maxZoom: 24, maxNativeZoom: 19, attribution: 'Esri'
+            })
         };
 
-        function initMap() {
+        function initMap(lat, lng, mode) {
+            userLat = lat || 15.3694;
+            userLng = lng || 44.1910;
+            activeMode = mode || 'SATELLITE';
+
             try {
-                // Initialize map centered on Sana'a by default with Deep Zoom System
                 map = L.map('map', {
-                    center: [userLat, userLng],
-                    zoom: 15,
-                    minZoom: 3,
-                    maxZoom: 24,
-                    zoomDelta: 0.5,
-                    zoomSnap: 0.25,
                     zoomControl: false,
-                    attributionControl: true
-                });
+                    attributionControl: true,
+                    fadeAnimation: true,
+                    zoomAnimation: true
+                }).setView([userLat, userLng], 15);
 
-                // [إصلاح نهائي] إزالة رابط البادئة من نص الإسناد لمنع أي نقر أو انتقال خارجي
-                if (map.attributionControl) {
-                    map.attributionControl.setPrefix('');
-                }
+                setLayer(activeMode);
 
-                // 🛰️ Default: Open with Satellite mode directly
-                currentBaseLayer = providers['satellite'].base.addTo(map);
-                if (providers['satellite'].labels) {
-                    currentLabelsLayer = providers['satellite'].labels.addTo(map);
-                }
-
-                // Marker Cluster Group with custom styling and individual pins on city zoom
                 markerClusterGroup = L.markerClusterGroup({
-                    maxClusterRadius: 20,
-                    disableClusteringAtZoom: 13,
+                    maxClusterRadius: 40,
                     spiderfyOnMaxZoom: true,
-                    showCoverageOnHover: false,
-                    zoomToBoundsOnClick: true
+                    showCoverageOnHover: false
                 });
                 map.addLayer(markerClusterGroup);
 
-                // Map background click
-                map.on('click', function(e) {
-                    if (window.AndroidBridge && window.AndroidBridge.onMapClicked) {
-                        window.AndroidBridge.onMapClicked();
-                    }
-                });
+                updateUserLocation(userLat, userLng, 50, false);
 
                 if (window.AndroidBridge && window.AndroidBridge.onMapReady) {
                     window.AndroidBridge.onMapReady();
                 }
-                setTimeout(function() {
-                    if (map) map.invalidateSize();
-                }, 200);
-                window.addEventListener('resize', function() {
-                    if (map) map.invalidateSize();
-                });
-            } catch(e) {
+            } catch (e) {
                 console.error("Map init error:", e);
             }
         }
 
-        // 🔄 Switch Modes: 'OSM', 'HOT', 'TOPO', 'SATELLITE', 'VELA_3D'
-        // [إصلاح نهائي] واجهة برمجية للتبديل بين الطبقات الأربعة الرسمية للخريطة
-        function switchMapMode(modeKey) {
-            activeMode = modeKey;
-            var mapEl = document.getElementById('map');
-            var modeIcon = document.getElementById('modeIcon');
-            var modeTitle = document.getElementById('modeTitle');
-
-            // Remove existing layers
-            if (currentBaseLayer) map.removeLayer(currentBaseLayer);
-            if (currentLabelsLayer) map.removeLayer(currentLabelsLayer);
-
-            var key = (modeKey || 'SATELLITE').toUpperCase();
-            if (key === 'VELA_3D') {
-                currentBaseLayer = providers['vela_3d'].base.addTo(map);
-                currentLabelsLayer = null;
-                currentBaseLayer.bringToBack();
-                mapEl.classList.add('vela-3d-tilt');
-                modeIcon.innerText = '🏙️';
-                modeTitle.innerText = 'Vela 3D (مباني ثلاثية الأبعاد)';
-            } else if (key === 'OSM') {
-                currentBaseLayer = providers['osm'].base.addTo(map);
-                currentLabelsLayer = null;
-                currentBaseLayer.bringToBack();
-                mapEl.classList.remove('vela-3d-tilt');
-                modeIcon.innerText = '🌐';
-                modeTitle.innerText = 'OpenStreetMap Standard';
-            } else if (key === 'HOT') {
-                currentBaseLayer = providers['hot'].base.addTo(map);
-                currentLabelsLayer = null;
-                currentBaseLayer.bringToBack();
-                mapEl.classList.remove('vela-3d-tilt');
-                modeIcon.innerText = '🗺️';
-                modeTitle.innerText = 'خريطة الشوارع الحيوية (HOT)';
-            } else if (key === 'TOPO') {
-                currentBaseLayer = providers['topo'].base.addTo(map);
-                currentLabelsLayer = null;
-                currentBaseLayer.bringToBack();
-                mapEl.classList.remove('vela-3d-tilt');
-                modeIcon.innerText = '⛰️';
-                modeTitle.innerText = 'خريطة التضاريس (Topo)';
-            } else if (key === 'OAM') {
-                currentBaseLayer = providers['oam'].base.addTo(map);
-                currentLabelsLayer = null;
-                currentBaseLayer.bringToBack();
-                mapEl.classList.remove('vela-3d-tilt');
-                modeIcon.innerText = '📷';
-                modeTitle.innerText = 'صور OpenAerialMap الجوية';
-            } else {
-                // Default: SATELLITE
-                currentBaseLayer = providers['satellite'].base.addTo(map);
-                if (providers['satellite'].labels) {
-                    currentLabelsLayer = providers['satellite'].labels.addTo(map);
-                }
-                currentBaseLayer.bringToBack();
-                mapEl.classList.remove('vela-3d-tilt');
-                modeIcon.innerText = '🛰️';
-                modeTitle.innerText = 'صور الأقمار الصناعية (Satellite)';
+        function setLayer(mode) {
+            activeMode = mode || 'SATELLITE';
+            if (currentBaseLayer && map) {
+                map.removeLayer(currentBaseLayer);
             }
 
-            if (window.AndroidBridge && window.AndroidBridge.onMapModeChanged) {
-                window.AndroidBridge.onMapModeChanged(key);
+            var providerKey = 'satellite';
+            var title = 'أقمار صناعية (عالي الدقة)';
+            var icon = '🛰️';
+
+            if (mode === 'OSM') {
+                providerKey = 'osm';
+                title = 'خريطة الشوارع القياسية (OSM)';
+                icon = '🌐';
+            } else if (mode === 'HOT') {
+                providerKey = 'hot';
+                title = 'خريطة الشوارع الحية (HOT)';
+                icon = '🗺️';
+            } else if (mode === 'TOPO') {
+                providerKey = 'topo';
+                title = 'التضاريس والارتفاعات (Topo)';
+                icon = '⛰️';
+            } else if (mode === 'VELA_3D') {
+                providerKey = 'satellite';
+                title = 'Vela 3D (مباني ثلاثية الأبعاد)';
+                icon = '🏙️';
+            } else if (mode === 'SATELLITE') {
+                providerKey = 'satellite';
+                title = 'أقمار صناعية (عالي الدقة)';
+                icon = '🛰️';
             }
-        }
-        window.switchMapMode = switchMapMode;
 
-        var currentTilt = 0;
-        var currentRotation = 0;
-
-        function setMapPerspective(tilt, rotation) {
-            currentTilt = tilt !== undefined ? tilt : currentTilt;
-            currentRotation = rotation !== undefined ? rotation : currentRotation;
-            var mapEl = document.getElementById('map');
-            if (mapEl) {
-                if (currentTilt > 0 || currentRotation !== 0) {
-                    mapEl.style.transform = 'perspective(1200px) rotateX(' + currentTilt + 'deg) rotateZ(' + currentRotation + 'deg) scale(1.1)';
-                    mapEl.classList.add('vela-3d-tilt');
-                } else {
-                    mapEl.style.transform = 'none';
-                    mapEl.classList.remove('vela-3d-tilt');
-                }
+            if (providers[providerKey] && map) {
+                currentBaseLayer = providers[providerKey];
+                currentBaseLayer.addTo(map);
             }
-        }
-        window.setMapPerspective = setMapPerspective;
 
-        function setMapTilt(tilt) {
-            setMapPerspective(tilt, currentRotation);
+            var iconEl = document.getElementById('modeIcon');
+            var titleEl = document.getElementById('modeTitle');
+            if (iconEl) iconEl.innerText = icon;
+            if (titleEl) titleEl.innerText = title;
         }
-        window.setMapTilt = setMapTilt;
 
-        function setMapRotation(rotation) {
-            setMapPerspective(currentTilt, rotation);
+        function switchMapMode(mode) {
+            setLayer(mode);
         }
-        window.setMapRotation = setMapRotation;
 
-        // Update GPS Location
-        function updateUserLocation(lat, lng, accuracy, shouldPan) {
-            if (!lat || !lng || isNaN(lat) || isNaN(lng)) return;
+        function updateUserLocation(lat, lng, accuracy, pan) {
             userLat = lat;
             userLng = lng;
-
-            var userIcon = L.divIcon({
-                className: '',
-                html: '<div class="user-pulse-marker"><div class="user-pulse"></div><div class="user-dot"></div></div>',
-                iconSize: [24, 24],
-                iconAnchor: [12, 12]
-            });
-
-            if (!userMarker) {
-                userMarker = L.marker([lat, lng], {
-                    icon: userIcon,
-                    zIndexOffset: 1000
-                }).addTo(map);
-            } else {
+            if (!map) return;
+            if (userMarker) {
                 userMarker.setLatLng([lat, lng]);
-            }
-
-            if (accuracy && accuracy > 0 && accuracy < 3000) {
-                if (!userAccuracyCircle) {
-                    userAccuracyCircle = L.circle([lat, lng], {
-                        radius: accuracy,
-                        color: '#00E5FF',
-                        weight: 1.5,
-                        fillColor: '#00E5FF',
-                        fillOpacity: 0.12
-                    }).addTo(map);
-                } else {
-                    userAccuracyCircle.setLatLng([lat, lng]);
-                    userAccuracyCircle.setRadius(accuracy);
-                }
-            }
-
-            if (shouldPan && map) {
-                map.panTo([lat, lng], { animate: true });
-            }
-        }
-
-        // Markers Population with Rich Category Styling
-        var activeMarkers = [];
-        function setMarkers(markersJsonStr) {
-            try {
-                if (!markerClusterGroup) return;
-                // [إصلاح تسريب الذاكرة] فصل كافة مستمعي الأحداث قبل تفريغ العلامات
-                if (activeMarkers && activeMarkers.length > 0) {
-                    for (var i = 0; i < activeMarkers.length; i++) {
-                        if (activeMarkers[i] && activeMarkers[i].off) {
-                            activeMarkers[i].off();
-                        }
-                    }
-                    activeMarkers = [];
-                }
-                markerClusterGroup.clearLayers();
-                var items = (typeof markersJsonStr === 'string') ? JSON.parse(markersJsonStr) : markersJsonStr;
-                if (!items || !items.length) return;
-
-                items.forEach(function(item) {
-                    if (!item.lat || !item.lng || item.lat === 0.0 || item.lng === 0.0) return;
-                    var pinBg = item.badgeColor || '#00E5FF';
-                    var emoji = item.emoji || '📍';
-                    var displayName = item.name || '';
-                    if (displayName.length > 20) {
-                        displayName = displayName.substring(0, 19) + '…';
-                    }
-
-                    var iconHtml = '<div class="custom-pin-container">' +
-                        '<div class="custom-pin-head" style="background-color: ' + pinBg + ';">' + emoji + '</div>' +
-                        (displayName ? '<div class="custom-pin-label">' + displayName + '</div>' : '') +
-                        '</div>';
-
-                    var customIcon = L.divIcon({
-                        className: 'custom-leaflet-marker',
-                        html: iconHtml,
-                        iconSize: [145, 66],
-                        iconAnchor: [72.5, 19]
-                    });
-
-                    var marker = L.marker([item.lat, item.lng], { icon: customIcon });
-                    marker.on('click', function(e) {
-                        L.DomEvent.stopPropagation(e);
-                        if (window.AndroidBridge && window.AndroidBridge.onMarkerClicked) {
-                            window.AndroidBridge.onMarkerClicked(item.id, item.type);
-                        }
-                    });
-                    activeMarkers.push(marker);
-                    markerClusterGroup.addLayer(marker);
+                if (userAccuracyCircle) userAccuracyCircle.setLatLng([lat, lng]);
+                if (pan) map.setView([lat, lng], map.getZoom());
+            } else {
+                var pulseHtml = '<div class="user-pulse-marker"><div class="user-pulse"></div><div class="user-dot"></div></div>';
+                var icon = L.divIcon({
+                    className: 'custom-leaflet-marker',
+                    html: pulseHtml,
+                    iconSize: [24, 24],
+                    iconAnchor: [12, 12]
                 });
-            } catch(e) {
-                console.error("Error setting markers:", e);
+                userMarker = L.marker([lat, lng], {icon: icon}).addTo(map);
+                userAccuracyCircle = L.circle([lat, lng], {
+                    radius: accuracy || 50,
+                    color: '#00E5FF',
+                    fillColor: '#00E5FF',
+                    fillOpacity: 0.15,
+                    weight: 1
+                }).addTo(map);
+                if (pan) map.setView([lat, lng], 15);
             }
         }
 
-        // [دعم Base64 لمنع أي مشاكل تشفير للنصوص العربية والإيموجي]
-        function setMarkersBase64(b64Str) {
+        function setMarkersBase64(b64) {
             try {
-                var jsonStr = decodeURIComponent(escape(window.atob(b64Str)));
-                setMarkers(jsonStr);
-            } catch(e) {
-                console.error("Base64 error", e);
-                setMarkers(b64Str);
+                var jsonStr = decodeURIComponent(escape(window.atob(b64)));
+                var markers = JSON.parse(jsonStr);
+                setMarkersList(markers);
+            } catch (e) {
+                console.error("setMarkersBase64 error:", e);
             }
         }
-        window.setMarkersBase64 = setMarkersBase64;
 
-        function setCity(cityName, lat, lng, zoomLevel) {
-            if (map && lat && lng) {
-                map.setView([lat, lng], zoomLevel || 15, { animate: true });
+        function setMarkers(jsonStr) {
+            try {
+                var markers = JSON.parse(jsonStr);
+                setMarkersList(markers);
+            } catch (e) {
+                console.error("setMarkers error:", e);
             }
+        }
+
+        function setMarkersList(markers) {
+            if (!markerClusterGroup) return;
+            markerClusterGroup.clearLayers();
+            markers.forEach(function(m) {
+                var emoji = '📍';
+                var color = '#2563EB';
+                if (m.category === 'store') { emoji = '🏪'; color = '#10B981'; }
+                else if (m.category === 'provider') { emoji = '👷'; color = '#3B82F6'; }
+                else if (m.category === 'property') { emoji = '🏢'; color = '#F59E0B'; }
+
+                var html = '<div class="custom-pin-container" onclick="onMarkerClick(\'' + m.id + '\', \'' + m.category + '\')">' +
+                           '<div class="custom-pin-head" style="background-color: ' + color + ';">' + emoji + '</div>' +
+                           '<div class="custom-pin-label">' + m.title + '</div>' +
+                           '</div>';
+
+                var icon = L.divIcon({
+                    className: 'custom-leaflet-marker',
+                    html: html,
+                    iconSize: [145, 65],
+                    iconAnchor: [72, 38]
+                });
+
+                var marker = L.marker([m.lat, m.lng], {icon: icon});
+                marker.entityId = m.id;
+                marker.category = m.category;
+                markerClusterGroup.addLayer(marker);
+            });
+        }
+
+        function setCity(name, lat, lng, zoom) {
+            if (map) {
+                map.setView([lat, lng], zoom || 14);
+            }
+        }
+
+        function setMapPerspective(tilt, rotation) {
+            // No CSS tilt skewing to prevent trapezoid distortion
         }
 
         function zoomIn() {
@@ -551,76 +373,21 @@
 
         function recenterUser() {
             if (map && userLat && userLng) {
-                map.invalidateSize();
-                map.setView([userLat, userLng], 16, { animate: true });
+                map.setView([userLat, userLng], 15);
             }
         }
 
-        // 🛣️ رسم مسار الملاحة المباشر بدقة الشوارع (Route Polyline)
-        var activeRoutePolyline = null;
-        var activeRouteBorder = null;
-        var routeWaypointMarkers = [];
-
-        function drawRoute(coordsJson, colorHex) {
-            try {
-                clearRoute();
-                if (!map || !coordsJson) return;
-                var pts = (typeof coordsJson === 'string') ? JSON.parse(coordsJson) : coordsJson;
-                if (!pts || !pts.length) return;
-
-                // رسم خط التوهج الخلفي (Outer Glow)
-                activeRouteBorder = L.polyline(pts, {
-                    color: '#0F172A',
-                    weight: 9,
-                    opacity: 0.7,
-                    lineJoin: 'round',
-                    lineCap: 'round'
-                }).addTo(map);
-
-                // رسم المسار الرئيسي المضيء (Neon Cyan / Emerald)
-                activeRoutePolyline = L.polyline(pts, {
-                    color: colorHex || '#00E5FF',
-                    weight: 5.5,
-                    opacity: 0.95,
-                    lineJoin: 'round',
-                    lineCap: 'round'
-                }).addTo(map);
-
-                // ضبط إطار الرؤية ليشمل كامل المسار مع هامش مريح
-                map.invalidateSize();
-                map.fitBounds(activeRoutePolyline.getBounds(), {
-                    padding: [60, 60],
-                    animate: true,
-                    maxZoom: 17
-                });
-            } catch(e) {
-                console.error("drawRoute error:", e);
+        function onMarkerClick(id, category) {
+            if (window.AndroidBridge && window.AndroidBridge.onMarkerSelected) {
+                window.AndroidBridge.onMarkerSelected(id, category);
             }
         }
-        window.drawRoute = drawRoute;
 
-        function clearRoute() {
-            try {
-                if (activeRouteBorder && map) {
-                    map.removeLayer(activeRouteBorder);
-                    activeRouteBorder = null;
-                }
-                if (activeRoutePolyline && map) {
-                    map.removeLayer(activeRoutePolyline);
-                    activeRoutePolyline = null;
-                }
-                if (routeWaypointMarkers && routeWaypointMarkers.length) {
-                    routeWaypointMarkers.forEach(function(m) { if (map) map.removeLayer(m); });
-                    routeWaypointMarkers = [];
-                }
-            } catch(e) {
-                console.error("clearRoute error:", e);
-            }
-        }
-        window.clearRoute = clearRoute;
-
+        // Auto initialize on load if not called by Android view
         window.onload = function() {
-            initMap();
+            if (!map) {
+                initMap(15.3694, 44.1910, 'SATELLITE');
+            }
         };
     </script>
 </body>
