@@ -55,6 +55,8 @@ fun RealLeafletMapView(
     onDeselect: () -> Unit = {},
     onSwitchToRadar: (() -> Unit)? = null,
     onMapLoadFailed: (() -> Unit)? = null,
+    tilt: Float = 35f,
+    rotation: Float = 0f,
     themeColors: VisualThemePalette = resolveThemePalette(AdminSettingsEntity()),
     modifier: Modifier = Modifier
 ) {
@@ -124,6 +126,14 @@ fun RealLeafletMapView(
         if (isMapReady && webViewRef != null) {
             val cityCoords = OfflineMapManager.getCityCoordinates(selectedCity)
             val script = "if (window.setCity) { window.setCity('${cityCoords.nameAr}', ${cityCoords.latitude}, ${cityCoords.longitude}, ${cityCoords.defaultZoom}); }"
+            webViewRef?.evaluateJavascript(script, null)
+        }
+    }
+
+    // تطبيق إمالة الكاميرا ثلاثية الأبعاد والدوران (3D Tilt & Rotation Perspective)
+    LaunchedEffect(isMapReady, tilt, rotation) {
+        if (isMapReady && webViewRef != null) {
+            val script = "if (window.setMapPerspective) { window.setMapPerspective($tilt, $rotation); }"
             webViewRef?.evaluateJavascript(script, null)
         }
     }

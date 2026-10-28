@@ -57,10 +57,41 @@ class MapScreenState(
     var bookingProviderTarget by mutableStateOf<ProviderEntity?>(null)
     var isNavigating by mutableStateOf(false)
     val dynamicOffsets = mutableStateMapOf<String, Pair<Double, Double>>()
+    val selectedWaypoints = mutableStateListOf<com.example.utils.NavWaypoint>()
+
+    fun addWaypoint(entity: Any) {
+        val name = when (entity) {
+            is com.example.data.ProviderEntity -> entity.name
+            is com.example.data.StoreEntity -> entity.name
+            is com.example.data.PropertyEntity -> entity.title
+            else -> "نقطة غير معروفة"
+        }
+        val lat = when (entity) {
+            is com.example.data.ProviderEntity -> entity.latitude
+            is com.example.data.StoreEntity -> entity.latitude
+            is com.example.data.PropertyEntity -> entity.latitude
+            else -> 0.0
+        }
+        val lng = when (entity) {
+            is com.example.data.ProviderEntity -> entity.longitude
+            is com.example.data.StoreEntity -> entity.longitude
+            is com.example.data.PropertyEntity -> entity.longitude
+            else -> 0.0
+        }
+        
+        if (lat != 0.0 && lng != 0.0) {
+            selectedWaypoints.add(com.example.utils.NavWaypoint(name = name, latitude = lat, longitude = lng))
+        }
+    }
+
+    fun removeWaypoint(waypoint: com.example.utils.NavWaypoint) {
+        selectedWaypoints.remove(waypoint)
+    }
 
     fun resetSelection() {
         selectedEntity = null
         bookingProviderTarget = null
+        selectedWaypoints.clear()
     }
 
     fun clearOffsets() {

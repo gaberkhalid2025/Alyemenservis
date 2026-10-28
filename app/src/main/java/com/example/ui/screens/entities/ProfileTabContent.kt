@@ -138,18 +138,103 @@ fun ProfileTabContent(
                 }
             }
         }
-        2 -> {
-            // Warranty / Working Hours / Policy
-            Card(
-                colors = CardDefaults.cardColors(containerColor = themeColors.surface),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("📜 الشروط والضمان المعتمد بالمنصة", fontWeight = FontWeight.Bold, color = themeColors.accent, fontSize = 13.sp)
-                    Text("• جميع التعاملات تخضع لميثاق الجودة والحماية في دليل خدمات اليمن.", color = Color.White, fontSize = 11.sp)
-                    Text("• إمكانية استرجاع الرسوم أو رفع شكوى مباشرة لإدارة المنصة في حال الإخلال بالمواصفات.", color = Color.LightGray, fontSize = 11.sp)
-                    Text("• الدفع المباشر عبر المحافظ الإلكترونية المعتمدة (الكريمي، جيب، جوالي، ون كاش).", color = Color.LightGray, fontSize = 11.sp)
+        else -> {
+            when (entityType) {
+                ProfileEntityType.TECHNICIAN -> {
+                    when (selectedTab) {
+                        0 -> {
+                            // الخدمات
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                                shape = RoundedCornerShape(14.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Text("🛠️ الخدمات التخصصية المعتمدة", fontWeight = FontWeight.Bold, color = themeColors.accent, fontSize = 13.5.sp)
+                                    val servicesList = provider?.profession?.split("،", ",", "-")?.map { it.trim() }?.filter { it.isNotBlank() } ?: emptyList()
+                                    if (servicesList.isEmpty()) {
+                                        Text(text = "• ${provider?.specialization?.ifBlank { "خدمات صيانة وتركيبات متكاملة" }}", color = Color.White, fontSize = 12.sp)
+                                        Text(text = "• فحص وتشخيص الأعطال بدقة عالية", color = Color.White, fontSize = 12.sp)
+                                        Text(text = "• توفير قطع الغيار الأصلية وضمان جودة التنفيذ", color = Color.White, fontSize = 12.sp)
+                                    } else {
+                                        servicesList.forEach { s ->
+                                            Text(text = "• $s", color = Color.White, fontSize = 12.sp)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        2 -> {
+                            // المعرض وسابقة الأعمال
+                            val photos = provider?.workPhotosBase64 ?: emptyList()
+                            if (photos.isEmpty()) {
+                                EmptyStateBox("لا توجد صور سابقة أعمال مرفوعة حالياً في المعرض.", themeColors)
+                            } else {
+                                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    items(photos) { photo ->
+                                        Card(
+                                            modifier = Modifier.size(130.dp),
+                                            shape = RoundedCornerShape(12.dp)
+                                        ) {
+                                            SmartAsyncImage(model = photo, contentDescription = "عمل سابق", modifier = Modifier.fillMaxSize())
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        3 -> {
+                            // عن الفني
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                                shape = RoundedCornerShape(14.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Text("👤 النبذة المهنية والخبرات", fontWeight = FontWeight.Bold, color = themeColors.accent, fontSize = 13.5.sp)
+                                    Text(text = provider?.specialization?.ifBlank { "فني متخصص معتمد لدى منصة دليل خدمات اليمن بخبرة ممتدة واحترافية عالية." } ?: "", color = Color.White, fontSize = 12.sp, lineHeight = 18.sp)
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text("📍 مناطق التغطية وتقديم الخدمة:", fontWeight = FontWeight.Bold, color = Color(0xFF38BDF8), fontSize = 12.sp)
+                                    Text(text = "${provider?.area ?: "صنعاء"} - ${provider?.localNeighborhood ?: "كافة الأحياء والمناطق المجاورة"}", color = Color.LightGray, fontSize = 11.5.sp)
+                                }
+                            }
+                        }
+                        4 -> {
+                            // أوقات العمل
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                                shape = RoundedCornerShape(14.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Text("⏰ أوقات العمل والجاهزية الميدانية", fontWeight = FontWeight.Bold, color = themeColors.accent, fontSize = 13.5.sp)
+                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        Surface(shape = RoundedCornerShape(999.dp), color = Color(0xFF10B981).copy(alpha = 0.2f)) {
+                                            Text("🟢 متاح الآن لاستقبال الطلبات", color = Color(0xFF10B981), fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp))
+                                        }
+                                    }
+                                    Text("• من السبت إلى الخميس: 8:00 صباحاً – 10:00 مساءً", color = Color.White, fontSize = 11.5.sp)
+                                    Text("• الجمعة: للحالات الطارئة والطلبات العاجلة فقط", color = Color.LightGray, fontSize = 11.sp)
+                                }
+                            }
+                        }
+                        else -> {
+                            EmptyStateBox("لا توجد تفاصيل إضافية لهذا التبويب.", themeColors)
+                        }
+                    }
+                }
+                else -> {
+                    // Default for other entities
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("📜 الشروط والضمان المعتمد بالمنصة", fontWeight = FontWeight.Bold, color = themeColors.accent, fontSize = 13.sp)
+                            Text("• جميع التعاملات تخضع لميثاق الجودة والحماية في دليل خدمات اليمن.", color = Color.White, fontSize = 11.sp)
+                            Text("• إمكانية الدفع المباشر والتواصل الفوري مع مزود الخدمة.", color = Color.LightGray, fontSize = 11.sp)
+                        }
+                    }
                 }
             }
         }

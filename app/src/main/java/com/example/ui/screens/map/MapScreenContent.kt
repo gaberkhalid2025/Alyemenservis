@@ -13,6 +13,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -44,6 +46,7 @@ import com.example.ui.screens.map.components.*
 import com.example.ui.screens.map.utils.MapDistanceCalculator
 import com.example.ui.screens.map.utils.OfflineMapManager
 import com.example.utils.MockValhallaNavigator
+import com.example.utils.ValhallaTileDownloader
 import com.example.utils.VisualThemePalette
 import com.example.utils.resolveThemePalette
 import kotlinx.coroutines.delay
@@ -96,6 +99,7 @@ fun MapScreenContent(
     var showSosDialog by remember { mutableStateOf(false) }
     var isSosBroadcasting by remember { mutableStateOf(false) }
     var compassBearing by remember { mutableFloatStateOf(0f) }
+    var showDownloadDialog by remember { mutableStateOf(false) }
 
     androidx.activity.compose.BackHandler(enabled = true) {
         if (isHudMode) {
@@ -239,6 +243,8 @@ fun MapScreenContent(
                 .padding(paddingValues)
         ) {
             // 🗺️ 1. Main Map Background / AR View (Occupies 100% of viewport, 90% completely unobstructed)
+            val isTilesDownloaded = remember { ValhallaTileDownloader.isTilesDownloaded(context) }
+            
             if (state.currentMapMode == MapMode.AR_VPS) {
                 ArVpsCameraOverlay(
                     nearbyProviders = filteredProviders,
@@ -279,11 +285,11 @@ fun MapScreenContent(
             } else {
                 RealLeafletMapView(
                     userCoords = Pair(safeUserLat, safeUserLng),
-                    currentMapMode = state.currentMapMode,
                     nearbyProviders = filteredProviders,
                     nearbyStores = filteredStores,
                     nearbyProperties = filteredProperties,
                     dynamicOffsets = state.dynamicOffsets,
+                    currentMapMode = state.currentMapMode,
                     selectedCity = state.selectedCity,
                     zoomScale = state.zoomScale,
                     onZoomScaleChange = { state.zoomScale = it },
@@ -379,7 +385,7 @@ fun MapScreenContent(
                     onCitySelected = { city ->
                         state.selectedCity = city
                         if (city != "الكل") {
-                            val coords = OfflineMapManager.getCityCoordinates(city)
+                            val coords = com.example.ui.screens.map.utils.OfflineMapManager.getCityCoordinates(city)
                             viewModel.updateUserLocation(coords.latitude, coords.longitude)
                         }
                     },
@@ -394,7 +400,7 @@ fun MapScreenContent(
                     },
                     onSearchExecute = { query ->
                         if (query.isNotBlank()) {
-                            val cityCoords = OfflineMapManager.getCityCoordinates(query)
+                            val cityCoords = com.example.ui.screens.map.utils.OfflineMapManager.getCityCoordinates(query)
                             if (cityCoords.nameAr != "صنعاء" || query.contains("صنعاء")) {
                                 state.selectedCity = cityCoords.nameAr
                                 viewModel.updateUserLocation(cityCoords.latitude, cityCoords.longitude)
@@ -407,7 +413,37 @@ fun MapScreenContent(
                         }
                     }
                 )
+
+                // 🇾🇪 Offline Map Status Badge
+                Surface(
+                    onClick = { if (!isTilesDownloaded) showDownloadDialog = true },
+                    shape = RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp),
+                    color = Color(0xFF0B0F19).copy(alpha = 0.85f),
+                    border = BorderStroke(1.dp, if (isTilesDownloaded) Color(0xFF10B981).copy(alpha = 0.4f) else Color(0xFFF59E0B).copy(alpha = 0.4f)),
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = 64.dp, end = 24.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .clip(CircleShape)
+                                .background(if (isTilesDownloaded) Color(0xFF10B981) else Color(0xFFF59E0B))
+                        )
+                        Text(
+                            text = if (isTilesDownloaded) "خرائط اليمن أوفلاين ✓" else "تحميل خرائط الملاحة 🇾🇪",
+                            color = Color.White,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                }
             }
+        }
 
             // 🎮 4. Unified Control Dock (قاعدة التحكم الموحدة) - Single continuous vertical capsule
             MapControls(
@@ -621,10 +657,11 @@ fun MapScreenContent(
                     text = {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             val layers = listOf(
-                                Triple(MapMode.SATELLITE, "🛰️ الأقمار الصناعية (عربي)", "صور جوية عالية الدقة للمدن والمعالم"),
-                                Triple(MapMode.OSM, "🌐 OpenStreetMap (الرسمية)", "الخريطة القياسية المفصلة"),
-                                Triple(MapMode.HOT, "🗺️ خريطة الشوارع (HOT)", "واضحة للشوارع الفرعية"),
-                                Triple(MapMode.TOPO, "⛰️ تضاريس وارتفاعات (Topo)", "إظهار المعالم والجبال")
+                                Triple(MapMode.SATELLITE, "🛰️ الأقمار الصناعية (عالي الدقة)", "صور جوية فضائية عالية الدقة للمدن والمعالم"),
+                                Triple(MapMode.VELA_3D, "🏙️ Vela 3D (مباني ثلاثية الأبعاد)", "عرض مجسم ثلاثي الأبعاد للمباني وإمالة الكاميرا التفاعلية"),
+                                Triple(MapMode.HOT, "🗺️ خريطة الشوارع الحية (HOT)", "خريطة تفاعلية للشوارع والأحياء المباشرة"),
+                                Triple(MapMode.TOPO, "⛰️ التضاريس والارتفاعات (Topo)", "إظهار المعالم الجغرافية والجبال والمجاري"),
+                                Triple(MapMode.OSM, "🌐 خريطة الشوارع القياسية (OSM)", "الخريطة المفصلة المفتوحة")
                             )
 
                             layers.forEach { (mode, title, desc) ->
@@ -660,6 +697,65 @@ fun MapScreenContent(
                 )
             }
 
+            // 📍 8.5. Multi-Stop Waypoints Management Bar (Appears when stops are added)
+            if (state.selectedWaypoints.isNotEmpty()) {
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = Color(0xFF0B0F19).copy(alpha = 0.90f),
+                    border = BorderStroke(1.2.dp, Color(0xFF38BDF8).copy(alpha = 0.6f)),
+                    shadowElevation = 10.dp,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = if (state.selectedEntity != null) 250.dp else 90.dp)
+                        .fillMaxWidth(0.92f)
+                ) {
+                    Column(modifier = Modifier.padding(10.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = "محطات التوقف المحددة (${state.selectedWaypoints.size})",
+                                color = Color.White,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            TextButton(onClick = { state.selectedWaypoints.clear() }) {
+                                Text("مسح الكل", color = Color(0xFFEF4444), fontSize = 11.sp)
+                            }
+                        }
+                        
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            contentPadding = PaddingValues(bottom = 4.dp)
+                        ) {
+                            items(state.selectedWaypoints) { wp ->
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = Color(0xFF1E293B),
+                                    border = BorderStroke(1.dp, Color(0xFF38BDF8).copy(alpha = 0.4f))
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                    ) {
+                                        Text(wp.name, color = Color.White, fontSize = 11.sp, maxLines = 1)
+                                        Spacer(Modifier.width(4.dp))
+                                        IconButton(
+                                            onClick = { state.removeWaypoint(wp) },
+                                            modifier = Modifier.size(16.dp)
+                                        ) {
+                                            Icon(Icons.Default.Close, contentDescription = null, tint = Color(0xFF94A3B8), modifier = Modifier.size(12.dp))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             // 📋 9. Bottom Sheet for clicked place (HIDDEN BY DEFAULT - APPEARS ONLY ON PIN TAP)
             state.selectedEntity?.let { entity ->
                 MapBottomSheet(
@@ -667,6 +763,12 @@ fun MapScreenContent(
                     userLat = safeUserLat,
                     userLng = safeUserLng,
                     onDismiss = { state.selectedEntity = null },
+                    onAddStop = { target ->
+                        state.addWaypoint(target)
+                        coroutineScope.launch {
+                            snackbarHostState.showSnackbar("📍 تمت إضافة المحطة للمسار")
+                        }
+                    },
                     onRequestBooking = { target ->
                         state.selectedEntity = null
                         when (target) {
@@ -694,6 +796,77 @@ fun MapScreenContent(
                 )
             }
         }
+    }
+
+    // 📥 Download Dialog for Offline Maps
+    if (showDownloadDialog) {
+        var isDownloading by remember { mutableStateOf(false) }
+        var downloadProgress by remember { mutableFloatStateOf(0f) }
+        var downloadStatusText by remember { mutableStateOf("") }
+
+        AlertDialog(
+            onDismissRequest = { if (!isDownloading) showDownloadDialog = false },
+            containerColor = Color(0xFF0B0F19),
+            titleContentColor = Color.White,
+            textContentColor = Color.White,
+            shape = RoundedCornerShape(20.dp),
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(Icons.Default.CloudDownload, contentDescription = null, tint = Color(0xFF38BDF8))
+                    Text("تحميل خرائط الملاحة أوفلاين", fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                }
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        "للحصول على أدق النتائج والملاحة في اليمن بدون إنترنت، يرجى تحميل حزمة الخرائط (حوالي 25 ميجابايت).",
+                        color = Color.White,
+                        fontSize = 13.sp
+                    )
+                    if (isDownloading) {
+                        LinearProgressIndicator(
+                            progress = { downloadProgress },
+                            modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
+                            color = Color(0xFF10B981),
+                            trackColor = Color(0xFF1E293B)
+                        )
+                        Text(downloadStatusText, color = Color(0xFF10B981), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                }
+            },
+            confirmButton = {
+                if (!isDownloading) {
+                    Button(
+                        onClick = {
+                            isDownloading = true
+                            coroutineScope.launch {
+                                val result = ValhallaTileDownloader.downloadAndExtractTiles(context) { p, status ->
+                                    downloadProgress = p
+                                    downloadStatusText = status
+                                }
+                                if (result.isSuccess) {
+                                    showDownloadDialog = false
+                                    snackbarHostState.showSnackbar("✅ تم تثبيت خرائط اليمن بنجاح! استمتع بالملاحة أوفلاين.")
+                                } else {
+                                    isDownloading = false
+                                    snackbarHostState.showSnackbar("❌ فشل التحميل، يرجى التحقق من الاتصال.")
+                                }
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981))
+                    ) {
+                        Text("تحميل الآن (25MB)", color = Color.White, fontWeight = FontWeight.Bold)
+                    }
+                }
+            },
+            dismissButton = {
+                if (!isDownloading) {
+                    TextButton(onClick = { showDownloadDialog = false }) {
+                        Text("لاحقاً", color = Color(0xFF94A3B8))
+                    }
+                }
+            }
+        )
     }
 
     // 🚨 10. SOS / الفزعة Confirmation Dialog

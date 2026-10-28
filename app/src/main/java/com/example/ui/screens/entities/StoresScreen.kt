@@ -61,7 +61,7 @@ fun StoresScreen(
     var selectedMinRating by remember { mutableStateOf(0.0f) }
     var showCreateStoreDialog by remember { mutableStateOf(false) }
 
-    val categories = listOf("الكل", "سوبرماركت", "إلكترونيات", "ملابس وموضة", "مواد بناء", "قطع غيار")
+    val categories = remember { com.example.ui.categories.AppCategoryTaxonomy.storesSubCategories.map { it.name } }
 
     val isLoading = remember(stores) { stores.isEmpty() }
 
@@ -79,9 +79,7 @@ fun StoresScreen(
                     store.localNeighborhood.contains(searchQuery, ignoreCase = true) ||
                     store.description.contains(searchQuery, ignoreCase = true)
 
-            val matchesCat = selectedCategory == "الكل" ||
-                    store.categoryId.contains(selectedCategory, ignoreCase = true) ||
-                    store.name.contains(selectedCategory, ignoreCase = true)
+            val matchesCat = com.example.ui.categories.AppCategoryTaxonomy.matchesStoreSubCategory(store, selectedCategory)
 
             val matchesCity = selectedCityId == "الكل" || store.cityId == selectedCityId
 
@@ -116,16 +114,16 @@ fun StoresScreen(
         themeColors = themeColors,
         items = filteredStores,
         isLoading = isLoading,
-        title = "المحلات التجارية والمتاجر",
-        titleIcon = "🏪",
-        searchPlaceholder = "بحث في المحلات والمتاجر... 🏪",
+        title = "المحلات والمتاجر والمراكز التجارية",
+        titleIcon = "🛍️",
+        searchPlaceholder = "بحث في المحلات والمتاجر ومراكز التسوق...",
         categories = categories,
         cities = cities,
         onSearchQueryChanged = { searchQuery = it },
         onCategorySelected = { selectedCategory = it },
         onCitySelected = { selectedCityId = it },
         onMinRatingSelected = { selectedMinRating = it },
-        emptyMessage = "لا توجد محلات تجارية مطابقة للبحث",
+        emptyMessage = "لا توجد متاجر تجارية مطابقة للبحث حالياً",
         extraHeaderContent = {
             Button(
                 onClick = { 
@@ -140,18 +138,18 @@ fun StoresScreen(
             }
         },
         itemContent = { store ->
-            StoreItemCard(
+            com.example.ui.components.StoreListItemCard(
                 store = store,
                 themeColors = themeColors,
                 onClick = { onStoreClick(store) },
+                viewModel = viewModel,
                 onChatClick = {
                     if (!isLoggedIn) {
                         showGuestDialog = true
                     } else {
                         onChatClick(store)
                     }
-                },
-                onRequestServiceClick = { onRequestServiceClick(store) }
+                }
             )
         }
     )

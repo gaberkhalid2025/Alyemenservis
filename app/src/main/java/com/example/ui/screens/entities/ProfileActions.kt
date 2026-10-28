@@ -174,25 +174,45 @@ fun ProfileActions(
                         }
                     }
                     ProfileEntityType.TECHNICIAN -> {
-                        Button(
-                            onClick = handleOpenChat,
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray),
-                            shape = RoundedCornerShape(10.dp),
-                            modifier = Modifier.weight(1f).height(44.dp)
-                        ) {
-                            Icon(Icons.Default.MailOutline, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("محادثة 💬", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                        }
+                        // 1. "حجز" (vivid green #10B981)
                         Button(
                             onClick = onRequestBooking,
-                            colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
-                            shape = RoundedCornerShape(10.dp),
-                            modifier = Modifier.weight(1.3f).height(44.dp)
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.weight(1.2f).height(46.dp)
                         ) {
-                            Icon(Icons.Default.Build, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("طلب حجز صيانة 🔧", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+                            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("حجز", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        }
+
+                        // 2. "التفاصيل" (soft indigo)
+                        Button(
+                            onClick = {
+                                if (entityPhone.isNotBlank()) {
+                                    val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$entityPhone"))
+                                    context.startActivity(intent)
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4A3FCC)),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.weight(1f).height(46.dp)
+                        ) {
+                            Icon(Icons.Default.Info, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("التفاصيل", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        }
+
+                        // 3. "محادثة" (blue #2563EB)
+                        Button(
+                            onClick = handleOpenChat,
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB)),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.weight(1.1f).height(46.dp)
+                        ) {
+                            Icon(Icons.Default.MailOutline, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("محادثة", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
                         }
                     }
                     ProfileEntityType.MEDICAL -> {

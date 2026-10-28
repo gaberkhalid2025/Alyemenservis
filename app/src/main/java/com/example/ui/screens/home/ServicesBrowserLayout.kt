@@ -100,16 +100,14 @@ fun ServicesBrowserLayout(
                 }
             }
 
-            // 2. Banner Slider
-            if (bannersList.isNotEmpty()) {
-                item {
-                    BannerSliderView(banners = bannersList, themeColors = themeColors) { catTarget ->
-                        if (catTarget.isNotEmpty()) viewModel.selectCategory(catTarget)
-                    }
+            // 2. Hero Promotional Banner Carousel (سلايدر العروض والشركاء)
+            item {
+                BannerSliderView(banners = bannersList, themeColors = themeColors) { catTarget ->
+                    if (catTarget.isNotEmpty()) viewModel.selectCategory(catTarget)
                 }
             }
 
-            // 3. Search Bar
+            // 3. Floating Glassmorphic Search & Filter Bar (شريط البحث الصوتي والذكي)
             item {
                 val isFilterActive = phoneOrNameFilter.isNotEmpty() || neighborFilter.isNotEmpty() || isVipOnly || isAvailableOnly
                 Box(
@@ -136,32 +134,76 @@ fun ServicesBrowserLayout(
                     )
                 }
             }
-        }
 
-        // 4. Tab Navigation Chips
-        item {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState())
-                    .padding(vertical = 2.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                activeTabs.forEach { tabName ->
-                    val isSelected = activeTabName == tabName
-                    Surface(
-                        onClick = { viewModel.setActiveBrowserTab(tabName) },
-                        shape = RoundedCornerShape(20.dp),
-                        color = if (isSelected) themeColors.accent else themeColors.surface,
-                        border = BorderStroke(1.dp, if (isSelected) themeColors.accent else Color.White.copy(alpha = 0.1f))
+            // 4, 5, 6: Category Grid (4x2) + Golden Partner CTA + Verified Technicians
+            item {
+                CategoryGridSection(
+                    onSelectSection = { secId ->
+                        when (secId) {
+                            "stores" -> viewModel.setActiveBrowserTab("المحلات والمتاجر")
+                            "restaurants" -> viewModel.setActiveBrowserTab("المطاعم والكافيهات")
+                            "medical" -> viewModel.setActiveBrowserTab("المراكز الطبية")
+                            "properties" -> viewModel.setActiveBrowserTab("العقارات")
+                            "jobs" -> viewModel.setActiveBrowserTab("إعلانات الوظائف")
+                            else -> viewModel.setActiveBrowserTab("المحلات والمتاجر")
+                        }
+                    },
+                    onSelectTechnicianSubCategory = { subCatName ->
+                        viewModel.updateSearchQuery(subCatName)
+                    },
+                    topRatedProviders = allProviders.sortedByDescending { it.rating },
+                    topRatedStores = stores.sortedByDescending { it.rating },
+                    onProviderClick = { prov ->
+                        viewModel.selectedProvider = prov
+                        viewModel.navigateTo("DYNAMIC_PROFILE")
+                    },
+                    onStoreClick = { store ->
+                        selectedStoreForDetails = store
+                    },
+                    onJoinAsProviderClick = {
+                        viewModel.setTargetRegistrationType("provider")
+                        viewModel.navigateTo(AppScreens.REGISTER_FORM)
+                    },
+                    themeColors = themeColors,
+                    onOpenChat = onChatOpen
+                )
+            }
+
+            // 7. Category Cards Showcase (Restaurant, Medical, Store, Real Estate)
+            item {
+                HomeScreenShowcaseSection(
+                    stores = stores,
+                    properties = properties,
+                    products = products,
+                    viewModel = viewModel,
+                    themeColors = themeColors,
+                    onStoreClick = { store ->
+                        selectedStoreForDetails = store
+                    },
+                    onPropertyClick = { prop ->
+                        selectedPropertyForDetails = prop
+                    },
+                    onChatOpen = onChatOpen
+                )
+            }
+        } else {
+            // Back button to Home when a section tab is active
+            item {
+                Surface(
+                    onClick = { viewModel.setActiveBrowserTab("الرئيسية") },
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color(0xFF1E293B),
+                    modifier = Modifier.padding(vertical = 4.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Text(
-                            text = tabName,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (isSelected) Color.Black else Color.White,
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                        )
+                        Text("←", color = themeColors.accent, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        Text("العودة للرئيسية", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text("·", color = Color.Gray, fontSize = 12.sp)
+                        Text(activeTabName, color = themeColors.accent, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }

@@ -43,7 +43,9 @@ data class PropertyEntity(
     val isNotificationsDisabled: Boolean = false,
     val productAttachmentsJson: String = "",
     override val isBlocked: Boolean = false,
-    override val blockReason: String = ""
+    override val blockReason: String = "",
+    val area: Int = 120,
+    val rooms: Int = 3
 ) : com.example.data.models.SupervisedEntity {
     @get:com.google.firebase.firestore.Exclude
     val password: String get() = passwordHash

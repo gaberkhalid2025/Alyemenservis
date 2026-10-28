@@ -26,18 +26,18 @@
             height: 100%;
             position: relative;
             overflow: hidden;
-            perspective: 1000px;
+            perspective: 1200px;
         }
         #map {
             width: 100%;
             height: 100%;
             background-color: #0B1120;
-            transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
-            transform-origin: 50% 70%;
+            transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            transform-origin: 50% 65%;
         }
-        /* 🏙️ Vela 3D Tilt View */
+        /* 🏙️ Vela 3D Tilt & Rotation Perspective View */
         #map.vela-3d-tilt {
-            transform: rotateX(32deg) scale(1.08);
+            transform: perspective(1200px) rotateX(35deg) rotateZ(0deg) scale(1.1);
         }
 
         /* Marker Badge Design - مطابق للصورة 3 تماماً */
@@ -387,6 +387,35 @@
             }
         }
         window.switchMapMode = switchMapMode;
+
+        var currentTilt = 0;
+        var currentRotation = 0;
+
+        function setMapPerspective(tilt, rotation) {
+            currentTilt = tilt !== undefined ? tilt : currentTilt;
+            currentRotation = rotation !== undefined ? rotation : currentRotation;
+            var mapEl = document.getElementById('map');
+            if (mapEl) {
+                if (currentTilt > 0 || currentRotation !== 0) {
+                    mapEl.style.transform = 'perspective(1200px) rotateX(' + currentTilt + 'deg) rotateZ(' + currentRotation + 'deg) scale(1.1)';
+                    mapEl.classList.add('vela-3d-tilt');
+                } else {
+                    mapEl.style.transform = 'none';
+                    mapEl.classList.remove('vela-3d-tilt');
+                }
+            }
+        }
+        window.setMapPerspective = setMapPerspective;
+
+        function setMapTilt(tilt) {
+            setMapPerspective(tilt, currentRotation);
+        }
+        window.setMapTilt = setMapTilt;
+
+        function setMapRotation(rotation) {
+            setMapPerspective(currentTilt, rotation);
+        }
+        window.setMapRotation = setMapRotation;
 
         // Update GPS Location
         function updateUserLocation(lat, lng, accuracy, shouldPan) {

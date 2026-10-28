@@ -16,6 +16,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -24,6 +25,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.MainViewModel
+import com.example.ui.theme.CairoFontFamily
+import com.example.ui.theme.TajawalFontFamily
 import com.example.utils.VisualThemePalette
 
 @Composable
@@ -116,197 +119,195 @@ fun AppHeaderBar(
         }
     }
 
-    val screenBackStack by viewModel.screenBackStack.collectAsState()
-    val showBackButton = screenBackStack.size > 1 || currentScreen != "USER_BROWSE"
+    val showBackButton = currentScreen != AppScreens.USER_BROWSE && currentScreen != AppScreens.HOME
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(themeColors.primary)
+            .background(Color(0xE60B1120)) // Frosted-glass background #0B1120 at 90% opacity
             .statusBarsPadding()
             .testTag("app_header_bar")
     ) {
-        // Row 1: Unified TopBar Header with Back Button (Controlled by Admin hideTopHeaderBar)
+        // Row 1: Top Bar with Location, Back, Title, and "طلباتي" Far End Action Button
         if (!settingsState.hideTopHeaderBar) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 6.dp, vertical = 2.dp),
-                verticalAlignment = Alignment.CenterVertically
+            Surface(
+                color = Color.Transparent,
+                modifier = Modifier.fillMaxWidth()
             ) {
-                if (showBackButton) {
-                    IconButton(
-                        onClick = { viewModel.goBack() },
-                        modifier = Modifier
-                            .background(Color.White.copy(alpha = 0.2f), CircleShape)
-                            .size(24.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = if (isEn) "Back" else "رجوع",
-                            tint = Color.White,
-                            modifier = Modifier.size(13.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(6.dp))
-                }
-
-                val defaultTitle = if (isEn) "Yemen Services Directory" else "دليل خدمات اليمن"
-                val customTitle = settingsState.customAppName.ifEmpty { settingsState.appName.ifEmpty { defaultTitle } }
-
-                val titleText = when (currentScreen) {
-                    "REGISTER_FORM" -> if (isEn) "Join & Register" else "الانضمام والتسجيل"
-                    "JOIN_REQUEST_STATUS" -> if (isEn) "Request Status" else "حالة طلب الانضمام"
-                    "ADMIN_PANEL" -> if (isEn) "Admin Panel" else "لوحة التحكم والإدارة"
-                    "OWNER_PANEL" -> if (isEn) "Owner Backdoor" else "البوابة الخلفية"
-                    "ABOUT_APP" -> if (isEn) "About App" else "عن التطبيق"
-                    "BOOKINGS_VIEW" -> if (isEn) "Bookings & Orders" else "الحجوزات والطلبات"
-                    "MAP_VIEW" -> if (isEn) "Services Map" else "خريطة الخدمات"
-                    else -> customTitle
-                }
-
-                Text(
-                    text = titleText,
-                    fontSize = 11.5.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false)
-                )
-
-                Spacer(modifier = Modifier.weight(1f))
-
-                // [ طلباتي ] Icon Button in Header (Reduced 30%)
-                Box(
+                Row(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(themeColors.accent)
-                        .clickable { viewModel.navigateTo("ORDERS_VIEW") }
-                        .padding(horizontal = 6.dp, vertical = 2.5.dp)
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(3.dp)
-                    ) {
-                        Text("📋", fontSize = 9.5.sp)
-                        val isProvider = viewModel.selectedProvider != null || viewModel.selectedStore != null || viewModel.selectedProperty != null
-                        Text(
-                            text = if (isEn) (if (isProvider) "Requests" else "My Requests") else (if (isProvider) "الطلبات" else "طلباتي"),
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.Black
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.width(6.dp))
-
-                val isRefreshingHeader by viewModel.isRefreshing.collectAsState()
-                IconButton(
-                    onClick = { viewModel.refreshData(showNotification = true) },
-                    modifier = Modifier
-                        .background(Color.White.copy(alpha = 0.2f), CircleShape)
-                        .size(24.dp)
-                ) {
-                    if (isRefreshingHeader) {
-                        CircularProgressIndicator(
-                            color = Color.White,
-                            strokeWidth = 1.5.dp,
-                            modifier = Modifier.size(12.dp)
-                        )
+                    if (showBackButton) {
+                        IconButton(
+                            onClick = { viewModel.goBack() },
+                            modifier = Modifier
+                                .size(34.dp)
+                                .background(Color(0xFF141A2E), CircleShape)
+                                .border(1.dp, Color.White.copy(alpha = 0.1f), CircleShape)
+                                .shadow(2.dp, CircleShape)
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "رجوع",
+                                tint = Color.White,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
                     } else {
-                        Icon(
-                            imageVector = Icons.Default.Refresh,
-                            contentDescription = if (isEn) "Refresh" else "تحديث البيانات",
-                            tint = Color.White,
-                            modifier = Modifier.size(12.dp)
-                        )
+                        // Location Pill (صنعاء ▾)
+                        Surface(
+                            onClick = { /* Select City */ },
+                            shape = RoundedCornerShape(999.dp),
+                            color = Color(0xFF141A2E),
+                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
+                            shadowElevation = 2.dp
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(Icons.Default.LocationOn, null, tint = Color(0xFF06B6D4), modifier = Modifier.size(13.dp))
+                                Text("صنعاء", fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = TajawalFontFamily, color = Color.White)
+                                Icon(Icons.Default.KeyboardArrowDown, null, tint = Color(0xFF94A3B8), modifier = Modifier.size(13.dp))
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                    }
+
+                    val titleText = when (currentScreen) {
+                        "REGISTER_FORM" -> if (isEn) "Join" else "الانضمام"
+                        "ADMIN_PANEL" -> if (isEn) "Admin" else "الإدارة"
+                        "ABOUT_APP" -> if (isEn) "About" else "عن التطبيق"
+                        "BOOKINGS_VIEW" -> if (isEn) "Bookings" else "الحجوزات"
+                        "MAP_VIEW" -> if (isEn) "Map & Radar" else "الخرائط والرادار"
+                        else -> settingsState.customAppName.ifEmpty { "دليل خدمات اليمن" }
+                    }
+
+                    Text(
+                        text = titleText,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        fontFamily = CairoFontFamily,
+                        color = Color.White,
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    // Far End Action Button: "طلباتي" (My Orders) pill button with clipboard icon, elevated dark-glass background, and 1px border
+                    Surface(
+                        onClick = { viewModel.navigateTo("ORDERS_VIEW") },
+                        shape = RoundedCornerShape(999.dp),
+                        color = Color(0xFF141A2E), // Elevated dark-glass background
+                        border = BorderStroke(1.dp, Color(0xFFF59E0B).copy(alpha = 0.6f)),
+                        shadowElevation = 4.dp
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 11.dp, vertical = 5.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(5.dp)
+                        ) {
+                            Icon(Icons.Default.Assignment, contentDescription = "طلباتي", tint = Color(0xFFF59E0B), modifier = Modifier.size(14.dp))
+                            Text(
+                                text = if (isEn) "Orders" else "طلباتي",
+                                fontSize = 10.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = CairoFontFamily,
+                                color = Color.White
+                            )
+                        }
+                    }
+                    
+                    Spacer(modifier = Modifier.width(6.dp))
+
+                    // Refresh Button
+                    val isRefreshingHeader by viewModel.isRefreshing.collectAsState()
+                    IconButton(
+                        onClick = { viewModel.refreshData(showNotification = true) },
+                        modifier = Modifier.size(30.dp)
+                    ) {
+                        if (isRefreshingHeader) {
+                            CircularProgressIndicator(color = Color(0xFF06B6D4), strokeWidth = 2.dp, modifier = Modifier.size(13.dp))
+                        } else {
+                            Icon(Icons.Default.Refresh, null, tint = Color(0xFF94A3B8), modifier = Modifier.size(16.dp))
+                        }
                     }
                 }
             }
         }
 
-        // Row 2: Navigation Items (5 luxury 3D golden icons - Preserved in order & iconography)
-        Row(
+        // Row 2: Navigation Items (Exact 5 Navigation Icons in Elevated Charcoal-Navy Glass Container)
+        Surface(
+            color = Color(0xFF141A2E), // Elevated Charcoal-Navy
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 4.dp, vertical = 2.dp)
-                .clip(RoundedCornerShape(16.dp))
-                .background(Color(0xFF1A2128))
-                .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)), RoundedCornerShape(16.dp))
-                .padding(vertical = 3.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceEvenly
+                .padding(horizontal = 10.dp, vertical = 3.dp),
+            shape = RoundedCornerShape(20.dp),
+            shadowElevation = 4.dp,
+            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))
         ) {
-            // 1. الرئيسية
-            val isBrowse = currentScreen == AppScreens.USER_BROWSE || currentScreen == "MAIN_DASHBOARD" || currentScreen == "HOME"
-            Luxury3DNavIcon(
-                emojiIcon = settingsState.topHomeIcon.ifEmpty { "🏠" },
-                vectorIcon = Icons.Default.Home,
-                label = if (isEn) "Home" else "الرئيسية",
-                isSelected = isBrowse,
-                iconSizeDp = settingsState.navIconSizeDp,
-                iconStyle = settingsState.topNavIconStyle,
-                onClick = {
-                    viewModel.navigateToScreen(AppScreens.USER_BROWSE)
-                    viewModel.registerBackdoorInteraction()
-                }
-            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 6.dp, horizontal = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                // 1. الرئيسية
+                val isBrowse = currentScreen == AppScreens.USER_BROWSE || currentScreen == "HOME"
+                Luxury3DNavIcon(
+                    emojiIcon = "🏠",
+                    vectorIcon = Icons.Default.Home,
+                    label = if (isEn) "Home" else "الرئيسية",
+                    isSelected = isBrowse,
+                    onClick = { viewModel.navigateToScreen(AppScreens.USER_BROWSE) }
+                )
 
-            // 2. الخرائط
-            if (settingsState.isMapFeatureEnabled) {
+                // 2. الخرائط
                 val isMap = currentScreen == AppScreens.MAP_VIEW
                 Luxury3DNavIcon(
-                    emojiIcon = settingsState.topMapsIcon.ifEmpty { "🗺️" },
-                    vectorIcon = Icons.Default.Place,
+                    emojiIcon = "🗺️",
+                    vectorIcon = Icons.Default.Map,
                     label = if (isEn) "Maps" else "الخرائط",
                     isSelected = isMap,
-                    iconSizeDp = settingsState.navIconSizeDp,
-                    iconStyle = settingsState.topNavIconStyle,
                     onClick = { viewModel.navigateToScreen(AppScreens.MAP_VIEW) }
                 )
+
+                // 3. الانضمام
+                val isJoin = currentScreen == AppScreens.REGISTER_FORM || currentScreen == AppScreens.JOIN_REQUEST_STATUS
+                Luxury3DNavIcon(
+                    emojiIcon = "👤",
+                    vectorIcon = Icons.Default.Person,
+                    label = if (isEn) "Join" else "الانضمام",
+                    isSelected = isJoin,
+                    onClick = { viewModel.navigateToScreen(AppScreens.REGISTER_FORM) }
+                )
+
+                // 4. الإشعارات
+                val isNotifScreen = currentScreen == AppScreens.NOTIFICATIONS_VIEW
+                Luxury3DNavIcon(
+                    emojiIcon = "🔔",
+                    vectorIcon = Icons.Default.Notifications,
+                    label = if (isEn) "Alerts" else "الإشعارات",
+                    isSelected = isNotifScreen,
+                    badgeCount = unreadNotifCount,
+                    onClick = { onNotificationsClick() }
+                )
+
+                // 5. المحادثات
+                val isChatsScreen = currentScreen == AppScreens.CHAT_LIST || currentScreen == AppScreens.CHAT_DIRECT
+                Luxury3DNavIcon(
+                    emojiIcon = "✉️",
+                    vectorIcon = Icons.Default.Email,
+                    label = if (isEn) "Chats" else "المحادثات",
+                    isSelected = isChatsScreen,
+                    badgeCount = unreadChatsCount,
+                    onClick = { onChatsClick() }
+                )
             }
-
-            // 3. الانضمام
-            val isJoin = currentScreen == AppScreens.REGISTER_FORM || currentScreen == AppScreens.JOIN_REQUEST_STATUS
-            Luxury3DNavIcon(
-                emojiIcon = settingsState.topJoinIcon.ifEmpty { "👤" },
-                vectorIcon = Icons.Default.Person,
-                label = if (isEn) "Join" else "الانضمام",
-                isSelected = isJoin,
-                iconSizeDp = settingsState.navIconSizeDp,
-                iconStyle = settingsState.topNavIconStyle,
-                onClick = { viewModel.navigateToScreen(AppScreens.REGISTER_FORM) }
-            )
-
-            // 4. الإشعارات
-            val isNotifScreen = currentScreen == AppScreens.NOTIFICATIONS_VIEW
-            Luxury3DNavIcon(
-                emojiIcon = settingsState.topNotifIcon.ifEmpty { "🔔" },
-                vectorIcon = Icons.Default.Notifications,
-                label = if (isEn) "Alerts" else "الإشعارات",
-                isSelected = isNotifScreen,
-                badgeCount = unreadNotifCount,
-                iconSizeDp = settingsState.navIconSizeDp,
-                iconStyle = settingsState.topNavIconStyle,
-                onClick = {
-                    onNotificationsClick()
-                }
-            )
-
-            // 5. المحادثات
-            val isChatsScreen = currentScreen == AppScreens.CHAT_LIST || currentScreen == AppScreens.CHAT_DIRECT
-            Luxury3DNavIcon(
-                emojiIcon = settingsState.topChatsIcon.ifEmpty { "✉️" },
-                vectorIcon = Icons.Default.Email,
-                label = if (isEn) "Chats" else "المحادثات",
-                isSelected = isChatsScreen,
-                badgeCount = unreadChatsCount,
-                iconSizeDp = settingsState.navIconSizeDp,
-                iconStyle = settingsState.topNavIconStyle,
-                onClick = { onChatsClick() }
-            )
         }
     }
 }

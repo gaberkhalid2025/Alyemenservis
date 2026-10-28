@@ -30,6 +30,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.ui.theme.TajawalFontFamily
 import coil.compose.AsyncImage
 import com.example.data.BannerEntity
 import com.example.utils.VisualThemePalette
@@ -70,30 +71,33 @@ fun Luxury3DNavIcon(
     label: String,
     isSelected: Boolean,
     badgeCount: Int = 0,
-    iconSizeDp: Int = 18,
+    iconSizeDp: Int = 20,
     iconStyle: String = "GOLDEN_3D",
     onClick: () -> Unit
 ) {
-    // 0.7f: معامل تصغير نسبي (30% scale reduction) للحفاظ على مساحات أشرطة التنقل
-    // 16f (حد أدنى): يمنع انكماش الأيقونة عن الحجم المرئي الأدنى
-    // 24f (حد أقصى): يمنع تضخم الأيقونة وخروجها عن شريط التنقل السفلي والعلوي
-    val actualSize = (iconSizeDp * 0.7f).coerceIn(16f, 24f)
+    val actualSize = (iconSizeDp * 0.75f).coerceIn(18f, 26f)
     val sizeDp = actualSize.dp
+    
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
-            .clickable(onClick = onClick)
-            .padding(horizontal = 2.dp, vertical = 1.dp)
+            .clickable(
+                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                indication = null,
+                onClick = onClick
+            )
+            .padding(horizontal = 4.dp, vertical = 2.dp)
     ) {
         Box(contentAlignment = Alignment.Center) {
             if (isSelected) {
+                // Vibrant Glow Backdrop
                 Box(
                     modifier = Modifier
-                        .size(sizeDp + 8.dp)
+                        .size(sizeDp + 12.dp)
                         .background(
                             brush = Brush.radialGradient(
                                 colors = listOf(
-                                    Color(0xFFF59E0B).copy(alpha = 0.45f),
+                                    Color(0xFFF59E0B).copy(alpha = 0.35f),
                                     Color.Transparent
                                 )
                             ),
@@ -106,34 +110,32 @@ fun Luxury3DNavIcon(
                 shape = CircleShape,
                 color = if (isSelected) Color(0xFF1E293B) else Color(0xFF0F172A),
                 border = BorderStroke(
-                    width = if (isSelected) 1.4.dp else 0.8.dp,
-                    brush = Brush.linearGradient(
-                        colors = if (isSelected) listOf(
-                            Color(0xFFFFFAED),
-                            Color(0xFFF59E0B),
-                            Color(0xFFD97706),
-                            Color(0xFFFEF3C7)
-                        ) else listOf(
-                            Color(0xFFCBD5E1).copy(alpha = 0.6f),
-                            Color(0xFF475569).copy(alpha = 0.3f)
+                    width = if (isSelected) 1.6.dp else 0.8.dp,
+                    brush = if (isSelected) {
+                        Brush.linearGradient(
+                            listOf(Color(0xFFFFFAED), Color(0xFFF59E0B), Color(0xFFD97706))
                         )
-                    )
+                    } else {
+                        Brush.linearGradient(
+                            listOf(Color.White.copy(alpha = 0.15f), Color.White.copy(alpha = 0.05f))
+                        )
+                    }
                 ),
-                shadowElevation = if (isSelected) 5.dp else 1.dp,
-                modifier = Modifier.size(sizeDp + 6.dp)
+                shadowElevation = if (isSelected) 6.dp else 0.dp,
+                modifier = Modifier.size(sizeDp + 8.dp)
             ) {
                 Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                    if (vectorIcon != null && iconStyle == "MINIMAL") {
+                    if (vectorIcon != null) {
                         Icon(
                             imageVector = vectorIcon,
                             contentDescription = label,
-                            tint = if (isSelected) Color(0xFFF59E0B) else Color.White,
+                            tint = if (isSelected) Color(0xFFF59E0B) else Color(0xFF94A3B8),
                             modifier = Modifier.size(sizeDp)
                         )
                     } else {
                         Text(
                             text = emojiIcon,
-                            fontSize = (sizeDp.value * 0.68f).sp,
+                            fontSize = (sizeDp.value * 0.75f).sp,
                             textAlign = TextAlign.Center
                         )
                     }
@@ -143,91 +145,91 @@ fun Luxury3DNavIcon(
             if (badgeCount > 0) {
                 Surface(
                     shape = CircleShape,
-                    color = Color(0xFF10B981), // Emerald Green
-                    border = BorderStroke(1.dp, Color(0xFFFFD700)), // Gold border
-                    shadowElevation = 3.dp,
+                    color = Color(0xFFEF4444), // Vibrant Red for alerts
+                    border = BorderStroke(1.dp, Color.White),
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .offset(x = 4.dp, y = (-2).dp)
-                        .size(15.dp)
+                        .offset(x = 2.dp, y = (-2).dp)
+                        .size(16.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                         Text(
-                            text = if (badgeCount > 99) "99+" else badgeCount.toString(),
-                            color = Color(0xFFFFD700), // Gold text
-                            fontSize = 8.sp,
-                            fontWeight = FontWeight.ExtraBold,
+                            text = if (badgeCount > 9) "!" else badgeCount.toString(),
+                            color = Color.White,
+                            fontSize = 8.5.sp,
+                            fontWeight = FontWeight.Black,
                             textAlign = TextAlign.Center
                         )
                     }
                 }
             }
         }
-        Spacer(modifier = Modifier.height(1.dp))
+        Spacer(modifier = Modifier.height(3.dp))
         Text(
             text = label,
-            fontSize = 7.5.sp,
+            fontSize = 8.sp,
             maxLines = 1,
             softWrap = false,
-            color = if (isSelected) Color(0xFFFFD700) else Color.LightGray,
-            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+            color = if (isSelected) Color(0xFFF59E0B) else Color(0xFF94A3B8),
+            fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Medium,
+            fontFamily = TajawalFontFamily
         )
     }
 }
 
 @Composable
 fun BannerSliderView(banners: List<BannerEntity>, themeColors: VisualThemePalette, onBannerClick: (String) -> Unit) {
+    val effectiveBanners = remember(banners) {
+        if (banners.isNotEmpty()) banners else listOf(
+            BannerEntity(id = "b1", title = "أقوى عروض وتخفيضات المتاجر والمحلات في اليمن 🛍️", redirectCategory = "المحلات والمتاجر", type = "TEXT"),
+            BannerEntity(id = "b2", title = "أشهى وجبات ومطاعم اليمن بتوصيل سريع فوري 🍔", redirectCategory = "المطاعم والكافيهات", type = "TEXT"),
+            BannerEntity(id = "b3", title = "احجز موعدك الطبي لدى أفضل المراكز والعيادات التخصصية 🏥", redirectCategory = "المراكز الطبية", type = "TEXT"),
+            BannerEntity(id = "b4", title = "فرص عقارية وشقق سكنية ومكاتب للإيجار والبيع 🏠", redirectCategory = "العقارات", type = "TEXT")
+        )
+    }
+
     var currentIndex by remember { mutableStateOf(0) }
+    val activeBanner = effectiveBanners.getOrNull(currentIndex) ?: effectiveBanners.first()
     
-    val activeBanner = if (banners.isNotEmpty()) banners.getOrNull(currentIndex) else null
-    
-    LaunchedEffect(currentIndex, banners) {
-        if (banners.isNotEmpty()) {
-            val active = banners.getOrNull(currentIndex)
-            val durationSec = if (active != null && active.duration > 0) active.duration else 5
+    LaunchedEffect(currentIndex, effectiveBanners.size) {
+        if (effectiveBanners.isNotEmpty()) {
+            val durationSec = if (activeBanner.duration > 0) activeBanner.duration else 5
             kotlinx.coroutines.delay(durationSec * 1000L)
-            currentIndex = (currentIndex + 1) % banners.size
+            currentIndex = (currentIndex + 1) % effectiveBanners.size
         }
     }
 
-    if (activeBanner != null) {
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(130.dp)
-                .clickable { onBannerClick(activeBanner.redirectCategory) },
-            shape = RoundedCornerShape(12.dp),
-            colors = CardDefaults.cardColors(containerColor = themeColors.secondary)
-        ) {
-            Box(modifier = Modifier.fillMaxSize()) {
-                when (activeBanner.type.uppercase()) {
-                    "IMAGE" -> {
-                        if (activeBanner.url.isNotEmpty()) {
-                            if (activeBanner.url.startsWith("data:image") || activeBanner.url.length > 200) {
-                                val bitmap = remember(activeBanner.url) {
-                                    try {
-                                        val base64Data = if (activeBanner.url.contains(",")) activeBanner.url.substringAfter(",") else activeBanner.url
-                                        val decodedBytes = Base64.decode(base64Data, Base64.DEFAULT)
-                                        BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size)
-                                    } catch (e: Exception) {
-                                        null
-                                    }
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(136.dp)
+            .clickable { onBannerClick(activeBanner.redirectCategory) },
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF141A2E)),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+    ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            when (activeBanner.type.uppercase()) {
+                "IMAGE" -> {
+                    if (activeBanner.url.isNotEmpty()) {
+                        if (activeBanner.url.startsWith("data:image") || activeBanner.url.length > 200) {
+                            val bitmap = remember(activeBanner.url) {
+                                try {
+                                    val base64Data = if (activeBanner.url.contains(",")) activeBanner.url.substringAfter(",") else activeBanner.url
+                                    val decodedBytes = Base64.decode(base64Data, Base64.DEFAULT)
+                                    BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size)
+                                } catch (e: Exception) {
+                                    null
                                 }
-                                if (bitmap != null) {
-                                    Image(
-                                        painter = BitmapPainter(bitmap.asImageBitmap()),
-                                        contentDescription = activeBanner.title,
-                                        modifier = Modifier.fillMaxSize(),
-                                        contentScale = androidx.compose.ui.layout.ContentScale.Crop
-                                    )
-                                } else {
-                                    AsyncImage(
-                                        model = activeBanner.url,
-                                        contentDescription = activeBanner.title,
-                                        modifier = Modifier.fillMaxSize(),
-                                        contentScale = androidx.compose.ui.layout.ContentScale.Crop
-                                    )
-                                }
+                            }
+                            if (bitmap != null) {
+                                Image(
+                                    painter = BitmapPainter(bitmap.asImageBitmap()),
+                                    contentDescription = activeBanner.title,
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                                )
                             } else {
                                 AsyncImage(
                                     model = activeBanner.url,
@@ -236,85 +238,117 @@ fun BannerSliderView(banners: List<BannerEntity>, themeColors: VisualThemePalett
                                     contentScale = androidx.compose.ui.layout.ContentScale.Crop
                                 )
                             }
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(
-                                        Brush.verticalGradient(
-                                            colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.8f))
-                                        )
-                                    )
-                            )
-                            Column(
-                                modifier = Modifier
-                                    .align(Alignment.BottomStart)
-                                    .padding(12.dp)
-                            ) {
-                                Text(
-                                    text = activeBanner.title,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White
-                                )
-                                if (activeBanner.redirectCategory.isNotEmpty()) {
-                                    Text(
-                                        text = "اضغط للانتقال إلى قسم: ${activeBanner.redirectCategory}",
-                                        fontSize = 9.sp,
-                                        color = themeColors.accent
-                                    )
-                                }
-                            }
                         } else {
-                            BannerTextFallback(activeBanner = activeBanner, themeColors = themeColors)
+                            AsyncImage(
+                                model = activeBanner.url,
+                                contentDescription = activeBanner.title,
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                            )
                         }
-                    }
-                    "VIDEO" -> {
-                        if (activeBanner.url.isNotEmpty()) {
-                            val context = LocalContext.current
-                            androidx.compose.ui.viewinterop.AndroidView(
-                                factory = { ctx ->
-                                    android.widget.VideoView(ctx).apply {
-                                        setVideoURI(android.net.Uri.parse(activeBanner.url))
-                                        setOnPreparedListener { mp ->
-                                            mp.isLooping = true
-                                            mp.setVolume(0f, 0f)
-                                            start()
-                                        }
-                                        setOnErrorListener { _, _, _ -> true }
-                                    }
-                                },
-                                modifier = Modifier.fillMaxSize()
-                            )
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(
-                                        Brush.verticalGradient(
-                                            colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.7f))
-                                        )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(
+                                    Brush.verticalGradient(
+                                        colors = listOf(Color.Transparent, Color(0xFF0B1120).copy(alpha = 0.85f))
                                     )
+                                )
+                        )
+                        Column(
+                            modifier = Modifier
+                                .align(Alignment.BottomStart)
+                                .padding(horizontal = 16.dp, vertical = 12.dp)
+                        ) {
+                            Text(
+                                text = activeBanner.title,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
                             )
-                            Column(
-                                modifier = Modifier
-                                    .align(Alignment.BottomStart)
-                                    .padding(12.dp)
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text("🎬 فيديو مميز", fontSize = 9.sp, color = themeColors.accent, fontWeight = FontWeight.Bold)
-                                }
+                            if (activeBanner.redirectCategory.isNotEmpty()) {
                                 Text(
-                                    text = activeBanner.title,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White
+                                    text = "اضغط للانتقال: ${activeBanner.redirectCategory} ←",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color(0xFF00E5FF)
                                 )
                             }
-                        } else {
-                            BannerTextFallback(activeBanner = activeBanner, themeColors = themeColors)
                         }
-                    }
-                    else -> {
+                    } else {
                         BannerTextFallback(activeBanner = activeBanner, themeColors = themeColors)
+                    }
+                }
+                "VIDEO" -> {
+                    if (activeBanner.url.isNotEmpty()) {
+                        val context = LocalContext.current
+                        androidx.compose.ui.viewinterop.AndroidView(
+                            factory = { ctx ->
+                                android.widget.VideoView(ctx).apply {
+                                    setVideoURI(android.net.Uri.parse(activeBanner.url))
+                                    setOnPreparedListener { mp ->
+                                        mp.isLooping = true
+                                        mp.setVolume(0f, 0f)
+                                        start()
+                                    }
+                                    setOnErrorListener { _, _, _ -> true }
+                                }
+                            },
+                            modifier = Modifier.fillMaxSize()
+                        )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(
+                                    Brush.verticalGradient(
+                                        colors = listOf(Color.Transparent, Color(0xFF0B1120).copy(alpha = 0.85f))
+                                    )
+                                )
+                        )
+                        Column(
+                            modifier = Modifier
+                                .align(Alignment.BottomStart)
+                                .padding(horizontal = 16.dp, vertical = 12.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("🎬 فيديو مميز", fontSize = 9.sp, color = Color(0xFF00E5FF), fontWeight = FontWeight.Bold)
+                            }
+                            Text(
+                                text = activeBanner.title,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                        }
+                    } else {
+                        BannerTextFallback(activeBanner = activeBanner, themeColors = themeColors)
+                    }
+                }
+                else -> {
+                    BannerTextFallback(activeBanner = activeBanner, themeColors = themeColors)
+                }
+            }
+
+            // Animated page indicator dots at bottom center
+            if (effectiveBanners.size > 1) {
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(5.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    effectiveBanners.indices.forEach { index ->
+                        val isSelected = index == currentIndex
+                        Box(
+                            modifier = Modifier
+                                .width(if (isSelected) 16.dp else 5.dp)
+                                .height(5.dp)
+                                .clip(RoundedCornerShape(999.dp))
+                                .background(
+                                    if (isSelected) Color(0xFF00E5FF) else Color.White.copy(alpha = 0.35f)
+                                )
+                        )
                     }
                 }
             }

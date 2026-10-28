@@ -221,6 +221,11 @@ class MainViewModel @Inject constructor(
     var selectedStore: com.example.data.StoreEntity? = null
     var selectedProperty: com.example.data.PropertyEntity? = null
     var selectedJob: com.example.data.JobEntity? = null
+    var comingSoonServiceName by androidx.compose.runtime.mutableStateOf("التوصيل")
+    fun openComingSoon(serviceName: String) {
+        comingSoonServiceName = serviceName
+        navigateToScreen(AppScreens.COMING_SOON_SERVICES)
+    }
     var selectedOfferId by androidx.compose.runtime.mutableStateOf("")
     var selectedRequestId by androidx.compose.runtime.mutableStateOf("")
     var showQuickServiceDialog by androidx.compose.runtime.mutableStateOf(false)

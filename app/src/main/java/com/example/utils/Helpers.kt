@@ -28,7 +28,25 @@ data class VisualThemePalette(
     val accent: Color,
     val gradientBrush: Brush,
     val scheme: ColorScheme,
-    val border: Color = Color(0xFF374151)
+    val border: Color = Color(0xFFE5E7EB),
+    
+    // Section Identity Colors (BOLD & VIVID)
+    val colorMedical: Color = Color(0xFF0D9488),
+    val colorRestaurant: Color = Color(0xFFE85D04),
+    val colorStore: Color = Color(0xFF10B981),
+    val colorRealEstate: Color = Color(0xFF1E3A8A),
+    val colorJob: Color = Color(0xFF6C5CE7),
+    val colorTechnician: Color = Color(0xFF4A3FCC),
+    val colorDelivery: Color = Color(0xFF64748B),
+    
+    // Light Tints for Category Backgrounds
+    val tintMedical: Color = Color(0xFFD8F3DC),
+    val tintRestaurant: Color = Color(0xFFFFF3E0),
+    val tintStore: Color = Color(0xFFFFD1DC),
+    val tintRealEstate: Color = Color(0xFFFFF3E0), // Gold/Cream tint
+    val tintJob: Color = Color(0xFFE0F2FE),
+    val tintTechnician: Color = Color(0xFFFFEDD5), // Orange/Cream tint
+    val tintDelivery: Color = Color(0xFFF1F5F9)
 )
 
 data class PresetPalette(
@@ -164,48 +182,35 @@ fun resolveThemePalette(settings: AdminSettingsEntity): VisualThemePalette {
             )
         }
         else -> {
-            // Check if there are custom hex colors specified, fall back to custom
-            if (settings.customPrimaryHex.startsWith("#") && settings.customBackgroundHex.startsWith("#")) {
-                val primary = parseColorSafely(settings.customPrimaryHex, Color(0xFF2563EB))
-                val secondary = parseColorSafely(settings.customSecondaryHex, Color(0xFF1D4ED8))
-                val background = parseColorSafely(settings.customBackgroundHex, Color(0xFF0F172A))
-                val surface = parseColorSafely(settings.customSurfaceHex, Color(0xFF1E293B))
-                val textPrimary = Color(0xFFF8FAFC)
-                val textSecondary = Color(0xFF94A3B8)
-                val accent = primary
-                VisualThemePalette(
-                    activeId = "CUSTOM",
+            val primary = Color(0xFF2563EB) // Electric Blue
+            val secondary = Color(0xFF10B981) // Emerald Green
+            val background = Color(0xFF0B1120) // Deep Luxury Navy-Black (#0B1020 / #0B1120)
+            val surface = Color(0xFF141A2E) // Elevated Charcoal-Navy (#141A2E / #131C2E)
+            val textPrimary = Color(0xFFF8FAFC) // Pure Crisp Slate White
+            val textSecondary = Color(0xFF94A3B8) // Refined Slate Gray
+            val accent = Color(0xFF06B6D4) // Electric Cyan Accent
+            VisualThemePalette(
+                activeId = "ULTRA_LUXURY_DARK",
+                primary = primary,
+                secondary = secondary,
+                background = background,
+                surface = surface,
+                textPrimary = textPrimary,
+                textSecondary = textSecondary,
+                accent = accent,
+                border = Color.White.copy(alpha = 0.08f),
+                gradientBrush = Brush.verticalGradient(listOf(Color(0xFF141A2E), Color(0xFF0B1120))),
+                scheme = darkColorScheme(
                     primary = primary,
                     secondary = secondary,
                     background = background,
                     surface = surface,
-                    textPrimary = textPrimary,
-                    textSecondary = textSecondary,
-                    accent = accent,
-                    gradientBrush = Brush.verticalGradient(listOf(surface, background)),
-                    scheme = darkColorScheme(primary = primary, secondary = secondary, background = background, surface = surface)
+                    onPrimary = Color.White,
+                    onSecondary = Color.White,
+                    onBackground = textPrimary,
+                    onSurface = textPrimary
                 )
-            } else {
-                val primary = Color(0xFFFF9800)
-                val secondary = Color(0xFF1A2128)
-                val background = Color(0xFF101418)
-                val surface = Color(0xFF1A2128)
-                val textPrimary = Color(0xFFFFFFFF)
-                val textSecondary = Color(0xFF9EA9B5)
-                val accent = Color(0xFFFF9800)
-                VisualThemePalette(
-                    activeId = "DEEP_SLATE_SUPERAPP",
-                    primary = primary,
-                    secondary = secondary,
-                    background = background,
-                    surface = surface,
-                    textPrimary = textPrimary,
-                    textSecondary = textSecondary,
-                    accent = accent,
-                    gradientBrush = Brush.verticalGradient(listOf(Color(0xFF1A2128), Color(0xFF101418))),
-                    scheme = darkColorScheme(primary = primary, secondary = secondary, background = background, surface = surface)
-                )
-            }
+            )
         }
     }
 }

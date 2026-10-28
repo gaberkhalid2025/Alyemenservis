@@ -22,19 +22,20 @@ fun ProfileTabs(
     themeColors: VisualThemePalette
 ) {
     val tabTitles = when (entityType) {
-        ProfileEntityType.TECHNICIAN -> listOf("سابقة الأعمال 📸", "التقييمات والآراء ⭐", "شروط الضمان 🛡️")
-        ProfileEntityType.STORE -> listOf("الكتالوج والبضائع 📦", "العروض والخصومات 🏷️", "تقييمات المتجر ⭐")
-        ProfileEntityType.RESTAURANT -> listOf("منيو الأكلات 🍔", "العروض الخاصة 🎁", "آراء الذواقة ⭐")
-        ProfileEntityType.MEDICAL -> listOf("العيادات والتخصصات 🩺", "أوقات الدوام والطوارئ ⏰", "آراء المراجعين ⭐")
-        ProfileEntityType.REAL_ESTATE -> listOf("صور العقار والمخطط 📐", "المواصفات والخدمات 🏢", "معاينة وخريطة 🗺️")
-        ProfileEntityType.JOB -> listOf("شروط ومؤهلات الوظيفة 📋", "المزايا والحوافز 💰", "عن جهة العمل 🏢")
-        ProfileEntityType.GENERAL -> listOf("الخدمات 🛠️", "التقييمات ⭐", "معلومات التواصل 📞")
+        ProfileEntityType.TECHNICIAN -> listOf("الخدمات 🛠️", "التقييمات والآراء ⭐", "المعرض 📸", "عن الفني 👤", "أوقات العمل ⏰")
+        ProfileEntityType.STORE -> listOf("الكتالوج والمنتجات 📦", "العروض والخصومات 🏷️", "التقييمات ⭐", "سياسة التوصيل 🚚", "طرق الدفع 💳", "عن المتجر 🏬")
+        ProfileEntityType.RESTAURANT -> listOf("القائمة والأصناف 🍽️", "العروض والخصومات 🔥", "التقييمات ⭐", "التوصيل والمناطق 🛵", "أوقات العمل ⏰", "عن المطعم 🏪")
+        ProfileEntityType.MEDICAL -> listOf("العيادات والتخصصات 🩺", "الأطباء 👨‍⚕️", "حجز موعد 📅", "المختبر والأشعة 🔬", "الطوارئ وأوقات العمل 🚨", "التقييمات والآراء ⭐", "عن المركز 🏥")
+        ProfileEntityType.REAL_ESTATE -> listOf("التفاصيل والمواصفات 📐", "الصور والمعرض 🖼️", "الموقع على الخريطة 🗺️", "المرافق والخدمات 🏢", "التواصل مع المعلن 📞")
+        ProfileEntityType.JOB -> listOf("وصف الوظيفة 📋", "المتطلبات والمؤهلات 🎓", "المزايا والراتب 💼", "معلومات الشركة 🏢", "طريقة التقديم ⚡")
+        ProfileEntityType.GENERAL -> listOf("الخدمات 🛠️", "التقييمات ⭐", "عن المنشأة ℹ️", "أوقات العمل ⏰")
     }
 
-    TabRow(
-        selectedTabIndex = selectedTab,
+    androidx.compose.material3.ScrollableTabRow(
+        selectedTabIndex = selectedTab.coerceIn(0, tabTitles.size - 1),
         containerColor = themeColors.surface,
         contentColor = themeColors.accent,
+        edgePadding = 8.dp,
         modifier = Modifier.clip(RoundedCornerShape(12.dp))
     ) {
         tabTitles.forEachIndexed { index, title ->

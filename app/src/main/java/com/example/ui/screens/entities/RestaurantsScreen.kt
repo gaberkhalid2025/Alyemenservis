@@ -61,7 +61,7 @@ fun RestaurantsScreen(
     var selectedMinRating by remember { mutableStateOf(0.0f) }
     var showCreateRestaurantDialog by remember { mutableStateOf(false) }
 
-    val categories = listOf("الكل", "وجبات شعبية", "وجبات سريعة", "مشويات", "حلويات وعصائر", "كافيهات")
+    val categories = remember { com.example.ui.categories.AppCategoryTaxonomy.restaurantsSubCategories.map { it.name } }
 
     val isLoading = remember(stores) { stores.isEmpty() }
 
@@ -82,9 +82,7 @@ fun RestaurantsScreen(
                     store.description.contains(searchQuery, ignoreCase = true) ||
                     store.localNeighborhood.contains(searchQuery, ignoreCase = true)
 
-            val matchesCat = selectedCategory == "الكل" ||
-                    store.categoryId.contains(selectedCategory, ignoreCase = true) ||
-                    store.name.contains(selectedCategory, ignoreCase = true)
+            val matchesCat = com.example.ui.categories.AppCategoryTaxonomy.matchesRestaurantSubCategory(store, selectedCategory)
 
             val matchesCity = selectedCityId == "الكل" || store.cityId == selectedCityId
 
@@ -119,16 +117,16 @@ fun RestaurantsScreen(
         themeColors = themeColors,
         items = restaurantStores,
         isLoading = isLoading,
-        title = "المطاعم والكافيهات اليمنيّة",
-        titleIcon = "🍔",
-        searchPlaceholder = "بحث عن مطعم، كافيه، أو وجبة... 🍔",
+        title = "المطاعم والكافيهات والمخابز",
+        titleIcon = "🍽️",
+        searchPlaceholder = "بحث عن مطعم، كافيه، مخبز، أو وجبة...",
         categories = categories,
         cities = cities,
         onSearchQueryChanged = { searchQuery = it },
         onCategorySelected = { selectedCategory = it },
         onCitySelected = { selectedCityId = it },
         onMinRatingSelected = { selectedMinRating = it },
-        emptyMessage = "لا توجد مطاعم مطابقة للبحث",
+        emptyMessage = "لا توجد مطاعم مطابقة للبحث حالياً",
         extraHeaderContent = {
             Button(
                 onClick = { 
@@ -143,18 +141,18 @@ fun RestaurantsScreen(
             }
         },
         itemContent = { rest ->
-            RestaurantCard(
-                restaurant = rest,
+            com.example.ui.components.StoreListItemCard(
+                store = rest,
                 themeColors = themeColors,
                 onClick = { onRestaurantClick(rest) },
+                viewModel = viewModel,
                 onChatClick = {
                     if (!isLoggedIn) {
                         showGuestDialog = true
                     } else {
                         onChatClick(rest)
                     }
-                },
-                onOrderMealClick = { onOrderMealClick(rest) }
+                }
             )
         }
     )

@@ -57,9 +57,17 @@ object ValhallaTileDownloader {
         try {
             onProgress(0.05f, "بدء الاتصال بخادم الخرائط...")
             val valhallaDir = getValhallaDir(context)
+            
+            // تنظيف المجلد قبل البدء لضمان التثبيت النظيف
+            if (valhallaDir.exists()) {
+                valhallaDir.deleteRecursively()
+                valhallaDir.mkdirs()
+            }
 
             val url = URL(downloadUrl)
             val connection = url.openConnection()
+            connection.connectTimeout = 10000
+            connection.readTimeout = 30000
             connection.connect()
 
             val zipInputStream = ZipInputStream(BufferedInputStream(connection.getInputStream()))
@@ -67,11 +75,11 @@ object ValhallaTileDownloader {
             var extracted = false
 
             while (entry != null) {
-                // البحث عن الملف الذي ينتهي بالاسم المطلوب
+                // البحث عن ملف tar الخاص بـ Valhalla داخل الـ zip
                 if (entry.name.endsWith(TILE_FILE_NAME)) {
                     val outputFile = File(valhallaDir, TILE_FILE_NAME)
                     FileOutputStream(outputFile).use { fos ->
-                        val buffer = ByteArray(8192)
+                        val buffer = ByteArray(16384)
                         var length: Int
                         var totalRead = 0L
                         val totalSize = entry.size
@@ -80,13 +88,16 @@ object ValhallaTileDownloader {
                             fos.write(buffer, 0, length)
                             totalRead += length
                             if (totalSize > 0) {
-                                val progress = 0.1f + (totalRead.toFloat() / totalSize) * 0.8f
-                                onProgress(progress, "جاري التثبيت... ${(progress * 100).toInt()}%")
+                                val progress = 0.1f + (totalRead.toFloat() / totalSize) * 0.85f
+                                onProgress(progress, "جاري تثبيت الخرائط... ${(progress * 100).toInt()}%")
+                            } else {
+                                // في حال كان الحجم غير معروف، نعرض تقدم تقديري
+                                val estimatedProgress = (0.1f + (totalRead.toFloat() / (25 * 1024 * 1024)) * 0.85f).coerceAtMost(0.95f)
+                                onProgress(estimatedProgress, "جاري التحميل... ${(totalRead / 1024 / 1024)}MB")
                             }
                         }
                     }
                     extracted = true
-                    break
                 }
                 zipInputStream.closeEntry()
                 entry = zipInputStream.nextEntry
@@ -97,12 +108,13 @@ object ValhallaTileDownloader {
                 createValhallaConfig(context)
                 val markerFile = File(valhallaDir, MARKER_FILE_NAME)
                 markerFile.writeText("downloaded_${System.currentTimeMillis()}")
-                onProgress(1.0f, "تم اكتمال التثبيت بنجاح ✓")
+                onProgress(1.0f, "تم اكتمال تثبيت خرائط اليمن بنجاح ✓")
                 Result.success(true)
             } else {
-                Result.failure(Exception("لم يتم العثور على ملف الخرائط داخل الأرشيف."))
+                Result.failure(Exception("لم يتم العثور على حزمة الخرائط ($TILE_FILE_NAME) داخل الأرشيف."))
             }
         } catch (e: Exception) {
+            android.util.Log.e("ValhallaDownloader", "Download failed: ${e.message}")
             Result.failure(e)
         }
     }

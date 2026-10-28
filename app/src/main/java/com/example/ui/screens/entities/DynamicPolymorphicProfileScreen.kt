@@ -148,6 +148,17 @@ fun DynamicPolymorphicProfileScreen(
     val calculatedBookingsCount = entityBookings.size
     val calculatedRevenue = entityBookings.filter { it.status == "COMPLETED" }.sumOf { it.totalAmount }
 
+    if (store != null && !isOwner) {
+        StoreCustomerCatalogView(
+            store = store,
+            products = products,
+            viewModel = viewModel,
+            themeColors = themeColors,
+            onBackClick = onBackClick
+        )
+        return
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(

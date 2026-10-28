@@ -56,7 +56,7 @@ fun MedicalCentersScreen(
     var selectedCityId by remember { mutableStateOf("الكل") }
     var selectedMinRating by remember { mutableStateOf(0.0f) }
 
-    val categories = listOf("الكل", "مستشفيات", "عيادات تخصصية", "صيدليات", "مختبرات تحاليل", "مراكز أشعة")
+    val categories = remember { com.example.ui.categories.AppCategoryTaxonomy.medicalSubCategories.map { it.name } }
 
     val currentUserId by viewModel.currentUserId.collectAsState()
     val adminRole by viewModel.adminRole.collectAsState()
@@ -93,10 +93,7 @@ fun MedicalCentersScreen(
                     provider.profession.contains(searchQuery, ignoreCase = true) ||
                     provider.specialization.contains(searchQuery, ignoreCase = true)
 
-            val matchesCat = selectedCategory == "الكل" ||
-                    provider.specialization.contains(selectedCategory, ignoreCase = true) ||
-                    provider.profession.contains(selectedCategory, ignoreCase = true) ||
-                    provider.customCategoryName.contains(selectedCategory, ignoreCase = true)
+            val matchesCat = com.example.ui.categories.AppCategoryTaxonomy.matchesMedicalSubCategory(provider, selectedCategory)
 
             val matchesCity = selectedCityId == "الكل" || provider.cityId == selectedCityId
 

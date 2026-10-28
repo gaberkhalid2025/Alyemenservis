@@ -173,14 +173,18 @@ fun NavigationScreen(
     ) {
         var zoomScale by remember { mutableFloatStateOf(1.2f) }
         var panOffset by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
+        var tilt by remember { mutableFloatStateOf(35f) }
+        var rotation by remember { mutableFloatStateOf(0f) }
+        var showTiltPanel by remember { mutableStateOf(false) }
 
-        // Interactive Map
-        OfflineInteractiveMap(
+        // Valhalla Map View with 3D Tilt and Rotation Perspective Support
+        RealLeafletMapView(
             userCoords = Pair(userLat, userLng),
             nearbyProviders = nearbyProviders,
             nearbyStores = nearbyStores,
             nearbyProperties = emptyList(),
             dynamicOffsets = emptyMap(),
+            currentMapMode = MapMode.VELA_3D,
             selectedCity = "الكل",
             zoomScale = zoomScale,
             onZoomScaleChange = { zoomScale = it },
@@ -197,7 +201,8 @@ fun NavigationScreen(
             },
             onPropertySelected = {},
             onDeselect = {},
-            route = routeResult,
+            tilt = tilt,
+            rotation = rotation,
             modifier = Modifier.fillMaxSize()
         )
 
@@ -243,6 +248,18 @@ fun NavigationScreen(
 
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         Button(
+                            onClick = { showTiltPanel = !showTiltPanel },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6366F1)),
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                            modifier = Modifier.height(30.dp)
+                        ) {
+                            Icon(Icons.Default.Map, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.White)
+                            Spacer(modifier = Modifier.width(2.dp))
+                            Text("منظور 3D", fontSize = 10.sp, color = Color.White)
+                        }
+
+                        Button(
                             onClick = { showAddStopDialog = true },
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
                             shape = RoundedCornerShape(8.dp),
@@ -265,6 +282,69 @@ fun NavigationScreen(
                                 Icon(Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.White)
                                 Spacer(modifier = Modifier.width(2.dp))
                                 Text("تحميل (25MB)", fontSize = 10.sp, color = Color.White)
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (showTiltPanel) {
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = Color(0xFF0F172A).copy(alpha = 0.95f),
+                    border = BorderStroke(1.dp, Color(0xFF6366F1)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("🏙️ إعدادات المنظور ثلاثي الأبعاد والدوران", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            IconButton(onClick = { showTiltPanel = false }, modifier = Modifier.size(24.dp)) {
+                                Icon(Icons.Default.Close, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(16.dp))
+                            }
+                        }
+
+                        Text("زاوية الإمالة (Tilt): ${tilt.toInt()}°", color = Color(0xFF00E5FF), fontSize = 11.sp)
+                        Slider(
+                            value = tilt,
+                            onValueChange = { tilt = it },
+                            valueRange = 0f..60f,
+                            colors = SliderDefaults.colors(thumbColor = Color(0xFF00E5FF), activeTrackColor = Color(0xFF00E5FF))
+                        )
+
+                        Text("دوران الخريطة (Rotation): ${rotation.toInt()}°", color = Color(0xFF00E5FF), fontSize = 11.sp)
+                        Slider(
+                            value = rotation,
+                            onValueChange = { rotation = it },
+                            valueRange = 0f..360f,
+                            colors = SliderDefaults.colors(thumbColor = Color(0xFF00E5FF), activeTrackColor = Color(0xFF00E5FF))
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Button(
+                                onClick = { tilt = 35f; rotation = 0f },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                                modifier = Modifier.weight(1f).height(32.dp),
+                                contentPadding = PaddingValues(0.dp)
+                            ) {
+                                Text("وضع 3D قياسي", fontSize = 11.sp)
+                            }
+                            Button(
+                                onClick = { tilt = 0f; rotation = 0f },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF334155)),
+                                modifier = Modifier.weight(1f).height(32.dp),
+                                contentPadding = PaddingValues(0.dp)
+                            ) {
+                                Text("مسطح (2D)", fontSize = 11.sp)
                             }
                         }
                     }

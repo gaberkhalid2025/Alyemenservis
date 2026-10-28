@@ -40,12 +40,12 @@ fun BoxScope.FloatingIconsOverlay(
     onAssistantClick: () -> Unit,
     onRequestServiceClick: () -> Unit
 ) {
-    // 1. Primary Action FAB: "اطلب خدمتك الآن" (ثابتة في مكانها حسب إعدادات الأدمن)
+    // 1. Primary Action FAB: "اطلب خدمتك الآن" (ثابتة في مكانها المريح فوق الشريط السفلي)
     if (!settings.footerMessage.contains("hide_urgent_fab")) {
         Box(
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                .padding(start = 12.dp, bottom = 4.dp)
+                .padding(start = 12.dp, bottom = 66.dp)
                 .shadow(8.dp, RoundedCornerShape(20.dp))
                 .clip(RoundedCornerShape(20.dp))
                 .background(
@@ -62,15 +62,10 @@ fun BoxScope.FloatingIconsOverlay(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Default.Send,
-                    contentDescription = "اطلب خدمتك الآن",
-                    tint = Color.White,
-                    modifier = Modifier.size(14.dp)
-                )
+                Text("⚡", fontSize = 14.sp)
                 Text(
-                    text = "اطلب خدمتك الآن ⚡",
-                    fontSize = 11.sp,
+                    text = "اطلب خدمتك الآن",
+                    fontSize = 11.5.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White,
                     letterSpacing = 0.sp,
@@ -80,12 +75,12 @@ fun BoxScope.FloatingIconsOverlay(
         }
     }
 
-    // 2. Smart Assistant FAB: "المساعد الذكي" (ثابتة في مكانها حسب إعدادات الأدمن)
+    // 2. Smart Assistant FAB: "المساعد الذكي" (ثابتة في مكانها المريح فوق الشريط السفلي)
     if (!settings.assistantHidden) {
         Box(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(end = 12.dp, bottom = 4.dp)
+                .padding(end = 12.dp, bottom = 66.dp)
                 .shadow(8.dp, RoundedCornerShape(20.dp))
                 .clip(RoundedCornerShape(20.dp))
                 .background(

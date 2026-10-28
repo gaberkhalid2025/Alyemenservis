@@ -2,6 +2,7 @@ package com.example.utils
 
 import android.content.Context
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.Locale
@@ -44,8 +45,13 @@ object RealValhallaNavigator {
         waypoints: List<NavWaypoint>
     ): NavRouteResult = withContext(Dispatchers.Default) {
         
-        // 1. المحاولة عبر الإنترنت (OSRM) أولاً لضمان أفضل دقة للطرق
-        val onlineResult = OnlineOsrmNavigator.calculateRoute(origin, waypoints)
+        // 1. المحاولة عبر الإنترنت (OSRM) مع إعادة محاولة واحدة في حال الفشل
+        var onlineResult = OnlineOsrmNavigator.calculateRoute(origin, waypoints)
+        if (onlineResult.error != null && onlineResult.error is NavError.NoConnection) {
+            delay(1000)
+            onlineResult = OnlineOsrmNavigator.calculateRoute(origin, waypoints)
+        }
+
         if (onlineResult.error == null) {
             return@withContext onlineResult
         }
@@ -296,11 +302,27 @@ object RealValhallaNavigator {
             val roadDist = (directDist * 1.3).coerceAtLeast(100.0)
             
             totalDistance += roadDist
-            val legDuration = (roadDist / (40.0 * 1000.0 / 3600.0))
+            val legDuration = (roadDist / (45.0 * 1000.0 / 3600.0)) // زيادة السرعة المتوسطة قليلاً
             totalDuration += legDuration
 
+            // إضافة تعرجات بسيطة للمسار المحاكي ليبدو أكثر واقعية من الخطوط المستقيمة
             coordsList.add(Pair(from.latitude, from.longitude))
-            coordsList.add(Pair((from.latitude + to.latitude) / 2.0, (from.longitude + to.longitude) / 2.0))
+            
+            val midLat = (from.latitude + to.latitude) / 2.0
+            val midLng = (from.longitude + to.longitude) / 2.0
+            val latDiff = to.latitude - from.latitude
+            val lngDiff = to.longitude - from.longitude
+            
+            // إضافة نقطتين انحناء طفيفتين
+            coordsList.add(Pair(
+                from.latitude + latDiff * 0.3 + (lngDiff * 0.05), 
+                from.longitude + lngDiff * 0.3 - (latDiff * 0.05)
+            ))
+            coordsList.add(Pair(
+                from.latitude + latDiff * 0.7 - (lngDiff * 0.05), 
+                from.longitude + lngDiff * 0.7 + (latDiff * 0.05)
+            ))
+            
             coordsList.add(Pair(to.latitude, to.longitude))
 
             val legSteps = mutableListOf<NavStep>()

@@ -45,24 +45,25 @@ fun ServicesSearchBar(
     themeColors: VisualThemePalette
 ) {
     Card(
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = themeColors.surface),
-        border = BorderStroke(0.8.dp, if (isFilterActive) themeColors.accent else themeColors.accent.copy(alpha = 0.25f)),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF141A2E)),
+        border = BorderStroke(1.dp, if (isFilterActive) Color(0xFF10B981) else Color.White.copy(alpha = 0.08f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 10.dp, vertical = 6.dp),
+                .padding(horizontal = 12.dp, vertical = 7.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
                 imageVector = Icons.Default.Search,
                 contentDescription = "بحث",
-                tint = themeColors.accent,
-                modifier = Modifier.size(18.dp)
+                tint = Color(0xFF00E5FF), // Cyan #00E5FF
+                modifier = Modifier.size(20.dp)
             )
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(10.dp))
 
             Box(
                 modifier = Modifier
@@ -76,9 +77,9 @@ fun ServicesSearchBar(
                     singleLine = true,
                     maxLines = 1,
                     textStyle = androidx.compose.ui.text.TextStyle(
-                        color = themeColors.textPrimary,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Normal
+                        color = Color(0xFFF8FAFC),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium
                     ),
                     modifier = Modifier
                         .fillMaxWidth()
@@ -86,9 +87,9 @@ fun ServicesSearchBar(
                     decorationBox = { innerTextField ->
                         if (searchQuery.isEmpty()) {
                             Text(
-                                text = "ابحث عن فني، متجر، خدمة، عقار...",
-                                fontSize = 11.sp,
-                                color = themeColors.textSecondary.copy(alpha = 0.7f),
+                                text = "ابحث عن خدمة، متجر، أو طبيب في اليمن...",
+                                fontSize = 11.5.sp,
+                                color = Color(0xFF94A3B8),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
@@ -103,25 +104,42 @@ fun ServicesSearchBar(
                     onClick = { onSearchQueryChange("") },
                     modifier = Modifier.size(24.dp)
                 ) {
-                    Icon(Icons.Default.Clear, contentDescription = "مسح", tint = Color.Gray, modifier = Modifier.size(14.dp))
+                    Icon(Icons.Default.Clear, contentDescription = "مسح", tint = Color.Gray, modifier = Modifier.size(15.dp))
                 }
+                Spacer(modifier = Modifier.width(4.dp))
             }
 
-            Spacer(modifier = Modifier.width(4.dp))
+            // Microphone button for speech-to-text voice search
+            IconButton(
+                onClick = onVoiceClick,
+                modifier = Modifier
+                    .size(32.dp)
+                    .background(Color.White.copy(alpha = 0.05f), CircleShape)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Mic,
+                    contentDescription = "بحث صوتي",
+                    tint = Color(0xFF00E5FF),
+                    modifier = Modifier.size(16.dp)
+                )
+            }
 
+            Spacer(modifier = Modifier.width(6.dp))
+
+            // Integrated Filter Icon with badge indicator opening filter drawer
             Box(contentAlignment = Alignment.TopEnd) {
                 Surface(
                     onClick = onFilterClick,
-                    shape = RoundedCornerShape(8.dp),
-                    color = if (isFilterActive) themeColors.accent else Color.White.copy(alpha = 0.08f),
-                    border = BorderStroke(0.7.dp, if (isFilterActive) themeColors.accent else Color.White.copy(alpha = 0.15f)),
+                    shape = RoundedCornerShape(10.dp),
+                    color = if (isFilterActive) Color(0xFF10B981) else Color.White.copy(alpha = 0.08f),
+                    border = BorderStroke(1.dp, if (isFilterActive) Color(0xFF10B981) else Color.White.copy(alpha = 0.12f)),
                     modifier = Modifier.size(34.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
-                            imageVector = Icons.Default.Settings,
+                            imageVector = Icons.Default.Tune,
                             contentDescription = "فلترة وبحث متقدم",
-                            tint = if (isFilterActive) Color.Black else Color.White,
+                            tint = if (isFilterActive) Color.White else Color(0xFFE2E8F0),
                             modifier = Modifier.size(16.dp)
                         )
                     }
@@ -129,22 +147,9 @@ fun ServicesSearchBar(
                 if (isFilterActive) {
                     Box(
                         modifier = Modifier
-                            .size(8.dp)
-                            .background(Color(0xFF10B981), CircleShape)
-                    )
-                }
-            }
-
-            if (isSpeechSearchEnabled) {
-                IconButton(
-                    onClick = onVoiceClick,
-                    modifier = Modifier.size(30.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Mic,
-                        contentDescription = "بحث صوتي",
-                        tint = themeColors.accent,
-                        modifier = Modifier.size(16.dp)
+                            .size(9.dp)
+                            .background(Color(0xFFEF4444), CircleShape)
+                            .border(1.dp, Color(0xFF141A2E), CircleShape)
                     )
                 }
             }

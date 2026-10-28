@@ -62,7 +62,7 @@ fun PropertiesScreen(
     var selectedMinRating by remember { mutableStateOf(0.0f) }
     var showCreatePropertyDialog by remember { mutableStateOf(false) }
 
-    val categories = listOf("الكل", "شقة", "بيت ومستقل", "محل تجاري", "أرض")
+    val categories = remember { com.example.ui.categories.AppCategoryTaxonomy.propertiesSubCategories.map { it.name } }
 
     // Determine loading state from properties list presence
     val isLoading = remember(properties) { properties.isEmpty() }
@@ -75,12 +75,7 @@ fun PropertiesScreen(
                     prop.description.contains(searchQuery, ignoreCase = true) ||
                     prop.localNeighborhood.contains(searchQuery, ignoreCase = true)
 
-            val matchesCat = selectedCategory == "الكل" ||
-                    (selectedCategory == "شقة" && prop.propertyType.contains("apartment", ignoreCase = true)) ||
-                    (selectedCategory == "بيت ومستقل" && prop.propertyType.contains("house", ignoreCase = true)) ||
-                    (selectedCategory == "محل تجاري" && prop.propertyType.contains("shop", ignoreCase = true)) ||
-                    (selectedCategory == "أرض" && prop.propertyType.contains("land", ignoreCase = true)) ||
-                    prop.propertyType.contains(selectedCategory, ignoreCase = true)
+            val matchesCat = com.example.ui.categories.AppCategoryTaxonomy.matchesPropertySubCategory(prop, selectedCategory)
 
             val matchesType = selectedTypeFilter == "الكل" || prop.type == selectedTypeFilter
 

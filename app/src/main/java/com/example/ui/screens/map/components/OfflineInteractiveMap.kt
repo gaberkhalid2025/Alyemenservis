@@ -403,26 +403,43 @@ fun OfflineInteractiveMap(
                         // Outer glow for the route
                         drawPath(
                             path = routePath,
-                            color = Color(0xFF00E5FF).copy(alpha = 0.25f),
-                            style = Stroke(width = 12.dp.toPx() / safeZoom, cap = androidx.compose.ui.graphics.StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round)
+                            color = Color(0xFF00E5FF).copy(alpha = 0.35f),
+                            style = Stroke(width = 14.dp.toPx() / safeZoom, cap = androidx.compose.ui.graphics.StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round)
+                        )
+                        // Second layer glow
+                        drawPath(
+                            path = routePath,
+                            color = Color(0xFF00E5FF).copy(alpha = 0.20f),
+                            style = Stroke(width = 24.dp.toPx() / safeZoom, cap = androidx.compose.ui.graphics.StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round)
                         )
                         // Main neon route line
                         drawPath(
                             path = routePath,
                             color = Color(0xFF00E5FF),
-                            style = Stroke(width = 6.dp.toPx() / safeZoom, cap = androidx.compose.ui.graphics.StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round)
+                            style = Stroke(width = 7.dp.toPx() / safeZoom, cap = androidx.compose.ui.graphics.StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round)
                         )
                         
-                        // Draw stop markers along the route
+                        // Draw stop markers along the route with premium styling
                         res.waypoints.forEachIndexed { index, wp ->
-                            if (index > 0) { // Skip origin if it's the user's current location
-                                val wx = safeCX + (((wp.longitude - originLng) * metersPerDegreeLng).toFloat() / safeMeters)
-                                val wy = safeCY + (((-(wp.latitude - originLat) * metersPerDegreeLat)).toFloat() / safeMeters)
-                                val wpCenter = Offset(wx, wy)
-                                
-                                drawCircle(Color(0xFF0F172A), 10.dp.toPx() / safeZoom, wpCenter)
-                                drawCircle(Color(0xFF00E5FF), 8.dp.toPx() / safeZoom, wpCenter, style = Stroke(2.dp.toPx()))
+                            val wx = safeCX + (((wp.longitude - originLng) * metersPerDegreeLng).toFloat() / safeMeters)
+                            val wy = safeCY + (((-(wp.latitude - originLat) * metersPerDegreeLat)).toFloat() / safeMeters)
+                            val wpCenter = Offset(wx, wy)
+
+                            if (index == 0) {
+                                // Start marker
+                                drawCircle(Color(0xFF10B981).copy(alpha = 0.3f), 18.dp.toPx() / safeZoom, wpCenter)
+                                drawCircle(Color(0xFF10B981), 10.dp.toPx() / safeZoom, wpCenter)
                                 drawCircle(Color.White, 4.dp.toPx() / safeZoom, wpCenter)
+                            } else if (index == res.waypoints.size - 1) {
+                                // Destination marker
+                                drawCircle(Color(0xFFEF4444).copy(alpha = 0.3f), 18.dp.toPx() / safeZoom, wpCenter)
+                                drawCircle(Color(0xFFEF4444), 10.dp.toPx() / safeZoom, wpCenter)
+                                drawCircle(Color.White, 4.dp.toPx() / safeZoom, wpCenter)
+                            } else {
+                                // Intermediate stop
+                                drawCircle(Color(0xFF0F172A), 10.dp.toPx() / safeZoom, wpCenter)
+                                drawCircle(Color(0xFF00E5FF), 8.dp.toPx() / safeZoom, wpCenter, style = Stroke(2.5.dp.toPx()))
+                                drawCircle(Color.White, 3.dp.toPx() / safeZoom, wpCenter)
                             }
                         }
                     }

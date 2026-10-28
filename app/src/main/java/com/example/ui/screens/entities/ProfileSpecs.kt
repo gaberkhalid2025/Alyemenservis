@@ -58,7 +58,7 @@ fun TechnicianSpecificSpecsView(provider: ProviderEntity?, themeColors: VisualTh
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("🔧 بيانات المهنة والاعتماد الفني", fontWeight = FontWeight.Bold, color = Color(0xFF60A5FA), fontSize = 13.sp)
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                SpecBadge("سعر المعاينة:", "${provider?.previewPrice?.toInt() ?: 1500} ر.ي", Icons.Default.CheckCircle)
+                SpecBadge("الخبرة والتصنيف:", "فني محترف معتمد 🎖️", Icons.Default.CheckCircle)
                 SpecBadge("الحالة:", if (provider?.isAvailable == true) "متاح للعمل الآن 🟢" else "مشغول 🔴", Icons.Default.Info)
             }
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {

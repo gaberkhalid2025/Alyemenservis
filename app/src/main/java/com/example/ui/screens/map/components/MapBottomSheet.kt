@@ -51,6 +51,7 @@ fun MapBottomSheet(
     themeColors: VisualThemePalette,
     onAskAleph: ((Any) -> Unit)? = null,
     onStartNavigation: ((Any) -> Unit)? = null,
+    onAddStop: ((Any) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -210,6 +211,19 @@ fun MapBottomSheet(
                     )
                 }
 
+                // Add Stop / Bookmark Action
+                IconButton(
+                    onClick = { onAddStop?.invoke(entity) },
+                    modifier = Modifier.size(36.dp).testTag("add_stop_btn")
+                ) {
+                    Icon(
+                        Icons.Default.AddLocationAlt,
+                        contentDescription = "إضافة محطة",
+                        tint = Color(0xFF38BDF8),
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+
                 // Close Button
                 IconButton(
                     onClick = onDismiss,
@@ -251,6 +265,22 @@ fun MapBottomSheet(
                     fontSize = 11.5.sp,
                     fontWeight = FontWeight.Bold
                 )
+            }
+
+            // Multi-Stop Waypoint Button
+            OutlinedButton(
+                onClick = { onAddStop?.invoke(entity) },
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.2.dp, Color(0xFF38BDF8)),
+                colors = ButtonDefaults.outlinedButtonColors(containerColor = Color(0xFF0F172A), contentColor = Color(0xFF38BDF8)),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(40.dp)
+                    .testTag("add_stop_main_btn")
+            ) {
+                Icon(Icons.Default.AddLocationAlt, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("➕ إضافة هذه الوجهة كمحطة توقف للمسار", fontSize = 12.sp, fontWeight = FontWeight.Bold)
             }
 
             // Action Buttons: [بدء الملاحة] Emerald Green + [اتصال] + [حجز]
