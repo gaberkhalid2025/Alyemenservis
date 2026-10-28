@@ -193,23 +193,25 @@
         var userLng = 44.1910;
         var activeMode = 'AERIAL_OAM';
 
-        // 🛰️ Free Global Tile Providers (No API Keys Required - Watermark Free)
+        // 🛰️ Free Global Tile Providers (Deep Zoom System: maxZoom 24, maxNativeZoom 20)
         var providers = {
             // 1. OpenStreetMap Standard (الرسمية)
             'osm': {
                 base: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                     subdomains: ['a', 'b', 'c'],
                     minZoom: 3,
-                    maxZoom: 20,
+                    maxZoom: 24,
+                    maxNativeZoom: 20,
                     attribution: '© OpenStreetMap Standard'
                 }),
                 labels: null
             },
-            // 2. خريطة الشوارع الحيوية (HOT)
+            // 2. خريطة الشوارع الحية (HOT)
             'hot': {
                 base: L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
                     minZoom: 3,
-                    maxZoom: 20,
+                    maxZoom: 24,
+                    maxNativeZoom: 20,
                     attribution: '© OpenStreetMap HOT'
                 }),
                 labels: null
@@ -218,7 +220,8 @@
             'topo': {
                 base: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
                     minZoom: 3,
-                    maxZoom: 17,
+                    maxZoom: 24,
+                    maxNativeZoom: 20,
                     attribution: '© OpenTopoMap'
                 }),
                 labels: null
@@ -228,7 +231,8 @@
                 base: L.tileLayer('https://mt{s}.google.com/vt/lyrs=y&hl=ar&x={x}&y={y}&z={z}', {
                     subdomains: ['0', '1', '2', '3'],
                     minZoom: 3,
-                    maxZoom: 20,
+                    maxZoom: 24,
+                    maxNativeZoom: 20,
                     attribution: '© صور الأقمار الصناعية'
                 }),
                 labels: null
@@ -237,13 +241,15 @@
             'esri': {
                 base: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
                     minZoom: 3,
-                    maxZoom: 19,
+                    maxZoom: 24,
+                    maxNativeZoom: 20,
                     attribution: '© Esri Satellite'
                 }),
                 labels: L.tileLayer('https://mt{s}.google.com/vt/lyrs=h&hl=ar&x={x}&y={y}&z={z}', {
                     subdomains: ['0', '1', '2', '3'],
                     minZoom: 3,
-                    maxZoom: 20,
+                    maxZoom: 24,
+                    maxNativeZoom: 20,
                     attribution: ''
                 })
             },
@@ -252,7 +258,8 @@
                 base: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                     subdomains: ['a', 'b', 'c'],
                     minZoom: 3,
-                    maxZoom: 20,
+                    maxZoom: 24,
+                    maxNativeZoom: 20,
                     attribution: '© OpenStreetMap 3D'
                 }),
                 labels: null
@@ -261,7 +268,8 @@
             'oam': {
                 base: L.tileLayer('https://tiles.openaerialmap.org/{z}/{x}/{y}.png', {
                     minZoom: 3,
-                    maxZoom: 20,
+                    maxZoom: 24,
+                    maxNativeZoom: 20,
                     attribution: '© OpenAerialMap'
                 }),
                 labels: null
@@ -270,12 +278,14 @@
 
         function initMap() {
             try {
-                // Initialize map centered on Sana'a by default
+                // Initialize map centered on Sana'a by default with Deep Zoom System
                 map = L.map('map', {
                     center: [userLat, userLng],
                     zoom: 15,
                     minZoom: 3,
-                    maxZoom: 20,
+                    maxZoom: 24,
+                    zoomDelta: 0.5,
+                    zoomSnap: 0.25,
                     zoomControl: false,
                     attributionControl: true
                 });

@@ -481,6 +481,13 @@ fun MapScreenContent(
                 isGpsActive = viewModel.isGpsTrackingActive.collectAsState().value,
                 themeColors = themeColors,
                 currentMapMode = state.currentMapMode,
+                onSelectMapMode = { mode, tilt ->
+                    state.currentMapMode = mode
+                    state.isRadarMode = false
+                    coroutineScope.launch {
+                        snackbarHostState.showSnackbar("تم تطبيق النمط بنجاح ✓")
+                    }
+                },
                 isDrivingMode = isDrivingMode,
                 onToggleDrivingMode = {
                     isDrivingMode = !isDrivingMode
@@ -643,57 +650,19 @@ fun MapScreenContent(
                 }
             }
 
-            // 🗺️ 8. Layer Selection Dialog
+            // 🗺️ 8. Layer Selection Dialog (نظام الطبقات الخمس)
             if (state.showLayerDialog) {
-                AlertDialog(
-                    onDismissRequest = { state.showLayerDialog = false },
-                    containerColor = Color(0xFF0B0F19),
-                    titleContentColor = Color.White,
-                    textContentColor = Color.White,
-                    shape = RoundedCornerShape(20.dp),
-                    title = {
-                        Text("🗺️ اختيار طبقة الخريطة", fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                    },
-                    text = {
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            val layers = listOf(
-                                Triple(MapMode.SATELLITE, "🛰️ الأقمار الصناعية (عالي الدقة)", "صور جوية فضائية عالية الدقة للمدن والمعالم"),
-                                Triple(MapMode.VELA_3D, "🏙️ Vela 3D (مباني ثلاثية الأبعاد)", "عرض مجسم ثلاثي الأبعاد للمباني وإمالة الكاميرا التفاعلية"),
-                                Triple(MapMode.HOT, "🗺️ خريطة الشوارع الحية (HOT)", "خريطة تفاعلية للشوارع والأحياء المباشرة"),
-                                Triple(MapMode.TOPO, "⛰️ التضاريس والارتفاعات (Topo)", "إظهار المعالم الجغرافية والجبال والمجاري"),
-                                Triple(MapMode.OSM, "🌐 خريطة الشوارع القياسية (OSM)", "الخريطة المفصلة المفتوحة")
-                            )
-
-                            layers.forEach { (mode, title, desc) ->
-                                val isSelected = state.currentMapMode == mode
-                                Surface(
-                                    onClick = {
-                                        state.currentMapMode = mode
-                                        state.isRadarMode = false
-                                        state.showLayerDialog = false
-                                        coroutineScope.launch {
-                                            snackbarHostState.showSnackbar("تم تفعيل: $title")
-                                        }
-                                    },
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = if (isSelected) Color(0xFF10B981).copy(alpha = 0.2f) else Color(0xFF1E293B),
-                                    border = BorderStroke(1.dp, if (isSelected) Color(0xFF10B981) else Color(0xFF334155)),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Column(modifier = Modifier.padding(12.dp)) {
-                                        Text(text = title, color = if (isSelected) Color(0xFF10B981) else Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                                        Spacer(modifier = Modifier.height(2.dp))
-                                        Text(text = desc, color = Color(0xFF94A3B8), fontSize = 11.sp)
-                                    }
-                                }
-                            }
+                MapLayersDialog(
+                    currentMapMode = state.currentMapMode,
+                    onSelectLayer = { mode, tilt ->
+                        state.currentMapMode = mode
+                        state.isRadarMode = false
+                        state.showLayerDialog = false
+                        coroutineScope.launch {
+                            snackbarHostState.showSnackbar("تم تفعيل الطبقة بنجاح ✓")
                         }
                     },
-                    confirmButton = {
-                        TextButton(onClick = { state.showLayerDialog = false }) {
-                            Text("إغلاق", color = Color(0xFF10B981))
-                        }
-                    }
+                    onDismiss = { state.showLayerDialog = false }
                 )
             }
 
