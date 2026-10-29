@@ -11,7 +11,10 @@ import java.net.URL
 
 /**
  * 🌐 OnlineOsrmNavigator
- * محرك الملاحة عبر الإنترنت باستخدام OSRM مع مهام أمان وخووارزميات وقت المهلة (Timeouts).
+ * [إصلاح ملاحة نهائي] محرك الملاحة عبر الإنترنت باستخدام OSRM
+ * - معالجة كاملة للاستثناءات والمهل الزمنية
+ * - إغلاق الاتصالات تلقائياً في finally
+ * - دعم نقاط توقف متعددة وإرشادات عربية دقيقة
  */
 object OnlineOsrmNavigator {
 
@@ -21,7 +24,9 @@ object OnlineOsrmNavigator {
         origin: NavWaypoint,
         waypoints: List<NavWaypoint>
     ): NavRouteResult = withContext(Dispatchers.IO) {
-        val allWaypoints = listOf(origin) + waypoints
+        val validWaypoints = waypoints.filter { !it.latitude.isNaN() && !it.longitude.isNaN() && it.latitude != 0.0 && it.longitude != 0.0 }
+        val allWaypoints = listOf(origin) + validWaypoints
+
         if (allWaypoints.size < 2) {
             return@withContext NavRouteResult(
                 totalDistanceMeters = 0.0,
@@ -35,51 +40,56 @@ object OnlineOsrmNavigator {
             )
         }
 
+        var connection: HttpURLConnection? = null
         try {
+            // [إصلاح ملاحة نهائي] OSRM يتطلب الترتيب lon,lat
             val coordsParam = allWaypoints.joinToString(";") { "${it.longitude},${it.latitude}" }
             val urlString = "${NavConfig.OSRM_BASE_URL}$coordsParam?overview=full&geometries=geojson&steps=true"
             val url = URL(urlString)
-            val connection = (url.openConnection() as HttpURLConnection).apply {
+
+            connection = (url.openConnection() as HttpURLConnection).apply {
                 connectTimeout = 8000
-                readTimeout = 15000
+                readTimeout = 12000
                 requestMethod = "GET"
-                setRequestProperty("User-Agent", "AlYemenServicesApp/1.0")
+                setRequestProperty("User-Agent", "AlYemenServicesApp/1.0 (Android; OpenStreetMap)")
+                instanceFollowRedirects = true
             }
 
-            if (connection.responseCode == 200) {
-                val reader = BufferedReader(InputStreamReader(connection.inputStream))
-                val response = reader.readText()
-                reader.close()
-                connection.disconnect()
-
+            val responseCode = connection.responseCode
+            if (responseCode == 200) {
+                val response = connection.inputStream.bufferedReader().use { it.readText() }
                 val json = JSONObject(response)
+
                 if (json.optString("code") == "Ok") {
-                    val routes = json.getJSONArray("routes")
-                    if (routes.length() > 0) {
+                    val routes = json.optJSONArray("routes")
+                    if (routes != null && routes.length() > 0) {
                         val route = routes.getJSONObject(0)
                         val totalDistance = route.optDouble("distance", 0.0)
                         val totalDuration = route.optDouble("duration", 0.0)
 
+                        // [إصلاح ملاحة نهائي] استخراج خط المسار (Polyline Coords) بصيغة [Lat, Lng] للخرائط
                         val coordsList = mutableListOf<Pair<Double, Double>>()
                         val geometry = route.optJSONObject("geometry")
                         if (geometry != null) {
                             val coordsArr = geometry.optJSONArray("coordinates")
                             if (coordsArr != null) {
                                 for (i in 0 until coordsArr.length()) {
-                                    val pt = coordsArr.getJSONArray(i)
-                                    coordsList.add(Pair(pt.getDouble(1), pt.getDouble(0)))
+                                    val pt = coordsArr.optJSONArray(i)
+                                    if (pt != null && pt.length() >= 2) {
+                                        // OSRM returns [lon, lat], we convert to Pair(lat, lon)
+                                        coordsList.add(Pair(pt.getDouble(1), pt.getDouble(0)))
+                                    }
                                 }
                             }
                         }
 
                         val legsList = mutableListOf<NavLeg>()
                         val legs = route.optJSONArray("legs")
-                        
                         if (legs != null) {
                             for (legIdx in 0 until legs.length()) {
-                                val leg = legs.getJSONObject(legIdx)
-                                val fromWp = allWaypoints[legIdx]
-                                val toWp = allWaypoints[legIdx + 1]
+                                val leg = legs.optJSONObject(legIdx) ?: continue
+                                val fromWp = allWaypoints.getOrNull(legIdx) ?: allWaypoints.first()
+                                val toWp = allWaypoints.getOrNull(legIdx + 1) ?: allWaypoints.last()
                                 val legDist = leg.optDouble("distance", 0.0)
                                 val legDur = leg.optDouble("duration", 0.0)
 
@@ -87,7 +97,7 @@ object OnlineOsrmNavigator {
                                 val steps = leg.optJSONArray("steps")
                                 if (steps != null) {
                                     for (stepIdx in 0 until steps.length()) {
-                                        val stepObj = steps.getJSONObject(stepIdx)
+                                        val stepObj = steps.optJSONObject(stepIdx) ?: continue
                                         val stepDist = stepObj.optDouble("distance", 0.0)
                                         val stepDur = stepObj.optDouble("duration", 0.0)
                                         val streetName = stepObj.optString("name", "").trim()
@@ -100,22 +110,27 @@ object OnlineOsrmNavigator {
                                             mType, streetName, stepDist, toWp.name
                                         )
 
-                                        legSteps.add(NavStep(
-                                            instruction = instruction,
-                                            distanceMeters = stepDist,
-                                            durationSeconds = stepDur,
-                                            maneuverType = mType,
-                                            streetName = streetName
-                                        ))
+                                        legSteps.add(
+                                            NavStep(
+                                                instruction = instruction,
+                                                distanceMeters = stepDist,
+                                                durationSeconds = stepDur,
+                                                maneuverType = mType,
+                                                streetName = streetName
+                                            )
+                                        )
                                     }
                                 }
-                                legsList.add(NavLeg(
-                                    fromWaypointId = fromWp.id,
-                                    toWaypointId = toWp.id,
-                                    distanceMeters = legDist,
-                                    durationSeconds = legDur,
-                                    steps = legSteps
-                                ))
+
+                                legsList.add(
+                                    NavLeg(
+                                        fromWaypointId = fromWp.id,
+                                        toWaypointId = toWp.id,
+                                        distanceMeters = legDist,
+                                        durationSeconds = legDur,
+                                        steps = legSteps
+                                    )
+                                )
                             }
                         }
 
@@ -126,11 +141,14 @@ object OnlineOsrmNavigator {
                             legs = legsList,
                             waypoints = allWaypoints,
                             isOffline = false,
-                            engineSource = "OSRM 🌐"
+                            engineSource = "OSRM 🌐 (أونلاين حي)"
                         )
                     }
                 }
+            } else {
+                Log.w(TAG, "OSRM server returned HTTP $responseCode")
             }
+
             return@withContext NavRouteResult(
                 totalDistanceMeters = 0.0,
                 totalDurationSeconds = 0.0,
@@ -142,7 +160,7 @@ object OnlineOsrmNavigator {
                 error = NavError.RouteNotFound
             )
         } catch (e: Exception) {
-            Log.e(TAG, "OSRM exception: ${e.message}", e)
+            Log.e(TAG, "OSRM calculateRoute exception: ${e.message}", e)
             return@withContext NavRouteResult(
                 totalDistanceMeters = 0.0,
                 totalDurationSeconds = 0.0,
@@ -153,6 +171,10 @@ object OnlineOsrmNavigator {
                 engineSource = "OSRM 🌐",
                 error = NavError.NoConnection
             )
+        } finally {
+            try {
+                connection?.disconnect()
+            } catch (e: Exception) {}
         }
     }
 

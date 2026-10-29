@@ -167,9 +167,21 @@ class MainActivity : ComponentActivity() {
             if (androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_FINE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED ||
                 androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_COARSE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
                 
+                // [إصلاح ملاحة نهائي] الحصول الفوري على آخر موقع معروف من FusedLocation
                 fusedLocationClient.lastLocation.addOnSuccessListener { location ->
-                    if (location != null) {
+                    if (location != null && location.latitude != 0.0 && location.longitude != 0.0) {
                         viewModel.updateUserLocation(location.latitude, location.longitude)
+                    }
+                }
+
+                // [إصلاح ملاحة نهائي] فحص LocationManager فوراً لتجاوز أي تأخير في Play Services
+                val lm = context.getSystemService(android.content.Context.LOCATION_SERVICE) as? android.location.LocationManager
+                lm?.let {
+                    val gpsLoc = it.getLastKnownLocation(android.location.LocationManager.GPS_PROVIDER)
+                    val netLoc = it.getLastKnownLocation(android.location.LocationManager.NETWORK_PROVIDER)
+                    val best = gpsLoc ?: netLoc
+                    if (best != null && best.latitude != 0.0 && best.longitude != 0.0) {
+                        viewModel.updateUserLocation(best.latitude, best.longitude)
                     }
                 }
                 
@@ -179,14 +191,17 @@ class MainActivity : ComponentActivity() {
                     } catch (_: Exception) {}
                 }
 
+                // [إصلاح ملاحة نهائي] دقة عالية وتحديث حي متوافق مع الملاحة الحقيقية
                 val locationRequest = com.google.android.gms.location.LocationRequest.Builder(
-                    com.google.android.gms.location.Priority.PRIORITY_BALANCED_POWER_ACCURACY, 60000L // 🚨 M-14: 60-second interval to prevent battery drain
-                ).setMinUpdateIntervalMillis(30000L).build()
+                    com.google.android.gms.location.Priority.PRIORITY_HIGH_ACCURACY, 4000L
+                ).setMinUpdateIntervalMillis(2000L).build()
                 
                 locationCallback = object : com.google.android.gms.location.LocationCallback() {
                     override fun onLocationResult(result: com.google.android.gms.location.LocationResult) {
                         for (loc in result.locations) {
-                            viewModel.updateUserLocation(loc.latitude, loc.longitude)
+                            if (loc.latitude != 0.0 && loc.longitude != 0.0) {
+                                viewModel.updateUserLocation(loc.latitude, loc.longitude)
+                            }
                         }
                     }
                 }

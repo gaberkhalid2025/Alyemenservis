@@ -235,6 +235,7 @@ class MainViewModel @Inject constructor(
     val userLongitude: StateFlow<Double> = _userLongitude.asStateFlow()
     internal val _isGpsTrackingActive = MutableStateFlow(false)
     val isGpsTrackingActive: StateFlow<Boolean> = _isGpsTrackingActive.asStateFlow()
+    private var locationCallback: com.google.android.gms.location.LocationCallback? = null
     internal val _isProvidersLoading get() = appState._isProvidersLoading
     val isProvidersLoading: StateFlow<Boolean> = _isProvidersLoading.asStateFlow()
     internal val _isChatChannelsLoading get() = appState._isChatChannelsLoading
@@ -346,19 +347,31 @@ class MainViewModel @Inject constructor(
             try {
                 if (androidx.core.content.ContextCompat.checkSelfPermission(ctx, android.Manifest.permission.ACCESS_FINE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED ||
                     androidx.core.content.ContextCompat.checkSelfPermission(ctx, android.Manifest.permission.ACCESS_COARSE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                    
                     val fusedClient = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(ctx)
+                    
                     fusedClient.lastLocation.addOnSuccessListener { loc ->
                         loc?.let { updateUserLocation(it.latitude, it.longitude) }
                     }
-                }
-                val lm = ctx.getSystemService(android.content.Context.LOCATION_SERVICE) as? android.location.LocationManager
-                val loc = lm?.getLastKnownLocation(android.location.LocationManager.GPS_PROVIDER)
-                    ?: lm?.getLastKnownLocation(android.location.LocationManager.NETWORK_PROVIDER)
-                loc?.let {
-                    updateUserLocation(it.latitude, it.longitude)
+
+                    val request = com.google.android.gms.location.LocationRequest.Builder(
+                        com.google.android.gms.location.Priority.PRIORITY_HIGH_ACCURACY, 5000L
+                    ).setMinUpdateIntervalMillis(2000L).build()
+
+                    if (locationCallback == null) {
+                        locationCallback = object : com.google.android.gms.location.LocationCallback() {
+                            override fun onLocationResult(result: com.google.android.gms.location.LocationResult) {
+                                result.lastLocation?.let { loc ->
+                                    updateUserLocation(loc.latitude, loc.longitude)
+                                }
+                            }
+                        }
+                    }
+
+                    fusedClient.requestLocationUpdates(request, locationCallback!!, android.os.Looper.getMainLooper())
                 }
             } catch (e: Exception) {
-                android.util.Log.e("MainViewModel", "Error: ", e)
+                android.util.Log.e("MainViewModel", "Location updates error: ", e)
             }
         }
     }

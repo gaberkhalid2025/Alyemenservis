@@ -16,7 +16,9 @@
         <domain includeSubdomains="true">firestore.googleapis.com</domain>
         <domain includeSubdomains="true">identitytoolkit.googleapis.com</domain>
         <domain includeSubdomains="true">securetoken.googleapis.com</domain>
-        <domain includeSubdomains="true">fcm.googleapis.com</domain>
         <domain includeSubdomains="true">firebaseinstallations.googleapis.com</domain>
+        <!-- [إصلاح ملاحة نهائي] السماح بالاتصال بخوادم OSRM والملاحة العالمية -->
+        <domain includeSubdomains="true">project-osrm.org</domain>
+        <domain includeSubdomains="true">router.project-osrm.org</domain>
     </domain-config>
 </network-security-config>

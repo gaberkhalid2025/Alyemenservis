@@ -383,6 +383,66 @@
             }
         }
 
+        // [إصلاح ملاحة نهائي] إدارة خط مسار الملاحة (Route Polyline)
+        var routePolyline = null;
+        var routeBackgroundPolyline = null;
+
+        function clearRoute() {
+            if (map) {
+                if (routePolyline) {
+                    map.removeLayer(routePolyline);
+                    routePolyline = null;
+                }
+                if (routeBackgroundPolyline) {
+                    map.removeLayer(routeBackgroundPolyline);
+                    routeBackgroundPolyline = null;
+                }
+            }
+        }
+
+        function setRoute(coordsJson) {
+            try {
+                clearRoute();
+                var coords = (typeof coordsJson === 'string') ? JSON.parse(coordsJson) : coordsJson;
+                if (!coords || !coords.length || !map) return;
+
+                // رسم خلفية داكنة للمسار لتعزيز التباين
+                routeBackgroundPolyline = L.polyline(coords, {
+                    color: '#0F172A',
+                    weight: 10,
+                    opacity: 0.75,
+                    lineJoin: 'round',
+                    lineCap: 'round'
+                }).addTo(map);
+
+                // رسم خط المسار السماوي المضيء
+                routePolyline = L.polyline(coords, {
+                    color: '#00E5FF',
+                    weight: 6,
+                    opacity: 0.95,
+                    lineJoin: 'round',
+                    lineCap: 'round'
+                }).addTo(map);
+
+                // ضبط الكاميرا لتشمل المسار بالكامل مع هوامش مريحة
+                map.fitBounds(routePolyline.getBounds(), {
+                    padding: [60, 60],
+                    maxZoom: 17
+                });
+            } catch (e) {
+                console.error("setRoute error: ", e);
+            }
+        }
+
+        function setRouteBase64(b64) {
+            try {
+                var jsonStr = decodeURIComponent(escape(window.atob(b64)));
+                setRoute(jsonStr);
+            } catch (e) {
+                console.error("setRouteBase64 error: ", e);
+            }
+        }
+
         // Auto initialize on load if not called by Android view
         window.onload = function() {
             if (!map) {

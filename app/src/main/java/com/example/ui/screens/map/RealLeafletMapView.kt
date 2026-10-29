@@ -57,6 +57,8 @@ fun RealLeafletMapView(
     onMapLoadFailed: (() -> Unit)? = null,
     tilt: Float = 35f,
     rotation: Float = 0f,
+    // [إصلاح ملاحة نهائي] إحداثيات خط المسار للملاحة
+    routeCoordinates: List<Pair<Double, Double>> = emptyList(),
     themeColors: VisualThemePalette = resolveThemePalette(AdminSettingsEntity()),
     modifier: Modifier = Modifier
 ) {
@@ -113,10 +115,10 @@ fun RealLeafletMapView(
         }
     }
 
-    // تحديث موقع المستخدم الفعلي على الخريطة
+    // تحديث موقع المستخدم الفعلي على الخريطة والتمحور التلقائي حوله
     LaunchedEffect(isMapReady, userCoords) {
         if (isMapReady && webViewRef != null && userCoords.first != 0.0 && userCoords.second != 0.0) {
-            val script = "if (window.updateUserLocation) { window.updateUserLocation(${userCoords.first}, ${userCoords.second}, 30, false); }"
+            val script = "if (window.updateUserLocation) { window.updateUserLocation(${userCoords.first}, ${userCoords.second}, 30, true); }"
             webViewRef?.evaluateJavascript(script, null)
         }
     }
@@ -158,6 +160,20 @@ fun RealLeafletMapView(
         }
     }
 
+    // [إصلاح ملاحة نهائي] رسم ومسح مسار الملاحة على خريطة Leaflet
+    LaunchedEffect(isMapReady, routeCoordinates) {
+        if (isMapReady && webViewRef != null) {
+            if (routeCoordinates.isNotEmpty()) {
+                val coordsJson = routeCoordinates.joinToString(prefix = "[", postfix = "]") { "[${it.first},${it.second}]" }
+                val b64 = android.util.Base64.encodeToString(coordsJson.toByteArray(Charsets.UTF_8), android.util.Base64.NO_WRAP)
+                val script = "if (window.setRouteBase64) { window.setRouteBase64('$b64'); } else if (window.setRoute) { window.setRoute('$coordsJson'); }"
+                webViewRef?.evaluateJavascript(script, null)
+            } else {
+                webViewRef?.evaluateJavascript("if (window.clearRoute) { window.clearRoute(); }", null)
+            }
+        }
+    }
+
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -186,34 +202,45 @@ fun RealLeafletMapView(
                             allowFileAccess = true
                             allowContentAccess = true
                         }
-                        // جسر التواصل بين JavaScript في Leaflet وكود Kotlin الأصلي
+                        // [إصلاح ملاحة نهائي] جسر التواصل الآمن بين JavaScript و Kotlin على الخيط الرئيسي
+                        val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
                         addJavascriptInterface(object {
                             @JavascriptInterface
                             fun onMapReady() {
-                                isMapReady = true
+                                mainHandler.post { isMapReady = true }
                             }
 
                             @JavascriptInterface
                             fun onMapClicked() {
-                                onDeselect()
+                                mainHandler.post { onDeselect() }
+                            }
+
+                            @JavascriptInterface
+                            fun onMarkerSelected(id: String, type: String) {
+                                handleMarkerClick(id, type)
                             }
 
                             @JavascriptInterface
                             fun onMarkerClicked(id: String, type: String) {
-                                when (type.uppercase()) {
-                                    "PROVIDER" -> {
-                                        nearbyProviders.find { it.id == id }?.let { onProviderSelected(it) }
-                                    }
-                                    "STORE", "RESTAURANT", "MEDICAL" -> {
-                                        nearbyStores.find { it.id == id }?.let { onStoreSelected(it) }
-                                    }
-                                    "PROPERTY" -> {
-                                        nearbyProperties.find { it.id == id }?.let { onPropertySelected(it) }
+                                handleMarkerClick(id, type)
+                            }
+
+                            private fun handleMarkerClick(id: String, type: String) {
+                                mainHandler.post {
+                                    when (type.uppercase()) {
+                                        "PROVIDER" -> {
+                                            nearbyProviders.find { it.id == id }?.let { onProviderSelected(it) }
+                                        }
+                                        "STORE", "RESTAURANT", "MEDICAL" -> {
+                                            nearbyStores.find { it.id == id }?.let { onStoreSelected(it) }
+                                        }
+                                        "PROPERTY" -> {
+                                            nearbyProperties.find { it.id == id }?.let { onPropertySelected(it) }
+                                        }
                                     }
                                 }
                             }
 
-                            // [إصلاح نهائي] استعلام وتغيير طبقات الخريطة عبر الجسر
                             @JavascriptInterface
                             fun onMapModeChanged(newMode: String) {
                                 android.util.Log.d("LeafletBridge", "Map mode switched to: $newMode")

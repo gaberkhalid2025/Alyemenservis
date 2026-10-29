@@ -45,7 +45,6 @@ import com.example.ui.dialogs.BookingDialog
 import com.example.ui.screens.map.components.*
 import com.example.ui.screens.map.utils.MapDistanceCalculator
 import com.example.ui.screens.map.utils.OfflineMapManager
-import com.example.utils.MockValhallaNavigator
 import com.example.utils.ValhallaTileDownloader
 import com.example.utils.VisualThemePalette
 import com.example.utils.resolveThemePalette
@@ -127,10 +126,9 @@ fun MapScreenContent(
     val rawUserLat = if (userLatState != 0.0 && !userLatState.isNaN()) userLatState else fallbackCityCoords.latitude
     val rawUserLng = if (userLngState != 0.0 && !userLngState.isNaN()) userLngState else fallbackCityCoords.longitude
 
-    // Road Snapping calculation
-    val (safeUserLat, safeUserLng) = remember(rawUserLat, rawUserLng) {
-        MockValhallaNavigator.snapToRoad(rawUserLat, rawUserLng)
-    }
+    // [إصلاح ملاحة نهائي] استخدام إحداثيات GPS الحقيقية بدقة تامة دون تقريب وهمي
+    val safeUserLat = rawUserLat
+    val safeUserLng = rawUserLng
 
     // Location Permission launcher
     val locationPermissionLauncher = rememberLauncherForActivityResult(
@@ -147,6 +145,9 @@ fun MapScreenContent(
     }
 
     LaunchedEffect(Unit) {
+        try {
+            OfflineMapManager.purgeCacheIfNeeded(context)
+        } catch (e: Exception) {}
         val hasFine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
         val hasCoarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
         if (hasFine || hasCoarse) {
