@@ -21,6 +21,17 @@ object OnlineOsrmNavigator {
     private const val TAG = "OnlineOsrmNavigator"
 
     suspend fun calculateRoute(
+        origin: Pair<Double, Double>,
+        waypoints: List<Pair<Double, Double>>
+    ): NavRouteResult {
+        val originWp = NavWaypoint(name = "موقعي", latitude = origin.first, longitude = origin.second, type = WaypointType.START)
+        val listWps = waypoints.mapIndexed { idx, pt ->
+            NavWaypoint(name = "نقطة ${idx + 1}", latitude = pt.first, longitude = pt.second, type = WaypointType.BREAK)
+        }
+        return calculateRoute(originWp, listWps)
+    }
+
+    suspend fun calculateRoute(
         origin: NavWaypoint,
         waypoints: List<NavWaypoint>
     ): NavRouteResult = withContext(Dispatchers.IO) {

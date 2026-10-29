@@ -559,7 +559,21 @@ fun NavigationScreen(
                                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
                                     Icon(Icons.Default.CloudDownload, contentDescription = null, tint = Color.White, modifier = Modifier.size(12.dp))
-                                    Text("أوفلاين (25MB)", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                    Text("تحميل خرائط أوفلاين (اختياري)", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        } else {
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = Color(0xFF10B981).copy(alpha = 0.9f)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color.White, modifier = Modifier.size(12.dp))
+                                    Text("ملاحة أوفلاين مفعلة 🇾🇪", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                                 }
                             }
                         }

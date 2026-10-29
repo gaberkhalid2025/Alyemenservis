@@ -89,8 +89,8 @@ fun ServicesBrowserLayout(
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        contentPadding = PaddingValues(start = 8.dp, end = 8.dp, top = 6.dp, bottom = 96.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         if (activeTabName == "الرئيسية") {
             // 1. Top Custom Banner
@@ -135,7 +135,7 @@ fun ServicesBrowserLayout(
                 }
             }
 
-            // 4, 5, 6: Category Grid (4x2) + Golden Partner CTA + Verified Technicians
+            // 4 & 5: Category Grid (4x2) + Golden Partner CTA
             item {
                 CategoryGridSection(
                     onSelectSection = { secId ->
@@ -145,13 +145,16 @@ fun ServicesBrowserLayout(
                             "medical" -> viewModel.setActiveBrowserTab("المراكز الطبية")
                             "properties" -> viewModel.setActiveBrowserTab("العقارات")
                             "jobs" -> viewModel.setActiveBrowserTab("إعلانات الوظائف")
+                            "technicians" -> {
+                                viewModel.selectCategory("")
+                            }
                             else -> viewModel.setActiveBrowserTab("المحلات والمتاجر")
                         }
                     },
                     onSelectTechnicianSubCategory = { subCatName ->
                         viewModel.updateSearchQuery(subCatName)
                     },
-                    topRatedProviders = allProviders.sortedByDescending { it.rating },
+                    topRatedProviders = emptyList(),
                     topRatedStores = stores.sortedByDescending { it.rating },
                     onProviderClick = { prov ->
                         viewModel.selectedProvider = prov
@@ -166,24 +169,6 @@ fun ServicesBrowserLayout(
                     },
                     themeColors = themeColors,
                     onOpenChat = onChatOpen
-                )
-            }
-
-            // 7. Category Cards Showcase (Restaurant, Medical, Store, Real Estate)
-            item {
-                HomeScreenShowcaseSection(
-                    stores = stores,
-                    properties = properties,
-                    products = products,
-                    viewModel = viewModel,
-                    themeColors = themeColors,
-                    onStoreClick = { store ->
-                        selectedStoreForDetails = store
-                    },
-                    onPropertyClick = { prop ->
-                        selectedPropertyForDetails = prop
-                    },
-                    onChatOpen = onChatOpen
                 )
             }
         } else {

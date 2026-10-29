@@ -77,21 +77,38 @@ object RealValhallaNavigator {
         waypoints: List<NavWaypoint>
     ): NavRouteResult? {
         return try {
-            val valhallaDir = File(context.filesDir, NavConfig.VALHALLA_DIR)
+            val valhallaDir = ValhallaTileDownloader.getValhallaDir(context)
             val configFile = File(valhallaDir, "valhalla.json")
+            if (!configFile.exists()) {
+                ValhallaTileDownloader.createValhallaConfig(context)
+            }
             if (!configFile.exists()) return null
 
-            val valhallaClass = Class.forName("io.github.rallista.valhalla.Valhalla")
-            val instanceMethod = valhallaClass.getMethod("instance", Context::class.java, String::class.java)
-            val valhallaInstance = instanceMethod.invoke(null, context, configFile.absolutePath)
-            
-            val routeMethod = valhallaClass.getMethod("route", String::class.java)
+            val valhalla = try {
+                com.valhalla.valhalla.Valhalla(configFile.absolutePath)
+            } catch (_: Throwable) {
+                val clazz = Class.forName("com.valhalla.valhalla.Valhalla")
+                val ctor = clazz.getConstructor(String::class.java)
+                ctor.newInstance(configFile.absolutePath) as java.io.Closeable
+            }
+
             val requestJson = formatValhallaRequest(origin, waypoints)
-            val responseJson = routeMethod.invoke(valhallaInstance, requestJson) as String
-            
-            parseValhallaResponse(responseJson, origin, waypoints)
-        } catch (e: Exception) {
-            Log.w(TAG, "Native Valhalla library not found or failed: ${e.message}")
+            val responseJson = if (valhalla is com.valhalla.valhalla.Valhalla) {
+                val r = valhalla.routeRaw(requestJson)
+                try { valhalla.close() } catch (_: Exception) {}
+                r
+            } else {
+                val m = valhalla.javaClass.getMethod("routeRaw", String::class.java)
+                val r = m.invoke(valhalla, requestJson) as String
+                try { valhalla.close() } catch (_: Exception) {}
+                r
+            }
+
+            if (!responseJson.isNullOrBlank()) {
+                parseValhallaResponse(responseJson, origin, waypoints)
+            } else null
+        } catch (e: Throwable) {
+            Log.w(TAG, "Native Valhalla execution failed or tile archive missing: ${e.message}")
             null
         }
     }
