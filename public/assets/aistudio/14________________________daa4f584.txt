@@ -1,0 +1,27 @@
+# 14 – تحسينات متفرقة (اختياري، بعد استقرار 01–13)
+
+## 1) كود ميت لا تحذفه
+`MapScreenViewModel`, `MapScreenEvents`, `MapScreenUiState`, `MapScreenLayout` غير مستخدمة فعلياً (التعليق نفسه يقول ذلك). اتركها كما هي. ملاحظة فقط: `MapScreenViewModel.resetFilters()` يضع `_isRadarMode = true` وهذا غريب؛ لا تستخدمه قبل مراجعته.
+
+## 2) RadarRenderer + OfflineInteractiveMap: تخصيصات داخل الرسم
+يوجد نحو 14 استدعاء `Paint()`، منها `RadarRenderer.kt` سطر 118 داخل لحظة الرسم، تُنشأ مع كل إطار فتسبب ضغطاً على الذاكرة.
+**الإصلاح:** عرّف الـ Paint مرة واحدة خارج الرسم:
+```kotlin
+val labelPaint = remember { android.graphics.Paint().apply { isAntiAlias = true; textSize = 28f; color = android.graphics.Color.WHITE } }
+// ثم داخل drawIntoCanvas استخدم labelPaint بدل إنشاء Paint جديد
+```
+وكذلك قوائم الألوان `listOf(Color(...))` (سطر 104 و224) خذها إلى `remember`.
+
+## 3) ArVpsCameraOverlay: كاميرا قديمة
+يستخدم `android.hardware.Camera` (مهجورة منذ API 21) مع `setDisplayOrientation(90)` ثابتة. المشاكل: اتجاه خاطئ في الأجهزة اللوحية/التدوير، وقد تفشل `Camera.open()` إذا كانت الكاميرا مشغولة (الخطأ يُطبع فقط ولا تُعرض رسالة).
+**الإصلاح الموصى به:** CameraX (`androidx.camera:camera-view`) مع `PreviewView`، وعند الفشل اعرض رسالة «تعذر فتح الكاميرا» بدل شاشة سوداء. لا تغيّر طبقة العناصر فوق الكاميرا.
+
+## 4) البحث الأوفلاين الحقيقي (مرحلة لاحقة)
+حزمة Valhalla لا تحتوي أسماء أماكن. لبحث أوفلاين عن الشوارع والأماكن:
+1. استخرج الأماكن والشوارع من ملف OSM لليمن (Geofabrik `yemen-latest.osm.pbf`) بأداة مثل `osmium` أو `pyosmium` إلى CSV: الاسم، النوع، خط العرض، خط الطول.
+2. أنشئ `places.db` (SQLite) بجدول بحث نصي (FTS5 أو FTS4 – تحقق من دعم FTS5 على أدنى إصدار أندرويد تدعمه) مع عمود اسم **مطبَّع عربياً** (نفس دالة `normalizeArabic` في المستند 09).
+3. حمّله بنفس آلية التنزيل الآمن (المستند 10: مؤقت ← تحقق ← تبديل ذري).
+4. في `searchAddressAndPlaces` استعلم `places.db` أولاً، وNominatim ثانياً.
+
+## 5) ملاحظة عن الأرقام
+مكتبة Valhalla وبيانات OSM لليمن هما ما يحدد دقة المسارات؛ إن وجدت طرقاً ناقصة صحّحها في OSM ثم أعد توليد الحزمة.

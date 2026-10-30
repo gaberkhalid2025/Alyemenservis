@@ -1,0 +1,91 @@
+# 06 – MapScreenContent.kt  (تعديلات موضعية)
+**المسار:** `ui/screens/map/MapScreenContent.kt`  |  **الإجراء:** طبّق كل تعديل أدناه في مكانه؛ لا تعد كتابة الملف.
+
+## التعديل 1: بعد حساب `rawUserLat/rawUserLng` (قرب السطر 128)
+```kotlin
+val hasRealLocation = userLatState != 0.0 && userLngState != 0.0 &&
+        !userLatState.isNaN() && !userLngState.isNaN()
+```
+
+## التعديل 2: استبدال استدعاء `NavigationScreen` (قرب السطر 209-221)
+```kotlin
+if (state.isNavigating) {
+    NavigationScreen(
+        targetEntity = null,
+        userLat = safeUserLat,
+        userLng = safeUserLng,
+        hasRealLocation = hasRealLocation,
+        initialWaypoints = state.navWaypoints,
+        onFinishNavigation = { state.stopNavigation() },
+        nearbyProviders = filteredProviders,
+        nearbyStores = filteredStores
+    )
+    return
+}
+```
+
+## التعديل 3: أيقونة الملاحة في لوحة التحكم (`onToggleNavigation` قرب السطر 478)
+```kotlin
+onToggleNavigation = {
+    when {
+        !hasRealLocation -> {
+            viewModel.startLocationUpdates()
+            coroutineScope.launch { snackbarHostState.showSnackbar("فعّل GPS وانتظر تحديد موقعك ثم أعد المحاولة") }
+        }
+        !state.startNavigation(state.selectedEntity) -> {
+            coroutineScope.launch { snackbarHostState.showSnackbar("اختر وجهة أولاً: اضغط على مكان في الخريطة أو ابحث عنه") }
+        }
+    }
+},
+```
+
+## التعديل 4: زر «ابدأ الملاحة» في النافذة السفلية (قرب السطر 759)
+```kotlin
+onStartNavigation = { target ->
+    when {
+        !hasRealLocation -> {
+            viewModel.startLocationUpdates()
+            coroutineScope.launch { snackbarHostState.showSnackbar("فعّل GPS وانتظر تحديد موقعك") }
+        }
+        !state.startNavigation(target) -> {
+            coroutineScope.launch { snackbarHostState.showSnackbar("موقع هذا المكان غير محدد بدقة، لا يمكن الملاحة إليه") }
+        }
+    }
+},
+```
+
+## التعديل 5: «مسح الكل» في شريط المحطات (قرب السطر 693)
+`onClick = { state.selectedWaypoints.clear() }` ← `onClick = { state.clearWaypoints() }` (اختياري، للتناسق).
+
+## التعديل 6: تحديث شارة التحميل بعد نجاح التنزيل
+- السطر ~246: غيّر `val isTilesDownloaded = remember { ... }` إلى حالة قابلة للتحديث ويُعلَن عنها **أعلى الدالة** (قبل أي `return`):
+```kotlin
+var isTilesDownloaded by remember { mutableStateOf(ValhallaTileDownloader.isTilesDownloaded(context)) }
+```
+(واحذف التصريح القديم داخل الـ Box).
+- في معالج نجاح التنزيل (قرب السطر 812) أضف قبل `showDownloadDialog = false`:
+```kotlin
+isTilesDownloaded = true
+```
+
+## التعديل 7: تمرير معاملات الخريطة الجديدة (قرب السطر 286 داخل `RealLeafletMapView(`)
+أضف المعاملين (يوفّرهما المستند 07 والبحث 09):
+```kotlin
+focusPoint = searchedPlace?.let { Triple(it.shortName, it.latitude, it.longitude) },
+```
+(حيث `searchedPlace` معرَّفة في المستند 09).
+
+## التعديل 8 (تدوير الشاشة)
+ضع في `AndroidManifest.xml` على النشاط الرئيسي: `android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode"` أو ثبّت الاتجاه عمودياً أثناء الملاحة. (الـ Saver الجديد يحفظ الملاحة أيضاً.)
+
+## لا تفعل
+- لا تحذف `BackHandler`؛ سلوكه سليم بعد إصلاح `resetSelection`.
+- لا تغيّر `MockValhallaNavigator.snapToRoad` هنا (أصبح يعيد الإحداثي كما هو).
+
+## التعديل 9 (مهم): لا تنقل «موقع المستخدم» عند اختيار مدينة
+في `MapFilterBar(...)` داخل `onCitySelected` و`onSearchExecute` يوجد استدعاء `viewModel.updateUserLocation(coords.latitude, coords.longitude)`:
+هذا يجعل **مركز المدينة هو موقعك** فتنطلق الملاحة من نقطة وهمية، وتصبح `hasRealLocation = true` خطأً.
+- **احذف** هذين الاستدعاءين. الخريطة تتمركز على المدينة أصلاً عبر `selectedCity` (`window.setCity` في RealLeafletMapView).
+- `onCitySelected = { city -> state.selectedCity = city }`
+
+## التعديل 10: استبدال `onSearchExecute` (انظر المستند 09 للبحث الكامل)

@@ -1,0 +1,122 @@
+# 11 – OfflineMapManager.kt  +  MapDistanceCalculator.kt
+**المسار:** `ui/screens/map/utils/`  |  **الإجراء:** تعديلات موضعية (المستند يعطي الدوال الكاملة).
+
+## OfflineMapManager – المشاكل
+1. `getCityCoordinates` يعيد **صنعاء** عند أي إدخال غير معروف، ولنص فارغ يطابق أول مدينة (`contains("")`).
+2. الأسماء البديلة تتضمن رموزاً رقمية مثل `"1"`,`"2"`,`"3"` ومطابقتها بـ `contains` ⇒ أي استعلام فيه الرقم 1 يعيد صنعاء!
+3. رموز مكررة: `ye_dha` (ذمار/الضالع) و`ye_mah` (المهرة/المحويت).
+4. التخزين المؤقت للبلاطات معلن لكن غير مستخدم أصلاً (يُفعَّل بالمستند 08)، وصلاحية 7 أيام تحذف ما يحتاجه الأوفلاين.
+
+### أضف/استبدل داخل `object OfflineMapManager`
+```kotlin
+// ثابت: تغيير مدة الصلاحية إلى 30 يوماً
+private const val CACHE_TTL_MILLIS = 30L * 24 * 60 * 60 * 1000L
+
+private val DEFAULT_CITY = CityCoordinates("صنعاء", 15.3694, 44.1910, 13)
+
+private fun norm(s: String): String = s.trim().lowercase(java.util.Locale.ROOT)
+    .replace(Regex("[\\u064B-\\u0652\\u0640]"), "")
+    .replace(Regex("[إأآٱ]"), "ا")
+    .replace('ى', 'ي').replace('ة', 'ه')
+
+private fun matchMajor(city: String): CityCoordinates? {
+    val c = norm(city)
+    return MAJOR_YEMENI_CITIES.firstOrNull {
+        val n = norm(it.nameAr)
+        n == c || n.startsWith(c) || n.contains("($c")
+    }
+}
+
+/** يعيد null عند عدم وجود تطابق حقيقي (لا يفترض صنعاء). */
+fun findCity(query: String): CityCoordinates? {
+    val q = norm(query)
+    if (q.length < 2) return null
+    MAJOR_YEMENI_CITIES.firstOrNull {
+        val n = norm(it.nameAr)
+        n == q || (n.length >= 3 && (n.contains(q) && q.length >= 3 || q.contains(n)))
+    }?.let { return it }
+    for ((city, aliases) in CityAliases.ALIASES) {
+        val hit = aliases.any { a ->
+            val na = norm(a)
+            na.length >= 3 && !na.all { it.isDigit() } && !na.startsWith("ye_") &&
+                (na == q || q.split(" ").contains(na))
+        }
+        if (hit) matchMajor(city)?.let { return it }
+    }
+    return null
+}
+
+/** للتوافق: يعيد صنعاء كقيمة افتراضية فقط لأغراض مركز الخريطة، لا كموقع للمستخدم. */
+fun getCityCoordinates(cityName: String): CityCoordinates = findCity(cityName) ?: DEFAULT_CITY
+```
+- في `purgeCacheIfNeeded` أضف أول سطر داخل الدالة: لا تحذف إذا لم تتوفر شبكة (مرّر من المستدعي `isOnline: Boolean` أو افحص `ConnectivityManager`).
+- **لا تحذف** `CityAliases`: تُستخدم في `MapScreenFilters` بمطابقة مباشرة. صحّح فقط التكرار: اجعل رمز الضالع `ye_dal` ورمز المحويت `ye_mhw` **بعد** التأكد من أن `MapScreenFilters` لا يعتمد على الرموز القديمة (ابحث عنها قبل التعديل).
+
+---
+## MapDistanceCalculator – المشاكل
+- `computeEta` يكرر المسافة داخل النص (والواجهة تعرضها مرة أخرى منفصلة) ويسمّي الرحلة «سيراً» لأي مسافة < 1 كم حتى أثناء القيادة.
+- `formatDistance` لا يعالج NaN/السالب.
+- لا توجد دالة نطق ولا تنسيق مدة.
+
+### استبدل الملف بالكامل
+```kotlin
+package com.example.ui.screens.map.utils
+
+import com.example.utils.HaversinePrecisionNavigator
+import kotlin.math.max
+import kotlin.math.roundToInt
+
+enum class TransportMode(val speedKmH: Double, val icon: String, val labelArabic: String) {
+    WALKING(3.5, "⏱️", "سيراً"),
+    BICYCLE(15.0, "🚲", "بالدراجة"),
+    CAR(35.0, "🚘", "بالسيارة")
+}
+
+object MapDistanceCalculator {
+
+    /** مسافة جيوديسية مباشرة (ليست مسافة طريق). تعيد 0 للإحداثيات غير الصالحة. */
+    fun calculateDistanceMeters(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+        if (lat1.isNaN() || lon1.isNaN() || lat2.isNaN() || lon2.isNaN()) return 0.0
+        if (lat1 == 0.0 && lon1 == 0.0) return 0.0
+        if (lat2 == 0.0 && lon2 == 0.0) return 0.0
+        return HaversinePrecisionNavigator.calculateDistance(lat1, lon1, lat2, lon2)
+    }
+
+    fun formatDistance(meters: Double): String {
+        if (meters.isNaN() || meters < 0) return "—"
+        return if (meters < 1000) "${meters.roundToInt()} م"
+        else String.format(java.util.Locale.US, "%.1f كم", meters / 1000.0)
+    }
+
+    /** للنطق: يقرّب إلى 10 م (<100) أو 50 م، وللكيلومترات رقم عشري واحد. */
+    fun formatDistanceSpoken(meters: Double): String {
+        val m = max(0.0, if (meters.isNaN()) 0.0 else meters)
+        return if (m < 1000) {
+            val r = if (m < 100) (m / 10).roundToInt() * 10 else (m / 50).roundToInt() * 50
+            "${max(r, 10)} متراً"
+        } else {
+            val km = m / 1000.0
+            val txt = if (km == km.toInt().toDouble()) km.toInt().toString() else String.format(java.util.Locale.US, "%.1f", km)
+            "$txt كيلومتر"
+        }
+    }
+
+    /** مدة مختصرة للواجهة: «25 دقيقة» أو «1 س 20 د». */
+    fun formatDuration(seconds: Double): String {
+        if (seconds.isNaN() || seconds < 0) return "—"
+        val totalMin = (seconds / 60.0).roundToInt()
+        if (totalMin < 1) return "أقل من دقيقة"
+        if (totalMin < 60) return "$totalMin دقيقة"
+        val h = totalMin / 60
+        val m = totalMin % 60
+        return if (m == 0) "$h س" else "$h س $m د"
+    }
+
+    /** تقدير تقريبي من مسافة مباشرة. موسوم دائماً «تقريبي» وبدون تكرار المسافة. */
+    fun computeEta(distanceMeters: Double, mode: TransportMode? = null): String {
+        val selected = mode ?: if (distanceMeters < 1000.0) TransportMode.WALKING else TransportMode.CAR
+        val minutes = max(1, (distanceMeters / 1000.0 / selected.speedKmH * 60).roundToInt())
+        return "${selected.icon} ~ $minutes دقيقة ${selected.labelArabic} (تقريبي)"
+    }
+}
+```

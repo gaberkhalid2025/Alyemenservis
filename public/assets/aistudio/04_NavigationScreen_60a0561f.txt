@@ -1,0 +1,595 @@
+# 04 – NavigationScreen.kt
+**المسار:** `ui/screens/map/NavigationScreen.kt`  |  **الإجراء:** **استبدال الملف بالكامل** بالكود أدناه.
+
+## ما يُصلحه
+1. إزالة المحاكاة (طرح 150 م/1.5 ث، سرعة 50 ثابتة) واستبدالها بتتبع GPS حقيقي (`RouteTracker`).
+2. رفض الوجهة الفارغة/الصفرية (لا مزيد من «الوجهة المحددة» في وسط صنعاء ولا مسار إلى 0,0).
+3. استقبال المحطات من الخارج `initialWaypoints` (تمرير selectedWaypoints فعلياً).
+4. منطق الوصول: أقل من 30 م → «لقد وصلت إلى…» ثم «الوجهة التالية هي…، وتبعد X كم» ثم زيادة الفهرس وإعادة حساب المسار للمحطات المتبقية.
+5. كشف الخروج عن المسار وإعادة الحساب (حد أدنى 10 ثوانٍ بين إعادتين).
+6. رسم المسار على الخريطة (يتطلب المستند 07) وتتبع المستخدم.
+7. تنظيف الواجهة: شارة واحدة بسطر واحد، شريط محطات قابل للتمرير مع تمييز الحالية، بطاقة سفلية بثلاث خلايا متساوية بدون تكرار المسافة، Snackbar بدل Toast، حذف زر/لوحة 3D الميتة.
+8. تأكيد قبل إضافة محطة عند الضغط على علامة بالخريطة (لا إضافة عرضية).
+9. نطق التعليمات حسب المسافة والسرعة، مرة واحدة لكل مرحلة، مع كتم/تفعيل الصوت.
+10. تحذير إن لم يتوفر GPS حقيقي (`hasRealLocation`).
+
+**يعتمد على:** المستند 03 (RouteTracker)، 07 (معاملات RealLeafletMapView الجديدة)، 09 (البحث)، 11 (formatDuration/formatDistanceSpoken).
+
+```kotlin
+package com.example.ui.screens.map
+
+import android.speech.tts.TextToSpeech
+import android.util.Log
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.example.data.PropertyEntity
+import com.example.data.ProviderEntity
+import com.example.data.StoreEntity
+import com.example.ui.screens.map.utils.MapDistanceCalculator
+import com.example.utils.*
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import java.text.DateFormat
+import java.util.Date
+import java.util.Locale
+import kotlin.math.max
+
+private const val NAV_TAG = "NavigationScreen"
+
+private fun isValidCoordinate(lat: Double, lng: Double): Boolean =
+    !lat.isNaN() && !lng.isNaN() && lat in -90.0..90.0 && lng in -180.0..180.0 && !(lat == 0.0 && lng == 0.0)
+
+/** توافق مع الاستدعاء القديم الذي يمرر كياناً واحداً. */
+private fun legacyTargetWaypoint(entity: Any?): NavWaypoint? {
+    val (name, lat, lng) = when (entity) {
+        is ProviderEntity -> Triple(entity.name, entity.latitude, entity.longitude)
+        is StoreEntity -> Triple(entity.name, entity.latitude, entity.longitude)
+        is PropertyEntity -> Triple(entity.title, entity.latitude, entity.longitude)
+        else -> return null
+    }
+    return if (isValidCoordinate(lat, lng)) NavWaypoint(name = name, latitude = lat, longitude = lng) else null
+}
+
+private fun maneuverIcon(type: ManeuverType?): ImageVector = when (type) {
+    ManeuverType.LEFT -> Icons.Default.TurnLeft
+    ManeuverType.RIGHT -> Icons.Default.TurnRight
+    ManeuverType.SLIGHT_LEFT -> Icons.Default.TurnSlightLeft
+    ManeuverType.SLIGHT_RIGHT -> Icons.Default.TurnSlightRight
+    ManeuverType.SHARP_LEFT -> Icons.Default.TurnSharpLeft
+    ManeuverType.SHARP_RIGHT -> Icons.Default.TurnSharpRight
+    ManeuverType.UTURN -> Icons.Default.UTurnLeft
+    ManeuverType.ROUNDABOUT -> Icons.Default.RoundaboutRight
+    ManeuverType.MERGE -> Icons.Default.Merge
+    ManeuverType.DESTINATION -> Icons.Default.Flag
+    else -> Icons.Default.Straight   // إن لم يوجد رمز ما، استبدله بـ Icons.Default.ArrowUpward
+}
+
+@Composable
+fun NavigationScreen(
+    targetEntity: Any? = null,
+    userLat: Double,
+    userLng: Double,
+    onFinishNavigation: () -> Unit,
+    downloadUrl: String = ValhallaTileDownloader.DEFAULT_DOWNLOAD_URL,
+    nearbyProviders: List<ProviderEntity> = emptyList(),
+    nearbyStores: List<StoreEntity> = emptyList(),
+    initialWaypoints: List<NavWaypoint> = emptyList(),
+    hasRealLocation: Boolean = true,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val latestLat by rememberUpdatedState(userLat)
+    val latestLng by rememberUpdatedState(userLng)
+
+    // ───────── الصوت ─────────
+    var tts by remember { mutableStateOf<TextToSpeech?>(null) }
+    var ttsReady by remember { mutableStateOf(false) }
+    var voiceEnabled by remember { mutableStateOf(true) }
+    DisposableEffect(context) {
+        var instance: TextToSpeech? = null
+        instance = TextToSpeech(context) { status ->
+            if (status == TextToSpeech.SUCCESS) {
+                val r = instance?.setLanguage(Locale("ar"))
+                ttsReady = r != TextToSpeech.LANG_MISSING_DATA && r != TextToSpeech.LANG_NOT_SUPPORTED
+            }
+        }
+        tts = instance
+        onDispose { instance?.stop(); instance?.shutdown() }
+    }
+    val speak: (String) -> Unit = { text ->
+        if (voiceEnabled && ttsReady) tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "nav_${System.nanoTime()}")
+    }
+
+    // ───────── المحطات ─────────
+    val waypoints = remember {
+        mutableStateListOf<NavWaypoint>().apply {
+            val fromParams = initialWaypoints.filter { isValidCoordinate(it.latitude, it.longitude) }
+            if (fromParams.isNotEmpty()) addAll(fromParams) else legacyTargetWaypoint(targetEntity)?.let { add(it) }
+        }
+    }
+    if (waypoints.isEmpty()) {
+        LaunchedEffect(Unit) { onFinishNavigation() }   // لا وجهة صالحة → لا ملاحة وهمية
+        return
+    }
+
+    var currentWaypointIndex by remember { mutableIntStateOf(0) }
+    var routeVersion by remember { mutableIntStateOf(0) }
+    var routeResult by remember { mutableStateOf<NavRouteResult?>(null) }
+    var isLoadingRoute by remember { mutableStateOf(true) }
+    var tracker by remember { mutableStateOf<RouteTracker?>(null) }
+    var trackerState by remember { mutableStateOf<TrackerResult?>(null) }
+    var isTilesDownloaded by remember { mutableStateOf(ValhallaTileDownloader.isTilesDownloaded(context)) }
+    var navigationFinished by remember { mutableStateOf(false) }
+    var followUser by remember { mutableStateOf(true) }
+    var mapMode by remember { mutableStateOf(MapMode.OSM) }
+    var pendingStop by remember { mutableStateOf<NavWaypoint?>(null) }
+    var showAddStopDialog by remember { mutableStateOf(false) }
+    var showDownloadDialog by remember { mutableStateOf(false) }
+
+    val speedEstimator = remember { SpeedEstimator() }
+    val offRoute = remember { OffRouteDetector() }
+    val arrival = remember { ArrivalDetector() }
+    var currentSpeedKmh by remember { mutableIntStateOf(0) }
+    var lastRerouteAt by remember { mutableLongStateOf(0L) }
+    val announced = remember { mutableSetOf<String>() }
+
+    // ───────── حساب المسار (من الموقع الحالي عبر المحطات المتبقية) ─────────
+    LaunchedEffect(routeVersion, waypoints.size, isTilesDownloaded) {
+        val remaining = waypoints.drop(currentWaypointIndex)
+        if (remaining.isEmpty()) return@LaunchedEffect
+        isLoadingRoute = true
+        try {
+            val origin = NavWaypoint(name = "موقعي الحالي", latitude = latestLat, longitude = latestLng, type = WaypointType.START)
+            val result = RealValhallaNavigator.calculateRoute(context, origin, remaining)
+            routeResult = result
+            tracker = RouteTracker(result.coordinates)
+            trackerState = null
+            offRoute.reset()
+            announced.clear()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (t: Throwable) {
+            Log.e(NAV_TAG, "Route calculation failed: ${t.message}", t)
+            snackbarHostState.showSnackbar("تعذر حساب المسار، سيتم المحاولة مجدداً")
+        } finally {
+            isLoadingRoute = false
+        }
+    }
+
+    val result = routeResult
+    val isApproximate = result == null || result.error != null
+    val target = waypoints.getOrNull(currentWaypointIndex)
+
+    // ───────── الوصول إلى محطة ─────────
+    val handleArrival: () -> Unit = {
+        val arrived = waypoints.getOrNull(currentWaypointIndex)
+        val next = waypoints.getOrNull(currentWaypointIndex + 1)
+        if (arrived != null) {
+            if (next == null) {
+                speak("لقد وصلت إلى ${arrived.name}. اكتملت الرحلة")
+                navigationFinished = true
+            } else {
+                val legMeters = routeResult?.legs?.getOrNull(1)?.distanceMeters
+                    ?: HaversinePrecisionNavigator.calculateDistance(arrived.latitude, arrived.longitude, next.latitude, next.longitude)
+                val km = String.format(Locale.US, "%.1f", legMeters / 1000.0)
+                speak("لقد وصلت إلى ${arrived.name}. الوجهة التالية هي ${next.name}، وتبعد $km كم")
+                currentWaypointIndex += 1
+                routeVersion += 1
+            }
+        }
+    }
+
+    // ───────── تتبع الموقع الحقيقي ─────────
+    LaunchedEffect(userLat, userLng, tracker) {
+        val now = System.currentTimeMillis()
+        if (!hasRealLocation) return@LaunchedEffect
+        currentSpeedKmh = speedEstimator.update(userLat, userLng, now)
+        val t = tracker
+        if (t != null) trackerState = t.update(userLat, userLng)
+        val tgt = waypoints.getOrNull(currentWaypointIndex) ?: return@LaunchedEffect
+        val d = HaversinePrecisionNavigator.calculateDistance(userLat, userLng, tgt.latitude, tgt.longitude)
+        if (arrival.check(currentWaypointIndex, d)) {
+            handleArrival()
+        } else if (!isApproximate && trackerState != null &&
+            offRoute.update(trackerState!!.offRouteMeters, now) && now - lastRerouteAt > 10_000L
+        ) {
+            lastRerouteAt = now
+            offRoute.reset()
+            speak("جارٍ إعادة حساب المسار")
+            routeVersion += 1
+        }
+    }
+
+    LaunchedEffect(navigationFinished) {
+        if (navigationFinished) { delay(5_000L); onFinishNavigation() }
+    }
+    // العودة التلقائية لوضع التتبع بعد 8 ثوانٍ من سحب الخريطة
+    LaunchedEffect(followUser) {
+        if (!followUser) { delay(8_000L); followUser = true }
+    }
+
+    // ───────── مشتقات العرض ─────────
+    val steps = remember(result) { result?.getAllSteps() ?: emptyList() }
+    val stepStarts = remember(steps) {
+        DoubleArray(steps.size).also { arr -> var acc = 0.0; steps.forEachIndexed { i, s -> arr[i] = acc; acc += s.distanceMeters } }
+    }
+    val along = trackerState?.alongMeters ?: 0.0
+    val totalMeters = tracker?.totalMeters ?: result?.totalDistanceMeters ?: 0.0
+    val remainingMeters = trackerState?.remainingMeters ?: totalMeters
+    val progress = trackerState?.progress ?: 0f
+    val remainingSeconds = if (totalMeters > 1.0) (result?.totalDurationSeconds ?: 0.0) * (remainingMeters / totalMeters) else 0.0
+    val currentStepIndex = run {
+        var idx = 0
+        for (i in steps.indices) { if (stepStarts[i] <= along + 1.0) idx = i else break }
+        idx
+    }
+    val upcoming = steps.getOrNull(currentStepIndex + 1)
+    val distToManeuver = if (upcoming != null) max(0.0, stepStarts[currentStepIndex + 1] - along) else remainingMeters
+    val distToTarget = if (target != null)
+        HaversinePrecisionNavigator.calculateDistance(userLat, userLng, target.latitude, target.longitude) else 0.0
+
+    // ───────── النطق حسب المسافة والسرعة ─────────
+    LaunchedEffect(currentStepIndex, along, routeVersion) {
+        if (isApproximate || upcoming == null || !hasRealLocation) return@LaunchedEffect
+        val v = max(currentSpeedKmh / 3.6, 5.0)
+        val far = max(250.0, v * 20)
+        val mid = max(100.0, v * 8)
+        val near = 30.0
+        val level = when {
+            distToManeuver <= near -> "N"
+            distToManeuver <= mid -> "M"
+            distToManeuver <= far -> "F"
+            else -> return@LaunchedEffect
+        }
+        val key = "$routeVersion:${currentStepIndex + 1}:$level"
+        if (announced.add(key)) {
+            speak(if (level == "N") upcoming.instruction
+            else "بعد ${MapDistanceCalculator.formatDistanceSpoken(distToManeuver)}، ${upcoming.instruction}")
+        }
+    }
+
+    val engineLabel = when {
+        result == null -> "جارٍ حساب المسار..."
+        isApproximate -> "تقريبي - مسافة مباشرة"
+        result.isOffline -> "🗺️ وضع غير متصل · ${result.engineSource}"
+        else -> "🛰️ وضع متصل · ${result.engineSource}"
+    }
+    val instructionText = when {
+        !hasRealLocation -> "لم يتم تحديد موقعك بعد — فعّل GPS"
+        result == null -> "جارٍ حساب المسار..."
+        isApproximate -> "تقريبي: ${MapDistanceCalculator.formatDistance(distToTarget)} مباشرة إلى ${target?.name ?: ""} (بدون تعليمات منعطفات)"
+        upcoming != null -> "بعد ${MapDistanceCalculator.formatDistanceSpoken(distToManeuver)}، ${upcoming.instruction}"
+        else -> "واصل حتى الوصول إلى ${target?.name ?: "الوجهة"}"
+    }
+    val etaClock = remember(remainingSeconds) {
+        DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(System.currentTimeMillis() + (remainingSeconds * 1000).toLong()))
+    }
+
+    Box(modifier = modifier.fillMaxSize().background(Color(0xFF0B1120))) {
+
+        // ───────── الخريطة ─────────
+        RealLeafletMapView(
+            userCoords = Pair(userLat, userLng),
+            nearbyProviders = nearbyProviders,
+            nearbyStores = nearbyStores,
+            nearbyProperties = emptyList(),
+            dynamicOffsets = emptyMap(),
+            currentMapMode = mapMode,
+            selectedCity = "الكل",
+            selectedEntity = null,
+            onProviderSelected = { p ->
+                if (isValidCoordinate(p.latitude, p.longitude)) pendingStop = NavWaypoint(name = p.name, latitude = p.latitude, longitude = p.longitude)
+            },
+            onStoreSelected = { s ->
+                if (isValidCoordinate(s.latitude, s.longitude)) pendingStop = NavWaypoint(name = s.name, latitude = s.latitude, longitude = s.longitude)
+            },
+            onPropertySelected = {},
+            onDeselect = {},
+            routeCoordinates = result?.coordinates ?: emptyList(),
+            routeKey = routeVersion,
+            waypointMarkers = waypoints.mapIndexed { i, w -> Triple("${i + 1}. ${w.name}", w.latitude, w.longitude) },
+            followUser = followUser,
+            onUserPanned = { followUser = false },
+            modifier = Modifier.fillMaxSize()
+        )
+
+        // ───────── الجزء العلوي ─────────
+        Column(
+            modifier = Modifier.align(Alignment.TopCenter).fillMaxWidth().statusBarsPadding().padding(horizontal = 12.dp, vertical = 6.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // شارة الحالة (سطر واحد)
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = Color(0xFF0F172A).copy(alpha = 0.95f),
+                border = BorderStroke(1.dp, if (isApproximate) Color(0xFFF59E0B) else Color(0xFF10B981)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Box(Modifier.size(8.dp).clip(CircleShape).background(if (isApproximate) Color(0xFFF59E0B) else Color(0xFF10B981)))
+                    Text(engineLabel, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                    IconButton(onClick = { mapMode = if (mapMode == MapMode.OSM) MapMode.SATELLITE else MapMode.OSM }, modifier = Modifier.size(30.dp)) {
+                        Icon(Icons.Default.Layers, contentDescription = "الطبقة", tint = Color(0xFF38BDF8), modifier = Modifier.size(18.dp))
+                    }
+                    IconButton(onClick = { showAddStopDialog = true }, modifier = Modifier.size(30.dp)) {
+                        Icon(Icons.Default.Add, contentDescription = "إضافة محطة", tint = Color(0xFF10B981), modifier = Modifier.size(20.dp))
+                    }
+                    if (!isTilesDownloaded) {
+                        IconButton(onClick = { showDownloadDialog = true }, modifier = Modifier.size(30.dp)) {
+                            Icon(Icons.Default.CloudDownload, contentDescription = "تحميل الخرائط", tint = Color(0xFF0284C7), modifier = Modifier.size(20.dp))
+                        }
+                    }
+                }
+            }
+
+            // شريط المحطات (قابل للتمرير، الحالية مميزة)
+            LazyRow(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                itemsIndexed(waypoints.toList()) { index, wp ->
+                    val isCurrent = index == currentWaypointIndex
+                    val isPassed = index < currentWaypointIndex
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = Color(0xFF1E293B).copy(alpha = if (isPassed) 0.6f else 0.95f),
+                        border = BorderStroke(if (isCurrent) 2.dp else 1.dp, if (isCurrent) Color(0xFF10B981) else Color(0xFF00E5FF).copy(alpha = 0.4f))
+                    ) {
+                        Row(Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("${index + 1}", color = Color(0xFF00E5FF), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Text(wp.name, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 140.dp))
+                            if (waypoints.size > 1 && !isPassed) {
+                                IconButton(
+                                    onClick = {
+                                        waypoints.removeAt(index)
+                                        if (index < currentWaypointIndex) currentWaypointIndex -= 1
+                                        if (currentWaypointIndex >= waypoints.size) navigationFinished = true else routeVersion += 1
+                                    },
+                                    modifier = Modifier.size(18.dp)
+                                ) { Icon(Icons.Default.Close, contentDescription = "حذف", tint = Color(0xFFEF4444), modifier = Modifier.size(12.dp)) }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // بطاقة التعليمات
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = Color(0xFF0F172A).copy(alpha = 0.95f),
+                border = BorderStroke(1.5.dp, Color(0xFF00E5FF)),
+                shadowElevation = 12.dp,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Surface(shape = CircleShape, color = Color(0xFF0284C7), modifier = Modifier.size(52.dp)) {
+                        Box(contentAlignment = Alignment.Center) {
+                            if (isLoadingRoute && result == null) CircularProgressIndicator(Modifier.size(26.dp), color = Color.White, strokeWidth = 2.dp)
+                            else Icon(maneuverIcon(if (isApproximate) null else upcoming?.maneuverType), contentDescription = null, tint = Color.White, modifier = Modifier.size(30.dp))
+                        }
+                    }
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Text(
+                            text = (if (voiceEnabled) "🔊 صوت مفعل" else "🔇 صوت مكتوم") + " · $currentSpeedKmh كم/س",
+                            color = Color(0xFF00E5FF), fontSize = 12.sp, fontWeight = FontWeight.Bold
+                        )
+                        Text(instructionText, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                        Text(
+                            "المحطة ${currentWaypointIndex + 1}/${waypoints.size} · ${target?.name ?: ""}",
+                            color = Color(0xFFCBD5E1), fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    IconButton(onClick = { voiceEnabled = !voiceEnabled }, modifier = Modifier.size(34.dp)) {
+                        Icon(if (voiceEnabled) Icons.Default.VolumeUp else Icons.Default.VolumeOff, contentDescription = "الصوت", tint = Color(0xFF94A3B8))
+                    }
+                    IconButton(onClick = onFinishNavigation, modifier = Modifier.size(34.dp).testTag("exit_navigation_btn")) {
+                        Icon(Icons.Default.Close, contentDescription = "إنهاء", tint = Color(0xFF94A3B8))
+                    }
+                }
+            }
+        }
+
+        // زر إعادة التمركز
+        if (!followUser) {
+            FloatingActionButton(
+                onClick = { followUser = true },
+                containerColor = Color(0xFF0F172A),
+                modifier = Modifier.align(Alignment.CenterEnd).padding(end = 12.dp).size(46.dp)
+            ) { Icon(Icons.Default.MyLocation, contentDescription = "موقعي", tint = Color(0xFF00E5FF)) }
+        }
+
+        SnackbarHost(snackbarHostState, modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 210.dp))
+
+        // ───────── اللوحة السفلية (ثلاث خلايا متساوية بلا تكرار) ─────────
+        Column(
+            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().navigationBarsPadding().padding(horizontal = 14.dp, vertical = 12.dp)
+        ) {
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = Color(0xFF0F172A).copy(alpha = 0.96f),
+                border = BorderStroke(1.dp, Color(0xFF334155)),
+                shadowElevation = 14.dp,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(Modifier.fillMaxWidth()) {
+                        InfoCell("وقت الوصول", if (result == null) "—" else (if (isApproximate) "~ " else "") + etaClock, Color(0xFF10B981), Modifier.weight(1f))
+                        InfoCell("المدة المتبقية", if (result == null) "—" else (if (isApproximate) "~ " else "") + MapDistanceCalculator.formatDuration(remainingSeconds), Color.White, Modifier.weight(1f))
+                        InfoCell("المسافة المتبقية", if (result == null) "—" else MapDistanceCalculator.formatDistance(remainingMeters), Color.White, Modifier.weight(1f))
+                    }
+                    if (isApproximate && result != null) {
+                        Text("القيم تقريبية (خط مستقيم) — حمّل خرائط الأوفلاين أو اتصل بالإنترنت لمسار حقيقي", color = Color(0xFFF59E0B), fontSize = 11.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                    }
+                    LinearProgressIndicator(
+                        progress = { progress },
+                        modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
+                        color = Color(0xFF00E5FF), trackColor = Color(0xFF334155)
+                    )
+                    Button(
+                        onClick = onFinishNavigation,
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626), contentColor = Color.White),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth().height(46.dp).testTag("end_navigation_btn")
+                    ) {
+                        Icon(Icons.Default.Stop, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(if (waypoints.size > 1) "إنهاء الملاحة متعددة المحطات" else "إنهاء الملاحة", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+
+        // ───────── تأكيد إضافة محطة من الخريطة ─────────
+        pendingStop?.let { stop ->
+            AlertDialog(
+                onDismissRequest = { pendingStop = null },
+                containerColor = Color(0xFF0F172A),
+                title = { Text("إضافة محطة؟", color = Color.White, fontWeight = FontWeight.Bold) },
+                text = { Text("إضافة «${stop.name}» كمحطة في نهاية الرحلة؟", color = Color(0xFFCBD5E1)) },
+                confirmButton = {
+                    TextButton(onClick = { waypoints.add(stop); pendingStop = null; scope.launch { snackbarHostState.showSnackbar("تمت إضافة المحطة: ${stop.name}") } }) {
+                        Text("إضافة", color = Color(0xFF10B981))
+                    }
+                },
+                dismissButton = { TextButton(onClick = { pendingStop = null }) { Text("إلغاء", color = Color(0xFF94A3B8)) } }
+            )
+        }
+
+        // ───────── حوار البحث وإضافة محطة (debounce + حالات واضحة) ─────────
+        if (showAddStopDialog) {
+            var query by remember { mutableStateOf("") }
+            var results by remember { mutableStateOf<List<RealValhallaNavigator.SearchAddressResult>>(emptyList()) }
+            var searching by remember { mutableStateOf(false) }
+            var message by remember { mutableStateOf<String?>(null) }
+            LaunchedEffect(query) {
+                val q = query.trim()
+                if (q.length < 3) { results = emptyList(); message = null; searching = false; return@LaunchedEffect }
+                delay(600)
+                searching = true
+                results = RealValhallaNavigator.searchAddressAndPlaces(q, nearbyProviders, nearbyStores)
+                message = if (results.isEmpty()) (RealValhallaNavigator.lastSearchError ?: "لا توجد نتائج لـ «$q»") else null
+                searching = false
+            }
+            AlertDialog(
+                onDismissRequest = { showAddStopDialog = false },
+                containerColor = Color(0xFF0F172A),
+                title = { Text("إضافة محطة توقف جديدة", color = Color.White, fontWeight = FontWeight.Bold) },
+                text = {
+                    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        OutlinedTextField(
+                            value = query, onValueChange = { query = it }, singleLine = true,
+                            placeholder = { Text("ابحث عن شارع، محل، أو فني (3 أحرف على الأقل)", color = Color(0xFF94A3B8), fontSize = 12.sp) },
+                            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = Color(0xFF00E5FF), unfocusedBorderColor = Color(0xFF334155)),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        if (searching) LinearProgressIndicator(Modifier.fillMaxWidth(), color = Color(0xFF00E5FF))
+                        message?.let { Text(it, color = Color(0xFFF59E0B), fontSize = 12.sp) }
+                        LazyColumn(Modifier.fillMaxWidth().heightIn(max = 240.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            items(results) { res ->
+                                Surface(
+                                    onClick = {
+                                        waypoints.add(NavWaypoint(name = res.shortName, latitude = res.latitude, longitude = res.longitude))
+                                        showAddStopDialog = false
+                                        scope.launch { snackbarHostState.showSnackbar("تمت إضافة المحطة: ${res.shortName}") }
+                                    },
+                                    shape = RoundedCornerShape(10.dp), color = Color(0xFF1E293B), modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Text(res.icon, fontSize = 16.sp)
+                                        Column(Modifier.weight(1f)) {
+                                            Text(res.shortName, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                            Text(res.displayName, color = Color(0xFF94A3B8), fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = { TextButton(onClick = { showAddStopDialog = false }) { Text("إغلاق", color = Color(0xFF00E5FF)) } },
+                shape = RoundedCornerShape(18.dp)
+            )
+        }
+
+        // ───────── حوار التنزيل ─────────
+        if (showDownloadDialog) {
+            var isDownloading by remember { mutableStateOf(false) }
+            var downloadProgress by remember { mutableFloatStateOf(0f) }
+            var downloadStatusText by remember { mutableStateOf("") }
+            AlertDialog(
+                onDismissRequest = { if (!isDownloading) showDownloadDialog = false },
+                icon = { Icon(Icons.Default.CloudDownload, contentDescription = null, tint = Color(0xFF00E5FF), modifier = Modifier.size(36.dp)) },
+                title = { Text("تحميل حزمة الملاحة (أوفلاين)", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White, textAlign = TextAlign.Center) },
+                text = {
+                    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text("لتفعيل الملاحة بدون إنترنت يحتاج التطبيق إلى تحميل ملف الخرائط (حوالي 25 ميجابايت).", fontSize = 13.sp, color = Color(0xFFCBD5E1))
+                        if (isDownloading) {
+                            LinearProgressIndicator(progress = { downloadProgress }, modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)), color = Color(0xFF10B981), trackColor = Color(0xFF334155))
+                            Text(downloadStatusText, fontSize = 12.sp, color = Color(0xFF10B981), fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                },
+                confirmButton = {
+                    if (!isDownloading) {
+                        Button(
+                            onClick = {
+                                isDownloading = true
+                                scope.launch {
+                                    val r = ValhallaTileDownloader.downloadAndExtractTiles(context, downloadUrl) { p, s -> downloadProgress = p; downloadStatusText = s }
+                                    isDownloading = false
+                                    if (r.isSuccess) {
+                                        isTilesDownloaded = true
+                                        showDownloadDialog = false
+                                        snackbarHostState.showSnackbar("تم تثبيت حزمة الملاحة الأوفلاين ✓")
+                                    } else {
+                                        snackbarHostState.showSnackbar("فشل التحميل: ${r.exceptionOrNull()?.message ?: "تحقق من الاتصال"}")
+                                    }
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0284C7)), shape = RoundedCornerShape(10.dp)
+                        ) { Text("تحميل الآن", fontWeight = FontWeight.Bold) }
+                    }
+                },
+                dismissButton = { if (!isDownloading) TextButton(onClick = { showDownloadDialog = false }) { Text("لاحقاً", color = Color(0xFF94A3B8)) } },
+                containerColor = Color(0xFF0F172A), shape = RoundedCornerShape(18.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun InfoCell(label: String, value: String, valueColor: Color, modifier: Modifier = Modifier) {
+    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(value, color = valueColor, fontSize = 17.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(label, color = Color(0xFF94A3B8), fontSize = 11.sp, maxLines = 1)
+    }
+}
+```
+**ملاحظات لـ AI Studio:** (1) أسماء رموز Material الممتدة (`TurnLeft`…) قد تختلف حسب الإصدار؛ استبدل أي رمز غير موجود بـ `ArrowUpward`. (2) إن كان `NavRouteResult.getAllSteps()` أو `isOffline` أو `engineSource` بأسماء مختلفة فعدّلها. (3) لا تحذف أي ملف آخر.

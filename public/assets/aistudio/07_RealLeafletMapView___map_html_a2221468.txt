@@ -1,0 +1,249 @@
+# 07 – RealLeafletMapView.kt  +  assets/map.html
+**المسارات:** `ui/screens/map/RealLeafletMapView.kt` و `app/src/main/assets/map.html`  |  **الإجراء:** تعديلات موضعية.
+
+## المشاكل المكتشفة (حقيقية في الكود المرفوع)
+1. **عقد الربط JS ↔ Kotlin مكسور:**
+   - Kotlin يرسل المفاتيح `type`/`name`/`emoji`/`badgeColor`، وJS يقرأ `category`/`title` → كل الدبابيس بنفس الرمز 📍 وعنوان "undefined".
+   - JS ينادي `AndroidBridge.onMarkerSelected` بينما Kotlin يعرّف `onMarkerClicked` → **الضغط على أي دبوس في الخريطة الحقيقية لا يصل للتطبيق** (لا نافذة سفلية ولا ملاحة).
+2. **حقن HTML**: `m.title` يُدرج في HTML بلا تهريب، وأسماء المزودين من المستخدمين، والـ WebView فيه `AndroidBridge` → ثغرة أمنية.
+3. دوال الجسر (`@JavascriptInterface`) تعمل على خيط خلفي وتغيّر حالة Compose وتنفّذ Toast/UI → غير آمن.
+4. الجسر يلتقط `nearbyProviders` والـ callbacks لحظة الإنشاء فقط (قوائم قديمة بعد إعادة التركيب).
+5. الرجوع الاحتياطي `window.setMarkers('$markersJson')` بلا تهريب يكسر JS عند وجود `'` في الأسماء.
+6. لا يوجد رسم للمسار ولا محطات مرقمة ولا تتبع للمستخدم.
+7. `WebView` لا يُدمَّر عند الخروج (تسريب ذاكرة)، و`allowFileAccess=true` غير لازم (الأصول `file:///android_asset` لا تتأثر).
+8. لا اعتراض للبلاطات → لا أوفلاين (المستند 08).
+
+---
+## أولاً: map.html
+### (أ) استبدل `setMarkersList` و `onMarkerClick` بالكامل:
+```javascript
+function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+}
+function setMarkersList(markers) {
+    if (!markerClusterGroup) return;
+    markerClusterGroup.clearLayers();
+    markers.forEach(function (m) {
+        if (typeof m.lat !== 'number' || typeof m.lng !== 'number' || (m.lat === 0 && m.lng === 0)) return;
+        var type = String(m.type || '').toUpperCase();
+        var color = /^#[0-9A-Fa-f]{3,8}$/.test(m.badgeColor || '') ? m.badgeColor : '#2563EB';
+        var emoji = m.emoji || '📍';
+        var approx = m.isApprox === true;
+        var html = '<div class="custom-pin-container">' +
+            '<div class="custom-pin-head" style="background-color:' + color + ';' +
+            (approx ? 'opacity:0.65;border:2px dashed #fff;' : '') + '">' + esc(emoji) + '</div>' +
+            '<div class="custom-pin-label">' + esc(m.name) + (approx ? ' (موقع تقريبي)' : '') + '</div></div>';
+        var icon = L.divIcon({ className: 'custom-leaflet-marker', html: html, iconSize: [145, 65], iconAnchor: [72, 38] });
+        var marker = L.marker([m.lat, m.lng], { icon: icon });
+        marker.on('click', function () { onMarkerClick(String(m.id), type); });
+        markerClusterGroup.addLayer(marker);
+    });
+}
+function onMarkerClick(id, type) {
+    if (window.AndroidBridge && window.AndroidBridge.onMarkerClicked) {
+        window.AndroidBridge.onMarkerClicked(id, type);
+    }
+}
+```
+### (ب) داخل `initMap` مباشرة بعد إنشاء `map` (بعد `.setView(...)`):
+```javascript
+map.on('dragstart', function () {
+    if (window.AndroidBridge && window.AndroidBridge.onUserPanned) window.AndroidBridge.onUserPanned();
+});
+map.on('click', function () {
+    if (window.AndroidBridge && window.AndroidBridge.onMapClicked) window.AndroidBridge.onMapClicked();
+});
+```
+### (ج) أضف الدوال التالية قبل `window.onload` (المسار + المحطات + دبوس البحث):
+```javascript
+var routeLayer = null, routeCasing = null, waypointLayer = null, searchPin = null;
+
+function clearRoute() {
+    if (map && routeLayer) { map.removeLayer(routeLayer); routeLayer = null; }
+    if (map && routeCasing) { map.removeLayer(routeCasing); routeCasing = null; }
+}
+function setRouteBase64(b64, fit) {
+    try {
+        var pts = JSON.parse(window.atob(b64));            // [[lat,lng],...]
+        clearRoute();
+        if (!map || !pts || pts.length < 2) return;
+        routeCasing = L.polyline(pts, { color: '#0B1120', weight: 10, opacity: 0.9, lineCap: 'round', lineJoin: 'round' }).addTo(map);
+        routeLayer = L.polyline(pts, { color: '#00E5FF', weight: 5, opacity: 1, lineCap: 'round', lineJoin: 'round' }).addTo(map);
+        if (fit) map.fitBounds(routeLayer.getBounds(), { padding: [60, 60] });
+    } catch (e) { console.error('setRoute error', e); }
+}
+function setWaypointMarkersBase64(b64) {
+    try {
+        var list = JSON.parse(decodeURIComponent(escape(window.atob(b64))));   // [{label,lat,lng}]
+        if (!map) return;
+        if (waypointLayer) { map.removeLayer(waypointLayer); }
+        waypointLayer = L.layerGroup();
+        list.forEach(function (w, i) {
+            var html = '<div style="background:#10B981;color:#fff;border:2px solid #fff;border-radius:50%;width:26px;height:26px;' +
+                'display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:12px;">' + (i + 1) + '</div>';
+            var icon = L.divIcon({ className: 'wp-marker', html: html, iconSize: [26, 26], iconAnchor: [13, 13] });
+            L.marker([w.lat, w.lng], { icon: icon, interactive: false }).addTo(waypointLayer);
+        });
+        waypointLayer.addTo(map);
+    } catch (e) { console.error('setWaypointMarkers error', e); }
+}
+function showSearchPinBase64(b64) {
+    try {
+        var p = JSON.parse(decodeURIComponent(escape(window.atob(b64))));      // {name,lat,lng}
+        if (!map) return;
+        if (searchPin) { map.removeLayer(searchPin); searchPin = null; }
+        var html = '<div class="custom-pin-container"><div class="custom-pin-head" style="background-color:#F59E0B;">📍</div>' +
+            '<div class="custom-pin-label">' + esc(p.name) + '</div></div>';
+        var icon = L.divIcon({ className: 'custom-leaflet-marker', html: html, iconSize: [145, 65], iconAnchor: [72, 38] });
+        searchPin = L.marker([p.lat, p.lng], { icon: icon }).addTo(map);
+        map.setView([p.lat, p.lng], 17);
+    } catch (e) { console.error('showSearchPin error', e); }
+}
+function clearSearchPin() { if (map && searchPin) { map.removeLayer(searchPin); searchPin = null; } }
+```
+> الدوال معرّفة كـ `function` عامة فهي متاحة كـ `window.xxx` (كما تفعل بقية الدوال الحالية). لا تُدخلها داخل IIFE.
+
+---
+## ثانياً: RealLeafletMapView.kt
+### (أ) أضف المعاملات الجديدة لتوقيع الدالة (كلها لها قيم افتراضية فلا ينكسر أي استدعاء):
+```kotlin
+routeCoordinates: List<Pair<Double, Double>> = emptyList(),
+routeKey: Int = 0,
+waypointMarkers: List<Triple<String, Double, Double>> = emptyList(),
+followUser: Boolean = false,
+onUserPanned: (() -> Unit)? = null,
+focusPoint: Triple<String, Double, Double>? = null,
+```
+### (ب) imports إضافية
+```kotlin
+import android.os.Handler
+import android.os.Looper
+import android.util.Base64
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import org.json.JSONArray
+import org.json.JSONObject
+import com.example.ui.screens.map.utils.OfflineTileInterceptor
+```
+### (ج) داخل الدالة بعد `var hasLoadError` أضف (يحل مشكلة القوائم القديمة والخيط الخلفي):
+```kotlin
+val mainHandler = remember { Handler(Looper.getMainLooper()) }
+val providersState by rememberUpdatedState(nearbyProviders)
+val storesState by rememberUpdatedState(nearbyStores)
+val propertiesState by rememberUpdatedState(nearbyProperties)
+val onProviderSelectedState by rememberUpdatedState(onProviderSelected)
+val onStoreSelectedState by rememberUpdatedState(onStoreSelected)
+val onPropertySelectedState by rememberUpdatedState(onPropertySelected)
+val onDeselectState by rememberUpdatedState(onDeselect)
+val onUserPannedState by rememberUpdatedState(onUserPanned)
+```
+### (د) استبدل كائن `addJavascriptInterface(object { ... }, "AndroidBridge")` بهذا (كل شيء يُنفَّذ على الخيط الرئيسي):
+```kotlin
+addJavascriptInterface(object {
+    @JavascriptInterface fun onMapReady() { mainHandler.post { isMapReady = true } }
+    @JavascriptInterface fun onMapClicked() { mainHandler.post { onDeselectState() } }
+    @JavascriptInterface fun onUserPanned() { mainHandler.post { onUserPannedState?.invoke() } }
+    @JavascriptInterface fun onMarkerClicked(id: String, type: String) {
+        mainHandler.post {
+            when (type.uppercase()) {
+                "PROVIDER" -> providersState.find { it.id == id }?.let { onProviderSelectedState(it) }
+                "STORE", "RESTAURANT", "MEDICAL" -> storesState.find { it.id == id }?.let { onStoreSelectedState(it) }
+                "PROPERTY" -> propertiesState.find { it.id == id }?.let { onPropertySelectedState(it) }
+            }
+        }
+    }
+    @JavascriptInterface fun onMapModeChanged(newMode: String) { android.util.Log.d("LeafletBridge", "Map mode: $newMode") }
+    @JavascriptInterface fun getAvailableLayers(): String = "[\"OSM\",\"HOT\",\"TOPO\",\"SATELLITE\",\"VELA_3D\"]"
+}, "AndroidBridge")
+```
+### (هـ) إعدادات أمان WebView: غيّر
+`allowFileAccess = true` ← `allowFileAccess = false` ، و `allowContentAccess = true` ← `allowContentAccess = false`.
+(تحميل `file:///android_asset/map.html` لا يتأثر.) وأضف: `javaScriptCanOpenWindowsAutomatically = false`.
+
+### (و) في `webViewClient` أضف (اعتراض البلاطات للأوفلاين والتخزين المؤقت – المستند 08):
+```kotlin
+override fun shouldInterceptRequest(
+    view: WebView?, request: android.webkit.WebResourceRequest?
+): android.webkit.WebResourceResponse? {
+    val url = request?.url?.toString() ?: return null
+    return try { OfflineTileInterceptor.intercept(context, url) } catch (t: Throwable) { null }
+}
+```
+### (ز) حرّر التخلّص من WebView: في `AndroidView(...)` أضف
+```kotlin
+onRelease = { webView -> webView.stopLoading(); webView.removeJavascriptInterface("AndroidBridge"); webView.destroy() },
+```
+### (ح) احذف الرجوع غير المهرَّب في LaunchedEffect العلامات: استبدل سطر `val script = ...` بـ
+```kotlin
+val script = "if (window.setMarkersBase64) { window.setMarkersBase64('$b64'); }"
+```
+### (ط) أضف LaunchedEffects جديدة (بجانب الموجودة):
+```kotlin
+// رسم المسار (يُبنى الـ JSON خارج الخيط الرئيسي، مع تخفيف النقاط إلى ≈2000)
+LaunchedEffect(isMapReady, routeCoordinates, routeKey) {
+    if (!isMapReady || webViewRef == null) return@LaunchedEffect
+    if (routeCoordinates.size < 2) {
+        webViewRef?.evaluateJavascript("if (window.clearRoute) { window.clearRoute(); }", null)
+        return@LaunchedEffect
+    }
+    val b64 = withContext(Dispatchers.Default) {
+        val step = maxOf(1, routeCoordinates.size / 2000)
+        val arr = JSONArray()
+        var i = 0
+        while (i < routeCoordinates.size) {
+            arr.put(JSONArray().put(routeCoordinates[i].first).put(routeCoordinates[i].second)); i += step
+        }
+        val last = routeCoordinates.last()
+        arr.put(JSONArray().put(last.first).put(last.second))
+        Base64.encodeToString(arr.toString().toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
+    }
+    webViewRef?.evaluateJavascript("if (window.setRouteBase64) { window.setRouteBase64('$b64', ${!followUser}); }", null)
+}
+
+// محطات مرقمة
+LaunchedEffect(isMapReady, waypointMarkers) {
+    if (!isMapReady || webViewRef == null) return@LaunchedEffect
+    val arr = JSONArray()
+    waypointMarkers.forEach { (label, lat, lng) -> arr.put(JSONObject().put("label", label).put("lat", lat).put("lng", lng)) }
+    val b64 = Base64.encodeToString(arr.toString().toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
+    webViewRef?.evaluateJavascript("if (window.setWaypointMarkersBase64) { window.setWaypointMarkersBase64('$b64'); }", null)
+}
+
+// دبوس نتيجة البحث
+LaunchedEffect(isMapReady, focusPoint) {
+    if (!isMapReady || webViewRef == null) return@LaunchedEffect
+    if (focusPoint == null) {
+        webViewRef?.evaluateJavascript("if (window.clearSearchPin) { window.clearSearchPin(); }", null)
+    } else {
+        val o = JSONObject().put("name", focusPoint.first).put("lat", focusPoint.second).put("lng", focusPoint.third)
+        val b64 = Base64.encodeToString(o.toString().toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
+        webViewRef?.evaluateJavascript("if (window.showSearchPinBase64) { window.showSearchPinBase64('$b64'); }", null)
+    }
+}
+```
+### (ي) عدّل LaunchedEffect موقع المستخدم ليتتبع عند الطلب: غيّر `false` الأخيرة إلى `$followUser`
+```kotlin
+val script = "if (window.updateUserLocation) { window.updateUserLocation(${userCoords.first}, ${userCoords.second}, 30, $followUser); }"
+```
+وأضف `followUser` إلى مفاتيح `LaunchedEffect(isMapReady, userCoords, followUser)`.
+
+### (ك) اترك `tilt`/`rotation`/`setMapPerspective` كما هي (فارغة). لا تُعد CSS 3D.
+
+## ملاحظات
+- ألغِ المعالجات المكررة: تأكد أن `onMapClicked` يُستدعى من JS مرة واحدة فقط.
+- `evaluateJavascript` يجب أن يُستدعى من الخيط الرئيسي: هذه الـ LaunchedEffects تعمل على Main، لا تنقلها لـ Dispatchers.IO.
+
+---
+## إضافات لازمة (اكتشفتها عند مراجعة التدفق)
+1. **لا تُعد تمركز الخريطة على صنعاء عند «الكل»:** في `LaunchedEffect(isMapReady, selectedCity)` أضف أول سطر:
+   `if (selectedCity == "الكل") return@LaunchedEffect`
+   (وإلا تقفز الخريطة إلى صنعاء بدل موقعك).
+2. **تمركز أولي على موقع المستخدم مرة واحدة:** عرّف `var didInitialCenter by remember { mutableStateOf(false) }` وفي LaunchedEffect موقع المستخدم:
+```kotlin
+val pan = followUser || !didInitialCenter
+didInitialCenter = true
+val script = "if (window.updateUserLocation) { window.updateUserLocation(${userCoords.first}, ${userCoords.second}, 30, $pan); }"
+```
+3. الفحص `userCoords.first != 0.0` موجود أصلاً؛ أبقِه.

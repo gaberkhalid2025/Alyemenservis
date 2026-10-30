@@ -1,0 +1,148 @@
+# 13 – AndroidManifest.xml + build.gradle.kts + proguard-rules.pro + تسجيل الانهيار
+**الملفات:** `app/src/main/AndroidManifest.xml`, `app/build.gradle.kts`, `app/proguard-rules.pro`, وملف جديد `CrashReporter.kt`  |  **الإجراء:** تعديلات موضعية (لم أرَ هذه الملفات؛ يفتحها AI Studio أولاً ويضيف الناقص فقط).
+
+## 1) AndroidManifest.xml
+أضف إن لم تكن موجودة (لا تكرّر):
+```xml
+<uses-permission android:name="android.permission.INTERNET" />
+<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+<uses-permission android:name="android.permission.CAMERA" />
+<uses-permission android:name="android.permission.RECORD_AUDIO" />
+<uses-feature android:name="android.hardware.camera" android:required="false" />
+<uses-feature android:name="android.hardware.location.gps" android:required="false" />
+```
+- `ACCESS_NETWORK_STATE` **لازمة** لدالة `isNetworkAvailable` (المستند 01)؛ غيابها يسبب `SecurityException`.
+- في وسم `<application>`: `android:usesCleartextTraffic="false"` (كل الروابط HTTPS) و`android:name=".App"` إن لم يوجد صنف Application.
+- في النشاط الرئيسي: `android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode"` (حتى لا يُعاد إنشاء الـ WebView أثناء الملاحة عند تدوير الشاشة).
+
+## 2) app/build.gradle.kts
+```kotlin
+android {
+    defaultConfig {
+        ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
+    }
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+            pickFirsts += "**/libc++_shared.so"
+        }
+    }
+    buildTypes {
+        release { isMinifyEnabled = true; isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro") }
+    }
+}
+dependencies {
+    implementation("io.github.rallista:valhalla-mobile:0.4.0")   // تحقق من أحدث إصدار في Maven Central
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+}
+```
+لا تضف `externalNativeBuild` ولا `CMake` (المكتبة AAR جاهزة).
+
+## 3) proguard-rules.pro (مهم جداً لنسخة release)
+```proguard
+# جسر JavaScript ↔ Kotlin: بدونه تتعطل نقرات الخريطة في نسخة release
+-keepattributes JavascriptInterface
+-keepclassmembers class * {
+    @android.webkit.JavascriptInterface <methods>;
+}
+
+# JNI
+-keepclasseswithmembernames class * { native <methods>; }
+
+# Valhalla تُستدعى بالـ Reflection حالياً: بدون هذه القاعدة يحذفها R8
+-keep class io.github.rallista.** { *; }
+-dontwarn io.github.rallista.**
+
+# نماذج الملاحة إن كانت تُحلَّل بالأسماء (JSON)
+-keep class com.example.utils.Nav** { *; }
+```
+(عدّل اسم الحزمة `io.github.rallista` إلى الحزمة الحقيقية بعد التحقق من الصنف – المستند 01.)
+
+## 4) تسجيل الانهيار داخل التطبيق (لتعرف سبب الانهيار أونلاين دون Logcat)
+### أ) ملف جديد `com/example/utils/CrashReporter.kt`
+```kotlin
+package com.example.utils
+
+import android.app.Application
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.sp
+import java.io.File
+import java.util.Date
+
+object CrashReporter {
+    private const val FILE = "last_crash.txt"
+
+    fun install(app: Application) {
+        val previous = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+            try {
+                File(app.filesDir, FILE).writeText(
+                    "${Date()}\nthread=${thread.name}\n${android.util.Log.getStackTraceString(throwable)}"
+                )
+            } catch (_: Throwable) {}
+            previous?.uncaughtException(thread, throwable)
+        }
+    }
+
+    fun read(context: Context): String? =
+        runCatching { File(context.filesDir, FILE).takeIf { it.exists() }?.readText() }.getOrNull()
+
+    fun clear(context: Context) { runCatching { File(context.filesDir, FILE).delete() } }
+}
+
+/** ضعه مرة واحدة في أعلى MapScreenContent: يعرض تقرير آخر انهيار مع زر نسخ. */
+@Composable
+fun CrashReportDialog() {
+    val context = LocalContext.current
+    var report by remember { mutableStateOf(CrashReporter.read(context)) }
+    val text = report ?: return
+    AlertDialog(
+        onDismissRequest = { },
+        containerColor = Color(0xFF0F172A),
+        title = { Text("تقرير آخر انهيار", color = Color.White) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                Text(text.take(4000), color = Color(0xFFCBD5E1), fontSize = 10.sp)
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                cm.setPrimaryClip(ClipData.newPlainText("crash", text))
+            }) { Text("نسخ", color = Color(0xFF10B981)) }
+        },
+        dismissButton = {
+            TextButton(onClick = { CrashReporter.clear(context); report = null }) { Text("حذف", color = Color(0xFFEF4444)) }
+        }
+    )
+}
+```
+### ب) في صنف Application (أنشئه إن لم يوجد وسجّله في المانيفست `android:name=".App"`)
+```kotlin
+class App : Application() {
+    override fun onCreate() { super.onCreate(); CrashReporter.install(this) }
+}
+```
+### ج) في `MapScreenContent` أول سطر داخل الدالة
+```kotlin
+CrashReportDialog()
+```
+**الاستخدام:** اضغط زر الملاحة وهاتفك متصل ← إن انهار التطبيق افتحه مجدداً ← يظهر تقرير ← اضغط «نسخ» وأرسله لي. هذا يحدد سبب الانهيار بدقة.

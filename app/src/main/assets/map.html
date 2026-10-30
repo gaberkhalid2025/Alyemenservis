@@ -220,6 +220,13 @@
                 });
                 map.addLayer(markerClusterGroup);
 
+                map.on('dragstart', function () {
+                    if (window.AndroidBridge && window.AndroidBridge.onUserPanned) window.AndroidBridge.onUserPanned();
+                });
+                map.on('click', function () {
+                    if (window.AndroidBridge && window.AndroidBridge.onMapClicked) window.AndroidBridge.onMapClicked();
+                });
+
                 updateUserLocation(userLat, userLng, 50, false);
 
                 if (window.AndroidBridge && window.AndroidBridge.onMapReady) {
@@ -324,33 +331,39 @@
             }
         }
 
+        function esc(s) {
+            return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+                return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+            });
+        }
+
         function setMarkersList(markers) {
             if (!markerClusterGroup) return;
             markerClusterGroup.clearLayers();
-            markers.forEach(function(m) {
-                var emoji = '📍';
-                var color = '#2563EB';
-                if (m.category === 'store') { emoji = '🏪'; color = '#10B981'; }
-                else if (m.category === 'provider') { emoji = '👷'; color = '#3B82F6'; }
-                else if (m.category === 'property') { emoji = '🏢'; color = '#F59E0B'; }
-
-                var html = '<div class="custom-pin-container" onclick="onMarkerClick(\'' + m.id + '\', \'' + m.category + '\')">' +
-                           '<div class="custom-pin-head" style="background-color: ' + color + ';">' + emoji + '</div>' +
-                           '<div class="custom-pin-label">' + m.title + '</div>' +
-                           '</div>';
-
-                var icon = L.divIcon({
-                    className: 'custom-leaflet-marker',
-                    html: html,
-                    iconSize: [145, 65],
-                    iconAnchor: [72, 38]
-                });
-
-                var marker = L.marker([m.lat, m.lng], {icon: icon});
-                marker.entityId = m.id;
-                marker.category = m.category;
+            markers.forEach(function (m) {
+                if (typeof m.lat !== 'number' || typeof m.lng !== 'number' || (m.lat === 0 && m.lng === 0)) return;
+                var type = String(m.type || m.category || '').toUpperCase();
+                var color = /^#[0-9A-Fa-f]{3,8}$/.test(m.badgeColor || '') ? m.badgeColor : (type === 'STORE' ? '#10B981' : (type === 'PROVIDER' ? '#3B82F6' : '#F59E0B'));
+                var emoji = m.emoji || (type === 'STORE' ? '🏪' : (type === 'PROVIDER' ? '👷' : '📍'));
+                var name = m.name || m.title || '';
+                var approx = m.isApprox === true;
+                var html = '<div class="custom-pin-container">' +
+                    '<div class="custom-pin-head" style="background-color:' + color + ';' +
+                    (approx ? 'opacity:0.65;border:2px dashed #fff;' : '') + '">' + esc(emoji) + '</div>' +
+                    '<div class="custom-pin-label">' + esc(name) + (approx ? ' (موقع تقريبي)' : '') + '</div></div>';
+                var icon = L.divIcon({ className: 'custom-leaflet-marker', html: html, iconSize: [145, 65], iconAnchor: [72, 38] });
+                var marker = L.marker([m.lat, m.lng], { icon: icon });
+                marker.on('click', function () { onMarkerClick(String(m.id), type); });
                 markerClusterGroup.addLayer(marker);
             });
+        }
+
+        function onMarkerClick(id, type) {
+            if (window.AndroidBridge && window.AndroidBridge.onMarkerClicked) {
+                window.AndroidBridge.onMarkerClicked(id, type);
+            } else if (window.AndroidBridge && window.AndroidBridge.onMarkerSelected) {
+                window.AndroidBridge.onMarkerSelected(id, type);
+            }
         }
 
         function setCity(name, lat, lng, zoom) {
@@ -360,7 +373,7 @@
         }
 
         function setMapPerspective(tilt, rotation) {
-            // No CSS tilt skewing to prevent trapezoid distortion
+            // No CSS tilt skewing to prevent distortion
         }
 
         function zoomIn() {
@@ -377,70 +390,74 @@
             }
         }
 
-        function onMarkerClick(id, category) {
-            if (window.AndroidBridge && window.AndroidBridge.onMarkerSelected) {
-                window.AndroidBridge.onMarkerSelected(id, category);
-            }
-        }
-
-        // [إصلاح ملاحة نهائي] إدارة خط مسار الملاحة (Route Polyline)
-        var routePolyline = null;
-        var routeBackgroundPolyline = null;
+        // [إصلاح ملاحة نهائي] إدارة المسار، المحطات، ودبوس البحث
+        var routeLayer = null;
+        var routeCasing = null;
+        var waypointLayer = null;
+        var searchPin = null;
 
         function clearRoute() {
-            if (map) {
-                if (routePolyline) {
-                    map.removeLayer(routePolyline);
-                    routePolyline = null;
+            if (map && routeLayer) { map.removeLayer(routeLayer); routeLayer = null; }
+            if (map && routeCasing) { map.removeLayer(routeCasing); routeCasing = null; }
+        }
+
+        function setRouteBase64(b64, fit) {
+            try {
+                var jsonStr = (b64.indexOf('[') === 0) ? b64 : decodeURIComponent(escape(window.atob(b64)));
+                var pts = JSON.parse(jsonStr); // [[lat,lng],...]
+                clearRoute();
+                if (!map || !pts || pts.length < 2) return;
+                routeCasing = L.polyline(pts, { color: '#0B1120', weight: 10, opacity: 0.9, lineCap: 'round', lineJoin: 'round' }).addTo(map);
+                routeLayer = L.polyline(pts, { color: '#00E5FF', weight: 5, opacity: 1, lineCap: 'round', lineJoin: 'round' }).addTo(map);
+                if (fit !== false) {
+                    map.fitBounds(routeLayer.getBounds(), { padding: [60, 60], maxZoom: 17 });
                 }
-                if (routeBackgroundPolyline) {
-                    map.removeLayer(routeBackgroundPolyline);
-                    routeBackgroundPolyline = null;
-                }
+            } catch (e) {
+                console.error('setRouteBase64 error', e);
             }
         }
 
         function setRoute(coordsJson) {
+            setRouteBase64(coordsJson, true);
+        }
+
+        function setWaypointMarkersBase64(b64) {
             try {
-                clearRoute();
-                var coords = (typeof coordsJson === 'string') ? JSON.parse(coordsJson) : coordsJson;
-                if (!coords || !coords.length || !map) return;
-
-                // رسم خلفية داكنة للمسار لتعزيز التباين
-                routeBackgroundPolyline = L.polyline(coords, {
-                    color: '#0F172A',
-                    weight: 10,
-                    opacity: 0.75,
-                    lineJoin: 'round',
-                    lineCap: 'round'
-                }).addTo(map);
-
-                // رسم خط المسار السماوي المضيء
-                routePolyline = L.polyline(coords, {
-                    color: '#00E5FF',
-                    weight: 6,
-                    opacity: 0.95,
-                    lineJoin: 'round',
-                    lineCap: 'round'
-                }).addTo(map);
-
-                // ضبط الكاميرا لتشمل المسار بالكامل مع هوامش مريحة
-                map.fitBounds(routePolyline.getBounds(), {
-                    padding: [60, 60],
-                    maxZoom: 17
+                var jsonStr = decodeURIComponent(escape(window.atob(b64)));
+                var list = JSON.parse(jsonStr); // [{label,lat,lng}]
+                if (!map) return;
+                if (waypointLayer) { map.removeLayer(waypointLayer); }
+                waypointLayer = L.layerGroup();
+                list.forEach(function (w, i) {
+                    var html = '<div style="background:#10B981;color:#fff;border:2px solid #fff;border-radius:50%;width:26px;height:26px;' +
+                        'display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:12px;box-shadow:0 2px 6px rgba(0,0,0,0.5);">' + (i + 1) + '</div>';
+                    var icon = L.divIcon({ className: 'wp-marker', html: html, iconSize: [26, 26], iconAnchor: [13, 13] });
+                    L.marker([w.lat, w.lng], { icon: icon, interactive: false }).addTo(waypointLayer);
                 });
+                waypointLayer.addTo(map);
             } catch (e) {
-                console.error("setRoute error: ", e);
+                console.error('setWaypointMarkers error', e);
             }
         }
 
-        function setRouteBase64(b64) {
+        function showSearchPinBase64(b64) {
             try {
                 var jsonStr = decodeURIComponent(escape(window.atob(b64)));
-                setRoute(jsonStr);
+                var p = JSON.parse(jsonStr); // {name,lat,lng}
+                if (!map) return;
+                if (searchPin) { map.removeLayer(searchPin); searchPin = null; }
+                var html = '<div class="custom-pin-container"><div class="custom-pin-head" style="background-color:#F59E0B;">📍</div>' +
+                    '<div class="custom-pin-label">' + esc(p.name) + '</div></div>';
+                var icon = L.divIcon({ className: 'custom-leaflet-marker', html: html, iconSize: [145, 65], iconAnchor: [72, 38] });
+                searchPin = L.marker([p.lat, p.lng], { icon: icon }).addTo(map);
+                map.setView([p.lat, p.lng], 16);
             } catch (e) {
-                console.error("setRouteBase64 error: ", e);
+                console.error('showSearchPin error', e);
             }
+        }
+
+        function clearSearchPin() {
+            if (map && searchPin) { map.removeLayer(searchPin); searchPin = null; }
         }
 
         // Auto initialize on load if not called by Android view
@@ -452,3 +469,4 @@
     </script>
 </body>
 </html>
+

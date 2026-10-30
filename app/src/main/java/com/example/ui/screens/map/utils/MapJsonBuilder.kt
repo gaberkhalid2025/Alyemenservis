@@ -51,6 +51,7 @@ object MapJsonBuilder {
             val baseCoords = getProviderCoords(p)
             val rawLat = baseCoords.first
             val rawLng = baseCoords.second
+            if (rawLat.isNaN() || rawLng.isNaN()) return@forEach
             val isApproximate = p.latitude == 0.0 || p.longitude == 0.0
 
             val categoryEmoji = when {
@@ -78,7 +79,7 @@ object MapJsonBuilder {
                 put("emoji", categoryEmoji)
                 put("spec", cleanSpec)
                 put("phone", p.phone)
-                put("rating", if (p.rating > 0) String.format(java.util.Locale.US, "%.1f", p.rating) else "5.0")
+                put("rating", if (p.rating > 0) String.format(java.util.Locale.US, "%.1f", p.rating) else "جديد")
                 put("status", if (p.isAvailable) "متاح لاستقبال الطلبات 🟢" else "مشغول حالياً 🟡")
                 put("badgeColor", "#2563EB") // أزرق للفنيين
                 put("serviceCategory", "فنيون صيانة")
@@ -89,6 +90,10 @@ object MapJsonBuilder {
         // 2. Stores & Medical Centers & Restaurants
         nearbyStores.forEach { s ->
             val coords = getStoreCoords(s)
+            val rawLat = coords.first
+            val rawLng = coords.second
+            if (rawLat.isNaN() || rawLng.isNaN()) return@forEach
+
             val isMedical = s.sectionId.contains("medical") || s.categoryId.contains("medical") || s.categoryId.contains("pharmacy") || s.medicalLicenseNo.isNotBlank() || s.name.contains("طبي") || s.name.contains("مستشفى") || s.name.contains("عيادة") || s.name.contains("صيدلية")
             val isRestaurant = !isMedical && (s.sectionId.contains("restaurant") || s.categoryId.contains("restaurant") || s.name.contains("مطعم") || s.name.contains("مأكولات") || s.name.contains("كافيه") || s.name.contains("شاورما"))
 
@@ -99,8 +104,6 @@ object MapJsonBuilder {
                 else -> "🏪"
             }
 
-            val rawLat = coords.first
-            val rawLng = coords.second
             val isApproximate = s.latitude == 0.0 || s.longitude == 0.0
 
             val (badgeColor, categoryLabel) = when {
@@ -121,7 +124,7 @@ object MapJsonBuilder {
                 put("emoji", emoji)
                 put("spec", cleanDesc)
                 put("phone", s.phone)
-                put("rating", if (s.rating > 0) String.format(java.util.Locale.US, "%.1f", s.rating) else "5.0")
+                put("rating", if (s.rating > 0) String.format(java.util.Locale.US, "%.1f", s.rating) else "جديد")
                 put("status", if (s.isActive) "مفتوح ويستقبل الطلبات 🟢" else "مغلق حالياً 🔴")
                 put("badgeColor", badgeColor)
                 put("serviceCategory", categoryLabel)
@@ -134,8 +137,9 @@ object MapJsonBuilder {
             val coords = getPropertyCoords(pr)
             val rawLat = coords.first
             val rawLng = coords.second
-            val isApproximate = pr.latitude == 0.0 || pr.longitude == 0.0
+            if (rawLat.isNaN() || rawLng.isNaN()) return@forEach
 
+            val isApproximate = pr.latitude == 0.0 || pr.longitude == 0.0
             val priceFormatted = if (pr.price > 0) "${pr.price} ${pr.currency.ifEmpty { "ريال" }}" else "حسب الاتفاق"
             val cleanDesc = pr.description.ifBlank { "عقار معروض" }.take(60)
 
@@ -149,7 +153,7 @@ object MapJsonBuilder {
                 put("emoji", "🏠")
                 put("spec", "$cleanDesc ($priceFormatted)")
                 put("phone", pr.phone)
-                put("rating", "5.0")
+                put("rating", "—")
                 put("status", "معروض للإيجار / البيع 🟢")
                 put("badgeColor", "#8B5CF6")
                 put("serviceCategory", "عقارات وشقق")

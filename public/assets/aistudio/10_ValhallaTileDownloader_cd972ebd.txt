@@ -1,0 +1,206 @@
+# 10 – ValhallaTileDownloader.kt
+**المسار:** `com/example/utils/ValhallaTileDownloader.kt`  |  **الإجراء:** استبدال الملف بالكامل (نفس الواجهة العامة: `DEFAULT_DOWNLOAD_URL`, `isTilesDownloaded`, `downloadAndExtractTiles`, `importLocalTiles`).
+
+## المشاكل
+1. **يحذف مجلد valhalla بالكامل قبل التنزيل** → فشل التنزيل = ضياع الخرائط المثبّتة سابقاً.
+2. لا تحقق من السلامة (حجم/بصمة) ولا فحص مساحة تخزين.
+3. الكتابة مباشرة في الملف النهائي (انقطاع في المنتصف = ملف تالف).
+4. `importLocalTiles` يقرأ من مجلد التنزيلات العام: لا يعمل على أندرويد 11+ (Scoped Storage). يضاف مسار اختيار ملف (SAF).
+5. لا تحقق من رد HTTP.
+
+## الحل
+تنزيل/استخراج إلى مجلد مؤقت ← تحقق ← **تبديل ذري** (إعادة تسمية) ← كتابة الإعدادات ← كتابة ملف العلامة **أخيراً** (JSON فيه sha256 والحجم). `isTilesDownloaded` يقبل العلامة القديمة النصية (توافق مع من نزّل سابقاً).
+
+```kotlin
+package com.example.utils
+
+import android.content.Context
+import android.net.Uri
+import android.os.Environment
+import android.util.Log
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
+import java.io.BufferedInputStream
+import java.io.File
+import java.io.FileOutputStream
+import java.io.IOException
+import java.io.InputStream
+import java.net.HttpURLConnection
+import java.net.URL
+import java.security.MessageDigest
+import java.util.zip.ZipInputStream
+
+object ValhallaTileDownloader {
+
+    const val DEFAULT_DOWNLOAD_URL = "https://github.com/maher202021/Vela2026/releases/download/yemen-valhalla-1/yemen_valhalla_tiles.zip"
+    private const val TAG = "ValhallaDownloader"
+    private const val MARKER_FILE_NAME = NavConfig.VALHALLA_MARKER_FILE
+    private const val VALHALLA_DIR_NAME = NavConfig.VALHALLA_DIR
+    private const val TILE_FILE_NAME = NavConfig.VALHALLA_TILES_FILE
+    private const val LOCAL_ZIP_NAME = "yemen_valhalla_tiles.zip"
+    private const val TMP_DIR_NAME = "valhalla_tmp"
+    private const val OLD_DIR_NAME = "valhalla_old"
+    private const val MIN_TILE_BYTES = 1024L * 1024L
+    private const val MIN_FREE_BYTES = 100L * 1024L * 1024L
+
+    /** مجلد الخرائط (بدون إنشائه كأثر جانبي). */
+    private fun valhallaDir(context: Context) = File(context.filesDir, VALHALLA_DIR_NAME)
+
+    fun isTilesDownloaded(context: Context): Boolean {
+        return try {
+            val dir = valhallaDir(context)
+            val marker = File(dir, MARKER_FILE_NAME)
+            val tile = File(dir, TILE_FILE_NAME)
+            if (!marker.exists() || !tile.exists() || tile.length() < MIN_TILE_BYTES) return false
+            val text = marker.readText().trim()
+            if (text.startsWith("{")) {                       // علامة JSON الجديدة: تحقق من الحجم
+                val expected = JSONObject(text).optLong("sizeBytes", -1L)
+                if (expected > 0 && expected != tile.length()) return false
+            }                                                  // علامة نصية قديمة: مقبولة
+            true
+        } catch (t: Throwable) { false }
+    }
+
+    suspend fun downloadAndExtractTiles(
+        context: Context,
+        downloadUrl: String = DEFAULT_DOWNLOAD_URL,
+        onProgress: (Float, String) -> Unit
+    ): Result<Boolean> = withContext(Dispatchers.IO) {
+        var connection: HttpURLConnection? = null
+        try {
+            if (context.filesDir.usableSpace < MIN_FREE_BYTES) {
+                return@withContext Result.failure(IOException("مساحة التخزين غير كافية (يلزم نحو 100 ميجابايت)"))
+            }
+            onProgress(0.05f, "بدء الاتصال بخادم الخرائط...")
+            connection = (URL(downloadUrl).openConnection() as HttpURLConnection).apply {
+                connectTimeout = 15_000; readTimeout = 30_000; instanceFollowRedirects = true
+                setRequestProperty("User-Agent", "AlYemenServicesApp/1.0")
+            }
+            connection.connect()
+            if (connection.responseCode != 200) {
+                return@withContext Result.failure(IOException("رد الخادم: ${connection.responseCode}"))
+            }
+            val hint = connection.contentLengthLong
+            connection.inputStream.use { installFromZip(context, it, hint, downloadUrl, onProgress) }
+        } catch (e: CancellationException) {
+            File(context.filesDir, TMP_DIR_NAME).deleteRecursively(); throw e
+        } catch (t: Throwable) {
+            Log.e(TAG, "Download failed: ${t.message}", t)
+            File(context.filesDir, TMP_DIR_NAME).deleteRecursively()
+            Result.failure(t)
+        } finally { connection?.disconnect() }
+    }
+
+    /** استيراد من ملف يختاره المستخدم عبر ActivityResultContracts.OpenDocument (يعمل على كل إصدارات أندرويد). */
+    suspend fun importFromUri(
+        context: Context, uri: Uri, onProgress: (Float, String) -> Unit = { _, _ -> }
+    ): Result<Boolean> = withContext(Dispatchers.IO) {
+        try {
+            val input = context.contentResolver.openInputStream(uri)
+                ?: return@withContext Result.failure(IOException("تعذر فتح الملف"))
+            input.use { installFromZip(context, it, -1L, uri.toString(), onProgress) }
+        } catch (e: CancellationException) { throw e
+        } catch (t: Throwable) {
+            File(context.filesDir, TMP_DIR_NAME).deleteRecursively(); Result.failure(t)
+        }
+    }
+
+    @Deprecated("لا يعمل على أندرويد 11+ بدون صلاحيات؛ استخدم importFromUri مع OpenDocument")
+    suspend fun importLocalTiles(context: Context, onProgress: (Float, String) -> Unit = { _, _ -> }): Result<Boolean> =
+        withContext(Dispatchers.IO) {
+            val zipFile = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), LOCAL_ZIP_NAME)
+            if (!zipFile.exists()) {
+                return@withContext Result.failure(IOException("الملف $LOCAL_ZIP_NAME غير موجود أو لا يمكن الوصول إليه. اختره يدوياً من «استيراد من ملف»."))
+            }
+            try { zipFile.inputStream().use { installFromZip(context, it, zipFile.length(), zipFile.absolutePath, onProgress) } }
+            catch (t: Throwable) { Result.failure(t) }
+        }
+
+    // ───────── التثبيت الآمن ─────────
+    private fun installFromZip(
+        context: Context, input: InputStream, totalHint: Long, sourceUrl: String,
+        onProgress: (Float, String) -> Unit
+    ): Result<Boolean> {
+        val tmpDir = File(context.filesDir, TMP_DIR_NAME)
+        tmpDir.deleteRecursively(); tmpDir.mkdirs()
+        val tmpTar = File(tmpDir, TILE_FILE_NAME)
+        val digest = MessageDigest.getInstance("SHA-256")
+        var bytes = 0L
+        var found = false
+
+        ZipInputStream(BufferedInputStream(input)).use { zip ->
+            var entry = zip.nextEntry
+            while (entry != null) {
+                if (!entry.isDirectory && entry.name.substringAfterLast('/') == TILE_FILE_NAME) {
+                    FileOutputStream(tmpTar).use { fos ->
+                        val buf = ByteArray(32 * 1024)
+                        val est = if (totalHint > 0) totalHint else 25L * 1024 * 1024
+                        while (true) {
+                            val n = zip.read(buf)
+                            if (n == -1) break
+                            fos.write(buf, 0, n); digest.update(buf, 0, n); bytes += n
+                            val p = 0.1f + (bytes.toFloat() / est).coerceAtMost(1f) * 0.8f
+                            onProgress(p, "جاري التثبيت... ${bytes / 1024 / 1024}MB")
+                        }
+                        fos.fd.sync()
+                    }
+                    found = true
+                    break
+                }
+                zip.closeEntry()
+                entry = zip.nextEntry
+            }
+        }
+
+        if (!found) { tmpDir.deleteRecursively(); return Result.failure(IOException("لم يتم العثور على $TILE_FILE_NAME داخل الأرشيف")) }
+        if (bytes < MIN_TILE_BYTES) { tmpDir.deleteRecursively(); return Result.failure(IOException("الملف المستخرج صغير جداً أو تالف")) }
+
+        // تبديل ذري: لا نحذف القديم إلا بعد نجاح نقل الجديد
+        val dir = valhallaDir(context)
+        val old = File(context.filesDir, OLD_DIR_NAME)
+        old.deleteRecursively()
+        if (dir.exists() && !dir.renameTo(old)) { tmpDir.deleteRecursively(); return Result.failure(IOException("تعذر استبدال الملفات القديمة")) }
+        if (!tmpDir.renameTo(dir)) {
+            if (old.exists()) old.renameTo(dir)
+            tmpDir.deleteRecursively()
+            return Result.failure(IOException("تعذر نقل الملفات الجديدة"))
+        }
+
+        createValhallaConfig(context)
+        val sha = digest.digest().joinToString("") { "%02x".format(it) }
+        File(dir, MARKER_FILE_NAME).writeText(
+            JSONObject().put("version", 1).put("sha256", sha).put("sizeBytes", bytes)
+                .put("downloadedAt", System.currentTimeMillis()).put("sourceUrl", sourceUrl).toString()
+        )
+        old.deleteRecursively()
+        onProgress(1.0f, "تم اكتمال تثبيت خرائط اليمن بنجاح ✓")
+        return Result.success(true)
+    }
+
+    private fun createValhallaConfig(context: Context) {
+        val dir = valhallaDir(context)
+        val tiles = File(dir, TILE_FILE_NAME)
+        File(dir, "valhalla.json").writeText(
+            """
+            {
+              "mjolnir": {
+                "tile_dir": "${dir.absolutePath}",
+                "tile_extract": "${tiles.absolutePath}"
+              },
+              "routing": { "results_namespace": "valhalla" }
+            }
+            """.trimIndent()
+        )
+    }
+}
+```
+## اختياري: زر «استيراد من ملف»
+```kotlin
+val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+    if (uri != null) scope.launch { ValhallaTileDownloader.importFromUri(context, uri) { p, s -> /* حدّث الواجهة */ } }
+}
+// عند الضغط: picker.launch(arrayOf("application/zip", "application/octet-stream"))
+```
+> ملاحظة: إعداد `valhalla.json` أعلاه الحد الأدنى؛ إن كانت مكتبة valhalla-mobile تتطلب حقولاً إضافية (مثل `loki`/`thor`) فيضيفها AI Studio حسب توثيق المكتبة بعد التحقق من الواجهة الحقيقية (المستند 01).

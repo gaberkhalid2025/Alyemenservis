@@ -108,10 +108,11 @@ fun MapBottomSheet(
             lng = entity.longitude
         }
     }
-
-    val distanceMeters = MapDistanceCalculator.calculateDistanceMeters(userLat, userLng, lat, lng)
-    val distanceText = MapDistanceCalculator.formatDistance(distanceMeters)
-    val etaText = MapDistanceCalculator.computeEta(distanceMeters)
+    val hasValidCoords = lat != 0.0 && lng != 0.0 && !lat.isNaN() && !lng.isNaN()
+    val distanceMeters = if (hasValidCoords)
+        MapDistanceCalculator.calculateDistanceMeters(userLat, userLng, lat, lng) else 0.0
+    val distanceText = if (hasValidCoords) MapDistanceCalculator.formatDistance(distanceMeters) else "الموقع غير محدد"
+    val etaText = if (hasValidCoords) MapDistanceCalculator.computeEta(distanceMeters) else "—"
 
     Surface(
         shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
@@ -253,7 +254,7 @@ fun MapBottomSheet(
                 ) {
                     Icon(Icons.Default.Place, contentDescription = null, tint = Color(0xFF10B981), modifier = Modifier.size(16.dp))
                     Text(
-                        text = "المسافة: $distanceText",
+                        text = "المسافة المباشرة: $distanceText",
                         color = Color.White,
                         fontSize = 11.5.sp,
                         fontWeight = FontWeight.Bold
@@ -267,11 +268,21 @@ fun MapBottomSheet(
                 )
             }
 
+            if (!hasValidCoords) {
+                Text(
+                    text = "⚠️ لا يمكن الملاحة: موقع هذا المكان غير مسجّل بإحداثيات دقيقة",
+                    color = Color(0xFFF59E0B),
+                    fontSize = 11.sp,
+                    modifier = Modifier.padding(horizontal = 4.dp)
+                )
+            }
+
             // Multi-Stop Waypoint Button
             OutlinedButton(
                 onClick = { onAddStop?.invoke(entity) },
+                enabled = hasValidCoords,
                 shape = RoundedCornerShape(12.dp),
-                border = BorderStroke(1.2.dp, Color(0xFF38BDF8)),
+                border = BorderStroke(1.2.dp, if (hasValidCoords) Color(0xFF38BDF8) else Color.Gray),
                 colors = ButtonDefaults.outlinedButtonColors(containerColor = Color(0xFF0F172A), contentColor = Color(0xFF38BDF8)),
                 modifier = Modifier
                     .fillMaxWidth()
@@ -292,10 +303,13 @@ fun MapBottomSheet(
                 // 1. [بدء الملاحة] Emerald Green (#10B981)
                 Button(
                     onClick = { onStartNavigation?.invoke(entity) },
+                    enabled = hasValidCoords,
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Color(0xFF10B981),
-                        contentColor = Color.White
+                        contentColor = Color.White,
+                        disabledContainerColor = Color(0xFF334155),
+                        disabledContentColor = Color.Gray
                     ),
                     modifier = Modifier
                         .weight(1.3f)

@@ -1,0 +1,138 @@
+package com.example.utils
+
+import kotlin.math.cos
+import kotlin.math.max
+import kotlin.math.min
+import kotlin.math.roundToInt
+import kotlin.math.sqrt
+
+data class TrackerResult(
+    val alongMeters: Double,        // المسافة المقطوعة على امتداد المسار
+    val remainingMeters: Double,    // المتبقي على امتداد المسار
+    val offRouteMeters: Double,     // البعد العمودي عن المسار
+    val segmentIndex: Int,
+    val progress: Float             // 0..1
+)
+
+/** يُسقط الموقع على خط المسار بنافذة أمامية فقط (لا يقفز لجزء بعيد من مسار ملتف). */
+class RouteTracker(private val points: List<Pair<Double, Double>>) {
+
+    private val cumulative = DoubleArray(points.size)
+    val totalMeters: Double
+    private var lastSegment = 0
+
+    init {
+        var acc = 0.0
+        for (i in 1 until points.size) {
+            acc += HaversinePrecisionNavigator.calculateDistance(
+                points[i - 1].first, points[i - 1].second, points[i].first, points[i].second
+            )
+            cumulative[i] = acc
+        }
+        totalMeters = acc
+    }
+
+    val isUsable: Boolean get() = points.size >= 2 && totalMeters > 1.0
+
+    fun update(lat: Double, lng: Double): TrackerResult? {
+        if (!isUsable || lat.isNaN() || lng.isNaN()) return null
+        val lastSeg = points.size - 2
+        var best = scan(lat, lng, max(0, lastSegment - 1), min(lastSeg, lastSegment + FORWARD_WINDOW))
+        if (best.offRoute > REACQUIRE_THRESHOLD_M) {            // بعيد: ابحث في كل المسار (عودة للمسار أو قفزة)
+            val global = scan(lat, lng, 0, lastSeg)
+            if (global.offRoute < best.offRoute) best = global
+        }
+        lastSegment = best.segment
+        val remaining = max(0.0, totalMeters - best.along)
+        return TrackerResult(
+            alongMeters = best.along,
+            remainingMeters = remaining,
+            offRouteMeters = best.offRoute,
+            segmentIndex = best.segment,
+            progress = (best.along / totalMeters).toFloat().coerceIn(0f, 1f)
+        )
+    }
+
+    private class Candidate(val segment: Int, val along: Double, val offRoute: Double)
+
+    private fun scan(lat: Double, lng: Double, from: Int, to: Int): Candidate {
+        var bestSeg = from
+        var bestAlong = 0.0
+        var bestDist = Double.MAX_VALUE
+        val cosLat = cos(Math.toRadians(lat))
+        for (i in from..to) {
+            val a = points[i]
+            val b = points[i + 1]
+            // إحداثيات محلية بالأمتار، نقطة المستخدم = (0,0)
+            val ax = (a.second - lng) * METERS_PER_DEG * cosLat
+            val ay = (a.first - lat) * METERS_PER_DEG
+            val bx = (b.second - lng) * METERS_PER_DEG * cosLat
+            val by = (b.first - lat) * METERS_PER_DEG
+            val dx = bx - ax
+            val dy = by - ay
+            val len2 = dx * dx + dy * dy
+            val t = if (len2 < 1e-6) 0.0 else ((-ax * dx) + (-ay * dy)) / len2
+            val tc = t.coerceIn(0.0, 1.0)
+            val px = ax + tc * dx
+            val py = ay + tc * dy
+            val dist = sqrt(px * px + py * py)
+            if (dist < bestDist) {
+                bestDist = dist
+                bestSeg = i
+                bestAlong = cumulative[i] + tc * (cumulative[i + 1] - cumulative[i])
+            }
+        }
+        return Candidate(bestSeg, bestAlong, bestDist)
+    }
+
+    companion object {
+        const val METERS_PER_DEG = 111_195.0
+        const val FORWARD_WINDOW = 60
+        const val REACQUIRE_THRESHOLD_M = 80.0
+    }
+}
+
+/** خروج عن المسار: أكثر من thresholdM لمدة holdMs متواصلة (هستيريسيس). */
+class OffRouteDetector(private val thresholdM: Double = 40.0, private val holdMs: Long = 5_000L) {
+    private var since = 0L
+    fun update(offRouteM: Double, nowMs: Long): Boolean {
+        if (offRouteM <= thresholdM) { since = 0L; return false }
+        if (since == 0L) since = nowMs
+        return nowMs - since >= holdMs
+    }
+    fun reset() { since = 0L }
+}
+
+/** وصول: مرة واحدة فقط لكل فهرس محطة. */
+class ArrivalDetector(private val radiusM: Double = 30.0) {
+    private var firedIndex = -1
+    fun check(index: Int, distanceM: Double): Boolean {
+        if (index == firedIndex) return false
+        if (distanceM < radiusM) { firedIndex = index; return true }
+        return false
+    }
+    fun reset() { firedIndex = -1 }
+}
+
+/** سرعة من تتابع إحداثيات GPS مع تنعيم و«منطقة ميتة» لاهتزاز GPS أثناء الوقوف. */
+class SpeedEstimator {
+    private var lastLat = Double.NaN
+    private var lastLng = Double.NaN
+    private var lastTime = 0L
+    private var smoothedKmh = 0.0
+
+    fun update(lat: Double, lng: Double, nowMs: Long): Int {
+        if (!lastLat.isNaN() && lastTime > 0L) {
+            val dt = (nowMs - lastTime) / 1000.0
+            if (dt >= 0.5 && dt <= 15.0) {
+                val d = HaversinePrecisionNavigator.calculateDistance(lastLat, lastLng, lat, lng)
+                var inst = if (d < 3.0) 0.0 else d / dt * 3.6
+                if (inst > 250.0) inst = smoothedKmh          // قفزة غير منطقية
+                smoothedKmh = if (smoothedKmh == 0.0) inst else 0.6 * smoothedKmh + 0.4 * inst
+                if (inst == 0.0 && smoothedKmh < 2.0) smoothedKmh = 0.0
+            }
+        }
+        lastLat = lat; lastLng = lng; lastTime = nowMs
+        return smoothedKmh.roundToInt()
+    }
+}

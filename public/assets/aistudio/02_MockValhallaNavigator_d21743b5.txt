@@ -1,0 +1,92 @@
+# 02 – MockValhallaNavigator.kt
+**المسار:** `com/example/utils/MockValhallaNavigator.kt`  |  **الإجراء:** استبدال الملف بالكامل (نفس التواقيع العامة تماماً حتى لا ينكسر أي استدعاء).
+
+## المشاكل
+- يختلق مسارات: حد أدنى 350 م، عامل 1.25، سرعة 35 كم/س، خطوات 70%/30%، ويسمّي نفسه «محاكي الطرق اليمني».
+- `snapToRoad` مجرد تقريب لأربع خانات عشرية (≈11 م) وليس مطابقة طرق → الاسم مضلل. (يبقى الاسم لأن MapScreenContent يستدعيه، لكنه يعيد الإحداثي كما هو.)
+
+## الكود الكامل
+```kotlin
+package com.example.utils
+
+import android.content.Context
+
+/**
+ * MockValhallaNavigator (وضع تقريبي صادق)
+ * لا يختلق شوارع ولا منعطفات: مسافة مباشرة فقط بين النقاط، موسومة «تقريبي».
+ */
+object MockValhallaNavigator {
+
+    private const val ASSUMED_SPEED_MPS = 10.0 // 36 كم/س – لتقدير زمن تقريبي فقط
+
+    /** يُبقي الاسم للتوافق. لا يوجد "طريق" هنا؛ يعيد الإحداثي كما هو (مع قيمة صنعاء إن كان 0,0). */
+    fun snapToRoad(lat: Double, lng: Double): Pair<Double, Double> {
+        if (lat == 0.0 && lng == 0.0) return Pair(15.3694, 44.1910)
+        return Pair(lat, lng)
+    }
+
+    fun calculateRoute(
+        context: Context,
+        startLat: Double, startLng: Double,
+        destLat: Double, destLng: Double,
+        destName: String
+    ): NavRouteResult {
+        val origin = NavWaypoint(name = "موقعي الحالي", latitude = startLat, longitude = startLng, type = WaypointType.START)
+        val destination = NavWaypoint(name = destName, latitude = destLat, longitude = destLng, type = WaypointType.BREAK)
+        return calculateRoute(context, origin, listOf(destination))
+    }
+
+    fun calculateRoute(context: Context, origin: NavWaypoint, waypoints: List<NavWaypoint>): NavRouteResult {
+        val all = listOf(origin) + waypoints
+        if (all.size < 2) return empty(all, "Waypoints size < 2")
+
+        var total = 0.0
+        val coords = mutableListOf<Pair<Double, Double>>()
+        val legs = mutableListOf<NavLeg>()
+
+        for (i in 0 until all.size - 1) {
+            val from = all[i]
+            val to = all[i + 1]
+            val d = HaversinePrecisionNavigator.calculateDistance(from.latitude, from.longitude, to.latitude, to.longitude)
+            total += d
+            if (coords.isEmpty()) coords.add(Pair(from.latitude, from.longitude))
+            coords.add(Pair(to.latitude, to.longitude))
+            val isLast = i == all.size - 2
+            val step = NavStep(
+                instruction = "تقريبي - مسافة مباشرة إلى ${to.name}",
+                distanceMeters = d,
+                durationSeconds = d / ASSUMED_SPEED_MPS,
+                maneuverType = if (isLast) ManeuverType.DESTINATION else ManeuverType.STRAIGHT
+            )
+            legs.add(NavLeg(
+                fromWaypointId = from.id, toWaypointId = to.id,
+                distanceMeters = d, durationSeconds = d / ASSUMED_SPEED_MPS,
+                steps = listOf(step)
+            ))
+        }
+
+        return NavRouteResult(
+            totalDistanceMeters = total,
+            totalDurationSeconds = total / ASSUMED_SPEED_MPS,
+            coordinates = coords,
+            legs = legs,
+            waypoints = all,
+            isOffline = true,
+            engineSource = "تقريبي - مسافة مباشرة",
+            error = NavError.RouteNotFound   // الواجهة تعتبره «تقريبي»
+        )
+    }
+
+    fun calculateRoute(context: Context, waypoints: List<NavWaypoint>): NavRouteResult {
+        if (waypoints.isEmpty()) return empty(waypoints, "Empty waypoints")
+        return calculateRoute(context, waypoints.first(), waypoints.drop(1))
+    }
+
+    private fun empty(all: List<NavWaypoint>, reason: String) = NavRouteResult(
+        totalDistanceMeters = 0.0, totalDurationSeconds = 0.0,
+        coordinates = emptyList(), legs = emptyList(), waypoints = all,
+        isOffline = true, engineSource = "تقريبي", error = NavError.Unknown(reason)
+    )
+}
+```
+**ملاحظة:** إن كان لـ `NavStep` أو `NavLeg` حقول إضافية بلا قيم افتراضية، يضيفها AI Studio بقيم محايدة (0 / فارغ).

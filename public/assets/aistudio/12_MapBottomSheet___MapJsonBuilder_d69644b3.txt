@@ -1,0 +1,35 @@
+# 12 – MapBottomSheet.kt  +  MapJsonBuilder.kt
+**المسارات:** `ui/screens/map/components/MapBottomSheet.kt` و `ui/screens/map/utils/MapJsonBuilder.kt`  |  **الإجراء:** تعديلات موضعية.
+
+## MapBottomSheet – المشاكل
+1. التعليق يقول «road-snapped distance» لكن الحساب مسافة مباشرة (Haversine) → عرض مضلل. يجب وسمها «المسافة المباشرة … (تقريبي)».
+2. كيان بلا إحداثيات (0,0) يعرض «0 م» ويمكن الضغط على «ابدأ الملاحة» (كانت تنتهي بوجهة 0,0).
+3. «تقييم 5.0» افتراضي لمن لا تقييم له (في JSON).
+
+### التعديلات (حول السطر 112)
+```kotlin
+val hasValidCoords = lat != 0.0 && lng != 0.0 && !lat.isNaN() && !lng.isNaN()
+val distanceMeters = if (hasValidCoords)
+    MapDistanceCalculator.calculateDistanceMeters(userLat, userLng, lat, lng) else 0.0
+val distanceText = if (hasValidCoords) MapDistanceCalculator.formatDistance(distanceMeters) else "الموقع غير محدد"
+val etaText = if (hasValidCoords) MapDistanceCalculator.computeEta(distanceMeters) else "—"
+```
+- نص المسافة: `"المسافة المباشرة: $distanceText"` (بدل «المسافة:»).
+- أضف `enabled = hasValidCoords` إلى أزرار **«ابدأ الملاحة»** و**«إضافة محطة»** (السطور ≈216، 272، 294)، وعند التعطيل اعرض سطراً صغيراً: «لا يمكن الملاحة: موقع هذا المكان غير مسجّل».
+- عدّل التعليق العلوي: `Straight-line distance & approximate ETA`.
+
+## MapJsonBuilder – المشاكل
+1. `rating` الافتراضي `"5.0"` للمزودين/المتاجر/العقارات = تقييم مختلق.
+2. `getProviderCoords/getStoreCoords/getPropertyCoords` (في `com.example.utils` ولم أرها): يجب فحصها. إن كانت **تولّد إحداثيات اصطناعية** (hash/jitter) عند غياب الإحداثي الحقيقي فهذا مقبول للعرض فقط بشرط أن:
+   - `isApprox = true` (موجود)، والواجهة تعرضه «موقع تقريبي» (تم في map.html – المستند 07)،
+   - ولا تُستخدم هذه الإحداثيات أبداً للملاحة (الملاحة تقرأ `entity.latitude/longitude` الحقيقية وترفض 0,0 – المستندان 05 و04).
+3. تأكد أن مفاتيح JSON (`id,type,name,lat,lng,isApprox,emoji,badgeColor`) هي ما يقرؤه `setMarkersList` الجديد (المستند 07). **لا تغيّر أسماء المفاتيح.**
+
+### التعديلات
+```kotlin
+// بدل: if (p.rating > 0) String.format(java.util.Locale.US, "%.1f", p.rating) else "5.0"
+put("rating", if (p.rating > 0) String.format(java.util.Locale.US, "%.1f", p.rating) else "جديد")
+// المتاجر: نفس الشيء (s.rating)
+// العقارات: put("rating", "—")
+```
+وأضف حماية: `if (rawLat.isNaN() || rawLng.isNaN()) return@forEach` قبل `JSONObject()` في كل حلقة.

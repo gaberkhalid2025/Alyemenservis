@@ -13,6 +13,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -34,17 +35,20 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.example.data.PropertyEntity
 import com.example.data.ProviderEntity
 import com.example.data.StoreEntity
+import com.example.utils.NavWaypoint
 import com.example.ui.MainViewModel
 import com.example.ui.dialogs.BookingDialog
 import com.example.ui.screens.map.components.*
 import com.example.ui.screens.map.utils.MapDistanceCalculator
 import com.example.ui.screens.map.utils.OfflineMapManager
+import com.example.utils.RealValhallaNavigator
 import com.example.utils.ValhallaTileDownloader
 import com.example.utils.VisualThemePalette
 import com.example.utils.resolveThemePalette
@@ -77,6 +81,8 @@ fun MapScreenContent(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
+
+    com.example.utils.CrashReportDialog()
 
     // Status bar icon color setup
     val view = androidx.compose.ui.platform.LocalView.current
@@ -127,8 +133,34 @@ fun MapScreenContent(
     val rawUserLng = if (userLngState != 0.0 && !userLngState.isNaN()) userLngState else fallbackCityCoords.longitude
 
     // [إصلاح ملاحة نهائي] استخدام إحداثيات GPS الحقيقية بدقة تامة دون تقريب وهمي
+    val hasRealLocation = userLatState != 0.0 && userLngState != 0.0 &&
+            !userLatState.isNaN() && !userLngState.isNaN()
     val safeUserLat = rawUserLat
     val safeUserLng = rawUserLng
+
+    var isTilesDownloaded by remember { mutableStateOf(ValhallaTileDownloader.isTilesDownloaded(context)) }
+    var searchResults by remember { mutableStateOf<List<RealValhallaNavigator.SearchAddressResult>>(emptyList()) }
+    var isSearching by remember { mutableStateOf(false) }
+    var searchMessage by remember { mutableStateOf<String?>(null) }
+    var searchPanelOpen by remember { mutableStateOf(false) }
+    var searchedPlace by remember { mutableStateOf<RealValhallaNavigator.SearchAddressResult?>(null) }
+
+    LaunchedEffect(state.searchQuery) {
+        val q = state.searchQuery.trim()
+        if (q.length < 3) {
+            searchResults = emptyList()
+            searchMessage = null
+            isSearching = false
+            searchPanelOpen = false
+            return@LaunchedEffect
+        }
+        delay(600)
+        isSearching = true
+        searchPanelOpen = true
+        searchResults = RealValhallaNavigator.searchAddressAndPlaces(q, providers, stores, safeUserLat, safeUserLng)
+        searchMessage = if (searchResults.isEmpty()) (RealValhallaNavigator.lastSearchError ?: "لا توجد نتائج لـ «$q»") else null
+        isSearching = false
+    }
 
     // Location Permission launcher
     val locationPermissionLauncher = rememberLauncherForActivityResult(
@@ -209,13 +241,13 @@ fun MapScreenContent(
 
     // Fullscreen Turn-by-Turn Navigation Screen
     if (state.isNavigating) {
-        val targetEntity = state.selectedEntity
-
-        com.example.ui.screens.map.NavigationScreen(
-            targetEntity = targetEntity,
+        NavigationScreen(
+            targetEntity = null,
             userLat = safeUserLat,
             userLng = safeUserLng,
-            onFinishNavigation = { state.isNavigating = false },
+            hasRealLocation = hasRealLocation,
+            initialWaypoints = state.navWaypoints,
+            onFinishNavigation = { state.stopNavigation() },
             nearbyProviders = filteredProviders,
             nearbyStores = filteredStores
         )
@@ -244,7 +276,6 @@ fun MapScreenContent(
                 .padding(paddingValues)
         ) {
             // 🗺️ 1. Main Map Background / AR View (Occupies 100% of viewport, 90% completely unobstructed)
-            val isTilesDownloaded = remember { ValhallaTileDownloader.isTilesDownloaded(context) }
             
             if (state.currentMapMode == MapMode.AR_VPS) {
                 ArVpsCameraOverlay(
@@ -302,6 +333,7 @@ fun MapScreenContent(
                     onPropertySelected = { state.selectedEntity = it },
                     onDeselect = { state.selectedEntity = null },
                     onSwitchToRadar = { state.isRadarMode = true },
+                    focusPoint = searchedPlace?.let { Triple(it.shortName, it.latitude, it.longitude) },
                     modifier = Modifier.fillMaxSize()
                 )
             }
@@ -385,10 +417,6 @@ fun MapScreenContent(
                     selectedCity = state.selectedCity,
                     onCitySelected = { city ->
                         state.selectedCity = city
-                        if (city != "الكل") {
-                            val coords = com.example.ui.screens.map.utils.OfflineMapManager.getCityCoordinates(city)
-                            viewModel.updateUserLocation(coords.latitude, coords.longitude)
-                        }
                     },
                     searchQuery = state.searchQuery,
                     onSearchQueryChange = { state.searchQuery = it },
@@ -400,18 +428,9 @@ fun MapScreenContent(
                         }
                     },
                     onSearchExecute = { query ->
-                        if (query.isNotBlank()) {
-                            val cityCoords = com.example.ui.screens.map.utils.OfflineMapManager.getCityCoordinates(query)
-                            if (cityCoords.nameAr != "صنعاء" || query.contains("صنعاء")) {
-                                state.selectedCity = cityCoords.nameAr
-                                viewModel.updateUserLocation(cityCoords.latitude, cityCoords.longitude)
-                            } else {
-                                val match = filteredProviders.firstOrNull() ?: filteredStores.firstOrNull() ?: filteredProperties.firstOrNull()
-                                if (match != null) {
-                                    state.selectedEntity = match
-                                }
-                            }
-                        }
+                        val q = query.trim()
+                        if (q.length >= 3) searchPanelOpen = true
+                        OfflineMapManager.findCity(q)?.let { city -> state.selectedCity = city.nameAr }
                     }
                 )
 
@@ -442,9 +461,75 @@ fun MapScreenContent(
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold
                         )
+                    }
+                }
+
+                // 📋 لوحة نتائج البحث
+                if (searchPanelOpen && (isSearching || searchResults.isNotEmpty() || searchMessage != null)) {
+                    Surface(
+                        shape = RoundedCornerShape(18.dp),
+                        color = Color(0xFF0B0F19).copy(alpha = 0.97f),
+                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.10f)),
+                        modifier = Modifier
+                            .padding(top = 66.dp, start = 16.dp, end = 16.dp)
+                            .fillMaxWidth()
+                            .heightIn(max = 320.dp)
+                    ) {
+                        Column {
+                            if (isSearching) {
+                                LinearProgressIndicator(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    color = Color(0xFF10B981)
+                                )
+                            }
+                            searchMessage?.let {
+                                Text(
+                                    text = it,
+                                    color = Color(0xFFF59E0B),
+                                    fontSize = 12.sp,
+                                    modifier = Modifier.padding(14.dp)
+                                )
+                            }
+                            LazyColumn {
+                                items(searchResults) { res ->
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable {
+                                                searchedPlace = res
+                                                searchPanelOpen = false
+                                                state.searchQuery = ""
+                                            }
+                                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    ) {
+                                        Text(res.icon, fontSize = 18.sp)
+                                        Column(Modifier.weight(1f)) {
+                                            Text(
+                                                text = res.shortName,
+                                                color = Color.White,
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            Text(
+                                                text = res.displayName,
+                                                color = Color(0xFF94A3B8),
+                                                fontSize = 11.sp,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        }
+                                    }
+                                    HorizontalDivider(color = Color.White.copy(alpha = 0.06f))
+                                }
+                            }
+                        }
+                    }
                 }
             }
-        }
 
             // 🎮 4. Unified Control Dock (قاعدة التحكم الموحدة) - Single continuous vertical capsule
             MapControls(
@@ -477,7 +562,15 @@ fun MapScreenContent(
                 onOpenLayerDialog = { state.showLayerDialog = true },
                 isNavigationActive = state.isNavigating,
                 onToggleNavigation = {
-                    state.isNavigating = true
+                    when {
+                        !hasRealLocation -> {
+                            viewModel.startLocationUpdates()
+                            coroutineScope.launch { snackbarHostState.showSnackbar("فعّل GPS وانتظر تحديد موقعك ثم أعد المحاولة") }
+                        }
+                        !state.startNavigation(state.selectedEntity) -> {
+                            coroutineScope.launch { snackbarHostState.showSnackbar("اختر وجهة أولاً: اضغط على مكان في الخريطة أو ابحث عنه") }
+                        }
+                    }
                 },
                 isGpsActive = viewModel.isGpsTrackingActive.collectAsState().value,
                 themeColors = themeColors,
@@ -691,7 +784,7 @@ fun MapScreenContent(
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold
                             )
-                            TextButton(onClick = { state.selectedWaypoints.clear() }) {
+                            TextButton(onClick = { state.clearWaypoints() }) {
                                 Text("مسح الكل", color = Color(0xFFEF4444), fontSize = 11.sp)
                             }
                         }
@@ -758,12 +851,73 @@ fun MapScreenContent(
                     },
                     themeColors = themeColors,
                     onStartNavigation = { target ->
-                        state.isNavigating = true
+                        when {
+                            !hasRealLocation -> {
+                                viewModel.startLocationUpdates()
+                                coroutineScope.launch { snackbarHostState.showSnackbar("فعّل GPS وانتظر تحديد موقعك") }
+                            }
+                            !state.startNavigation(target) -> {
+                                coroutineScope.launch { snackbarHostState.showSnackbar("موقع هذا المكان غير محدد بدقة، لا يمكن الملاحة إليه") }
+                            }
+                        }
                     },
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .navigationBarsPadding()
                 )
+            }
+
+            // 📍 بطاقة المكان المختار من البحث (إصلاح البحث)
+            searchedPlace?.let { place ->
+                val dist = MapDistanceCalculator.calculateDistanceMeters(safeUserLat, safeUserLng, place.latitude, place.longitude)
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = Color(0xFF0B0F19).copy(alpha = 0.96f),
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.10f)),
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .navigationBarsPadding()
+                        .padding(12.dp)
+                        .fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(place.shortName, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                        Text(place.displayName, color = Color(0xFF94A3B8), fontSize = 11.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        Text("المسافة المباشرة: ${MapDistanceCalculator.formatDistance(dist)} (تقريبي)", color = Color(0xFF10B981), fontSize = 12.sp)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(
+                                onClick = {
+                                    val wp = NavWaypoint(name = place.shortName, latitude = place.latitude, longitude = place.longitude)
+                                    if (!hasRealLocation) {
+                                        viewModel.startLocationUpdates()
+                                        coroutineScope.launch { snackbarHostState.showSnackbar("فعّل GPS وانتظر تحديد موقعك") }
+                                    } else if (state.startNavigation(wp)) {
+                                        searchedPlace = null
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("ابدأ الملاحة", fontWeight = FontWeight.Bold)
+                            }
+                            OutlinedButton(
+                                onClick = {
+                                    state.addWaypoint(NavWaypoint(name = place.shortName, latitude = place.latitude, longitude = place.longitude))
+                                    coroutineScope.launch { snackbarHostState.showSnackbar("تمت إضافة المحطة للمسار") }
+                                },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("إضافة كمحطة")
+                            }
+                            TextButton(onClick = { searchedPlace = null }) {
+                                Text("إغلاق", color = Color(0xFF94A3B8))
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -815,6 +969,7 @@ fun MapScreenContent(
                                     downloadStatusText = status
                                 }
                                 if (result.isSuccess) {
+                                    isTilesDownloaded = true
                                     showDownloadDialog = false
                                     snackbarHostState.showSnackbar("✅ تم تثبيت خرائط اليمن بنجاح! استمتع بالملاحة أوفلاين.")
                                 } else {

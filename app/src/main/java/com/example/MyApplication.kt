@@ -41,6 +41,10 @@ class MyApplication : Application() {
         super.onCreate()
         instance = this
 
+        try {
+            com.example.utils.CrashReporter.install(this)
+        } catch (_: Throwable) {}
+
         // ===================== الخطوة 1: تهيئة Firebase بأمان =====================
         try {
             if (FirebaseApp.getApps(this).isEmpty()) {

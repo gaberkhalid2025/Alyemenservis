@@ -89,3 +89,22 @@
 -keep class com.example.ui.screens.map.** { *; }
 -keep class com.example.domain.models.** { *; }
 -keep class com.example.data.sources.** { *; }
+
+# ===== Leaflet JavaScript Bridge & JNI =====
+-keepattributes JavascriptInterface
+-keepclassmembers class * {
+    @android.webkit.JavascriptInterface <methods>;
+}
+-keepclasseswithmembernames class * { native <methods>; }
+
+# ===== Valhalla Mobile =====
+-keep class io.github.rallista.** { *; }
+-dontwarn io.github.rallista.**
+-keep class com.valhalla.** { *; }
+-dontwarn com.valhalla.**
+
+# ===== Navigation Models =====
+-keep class com.example.utils.Nav** { *; }
+-keep class com.example.utils.RouteTracker** { *; }
+-keep class com.example.utils.TrackerResult { *; }
+

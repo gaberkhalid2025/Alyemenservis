@@ -1,0 +1,176 @@
+# 01 – RealValhallaNavigator.kt
+**المسار:** `com/example/utils/RealValhallaNavigator.kt`  |  **الإجراء:** استبدل الدوال المذكورة فقط، وأبقِ بقية الملف.
+
+## المشاكل التي يعالجها
+1. **Deadlock**: النسخة ذات 6 معاملات تقفل `mutex` ثم تستدعي النسخة الأخرى التي تقفله مجدداً (الـ Mutex غير قابل لإعادة الدخول) فتتجمد للأبد.
+2. القفل كان يغلّف طلب الشبكة أيضاً؛ يجب أن يغلّف استدعاءات Valhalla الأصلية فقط.
+3. الترتيب: الأوفلاين (Valhalla) أولاً إن كانت الحزمة سليمة، ثم OSRM، ثم المسافة المباشرة «تقريبي».
+4. `catch (e: Exception)` لا يلتقط `UnsatisfiedLinkError` و`NoClassDefFoundError` (هذه `Error`) → انهيار محتمل.
+5. خطأ في تحويل المناورات: الرمز 14 = انعطاف حاد لليسار، 16 = خفيف (كانا معكوسين)، و26/27 فقط للدوار (28-34 عبّارات/نقل).
+6. تعليمات Valhalla تأتي بالإنجليزية؛ تُستبدل دائماً بـ `ArabicInstructionFormatter`.
+7. فشل Valhalla الأصلي كان صامتاً؛ يُسجَّل الآن في `NativeValhallaStatus` ليظهر في الواجهة.
+8. التحقق من الإحداثيات (رفض 0,0 و NaN).
+
+## الخطوة اليدوية الإلزامية (على AI Studio/المطوّر)
+الكود يستدعي Valhalla بالـ Reflection بالاسم `io.github.rallista.valhalla.Valhalla` ولا يمكن تأكيد صحة هذا الاسم.
+- افتح Android Studio ← Navigate ← Class ← فعّل "Include non-project items" ← ابحث `Valhalla`.
+- انسخ **اسم الصنف الحقيقي وتوقيع إنشاء المحرك ودالة route**، واستبدل الـ Reflection بنداء مباشر (يظهر الخطأ وقت البناء بدل الصمت).
+- إلى أن يتحقق ذلك، أبقِ الـ Reflection كما هو لكن مع `NativeValhallaStatus` (الكود أدناه) ليظهر السبب الحقيقي في الواجهة.
+
+## الكود
+```kotlin
+// ===== imports إضافية في أعلى الملف =====
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.withTimeoutOrNull
+
+// ===== أضف خارج الـ object (في نفس الملف) =====
+object NativeValhallaStatus {
+    @Volatile var lastError: String? = null
+    @Volatile var lastSuccessAt: Long = 0L
+}
+
+// ===== داخل object RealValhallaNavigator =====
+// (أ) احذف الحقل القديم private val mutex وأبدله بـ:
+private val nativeMutex = Mutex()
+
+// (ب) استبدل النسختين من calculateRoute بهاتين (بدون أي قفل في الأولى):
+suspend fun calculateRoute(
+    context: Context,
+    startLat: Double,
+    startLng: Double,
+    destLat: Double,
+    destLng: Double,
+    destName: String
+): NavRouteResult {
+    val origin = NavWaypoint(name = "موقعي الحالي", latitude = startLat, longitude = startLng, type = WaypointType.START)
+    val destination = NavWaypoint(name = destName, latitude = destLat, longitude = destLng, type = WaypointType.BREAK)
+    return calculateRoute(context, origin, listOf(destination))
+}
+
+suspend fun calculateRoute(
+    context: Context,
+    origin: NavWaypoint,
+    waypoints: List<NavWaypoint>
+): NavRouteResult = withContext(Dispatchers.IO) {
+    validateRequest(origin, waypoints)?.let { return@withContext it }
+    try {
+        computeRoute(context, origin, waypoints)
+    } catch (e: CancellationException) {
+        throw e
+    } catch (t: Throwable) {
+        Log.e(TAG, "Route calculation failed: ${t.message}", t)
+        calculateDirectFallbackRoute(origin, waypoints)
+    }
+}
+
+private fun isValidCoordinate(lat: Double, lng: Double): Boolean =
+    !lat.isNaN() && !lng.isNaN() && lat in -90.0..90.0 && lng in -180.0..180.0 && !(lat == 0.0 && lng == 0.0)
+
+private fun validateRequest(origin: NavWaypoint, waypoints: List<NavWaypoint>): NavRouteResult? {
+    val all = listOf(origin) + waypoints
+    val problem = when {
+        waypoints.isEmpty() -> "لا توجد وجهة"
+        all.any { !isValidCoordinate(it.latitude, it.longitude) } -> "إحداثيات غير صالحة"
+        else -> null
+    } ?: return null
+    return NavRouteResult(
+        totalDistanceMeters = 0.0, totalDurationSeconds = 0.0,
+        coordinates = emptyList(), legs = emptyList(), waypoints = all,
+        isOffline = true, engineSource = "تقريبي - $problem",
+        error = NavError.Unknown(problem)
+    )
+}
+
+private fun isNetworkAvailable(context: Context): Boolean {
+    val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return false
+    val net = cm.activeNetwork ?: return false
+    val caps = cm.getNetworkCapabilities(net) ?: return false
+    return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+}
+
+private suspend fun computeRoute(context: Context, origin: NavWaypoint, waypoints: List<NavWaypoint>): NavRouteResult {
+    // 1) أوفلاين أولاً إذا كانت الحزمة سليمة (القفل هنا فقط لأن المحرك الأصلي لا يُستدعى بالتوازي)
+    if (isReady(context)) {
+        val nativeResult = nativeMutex.withLock { tryRouteWithNativeValhalla(context, origin, waypoints) }
+        if (nativeResult != null && nativeResult.error == null && nativeResult.coordinates.size >= 2) return nativeResult
+    }
+    // 2) أونلاين (OSRM) مع مهلة 20 ثانية
+    if (isNetworkAvailable(context)) {
+        val online = try {
+            withTimeoutOrNull(20_000L) { OnlineOsrmNavigator.calculateRoute(origin, waypoints) }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (t: Throwable) {
+            Log.e(TAG, "OSRM failed: ${t.message}", t); null
+        }
+        if (online != null && online.error == null && online.coordinates.size >= 2) return online
+    }
+    // 3) تقريبي - مسافة مباشرة بلا تعليمات منعطفات
+    return calculateDirectFallbackRoute(origin, waypoints)
+}
+
+// (ج) استبدل tryRouteWithNativeValhalla كاملة بهذه (تلتقط Throwable وتسجّل السبب):
+private fun tryRouteWithNativeValhalla(
+    context: Context,
+    origin: NavWaypoint,
+    waypoints: List<NavWaypoint>
+): NavRouteResult? {
+    return try {
+        val valhallaDir = File(context.filesDir, NavConfig.VALHALLA_DIR)
+        val configFile = File(valhallaDir, "valhalla.json")
+        if (!configFile.exists()) {
+            NativeValhallaStatus.lastError = "valhalla.json غير موجود"
+            return null
+        }
+        // VERIFY: استبدل هذا الجزء بنداء مباشر بعد معرفة الصنف الحقيقي (انظر الخطوة اليدوية أعلاه)
+        val valhallaClass = Class.forName("io.github.rallista.valhalla.Valhalla")
+        val instanceMethod = valhallaClass.getMethod("instance", Context::class.java, String::class.java)
+        val valhallaInstance = instanceMethod.invoke(null, context, configFile.absolutePath)
+        val routeMethod = valhallaClass.getMethod("route", String::class.java)
+        val responseJson = routeMethod.invoke(valhallaInstance, formatValhallaRequest(origin, waypoints)) as String
+        val parsed = parseValhallaResponse(responseJson, origin, waypoints)
+        NativeValhallaStatus.lastError = null
+        NativeValhallaStatus.lastSuccessAt = System.currentTimeMillis()
+        parsed
+    } catch (t: Throwable) {   // Throwable: يشمل UnsatisfiedLinkError / NoClassDefFoundError
+        val cause = (t as? java.lang.reflect.InvocationTargetException)?.targetException ?: t
+        NativeValhallaStatus.lastError = "${cause.javaClass.simpleName}: ${cause.message}"
+        Log.e(TAG, "Native Valhalla failed: ${NativeValhallaStatus.lastError}", cause)
+        null
+    }
+}
+
+// (د) داخل parseValhallaResponse استبدل بناء NavStep بهذا (تعليمات عربية محلية دائماً):
+legSteps.add(NavStep(
+    instruction = ArabicInstructionFormatter.format(mType, streetName, manDist, waypoints.getOrNull(i)?.name ?: "الوجهة"),
+    distanceMeters = manDist,
+    durationSeconds = manDur,
+    maneuverType = mType,
+    streetName = streetName,
+    polylineIndex = currentCoordOffset + manObj.optInt("begin_shape_index", 0)
+))
+// واحذف السطر الذي يقرأ instruction من المحرك واستخدامه.
+
+// (هـ) استبدل mapValhallaManeuver كاملة (راجع أرقام الأنواع مع valhalla directions.proto للتأكد):
+private fun mapValhallaManeuver(type: Int): ManeuverType = when (type) {
+    1, 2, 3 -> ManeuverType.START
+    4, 5, 6 -> ManeuverType.DESTINATION
+    7, 8, 17, 22, 23, 24 -> ManeuverType.STRAIGHT      // becomes/continue/ramp straight/stay*
+    9 -> ManeuverType.SLIGHT_RIGHT
+    10 -> ManeuverType.RIGHT
+    11 -> ManeuverType.SHARP_RIGHT
+    12, 13 -> ManeuverType.UTURN
+    14 -> ManeuverType.SHARP_LEFT                       // كان معكوساً
+    15 -> ManeuverType.LEFT
+    16 -> ManeuverType.SLIGHT_LEFT                      // كان معكوساً
+    18, 19, 20, 21 -> ManeuverType.HIGHWAY_EXIT         // ramp/exit يمين ويسار
+    25, 37, 38 -> ManeuverType.MERGE
+    26, 27 -> ManeuverType.ROUNDABOUT                   // كان 26..34 (يشمل العبّارات)
+    else -> ManeuverType.STRAIGHT
+}
+```
+
+## ملاحظة على calculateDirectFallbackRoute
+تبقى كما هي (مسافة مباشرة، `error = NavError.RouteNotFound`). الواجهة (NavigationScreen) تعتبر `error != null` = «تقريبي» ولا تعطي تعليمات منعطفات.

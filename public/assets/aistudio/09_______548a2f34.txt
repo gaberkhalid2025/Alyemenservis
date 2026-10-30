@@ -1,0 +1,224 @@
+# 09 – البحث (RealValhallaNavigator + MapScreenContent)
+**الملفان:** `com/example/utils/RealValhallaNavigator.kt` و `ui/screens/map/MapScreenContent.kt`
+
+## المشاكل
+1. شريط البحث في الخريطة لا يطابق إلا المدن والمزودين المحليين، ولا يستدعي Nominatim، ولا يعطي أي رد (لذلك «هايل» لا تفعل شيئاً).
+2. حوار «إضافة محطة» يرسل طلب شبكة **عند كل ضغطة حرف** (يخالف حد 1 طلب/ثانية → خطر الحظر).
+3. لا حالة تحميل/لا نتائج/خطأ؛ وبدون إنترنت تكون القائمة فارغة بلا تفسير.
+4. التطبيع العربي ناقص (ئ، تطويل)، و«هائل» ≠ «هايل».
+5. نتائج بلا ترتيب حسب القرب، والكيانات المحلية بإحداثيات 0 تظهر وتفشل عند الملاحة.
+6. ملاحظة: ملف Valhalla لا يحوي أسماء أماكن؛ البحث الأوفلاين يتطلب قاعدة أماكن محلية (SQLite FTS5) — مرحلة لاحقة (المستند 14).
+
+---
+## أ) RealValhallaNavigator.kt: استبدل `searchAddressAndPlaces` و`normalizeArabic` بالكامل
+imports إضافية: `kotlinx.coroutines.delay`, `kotlinx.coroutines.sync.Mutex`, `kotlinx.coroutines.sync.withLock`, `org.json.JSONArray`.
+```kotlin
+@Volatile var lastSearchError: String? = null
+
+private val searchMutex = Mutex()
+private var lastNominatimAt = 0L
+private val searchCache = object : LinkedHashMap<String, List<SearchAddressResult>>(32, 0.75f, true) {
+    override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, List<SearchAddressResult>>?) = size > 40
+}
+
+suspend fun searchAddressAndPlaces(
+    query: String,
+    nearbyProviders: List<com.example.data.ProviderEntity> = emptyList(),
+    nearbyStores: List<com.example.data.StoreEntity> = emptyList(),
+    userLat: Double = 0.0,
+    userLng: Double = 0.0
+): List<SearchAddressResult> = withContext(Dispatchers.IO) {
+    lastSearchError = null
+    val clean = query.trim()
+    if (clean.length < 3) return@withContext emptyList()
+    val nq = normalizeArabic(clean)
+    val hasUser = !(userLat == 0.0 && userLng == 0.0)
+
+    // 1) محلي أولاً (فقط ما له إحداثيات صالحة)
+    val local = mutableListOf<SearchAddressResult>()
+    nearbyProviders.filter { it.latitude != 0.0 && it.longitude != 0.0 &&
+        (normalizeArabic(it.name).contains(nq) || normalizeArabic(it.area).contains(nq)) }
+        .take(6).forEach { p -> local.add(SearchAddressResult("${p.name} - ${p.area}", p.name, p.latitude, p.longitude, "provider", "👷")) }
+    nearbyStores.filter { it.latitude != 0.0 && it.longitude != 0.0 &&
+        (normalizeArabic(it.name).contains(nq) || normalizeArabic(it.cityId).contains(nq)) }
+        .take(6).forEach { s -> local.add(SearchAddressResult("${s.name} - ${s.cityId}", s.name, s.latitude, s.longitude, "store", "🏪")) }
+
+    // 2) Nominatim: حد 1 طلب/ثانية + كاش + رسالة خطأ واضحة
+    val remote: List<SearchAddressResult> = searchMutex.withLock {
+        searchCache[nq]?.let { return@withLock it }
+        val wait = 1_100L - (System.currentTimeMillis() - lastNominatimAt)
+        if (wait > 0) delay(wait)
+        var r = fetchNominatim(clean, userLat, userLng, hasUser)
+        if (r != null && r.isEmpty() && clean.contains("اي")) {            // هايل ↔ هائل
+            delay(1_100L)
+            r = fetchNominatim(clean.replace("اي", "ائ"), userLat, userLng, hasUser)
+        }
+        lastNominatimAt = System.currentTimeMillis()
+        if (r != null) searchCache[nq] = r
+        r ?: emptyList()
+    }
+
+    val sortedRemote = if (hasUser) remote.sortedBy {
+        HaversinePrecisionNavigator.calculateDistance(userLat, userLng, it.latitude, it.longitude)
+    } else remote
+    (local + sortedRemote).distinctBy { String.format(Locale.US, "%.5f_%.5f", it.latitude, it.longitude) }
+}
+
+/** null = فشل (يُسجَّل السبب في lastSearchError)، قائمة فارغة = لا نتائج. */
+private fun fetchNominatim(q: String, lat: Double, lng: Double, hasUser: Boolean): List<SearchAddressResult>? {
+    var c: HttpURLConnection? = null
+    return try {
+        val encoded = URLEncoder.encode(q, "UTF-8")
+        val viewbox = if (hasUser) "&viewbox=${lng - 1.0},${lat + 1.0},${lng + 1.0},${lat - 1.0}&bounded=0" else ""
+        val url = URL("${NavConfig.NOMINATIM_BASE_URL}?format=jsonv2&q=$encoded&countrycodes=ye&accept-language=ar&limit=10$viewbox")
+        c = (url.openConnection() as HttpURLConnection).apply {
+            connectTimeout = 8_000; readTimeout = 12_000; requestMethod = "GET"
+            setRequestProperty("User-Agent", "AlYemenServicesApp/1.0 (contact: support@yourdomain.example)")
+        }
+        when (val code = c.responseCode) {
+            200 -> {
+                val arr = JSONArray(c.inputStream.bufferedReader().use { it.readText() })
+                val out = mutableListOf<SearchAddressResult>()
+                for (i in 0 until arr.length()) {
+                    val o = arr.getJSONObject(i)
+                    val la = o.optString("lat").toDoubleOrNull() ?: continue
+                    val lo = o.optString("lon").toDoubleOrNull() ?: continue
+                    if (la == 0.0 && lo == 0.0) continue
+                    val display = o.optString("display_name")
+                    out.add(SearchAddressResult(display, display.split(",").first().trim(), la, lo, "address", "📍"))
+                }
+                out
+            }
+            429 -> { lastSearchError = "تم تجاوز حد الطلبات، حاول بعد قليل"; null }
+            else -> { lastSearchError = "خدمة البحث غير متاحة حالياً (رمز $code)"; null }
+        }
+    } catch (e: java.net.UnknownHostException) {
+        lastSearchError = "لا يوجد اتصال بالإنترنت — البحث متاح فقط في الأماكن المحلية"; null
+    } catch (e: java.net.SocketTimeoutException) {
+        lastSearchError = "انتهت مهلة الاتصال بخدمة البحث"; null
+    } catch (t: Throwable) {
+        Log.e(TAG, "Nominatim failed: ${t.message}"); lastSearchError = "تعذر البحث الآن"; null
+    } finally { c?.disconnect() }
+}
+
+private fun normalizeArabic(input: String): String = input.trim().lowercase(Locale.ROOT)
+    .replace(Regex("[\\u064B-\\u0652\\u0640]"), "")   // تشكيل + تطويل
+    .replace(Regex("[إأآٱ]"), "ا")
+    .replace('ى', 'ي').replace('ئ', 'ي')
+    .replace('ؤ', 'و')
+    .replace('ة', 'ه')
+    .replace(Regex("\\s+"), " ")
+```
+> الواجهة `SearchAddressResult` تبقى كما هي. استدعاءات `searchAddressAndPlaces(query, providers, stores)` القديمة تعمل (المعاملان الجديدان لهما قيم افتراضية).
+> عند فشل الإنترنت تظهر الأماكن المحلية + رسالة السبب (`lastSearchError`).
+
+---
+## ب) MapScreenContent.kt: واجهة نتائج البحث على الخريطة
+imports: `kotlinx.coroutines.delay`, `androidx.compose.foundation.lazy.LazyColumn`, `androidx.compose.foundation.lazy.items`, `androidx.compose.foundation.clickable`, `com.example.utils.RealValhallaNavigator`, `com.example.utils.NavWaypoint`, `com.example.ui.screens.map.utils.MapDistanceCalculator`.
+
+### 1) الحالة والتأثير (ضعهما بعد تعريف `safeUserLat/safeUserLng` وبعد `hasRealLocation`)
+```kotlin
+var searchResults by remember { mutableStateOf<List<RealValhallaNavigator.SearchAddressResult>>(emptyList()) }
+var isSearching by remember { mutableStateOf(false) }
+var searchMessage by remember { mutableStateOf<String?>(null) }
+var searchPanelOpen by remember { mutableStateOf(false) }
+var searchedPlace by remember { mutableStateOf<RealValhallaNavigator.SearchAddressResult?>(null) }
+
+LaunchedEffect(state.searchQuery) {
+    val q = state.searchQuery.trim()
+    if (q.length < 3) { searchResults = emptyList(); searchMessage = null; isSearching = false; searchPanelOpen = false; return@LaunchedEffect }
+    delay(600)                                   // debounce
+    isSearching = true
+    searchPanelOpen = true
+    searchResults = RealValhallaNavigator.searchAddressAndPlaces(q, providers, stores, safeUserLat, safeUserLng)
+    searchMessage = if (searchResults.isEmpty()) (RealValhallaNavigator.lastSearchError ?: "لا توجد نتائج لـ «$q»") else null
+    isSearching = false
+}
+```
+### 2) استبدل `onSearchExecute` في `MapFilterBar(...)`
+```kotlin
+onSearchExecute = { query ->
+    val q = query.trim()
+    if (q.length >= 3) searchPanelOpen = true
+    OfflineMapManager.findCity(q)?.let { city -> state.selectedCity = city.nameAr }   // يحرّك الخريطة فقط (المستند 11)
+},
+```
+(وتذكّر حذف `viewModel.updateUserLocation(...)` من `onCitySelected` — التعديل 9 في المستند 06.)
+
+### 3) لوحة النتائج: ضعها داخل الـ Box العلوي بعد شارة «خرائط اليمن أوفلاين» (لتظهر فوقها)
+```kotlin
+if (searchPanelOpen && (isSearching || searchResults.isNotEmpty() || searchMessage != null)) {
+    Surface(
+        shape = RoundedCornerShape(18.dp),
+        color = Color(0xFF0B0F19).copy(alpha = 0.97f),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.10f)),
+        modifier = Modifier.padding(top = 66.dp, start = 16.dp, end = 16.dp).fillMaxWidth().heightIn(max = 320.dp)
+    ) {
+        Column {
+            if (isSearching) LinearProgressIndicator(Modifier.fillMaxWidth(), color = Color(0xFF10B981))
+            searchMessage?.let { Text(it, color = Color(0xFFF59E0B), fontSize = 12.sp, modifier = Modifier.padding(14.dp)) }
+            LazyColumn {
+                items(searchResults) { res ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth()
+                            .clickable { searchedPlace = res; searchPanelOpen = false; state.searchQuery = "" }
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Text(res.icon, fontSize = 18.sp)
+                        Column(Modifier.weight(1f)) {
+                            Text(res.shortName, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(res.displayName, color = Color(0xFF94A3B8), fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
+                    HorizontalDivider(color = Color.White.copy(alpha = 0.06f))
+                }
+            }
+        }
+    }
+}
+```
+### 4) بطاقة المكان المختار (ضعها بجانب كتلة `state.selectedEntity?.let { MapBottomSheet(...) }`)
+```kotlin
+searchedPlace?.let { place ->
+    val dist = MapDistanceCalculator.calculateDistanceMeters(safeUserLat, safeUserLng, place.latitude, place.longitude)
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = Color(0xFF0B0F19).copy(alpha = 0.96f),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.10f)),
+        modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(12.dp).fillMaxWidth()
+    ) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(place.shortName, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+            Text(place.displayName, color = Color(0xFF94A3B8), fontSize = 11.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text("المسافة المباشرة: ${MapDistanceCalculator.formatDistance(dist)} (تقريبي)", color = Color(0xFF10B981), fontSize = 12.sp)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = {
+                        val wp = NavWaypoint(name = place.shortName, latitude = place.latitude, longitude = place.longitude)
+                        if (!hasRealLocation) {
+                            viewModel.startLocationUpdates()
+                            coroutineScope.launch { snackbarHostState.showSnackbar("فعّل GPS وانتظر تحديد موقعك") }
+                        } else if (state.startNavigation(wp)) searchedPlace = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                    modifier = Modifier.weight(1f)
+                ) { Text("ابدأ الملاحة", fontWeight = FontWeight.Bold) }
+                OutlinedButton(
+                    onClick = {
+                        state.addWaypoint(NavWaypoint(name = place.shortName, latitude = place.latitude, longitude = place.longitude))
+                        coroutineScope.launch { snackbarHostState.showSnackbar("تمت إضافة المحطة للمسار") }
+                    },
+                    modifier = Modifier.weight(1f)
+                ) { Text("إضافة كمحطة") }
+                TextButton(onClick = { searchedPlace = null }) { Text("إغلاق", color = Color(0xFF94A3B8)) }
+            }
+        }
+    }
+}
+```
+والدبوس على الخريطة يأتي من `focusPoint = searchedPlace?.let { Triple(it.shortName, it.latitude, it.longitude) }` (المستند 06 التعديل 7).
+
+## اختبار
+اكتب «هايل» ← بعد 0.6 ثانية تظهر نتائج أو رسالة واضحة. اضغط نتيجة ← يتمركز الخريطة ويظهر دبوس وبطاقة. بدون إنترنت ← الأماكن المحلية + «لا يوجد اتصال…».

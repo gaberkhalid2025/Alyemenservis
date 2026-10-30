@@ -2,8 +2,13 @@ package com.example.ui.screens.map
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
+import android.util.Base64
 import android.view.ViewGroup
 import android.webkit.JavascriptInterface
+import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -23,8 +28,13 @@ import com.example.data.StoreEntity
 import com.example.ui.screens.map.components.OfflineInteractiveMap
 import com.example.ui.screens.map.utils.MapJsonBuilder
 import com.example.ui.screens.map.utils.OfflineMapManager
+import com.example.ui.screens.map.utils.OfflineTileInterceptor
 import com.example.utils.VisualThemePalette
 import com.example.utils.resolveThemePalette
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import org.json.JSONArray
+import org.json.JSONObject
 
 /**
  * 🗺️ RealLeafletMapView (Vela 3D + OpenAerialMap Satellite Engine)
@@ -57,8 +67,12 @@ fun RealLeafletMapView(
     onMapLoadFailed: (() -> Unit)? = null,
     tilt: Float = 35f,
     rotation: Float = 0f,
-    // [إصلاح ملاحة نهائي] إحداثيات خط المسار للملاحة
     routeCoordinates: List<Pair<Double, Double>> = emptyList(),
+    routeKey: Int = 0,
+    waypointMarkers: List<Triple<String, Double, Double>> = emptyList(),
+    followUser: Boolean = false,
+    onUserPanned: (() -> Unit)? = null,
+    focusPoint: Triple<String, Double, Double>? = null,
     themeColors: VisualThemePalette = resolveThemePalette(AdminSettingsEntity()),
     modifier: Modifier = Modifier
 ) {
@@ -66,6 +80,17 @@ fun RealLeafletMapView(
     var isMapReady by remember { mutableStateOf(false) }
     var webViewRef by remember { mutableStateOf<WebView?>(null) }
     var hasLoadError by remember { mutableStateOf(false) }
+    var didInitialCenter by remember { mutableStateOf(false) }
+
+    val mainHandler = remember { Handler(Looper.getMainLooper()) }
+    val providersState by rememberUpdatedState(nearbyProviders)
+    val storesState by rememberUpdatedState(nearbyStores)
+    val propertiesState by rememberUpdatedState(nearbyProperties)
+    val onProviderSelectedState by rememberUpdatedState(onProviderSelected)
+    val onStoreSelectedState by rememberUpdatedState(onStoreSelected)
+    val onPropertySelectedState by rememberUpdatedState(onPropertySelected)
+    val onDeselectState by rememberUpdatedState(onDeselect)
+    val onUserPannedState by rememberUpdatedState(onUserPanned)
 
     // [المحور الثالث] حماية الشاشة السوداء: مؤقت 6 ثوانٍ. إذا لم تصل إشارة onMapReady يتم التحويل تلقائياً لـ OfflineInteractiveMap
     LaunchedEffect(isMapReady) {
@@ -93,8 +118,8 @@ fun RealLeafletMapView(
     // إرسال العلامات للخريطة عند اكتمال الجاهزية أو تغير البيانات بأمان تام عبر Base64
     LaunchedEffect(isMapReady, markersJson) {
         if (isMapReady && webViewRef != null && markersJson.isNotBlank()) {
-            val b64 = android.util.Base64.encodeToString(markersJson.toByteArray(Charsets.UTF_8), android.util.Base64.NO_WRAP)
-            val script = "if (window.setMarkersBase64) { window.setMarkersBase64('$b64'); } else if (window.setMarkers) { window.setMarkers('$markersJson'); }"
+            val b64 = Base64.encodeToString(markersJson.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
+            val script = "if (window.setMarkersBase64) { window.setMarkersBase64('$b64'); }"
             webViewRef?.evaluateJavascript(script, null)
         }
     }
@@ -115,29 +140,23 @@ fun RealLeafletMapView(
         }
     }
 
-    // تحديث موقع المستخدم الفعلي على الخريطة والتمحور التلقائي حوله
-    LaunchedEffect(isMapReady, userCoords) {
+    // تحديث موقع المستخدم الفعلي على الخريطة
+    LaunchedEffect(isMapReady, userCoords, followUser) {
         if (isMapReady && webViewRef != null && userCoords.first != 0.0 && userCoords.second != 0.0) {
-            val script = "if (window.updateUserLocation) { window.updateUserLocation(${userCoords.first}, ${userCoords.second}, 30, true); }"
+            val pan = followUser || !didInitialCenter
+            didInitialCenter = true
+            val script = "if (window.updateUserLocation) { window.updateUserLocation(${userCoords.first}, ${userCoords.second}, 30, $pan); }"
             webViewRef?.evaluateJavascript(script, null)
         }
     }
 
-    // تمركز الخريطة عند تغيير المدينة
+    // تمركز الخريطة عند تغيير المدينة (عدم التحويل لمركز صنعاء عند اختيار "الكل")
     LaunchedEffect(isMapReady, selectedCity) {
-        if (isMapReady && webViewRef != null) {
-            val cityCoords = OfflineMapManager.getCityCoordinates(selectedCity)
-            val script = "if (window.setCity) { window.setCity('${cityCoords.nameAr}', ${cityCoords.latitude}, ${cityCoords.longitude}, ${cityCoords.defaultZoom}); }"
-            webViewRef?.evaluateJavascript(script, null)
-        }
-    }
-
-    // تطبيق إمالة الكاميرا ثلاثية الأبعاد والدوران (3D Tilt & Rotation Perspective)
-    LaunchedEffect(isMapReady, tilt, rotation) {
-        if (isMapReady && webViewRef != null) {
-            val script = "if (window.setMapPerspective) { window.setMapPerspective($tilt, $rotation); }"
-            webViewRef?.evaluateJavascript(script, null)
-        }
+        if (!isMapReady || webViewRef == null) return@LaunchedEffect
+        if (selectedCity == "الكل") return@LaunchedEffect
+        val cityCoords = OfflineMapManager.getCityCoordinates(selectedCity)
+        val script = "if (window.setCity) { window.setCity('${cityCoords.nameAr}', ${cityCoords.latitude}, ${cityCoords.longitude}, ${cityCoords.defaultZoom}); }"
+        webViewRef?.evaluateJavascript(script, null)
     }
 
     // التحكم في التكبير والتصغير التفاعلي
@@ -160,17 +179,48 @@ fun RealLeafletMapView(
         }
     }
 
-    // [إصلاح ملاحة نهائي] رسم ومسح مسار الملاحة على خريطة Leaflet
-    LaunchedEffect(isMapReady, routeCoordinates) {
-        if (isMapReady && webViewRef != null) {
-            if (routeCoordinates.isNotEmpty()) {
-                val coordsJson = routeCoordinates.joinToString(prefix = "[", postfix = "]") { "[${it.first},${it.second}]" }
-                val b64 = android.util.Base64.encodeToString(coordsJson.toByteArray(Charsets.UTF_8), android.util.Base64.NO_WRAP)
-                val script = "if (window.setRouteBase64) { window.setRouteBase64('$b64'); } else if (window.setRoute) { window.setRoute('$coordsJson'); }"
-                webViewRef?.evaluateJavascript(script, null)
-            } else {
-                webViewRef?.evaluateJavascript("if (window.clearRoute) { window.clearRoute(); }", null)
+    // رسم ومسح مسار الملاحة على خريطة Leaflet
+    LaunchedEffect(isMapReady, routeCoordinates, routeKey) {
+        if (!isMapReady || webViewRef == null) return@LaunchedEffect
+        if (routeCoordinates.size < 2) {
+            webViewRef?.evaluateJavascript("if (window.clearRoute) { window.clearRoute(); }", null)
+            return@LaunchedEffect
+        }
+        val b64 = withContext(Dispatchers.Default) {
+            val step = maxOf(1, routeCoordinates.size / 2000)
+            val arr = JSONArray()
+            var i = 0
+            while (i < routeCoordinates.size) {
+                arr.put(JSONArray().put(routeCoordinates[i].first).put(routeCoordinates[i].second))
+                i += step
             }
+            val last = routeCoordinates.last()
+            arr.put(JSONArray().put(last.first).put(last.second))
+            Base64.encodeToString(arr.toString().toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
+        }
+        webViewRef?.evaluateJavascript("if (window.setRouteBase64) { window.setRouteBase64('$b64', ${!followUser}); }", null)
+    }
+
+    // محطات المسار المرقمة
+    LaunchedEffect(isMapReady, waypointMarkers) {
+        if (!isMapReady || webViewRef == null) return@LaunchedEffect
+        val arr = JSONArray()
+        waypointMarkers.forEach { (label, lat, lng) ->
+            arr.put(JSONObject().put("label", label).put("lat", lat).put("lng", lng))
+        }
+        val b64 = Base64.encodeToString(arr.toString().toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
+        webViewRef?.evaluateJavascript("if (window.setWaypointMarkersBase64) { window.setWaypointMarkersBase64('$b64'); }", null)
+    }
+
+    // دبوس نتيجة البحث
+    LaunchedEffect(isMapReady, focusPoint) {
+        if (!isMapReady || webViewRef == null) return@LaunchedEffect
+        if (focusPoint == null) {
+            webViewRef?.evaluateJavascript("if (window.clearSearchPin) { window.clearSearchPin(); }", null)
+        } else {
+            val o = JSONObject().put("name", focusPoint.first).put("lat", focusPoint.second).put("lng", focusPoint.third)
+            val b64 = Base64.encodeToString(o.toString().toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
+            webViewRef?.evaluateJavascript("if (window.showSearchPinBase64) { window.showSearchPinBase64('$b64'); }", null)
         }
     }
 
@@ -199,11 +249,11 @@ fun RealLeafletMapView(
                             displayZoomControls = false
                             loadWithOverviewMode = true
                             useWideViewPort = true
-                            allowFileAccess = true
-                            allowContentAccess = true
+                            allowFileAccess = false
+                            allowContentAccess = false
+                            javaScriptCanOpenWindowsAutomatically = false
                         }
-                        // [إصلاح ملاحة نهائي] جسر التواصل الآمن بين JavaScript و Kotlin على الخيط الرئيسي
-                        val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
+
                         addJavascriptInterface(object {
                             @JavascriptInterface
                             fun onMapReady() {
@@ -212,7 +262,12 @@ fun RealLeafletMapView(
 
                             @JavascriptInterface
                             fun onMapClicked() {
-                                mainHandler.post { onDeselect() }
+                                mainHandler.post { onDeselectState() }
+                            }
+
+                            @JavascriptInterface
+                            fun onUserPanned() {
+                                mainHandler.post { onUserPannedState?.invoke() }
                             }
 
                             @JavascriptInterface
@@ -229,13 +284,13 @@ fun RealLeafletMapView(
                                 mainHandler.post {
                                     when (type.uppercase()) {
                                         "PROVIDER" -> {
-                                            nearbyProviders.find { it.id == id }?.let { onProviderSelected(it) }
+                                            providersState.find { it.id == id }?.let { onProviderSelectedState(it) }
                                         }
                                         "STORE", "RESTAURANT", "MEDICAL" -> {
-                                            nearbyStores.find { it.id == id }?.let { onStoreSelected(it) }
+                                            storesState.find { it.id == id }?.let { onStoreSelectedState(it) }
                                         }
                                         "PROPERTY" -> {
-                                            nearbyProperties.find { it.id == id }?.let { onPropertySelected(it) }
+                                            propertiesState.find { it.id == id }?.let { onPropertySelectedState(it) }
                                         }
                                     }
                                 }
@@ -243,7 +298,7 @@ fun RealLeafletMapView(
 
                             @JavascriptInterface
                             fun onMapModeChanged(newMode: String) {
-                                android.util.Log.d("LeafletBridge", "Map mode switched to: $newMode")
+                                android.util.Log.d("LeafletBridge", "Map mode: $newMode")
                             }
 
                             @JavascriptInterface
@@ -253,8 +308,19 @@ fun RealLeafletMapView(
                         }, "AndroidBridge")
 
                         webViewClient = object : WebViewClient() {
-                            // [إصلاح نهائي] منع الانتقال إلى أي موقع أو صفحة خارجية نهائياً عند النقر على نص الإسناد
-                            override fun shouldOverrideUrlLoading(view: WebView?, request: android.webkit.WebResourceRequest?): Boolean {
+                            override fun shouldInterceptRequest(
+                                view: WebView?,
+                                request: WebResourceRequest?
+                            ): WebResourceResponse? {
+                                val url = request?.url?.toString() ?: return null
+                                return try {
+                                    OfflineTileInterceptor.intercept(context, url)
+                                } catch (_: Throwable) {
+                                    null
+                                }
+                            }
+
+                            override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                                 return true
                             }
 
@@ -283,7 +349,7 @@ fun RealLeafletMapView(
 
                             override fun onReceivedError(
                                 view: WebView?,
-                                request: android.webkit.WebResourceRequest?,
+                                request: WebResourceRequest?,
                                 error: android.webkit.WebResourceError?
                             ) {
                                 super.onReceivedError(view, request, error)
@@ -300,6 +366,11 @@ fun RealLeafletMapView(
                 },
                 update = { webView ->
                     webViewRef = webView
+                },
+                onRelease = { webView ->
+                    webView.stopLoading()
+                    webView.removeJavascriptInterface("AndroidBridge")
+                    webView.destroy()
                 },
                 modifier = Modifier.fillMaxSize()
             )
