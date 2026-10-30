@@ -36,8 +36,41 @@ import com.example.data.ProviderEntity
 import com.example.data.StoreEntity
 import com.example.utils.getPropertyCoords
 import com.example.utils.getProviderCoords
-import com.example.utils.getStoreCoords
 import kotlin.math.*
+
+// [إصلاح 21] كائنات Paint ثابتة على مستوى الملف لإلغاء أي تخصيصات أثناء رسم الإطارات (60 FPS)
+private val sRoadTextPaint = android.graphics.Paint().apply {
+    color = android.graphics.Color.WHITE
+    textAlign = android.graphics.Paint.Align.CENTER
+    isFakeBoldText = true
+    isAntiAlias = true
+    setShadowLayer(5f, 1f, 1f, android.graphics.Color.BLACK)
+}
+private val sRoundPaint = android.graphics.Paint().apply {
+    color = android.graphics.Color.WHITE
+    textAlign = android.graphics.Paint.Align.CENTER
+    isFakeBoldText = true
+    isAntiAlias = true
+    setShadowLayer(5f, 1f, 1f, android.graphics.Color.BLACK)
+}
+private val sDistPaint = android.graphics.Paint().apply {
+    color = android.graphics.Color.WHITE
+    textAlign = android.graphics.Paint.Align.CENTER
+    isFakeBoldText = true
+    isAntiAlias = true
+    setShadowLayer(6f, 1f, 1f, android.graphics.Color.BLACK)
+}
+private val sPillPaint = android.graphics.Paint().apply {
+    color = android.graphics.Color.parseColor("#B30F172A")
+    isAntiAlias = true
+    style = android.graphics.Paint.Style.FILL
+}
+private val sBorderPaint = android.graphics.Paint().apply {
+    color = android.graphics.Color.parseColor("#475569")
+    isAntiAlias = true
+    style = android.graphics.Paint.Style.STROKE
+    strokeWidth = 1.2f
+}
 
 /**
  * 🗺️ OfflineInteractiveMap (Full Entity Overload)
@@ -107,6 +140,73 @@ fun OfflineInteractiveMap(
         ),
         label = "pulse_progress"
     )
+
+    // [إصلاح 21] كائنات Paint مع التذكر لمنع إعادة الإنشاء أثناء رسم الإطارات
+    val emojiPaint = remember {
+        android.graphics.Paint().apply {
+            textAlign = android.graphics.Paint.Align.CENTER
+            isAntiAlias = true
+        }
+    }
+    val titlePaint = remember {
+        android.graphics.Paint().apply {
+            color = android.graphics.Color.WHITE
+            textAlign = android.graphics.Paint.Align.CENTER
+            isFakeBoldText = true
+            isAntiAlias = true
+            setShadowLayer(6f, 2f, 2f, android.graphics.Color.parseColor("#E6000000"))
+        }
+    }
+    val subtitlePaint = remember {
+        android.graphics.Paint().apply {
+            color = android.graphics.Color.parseColor("#38BDF8")
+            textAlign = android.graphics.Paint.Align.CENTER
+            isFakeBoldText = true
+            isAntiAlias = true
+            setShadowLayer(4f, 1f, 1f, android.graphics.Color.parseColor("#E6000000"))
+        }
+    }
+    val labelBgPaint = remember {
+        android.graphics.Paint().apply {
+            color = android.graphics.Color.parseColor("#CC0F172A")
+            isAntiAlias = true
+            style = android.graphics.Paint.Style.FILL
+        }
+    }
+    val uTitlePaint = remember {
+        android.graphics.Paint().apply {
+            textSize = 21f
+            color = android.graphics.Color.WHITE
+            textAlign = android.graphics.Paint.Align.CENTER
+            isFakeBoldText = true
+            isAntiAlias = true
+            setShadowLayer(4f, 1f, 1f, android.graphics.Color.BLACK)
+        }
+    }
+    val uSubPaint = remember {
+        android.graphics.Paint().apply {
+            textSize = 15f
+            color = android.graphics.Color.parseColor("#38BDF8")
+            textAlign = android.graphics.Paint.Align.CENTER
+            isFakeBoldText = true
+            isAntiAlias = true
+        }
+    }
+    val uBgPaint = remember {
+        android.graphics.Paint().apply {
+            color = android.graphics.Color.parseColor("#E60F172A")
+            style = android.graphics.Paint.Style.FILL
+            isAntiAlias = true
+        }
+    }
+    val uBorderPaint = remember {
+        android.graphics.Paint().apply {
+            color = android.graphics.Color.parseColor("#00E5FF")
+            style = android.graphics.Paint.Style.STROKE
+            strokeWidth = 1.8f
+            isAntiAlias = true
+        }
+    }
 
     // Accurate calculation of map points
     val mapPoints = remember(
@@ -486,35 +586,9 @@ fun OfflineInteractiveMap(
                 val titleLabelSize = (18f * fontScale).coerceIn(13f, 25f)
                 val subLabelSize = (14f * fontScale).coerceIn(11f, 19f)
 
-                val emojiPaint = android.graphics.Paint().apply {
-                    textSize = emojiSize
-                    textAlign = android.graphics.Paint.Align.CENTER
-                    isAntiAlias = true
-                }
-
-                val titlePaint = android.graphics.Paint().apply {
-                    textSize = titleLabelSize
-                    color = android.graphics.Color.WHITE
-                    textAlign = android.graphics.Paint.Align.CENTER
-                    isFakeBoldText = true
-                    isAntiAlias = true
-                    setShadowLayer(6f, 2f, 2f, android.graphics.Color.parseColor("#E6000000"))
-                }
-
-                val subtitlePaint = android.graphics.Paint().apply {
-                    textSize = subLabelSize
-                    color = android.graphics.Color.parseColor("#38BDF8") // Sky blue accent
-                    textAlign = android.graphics.Paint.Align.CENTER
-                    isFakeBoldText = true
-                    isAntiAlias = true
-                    setShadowLayer(4f, 1f, 1f, android.graphics.Color.parseColor("#E6000000"))
-                }
-
-                val labelBgPaint = android.graphics.Paint().apply {
-                    color = android.graphics.Color.parseColor("#CC0F172A")
-                    isAntiAlias = true
-                    style = android.graphics.Paint.Style.FILL
-                }
+                emojiPaint.textSize = emojiSize
+                titlePaint.textSize = titleLabelSize
+                subtitlePaint.textSize = subLabelSize
 
                 // 5. Render service & entity markers with ground needles, shadows and distance tags
                 screenPoints.forEach { pt ->
@@ -662,21 +736,6 @@ fun OfflineInteractiveMap(
                     // User location title badge
                     val uLabel = "موقعك المباشر 📍"
                     val uSubLabel = if (selectedCity != "الكل") "محافظة $selectedCity" else "نظام تحديد المواقع GPS نشط"
-                    val uTitlePaint = android.graphics.Paint().apply {
-                        textSize = 21f
-                        color = android.graphics.Color.WHITE
-                        textAlign = android.graphics.Paint.Align.CENTER
-                        isFakeBoldText = true
-                        isAntiAlias = true
-                        setShadowLayer(4f, 1f, 1f, android.graphics.Color.BLACK)
-                    }
-                    val uSubPaint = android.graphics.Paint().apply {
-                        textSize = 15f
-                        color = android.graphics.Color.parseColor("#38BDF8")
-                        textAlign = android.graphics.Paint.Align.CENTER
-                        isFakeBoldText = true
-                        isAntiAlias = true
-                    }
                     val uW = uTitlePaint.measureText(uLabel).coerceAtLeast(uSubPaint.measureText(uSubLabel))
                     val uRect = android.graphics.RectF(
                         userPin.x - (uW / 2f) - 14f,
@@ -684,17 +743,6 @@ fun OfflineInteractiveMap(
                         userPin.x + (uW / 2f) + 14f,
                         userPin.y - 18f
                     )
-                    val uBgPaint = android.graphics.Paint().apply {
-                        color = android.graphics.Color.parseColor("#E60F172A")
-                        style = android.graphics.Paint.Style.FILL
-                        isAntiAlias = true
-                    }
-                    val uBorderPaint = android.graphics.Paint().apply {
-                        color = android.graphics.Color.parseColor("#00E5FF")
-                        style = android.graphics.Paint.Style.STROKE
-                        strokeWidth = 1.8f
-                        isAntiAlias = true
-                    }
                     drawContext.canvas.nativeCanvas.drawRoundRect(uRect, 10f, 10f, uBgPaint)
                     drawContext.canvas.nativeCanvas.drawRoundRect(uRect, 10f, 10f, uBorderPaint)
                     drawContext.canvas.nativeCanvas.drawText(uLabel, userPin.x, userPin.y - 42f, uTitlePaint)
@@ -1037,13 +1085,8 @@ private fun DrawScope.drawCityRoadGrid(
     val streetOuterColor = Color(0xFF0284C7)  // Sky
     val streetInnerColor = Color(0xFFE0F2FE)  // Light cyan
 
-    val roadTextPaint = android.graphics.Paint().apply {
+    val roadTextPaint = sRoadTextPaint.apply {
         textSize = (20f * zoomScale.coerceIn(0.7f, 1.6f)).coerceIn(16f, 28f)
-        color = android.graphics.Color.WHITE
-        textAlign = android.graphics.Paint.Align.CENTER
-        isFakeBoldText = true
-        isAntiAlias = true
-        setShadowLayer(5f, 1f, 1f, android.graphics.Color.BLACK)
     }
 
     // إصلاح 1.3: رسم الشوارع بمستويات تفصيل تعتمد على قيمة zoomScale
@@ -1147,13 +1190,8 @@ private fun DrawScope.drawCityRoadGrid(
         )
     }
 
-    val roundPaint = android.graphics.Paint().apply {
+    val roundPaint = sRoundPaint.apply {
         textSize = (20f * zoomScale.coerceIn(0.7f, 1.5f)).coerceIn(15f, 26f)
-        color = android.graphics.Color.WHITE
-        textAlign = android.graphics.Paint.Align.CENTER
-        isFakeBoldText = true
-        isAntiAlias = true
-        setShadowLayer(5f, 1f, 1f, android.graphics.Color.BLACK)
     }
 
     roundabouts.forEach { rb ->
@@ -1246,13 +1284,8 @@ private fun DrawScope.drawCityRoadGrid(
         )
     }
 
-    val distPaint = android.graphics.Paint().apply {
+    val distPaint = sDistPaint.apply {
         textSize = (22f * zoomScale.coerceIn(0.7f, 1.5f)).coerceIn(16f, 28f)
-        color = android.graphics.Color.WHITE
-        textAlign = android.graphics.Paint.Align.CENTER
-        isFakeBoldText = true
-        isAntiAlias = true
-        setShadowLayer(6f, 1f, 1f, android.graphics.Color.BLACK)
     }
 
     districts.forEach { d ->
@@ -1261,19 +1294,8 @@ private fun DrawScope.drawCityRoadGrid(
             val label = "${d.emoji} ${d.name}"
             val textW = distPaint.measureText(label)
             val bgRect = android.graphics.RectF(pt.x - textW / 2f - 10f, pt.y - 20f, pt.x + textW / 2f + 10f, pt.y + 8f)
-            val pillPaint = android.graphics.Paint().apply {
-                color = android.graphics.Color.parseColor("#B30F172A")
-                isAntiAlias = true
-                style = android.graphics.Paint.Style.FILL
-            }
-            val borderPaint = android.graphics.Paint().apply {
-                color = android.graphics.Color.parseColor("#475569")
-                isAntiAlias = true
-                style = android.graphics.Paint.Style.STROKE
-                strokeWidth = 1.2f
-            }
-            drawContext.canvas.nativeCanvas.drawRoundRect(bgRect, 8f, 8f, pillPaint)
-            drawContext.canvas.nativeCanvas.drawRoundRect(bgRect, 8f, 8f, borderPaint)
+            drawContext.canvas.nativeCanvas.drawRoundRect(bgRect, 8f, 8f, sPillPaint)
+            drawContext.canvas.nativeCanvas.drawRoundRect(bgRect, 8f, 8f, sBorderPaint)
             drawContext.canvas.nativeCanvas.drawText(label, pt.x, pt.y, distPaint)
         }
     }

@@ -88,18 +88,39 @@ fun NavigationScreen(
     // ───────── الصوت ─────────
     var tts by remember { mutableStateOf<TextToSpeech?>(null) }
     var ttsReady by remember { mutableStateOf(false) }
+    var ttsMissing by remember { mutableStateOf(false) }
     var voiceEnabled by remember { mutableStateOf(true) }
     DisposableEffect(context) {
         var instance: TextToSpeech? = null
         instance = TextToSpeech(context) { status ->
             if (status == TextToSpeech.SUCCESS) {
                 val r = instance?.setLanguage(Locale("ar"))
-                ttsReady = r != TextToSpeech.LANG_MISSING_DATA && r != TextToSpeech.LANG_NOT_SUPPORTED
+                ttsMissing = r == TextToSpeech.LANG_MISSING_DATA || r == TextToSpeech.LANG_NOT_SUPPORTED
+                ttsReady = !ttsMissing
             }
         }
         tts = instance
         onDispose { instance?.stop(); instance?.shutdown() }
     }
+
+    LaunchedEffect(ttsMissing) {
+        if (ttsMissing) {
+            val res = snackbarHostState.showSnackbar(
+                message = "لا توجد حزمة نطق صوت عربي على جهازك",
+                actionLabel = "تثبيت",
+                duration = SnackbarDuration.Long
+            )
+            if (res == SnackbarResult.ActionPerformed) {
+                try {
+                    context.startActivity(
+                        android.content.Intent(TextToSpeech.Engine.ACTION_INSTALL_TTS_DATA)
+                            .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                    )
+                } catch (_: Exception) {}
+            }
+        }
+    }
+
     val speak: (String) -> Unit = { text ->
         if (voiceEnabled && ttsReady) tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "nav_${System.nanoTime()}")
     }
@@ -114,6 +135,38 @@ fun NavigationScreen(
     if (waypoints.isEmpty()) {
         LaunchedEffect(Unit) { onFinishNavigation() }   // لا وجهة صالحة → لا ملاحة وهمية
         return
+    }
+
+    // [إصلاح 19] إبقاء الشاشة مضاءة طوال فترة الملاحة
+    val view = androidx.compose.ui.platform.LocalView.current
+    DisposableEffect(view) {
+        view.keepScreenOn = true
+        onDispose { view.keepScreenOn = false }
+    }
+
+    // [إصلاح 19] تأكيد الخروج بزر الرجوع لمنع الإنهاء العرضي
+    var showExitConfirm by remember { mutableStateOf(false) }
+    androidx.activity.compose.BackHandler(enabled = true) { showExitConfirm = true }
+    if (showExitConfirm) {
+        AlertDialog(
+            onDismissRequest = { showExitConfirm = false },
+            containerColor = Color(0xFF0F172A),
+            title = { Text("إنهاء الملاحة؟", color = Color.White, fontWeight = FontWeight.Bold) },
+            text = { Text("سيتوقف التوجيه الصوتي وتُحذف مسارات الملاحة النشطة.", color = Color(0xFFCBD5E1)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showExitConfirm = false
+                    onFinishNavigation()
+                }) {
+                    Text("إنهاء", color = Color(0xFFEF4444), fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showExitConfirm = false }) {
+                    Text("متابعة", color = Color(0xFF10B981))
+                }
+            }
+        )
     }
 
     var currentWaypointIndex by remember { mutableIntStateOf(0) }
@@ -138,14 +191,16 @@ fun NavigationScreen(
     val announced = remember { mutableSetOf<String>() }
 
     // ───────── حساب المسار (من الموقع الحالي عبر المحطات المتبقية) ─────────
-    LaunchedEffect(routeVersion, waypoints.size, isTilesDownloaded) {
+    LaunchedEffect(routeVersion, waypoints.size, isTilesDownloaded, hasRealLocation) {
         val remaining = waypoints.drop(currentWaypointIndex)
         if (remaining.isEmpty()) return@LaunchedEffect
+        if (!hasRealLocation) {
+            isLoadingRoute = false
+            return@LaunchedEffect // [إصلاح 19] لا مسار بلا موقع GPS حقيقي
+        }
         isLoadingRoute = true
         try {
-            val safeLat = if (latestLat != 0.0) latestLat else 15.3694
-            val safeLng = if (latestLng != 0.0) latestLng else 44.1910
-            val origin = NavWaypoint(name = "موقعي الحالي", latitude = safeLat, longitude = safeLng, type = WaypointType.START)
+            val origin = NavWaypoint(name = "موقعي الحالي", latitude = latestLat, longitude = latestLng, type = WaypointType.START)
             val result = RealValhallaNavigator.calculateRoute(context, origin, remaining)
             routeResult = result
             tracker = RouteTracker(result.coordinates)
@@ -223,7 +278,10 @@ fun NavigationScreen(
     val totalMeters = tracker?.totalMeters ?: result?.totalDistanceMeters ?: 0.0
     val remainingMeters = trackerState?.remainingMeters ?: totalMeters
     val progress = trackerState?.progress ?: 0f
-    val remainingSeconds = if (totalMeters > 1.0) (result?.totalDurationSeconds ?: 0.0) * (remainingMeters / totalMeters) else 0.0
+    val baseSeconds = if (totalMeters > 1.0) (result?.totalDurationSeconds ?: 0.0) * (remainingMeters / totalMeters) else 0.0
+    val expectedKmh = if ((result?.totalDurationSeconds ?: 0.0) > 0) totalMeters / result!!.totalDurationSeconds * 3.6 else 0.0
+    val speedFactor = if (!isApproximate && currentSpeedKmh >= 15 && expectedKmh > 0) (expectedKmh / currentSpeedKmh).coerceIn(0.7, 1.5) else 1.0
+    val remainingSeconds = baseSeconds * speedFactor
     val currentStepIndex = run {
         var idx = 0
         for (i in steps.indices) { if (stepStarts[i] <= along + 1.0) idx = i else break }
@@ -260,6 +318,7 @@ fun NavigationScreen(
         result.isOffline -> "🗺️ وضع غير متصل · ${result.engineSource}"
         else -> "🛰️ وضع متصل · ${result.engineSource}"
     }
+    val nativeError = if (isTilesDownloaded && result != null && !result.isOffline) NativeValhallaStatus.lastError else null
     val instructionText = when {
         !hasRealLocation -> "لم يتم تحديد موقعك بعد — فعّل GPS"
         result == null -> "جارٍ حساب المسار..."
@@ -304,30 +363,42 @@ fun NavigationScreen(
             modifier = Modifier.align(Alignment.TopCenter).fillMaxWidth().statusBarsPadding().padding(horizontal = 12.dp, vertical = 6.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // شارة الحالة (سطر واحد)
+            // شارة الحالة
             Surface(
                 shape = RoundedCornerShape(14.dp),
                 color = Color(0xFF0F172A).copy(alpha = 0.95f),
                 border = BorderStroke(1.dp, if (isApproximate) Color(0xFFF59E0B) else Color(0xFF10B981)),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Box(Modifier.size(8.dp).clip(CircleShape).background(if (isApproximate) Color(0xFFF59E0B) else Color(0xFF10B981)))
-                    Text(engineLabel, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                    IconButton(onClick = { mapMode = if (mapMode == MapMode.OSM) MapMode.SATELLITE else MapMode.OSM }, modifier = Modifier.size(30.dp)) {
-                        Icon(Icons.Default.Layers, contentDescription = "الطبقة", tint = Color(0xFF38BDF8), modifier = Modifier.size(18.dp))
-                    }
-                    IconButton(onClick = { showAddStopDialog = true }, modifier = Modifier.size(30.dp)) {
-                        Icon(Icons.Default.Add, contentDescription = "إضافة محطة", tint = Color(0xFF10B981), modifier = Modifier.size(20.dp))
-                    }
-                    if (!isTilesDownloaded) {
-                        IconButton(onClick = { showDownloadDialog = true }, modifier = Modifier.size(30.dp)) {
-                            Icon(Icons.Default.CloudDownload, contentDescription = "تحميل الخرائط", tint = Color(0xFF0284C7), modifier = Modifier.size(20.dp))
+                Column {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Box(Modifier.size(8.dp).clip(CircleShape).background(if (isApproximate) Color(0xFFF59E0B) else Color(0xFF10B981)))
+                        Text(engineLabel, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                        IconButton(onClick = { mapMode = if (mapMode == MapMode.OSM) MapMode.SATELLITE else MapMode.OSM }, modifier = Modifier.size(30.dp)) {
+                            Icon(Icons.Default.Layers, contentDescription = "الطبقة", tint = Color(0xFF38BDF8), modifier = Modifier.size(18.dp))
                         }
+                        IconButton(onClick = { showAddStopDialog = true }, modifier = Modifier.size(30.dp)) {
+                            Icon(Icons.Default.Add, contentDescription = "إضافة محطة", tint = Color(0xFF10B981), modifier = Modifier.size(20.dp))
+                        }
+                        if (!isTilesDownloaded) {
+                            IconButton(onClick = { showDownloadDialog = true }, modifier = Modifier.size(30.dp)) {
+                                Icon(Icons.Default.CloudDownload, contentDescription = "تحميل الخرائط", tint = Color(0xFF0284C7), modifier = Modifier.size(20.dp))
+                            }
+                        }
+                    }
+                    nativeError?.let {
+                        Text(
+                            text = "تعذر تشغيل الأوفلاين: $it",
+                            color = Color(0xFFF59E0B),
+                            fontSize = 10.sp,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                        )
                     }
                 }
             }

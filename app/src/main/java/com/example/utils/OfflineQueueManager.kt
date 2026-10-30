@@ -232,6 +232,7 @@ class OfflineQueueManager @Inject constructor(
                 "REQUEST" -> "instant_requests"
                 "MESSAGE" -> "chat_messages"
                 "OFFER" -> "offers"
+                "SOS" -> "sos_alerts"
                 else -> "offline_sync_logs"
             }
             val targetDoc = if (req.data.containsKey("id") && req.data["id"] is String) {

@@ -49,6 +49,7 @@ import com.example.ui.screens.map.components.*
 import com.example.ui.screens.map.utils.MapDistanceCalculator
 import com.example.ui.screens.map.utils.OfflineMapManager
 import com.example.utils.RealValhallaNavigator
+import com.example.utils.SosDispatcher
 import com.example.utils.ValhallaTileDownloader
 import com.example.utils.VisualThemePalette
 import com.example.utils.resolveThemePalette
@@ -102,15 +103,13 @@ fun MapScreenContent(
     var showCompanionBar by remember { mutableStateOf(false) }
     var companionFilter by remember { mutableStateOf<String?>(null) }
     var showSosDialog by remember { mutableStateOf(false) }
-    var isSosBroadcasting by remember { mutableStateOf(false) }
-    var compassBearing by remember { mutableFloatStateOf(0f) }
     var showDownloadDialog by remember { mutableStateOf(false) }
 
     androidx.activity.compose.BackHandler(enabled = true) {
         if (isHudMode) {
             isHudMode = false
         } else if (state.isNavigating) {
-            state.isNavigating = false
+            state.stopNavigation()
         } else if (state.selectedEntity != null) {
             state.resetSelection()
         } else {
@@ -132,11 +131,19 @@ fun MapScreenContent(
     val rawUserLat = if (userLatState != 0.0 && !userLatState.isNaN()) userLatState else fallbackCityCoords.latitude
     val rawUserLng = if (userLngState != 0.0 && !userLngState.isNaN()) userLngState else fallbackCityCoords.longitude
 
-    // [إصلاح ملاحة نهائي] استخدام إحداثيات GPS الحقيقية بدقة تامة دون تقريب وهمي
-    val hasRealLocation = userLatState != 0.0 && userLngState != 0.0 &&
-            !userLatState.isNaN() && !userLngState.isNaN()
+    // [إصلاح 17] التحقق من الموقع الحقيقي وعدم الاعتماد على إحداثيات وهمية
+    val isUserLocationReal by viewModel.isUserLocationReal.collectAsState()
+    val hasRealLocation = isUserLocationReal &&
+            userLatState != 0.0 && userLngState != 0.0 && !userLatState.isNaN() && !userLngState.isNaN()
     val safeUserLat = rawUserLat
     val safeUserLng = rawUserLng
+
+    // [إصلاح 18] بوصلة حقيقية باستخدام الحساسات
+    val heading = com.example.utils.rememberHeadingDegrees(
+        enabled = !state.isNavigating,
+        lat = safeUserLat,
+        lng = safeUserLng
+    )
 
     var isTilesDownloaded by remember { mutableStateOf(ValhallaTileDownloader.isTilesDownloaded(context)) }
     var searchResults by remember { mutableStateOf<List<RealValhallaNavigator.SearchAddressResult>>(emptyList()) }
@@ -144,6 +151,17 @@ fun MapScreenContent(
     var searchMessage by remember { mutableStateOf<String?>(null) }
     var searchPanelOpen by remember { mutableStateOf(false) }
     var searchedPlace by remember { mutableStateOf<RealValhallaNavigator.SearchAddressResult?>(null) }
+
+    // [إصلاح 18] البحث الصوتي باستخدام محرك النظام
+    val speechLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { res ->
+        if (res.resultCode == android.app.Activity.RESULT_OK) {
+            val text = res.data?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
+            if (!text.isNullOrBlank()) {
+                state.searchQuery = text.trim()
+                searchPanelOpen = true
+            }
+        }
+    }
 
     LaunchedEffect(state.searchQuery) {
         val q = state.searchQuery.trim()
@@ -241,6 +259,10 @@ fun MapScreenContent(
 
     // Fullscreen Turn-by-Turn Navigation Screen
     if (state.isNavigating) {
+        DisposableEffect(Unit) {
+            viewModel.startNavigationTracking()
+            onDispose { viewModel.stopNavigationTracking() }
+        }
         NavigationScreen(
             targetEntity = null,
             userLat = safeUserLat,
@@ -423,8 +445,16 @@ fun MapScreenContent(
                     themeColors = themeColors,
                     onBackClick = onBackClick,
                     onVoiceSearchClick = {
-                        coroutineScope.launch {
-                            snackbarHostState.showSnackbar("🎙️ المساعد الصوتي يستمع: تحدث باسم الشارع أو الخدمة...")
+                        val intent = android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                            putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                            putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE, "ar-YE")
+                            putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, "تحدث باسم الشارع أو الخدمة")
+                            putExtra(android.speech.RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+                        }
+                        try {
+                            speechLauncher.launch(intent)
+                        } catch (e: android.content.ActivityNotFoundException) {
+                            coroutineScope.launch { snackbarHostState.showSnackbar("جهازك لا يدعم التعرف على الصوت") }
                         }
                     },
                     onSearchExecute = { query ->
@@ -592,11 +622,10 @@ fun MapScreenContent(
                         )
                     }
                 },
-                compassBearing = compassBearing,
+                compassBearing = -heading,
                 onResetCompass = {
-                    compassBearing = 0f
                     coroutineScope.launch {
-                        snackbarHostState.showSnackbar("🧭 تم إعادة توجيه الخريطة إلى الشمال الحقيقي")
+                        snackbarHostState.showSnackbar("🧭 اتجاه الشمال مضبوط وفق بوصلة الجهاز الحقيقية")
                     }
                 },
                 modifier = Modifier
@@ -996,53 +1025,79 @@ fun MapScreenContent(
 
     // 🚨 10. SOS / الفزعة Confirmation Dialog
     if (showSosDialog) {
+        val nearest = remember(filteredProviders, safeUserLat, safeUserLng) {
+            filteredProviders
+                .filter { it.phone.isNotBlank() && it.latitude != 0.0 && it.longitude != 0.0 }
+                .minByOrNull { MapDistanceCalculator.calculateDistanceMeters(safeUserLat, safeUserLng, it.latitude, it.longitude) }
+        }
+        val sosText = SosDispatcher.buildMessage(safeUserLat, safeUserLng, null)
+
         AlertDialog(
             onDismissRequest = { showSosDialog = false },
-            containerColor = Color(0xFF0B0F19),
-            titleContentColor = Color.White,
-            textContentColor = Color.White,
+            containerColor = Color(0xFF0F172A),
             shape = RoundedCornerShape(20.dp),
             title = {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Icon(Icons.Default.Emergency, contentDescription = null, tint = Color(0xFFEF4444))
-                    Text("فزعة طوارئ 🆘", fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                    Text("🚨 نداء فزعة طوارئ", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 17.sp)
                 }
             },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        "هل تحتاج إلى مساعدة فورية أو بنشر أو سحب مركبة؟",
-                        color = Color.White,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                    Text(
-                        "سيتم إرسال إحداثيات موقعك الحالي ($safeUserLat, $safeUserLng) إلى أقرب فني وميكانيكي معتمد في محيطك فوراً.",
-                        color = Color(0xFF94A3B8),
-                        fontSize = 11.5.sp
-                    )
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        isSosBroadcasting = true
-                        coroutineScope.launch {
-                            delay(600)
-                            isSosBroadcasting = false
-                            showSosDialog = false
-                            snackbarHostState.showSnackbar("🚨 تم إرسال نداء الفزعة وإحداثيات موقعك لأقرب فني طوارئ معتمد!")
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    if (!hasRealLocation) {
+                        Text("لم يتم تحديد موقعك الحقيقي بعد، فلن يُرسَل موقع. يمكنك الاتصال مباشرة.", color = Color(0xFFF59E0B), fontSize = 13.sp)
+                    } else {
+                        Text("سيتم استخدام موقعك الحالي. لا يُعتبر النداء مرسلاً إلا بعد تأكيد الإرسال أدناه.", color = Color(0xFFCBD5E1), fontSize = 13.sp)
+                    }
+                    nearest?.let { p ->
+                        Text("أقرب فني: ${p.name}", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        Button(
+                            onClick = { SosDispatcher.safeStart(context, SosDispatcher.dialIntent(p.phone)) },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("📞 اتصل بـ ${p.name}")
                         }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
-                    shape = RoundedCornerShape(10.dp)
-                ) {
-                    Text(if (isSosBroadcasting) "جارِ الإرسال..." else "إرسال نداء الفزعة", color = Color.White, fontWeight = FontWeight.Bold)
+                        if (hasRealLocation) {
+                            OutlinedButton(
+                                onClick = {
+                                    if (!SosDispatcher.safeStart(context, SosDispatcher.smsIntent(p.phone, sosText))) {
+                                        coroutineScope.launch { snackbarHostState.showSnackbar("تعذر فتح تطبيق الرسائل") }
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("✉️ أرسل رسالة SMS بموقعي (تعمل بلا إنترنت)")
+                            }
+                        }
+                    }
+                    if (hasRealLocation) {
+                        OutlinedButton(
+                            onClick = { SosDispatcher.safeStart(context, SosDispatcher.shareIntent(sosText)) },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("📤 مشاركة موقعي (واتساب وغيره)")
+                        }
+                        Button(
+                            onClick = {
+                                viewModel.enqueueSos(safeUserLat, safeUserLng, null, sosText)
+                                showSosDialog = false
+                                coroutineScope.launch {
+                                    snackbarHostState.showSnackbar("تم حفظ النداء وسيُرسل للخادم فور توفر الإنترنت. للأمان اتصل أيضاً بأقرب فني.")
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("🚨 إرسال نداء عبر التطبيق", fontWeight = FontWeight.Bold)
+                        }
+                    }
                 }
             },
+            confirmButton = {},
             dismissButton = {
                 TextButton(onClick = { showSosDialog = false }) {
-                    Text("إلغاء", color = Color(0xFF94A3B8))
+                    Text("إغلاق", color = Color(0xFF94A3B8))
                 }
             }
         )

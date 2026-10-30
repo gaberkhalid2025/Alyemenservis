@@ -11,6 +11,7 @@ import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 import kotlin.math.*
@@ -163,15 +164,8 @@ class LocationService(
                         )
                     )
                 } else {
-                    // Fallback to default Yemen location
-                    LocationResult.Success(
-                        LocationCoordinates(
-                            latitude = DEFAULT_YEMEN_LAT,
-                            longitude = DEFAULT_YEMEN_LNG,
-                            accuracyMeters = 5000f,
-                            isMock = true
-                        )
-                    )
+                    // لا موقع متاح: لا نختلق إحداثيات
+                    LocationResult.Error("تعذر تحديد موقعك حالياً. تأكد من تشغيل GPS ثم أعد المحاولة")
                 }
             }
         } catch (e: SecurityException) {
@@ -194,6 +188,46 @@ class LocationService(
         } catch (e: Exception) {
             null
         }
+    }
+
+    /**
+     * [إصلاح 17] تدفق مستمر لموقع GPS مع فلترة الدقة والمواقع الوهمية والقفزات
+     */
+    @SuppressLint("MissingPermission")
+    fun locationUpdates(intervalMs: Long = 1000L, maxAccuracyM: Float = 50f): kotlinx.coroutines.flow.Flow<LocationCoordinates> = kotlinx.coroutines.flow.callbackFlow {
+        val permission = checkPermissionState()
+        if (permission == LocationPermissionState.DENIED || permission == LocationPermissionState.GPS_DISABLED) {
+            close()
+            return@callbackFlow
+        }
+        val request = com.google.android.gms.location.LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, intervalMs)
+            .setMinUpdateIntervalMillis(intervalMs / 2)
+            .setWaitForAccurateLocation(false)
+            .build()
+
+        var last: Location? = null
+        val callback = object : com.google.android.gms.location.LocationCallback() {
+            override fun onLocationResult(result: com.google.android.gms.location.LocationResult) {
+                val loc = result.lastLocation ?: return
+                val isMock = if (android.os.Build.VERSION.SDK_INT >= 31) loc.isMock else @Suppress("DEPRECATION") loc.isFromMockProvider
+                if (isMock) return // تجاهل مواقع المحاكاة
+                if (loc.hasAccuracy() && loc.accuracy > maxAccuracyM) return // دقة سيئة
+                val prev = last
+                if (prev != null) { // رفض القفزات غير المنطقية (> 70 م/ث)
+                    val dt = (loc.time - prev.time) / 1000.0
+                    if (dt > 0 && prev.distanceTo(loc) / dt > 70.0) return
+                }
+                last = loc
+                trySend(LocationCoordinates(
+                    latitude = loc.latitude,
+                    longitude = loc.longitude,
+                    accuracyMeters = loc.accuracy,
+                    timestamp = loc.time
+                ))
+            }
+        }
+        client.requestLocationUpdates(request, callback, android.os.Looper.getMainLooper())
+        awaitClose { client.removeLocationUpdates(callback) }
     }
 
     /**

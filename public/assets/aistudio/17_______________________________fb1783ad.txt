@@ -1,0 +1,115 @@
+# 17 – الموقع الصادق + تحديثات GPS مستمرة
+**الملفات:** `LocationService.kt`، `MainViewModel.kt`، `MapScreenContent.kt`  |  **الإجراء:** تعديلات موضعية.
+
+## المشاكل
+1. `LocationService.getCurrentCoordinates` يعيد **نجاحاً** بإحداثيات وسط صنعاء (`isMock = true`, دقة 5000 م) عند فشل كل المصادر. التطبيق يتعامل معها كموقعك الحقيقي، و`hasRealLocation` لا يفحص `isMock` ولا الدقة ⇒ تنطلق الملاحة من مكان خاطئ.
+2. لا توجد **تحديثات مستمرة**؛ الدالة تجلب موقعاً واحداً. الملاحة تحتاج تدفقاً كل ~1 ثانية.
+3. لا فلترة للدقة ولا للقفزات ولا لمواقع المحاكاة.
+
+## أ) LocationService.kt
+### 1) استبدل فرع الرجوع الأخير (داخل `getCurrentCoordinates`):
+```kotlin
+} else {
+    // لا موقع متاح: لا نختلق إحداثيات
+    LocationResult.Error("تعذر تحديد موقعك حالياً. تأكد من تشغيل GPS ثم أعد المحاولة")
+}
+```
+أبقِ `DEFAULT_YEMEN_LAT/LNG` لتمركز الخريطة فقط، وتأكد أنها لا تُنشر كموقع مستخدم.
+
+### 2) أضف دالة التدفق المستمر داخل الصنف:
+imports: `android.os.Looper`, `com.google.android.gms.location.LocationCallback`, `com.google.android.gms.location.LocationRequest`, `kotlinx.coroutines.channels.awaitClose`, `kotlinx.coroutines.flow.Flow`, `kotlinx.coroutines.flow.callbackFlow`.
+```kotlin
+@SuppressLint("MissingPermission")
+fun locationUpdates(intervalMs: Long = 1000L, maxAccuracyM: Float = 50f): Flow<LocationCoordinates> = callbackFlow {
+    val permission = checkPermissionState()
+    if (permission == LocationPermissionState.DENIED || permission == LocationPermissionState.GPS_DISABLED) {
+        close(); return@callbackFlow
+    }
+    val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, intervalMs)
+        .setMinUpdateIntervalMillis(intervalMs / 2)
+        .setWaitForAccurateLocation(false)
+        .build()
+
+    var last: Location? = null
+    val callback = object : LocationCallback() {
+        override fun onLocationResult(result: com.google.android.gms.location.LocationResult) {
+            val loc = result.lastLocation ?: return
+            val isMock = if (android.os.Build.VERSION.SDK_INT >= 31) loc.isMock else @Suppress("DEPRECATION") loc.isFromMockProvider
+            if (isMock) return                                        // تجاهل مواقع المحاكاة
+            if (loc.hasAccuracy() && loc.accuracy > maxAccuracyM) return   // دقة سيئة
+            val prev = last
+            if (prev != null) {                                       // رفض القفزات غير المنطقية (> 70 م/ث)
+                val dt = (loc.time - prev.time) / 1000.0
+                if (dt > 0 && prev.distanceTo(loc) / dt > 70.0) return
+            }
+            last = loc
+            trySend(LocationCoordinates(
+                latitude = loc.latitude, longitude = loc.longitude,
+                accuracyMeters = loc.accuracy, timestamp = loc.time
+            ))
+        }
+    }
+    client.requestLocationUpdates(request, callback, Looper.getMainLooper())
+    awaitClose { client.removeLocationUpdates(callback) }
+}
+```
+> `LocationResult` هنا هو صنف Google؛ ولأن الملف يعرّف صنفاً بنفس الاسم، استخدم الاسم الكامل كما فوق.
+
+## ب) MainViewModel.kt
+أضف (بجانب `userLatitude/userLongitude`):
+```kotlin
+private val _userLocationAccuracyM = MutableStateFlow(Float.MAX_VALUE)
+val userLocationAccuracyM: StateFlow<Float> = _userLocationAccuracyM
+private val _isUserLocationReal = MutableStateFlow(false)
+val isUserLocationReal: StateFlow<Boolean> = _isUserLocationReal
+
+private var navTrackingJob: kotlinx.coroutines.Job? = null
+
+fun startNavigationTracking() {
+    if (navTrackingJob?.isActive == true) return
+    navTrackingJob = viewModelScope.launch {
+        locationService.locationUpdates().collect { c ->
+            updateUserLocation(c.latitude, c.longitude)          // الدالة الموجودة عندك
+            _userLocationAccuracyM.value = c.accuracyMeters
+            _isUserLocationReal.value = true
+        }
+    }
+}
+fun stopNavigationTracking() { navTrackingJob?.cancel(); navTrackingJob = null }
+```
+وفي المكان الذي يعالج `LocationResult.Success` داخل `startLocationUpdates()`:
+```kotlin
+is LocationResult.Success -> {
+    val c = result.coordinates
+    val real = !c.isMock && c.accuracyMeters <= 150f
+    if (real) { updateUserLocation(c.latitude, c.longitude); _userLocationAccuracyM.value = c.accuracyMeters }
+    _isUserLocationReal.value = real
+}
+is LocationResult.Error -> _isUserLocationReal.value = false
+```
+(ابحث عن المعالجة الفعلية في ملفك وطابق الأسماء.)
+
+## ج) MapScreenContent.kt
+1. استبدل تعريف `hasRealLocation`:
+```kotlin
+val isUserLocationReal by viewModel.isUserLocationReal.collectAsState()
+val hasRealLocation = isUserLocationReal &&
+        userLatState != 0.0 && userLngState != 0.0 && !userLatState.isNaN() && !userLngState.isNaN()
+```
+2. عند بدء الملاحة (داخل `if (state.isNavigating)` وقبل الاستدعاء) أضف:
+```kotlin
+DisposableEffect(Unit) {
+    viewModel.startNavigationTracking()
+    onDispose { viewModel.stopNavigationTracking() }
+}
+```
+> إن وُضع داخل `if` فهو مسموح في Compose، لكنه قبل `return` مباشرة.
+3. `BackHandler`: غيّر `state.isNavigating = false` إلى `state.stopNavigation()`.
+
+## د) صلاحيات المانيفست
+`ACCESS_FINE_LOCATION` و`ACCESS_COARSE_LOCATION` (موجودتان)، وللملاحة والشاشة مطفأة لاحقاً: خدمة أمامية من نوع `location` مع `FOREGROUND_SERVICE_LOCATION` (مرحلة لاحقة).
+
+## اختبار
+1. وضع الطيران وGPS مطفأ: الزر يعرض «فعّل GPS»، ولا تبدأ الملاحة.
+2. GPS يعمل في الخلاء: بعد التثبيت تظهر الشارة الخضراء وتبدأ الملاحة.
+3. امشِ 100 متر: تقل المسافة المتبقية تدريجياً (ليست قفزات).

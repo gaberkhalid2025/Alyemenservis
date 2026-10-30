@@ -1,0 +1,90 @@
+# 19 – NavigationScreen.kt (إصلاحات متبقية)
+**المسار:** `ui/screens/map/NavigationScreen.kt`  |  **الإجراء:** تعديلات موضعية على الملف الحالي (لا تعد كتابته).
+
+## 1) أخطر: أزل الرجوع إلى صنعاء كنقطة انطلاق
+في `LaunchedEffect(routeVersion, waypoints.size, isTilesDownloaded)` وُضع `safeLat = if (latestLat != 0.0) latestLat else 15.3694` (وكذلك الطول). هذا يحسب مساراً من مكان لست فيه. استبدل بداية الـ effect بـ:
+```kotlin
+LaunchedEffect(routeVersion, waypoints.size, isTilesDownloaded, hasRealLocation) {
+    val remaining = waypoints.drop(currentWaypointIndex)
+    if (remaining.isEmpty()) return@LaunchedEffect
+    if (!hasRealLocation) { isLoadingRoute = false; return@LaunchedEffect }   // لا مسار بلا موقع حقيقي
+    isLoadingRoute = true
+    try {
+        val origin = NavWaypoint(name = "موقعي الحالي", latitude = latestLat, longitude = latestLng, type = WaypointType.START)
+        val result = RealValhallaNavigator.calculateRoute(context, origin, remaining)
+        // ... بقية الجسم كما هو
+```
+(احذف سطري `safeLat/safeLng`.)
+
+## 2) إبقاء الشاشة مضاءة أثناء الملاحة
+ضعه بعد فحص `waypoints.isEmpty()`:
+```kotlin
+val view = androidx.compose.ui.platform.LocalView.current
+DisposableEffect(view) {
+    view.keepScreenOn = true
+    onDispose { view.keepScreenOn = false }
+}
+```
+
+## 3) تأكيد قبل الخروج بزر الرجوع (لا إنهاء عرضي)
+```kotlin
+var showExitConfirm by remember { mutableStateOf(false) }
+androidx.activity.compose.BackHandler(enabled = true) { showExitConfirm = true }
+if (showExitConfirm) {
+    AlertDialog(
+        onDismissRequest = { showExitConfirm = false },
+        containerColor = Color(0xFF0F172A),
+        title = { Text("إنهاء الملاحة؟", color = Color.White, fontWeight = FontWeight.Bold) },
+        text = { Text("سيتوقف التوجيه الصوتي وتُحذف المحطات.", color = Color(0xFFCBD5E1)) },
+        confirmButton = { TextButton(onClick = { showExitConfirm = false; onFinishNavigation() }) { Text("إنهاء", color = Color(0xFFEF4444)) } },
+        dismissButton = { TextButton(onClick = { showExitConfirm = false }) { Text("متابعة", color = Color(0xFF10B981)) } }
+    )
+}
+```
+> `BackHandler` الذي في `MapScreenContent` يبقى مركّباً أيضاً، لكن هذا الأحدث تركيباً فيأخذ الأولوية.
+
+## 4) إظهار سبب فشل الأوفلاين بدل الصمت
+بعد حساب `engineLabel` أضف:
+```kotlin
+val nativeError = if (isTilesDownloaded && result != null && !result.isOffline) NativeValhallaStatus.lastError else null
+```
+وفي بطاقة الشارة العلوية بعد `Row`:
+```kotlin
+nativeError?.let {
+    Text("تعذر تشغيل الأوفلاين: $it", color = Color(0xFFF59E0B), fontSize = 10.sp, maxLines = 2, overflow = TextOverflow.Ellipsis,
+        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp))
+}
+```
+(تحتاج الشارة إلى `Column` حول `Row` لتحتوي السطرين.)
+
+## 5) صوت عربي غير مثبّت على الجهاز
+عرّف `var ttsMissing by remember { mutableStateOf(false) }` وفي رد استدعاء TTS:
+```kotlin
+val r = instance?.setLanguage(Locale("ar"))
+ttsMissing = r == TextToSpeech.LANG_MISSING_DATA || r == TextToSpeech.LANG_NOT_SUPPORTED
+ttsReady = !ttsMissing
+```
+ثم:
+```kotlin
+LaunchedEffect(ttsMissing) {
+    if (ttsMissing) {
+        val res = snackbarHostState.showSnackbar("لا توجد بيانات صوت عربي على جهازك", actionLabel = "تثبيت", duration = SnackbarDuration.Long)
+        if (res == SnackbarResult.ActionPerformed) {
+            try { context.startActivity(android.content.Intent(TextToSpeech.Engine.ACTION_INSTALL_TTS_DATA).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) } catch (_: Exception) {}
+        }
+    }
+}
+```
+
+## 6) تحسين: سرعة وصول أدق
+يُحسب الوقت المتبقي حالياً نسبياً من المسافة. استبدل `remainingSeconds` بنسخة تأخذ السرعة الحية (ضمن حدود):
+```kotlin
+val baseSeconds = if (totalMeters > 1.0) (result?.totalDurationSeconds ?: 0.0) * (remainingMeters / totalMeters) else 0.0
+val expectedKmh = if ((result?.totalDurationSeconds ?: 0.0) > 0) totalMeters / result!!.totalDurationSeconds * 3.6 else 0.0
+val speedFactor = if (!isApproximate && currentSpeedKmh >= 15 && expectedKmh > 0) (expectedKmh / currentSpeedKmh).coerceIn(0.7, 1.5) else 1.0
+val remainingSeconds = baseSeconds * speedFactor
+```
+## اختبار
+1. بلا GPS: لا مسار ولا نطق، رسالة «لم يتم تحديد موقعك».
+2. زر الرجوع أثناء الملاحة: يظهر تأكيد.
+3. افصل حزمة الأوفلاين عمداً (ملف تالف) وأنت متصل: تظهر شارة OSRM وسطر «تعذر تشغيل الأوفلاين: …».

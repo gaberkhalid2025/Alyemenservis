@@ -1,0 +1,144 @@
+# 16 – زر الفزعة SOS: من وهمي إلى حقيقي وصادق
+**الملفات:** `MapScreenContent.kt` (كتلة `if (showSosDialog)` ≈ سطر 998-1048)، `OfflineQueueManager.kt`، `MainViewModel.kt`، ملف جديد `SosDispatcher.kt`  |  **الإجراء:** استبدال الكتلة + إضافة ملف.
+
+## المشكلة (حرجة)
+الكود الحالي: `delay(600)` ثم يعرض «🚨 تم إرسال نداء الفزعة وإحداثيات موقعك لأقرب فني طوارئ معتمد!». **لا يُرسل شيء.** مستخدم في خطر سيعتقد أن المساعدة في الطريق.
+
+## المبادئ
+1. لا تُعرض عبارة «تم الإرسال» إلا بعد تأكيد حقيقي (نجاح Firestore، أو أن المستخدم ضغط «إرسال» في تطبيق الرسائل).
+2. إن لم يوجد موقع حقيقي فلا إرسال إحداثيات؛ اعرض ذلك صراحة وأبقِ خيار الاتصال.
+3. ثلاث قنوات: **اتصال** بأقرب فني، **SMS** برابط الموقع (يعمل بلا إنترنت)، **نداء عبر التطبيق** (طابور Firestore).
+4. لا تُدّعَ أن فنياً أُخطر. الإخطار يحتاج Cloud Function على الخادم؛ بدونها النص الصادق: «تم حفظ النداء ووصل للخادم».
+
+## 1) ملف جديد `com/example/utils/SosDispatcher.kt`
+```kotlin
+package com.example.utils
+
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import java.util.Locale
+
+object SosDispatcher {
+
+    /** رابط خريطة يعمل بدون حساب جوجل. */
+    fun mapLink(lat: Double, lng: Double): String {
+        val la = String.format(Locale.US, "%.6f", lat)
+        val lo = String.format(Locale.US, "%.6f", lng)
+        return "https://www.openstreetmap.org/?mlat=$la&mlon=$lo#map=18/$la/$lo"
+    }
+
+    fun buildMessage(lat: Double, lng: Double, accuracyM: Float?): String {
+        val acc = accuracyM?.let { " (دقة ≈ ${it.toInt()} م)" } ?: ""
+        return "🚨 نداء فزعة: أحتاج مساعدة عاجلة.\nموقعي$acc:\n${mapLink(lat, lng)}"
+    }
+
+    /** يفتح تطبيق الرسائل مع نص جاهز؛ المستخدم هو من يضغط «إرسال». */
+    fun smsIntent(phone: String, body: String): Intent =
+        Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:${Uri.encode(phone)}")).putExtra("sms_body", body)
+
+    fun dialIntent(phone: String): Intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${Uri.encode(phone)}"))
+
+    /** مشاركة عامة (واتساب...) إن لم يتوفر رقم. */
+    fun shareIntent(body: String): Intent =
+        Intent.createChooser(Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, body) }, "مشاركة موقعي")
+
+    fun safeStart(context: Context, intent: Intent): Boolean = try {
+        context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); true
+    } catch (e: Exception) { false }
+}
+```
+
+## 2) OfflineQueueManager.executeRequest: أضف مجموعة خاصة
+في `when (req.type)` أضف: `"SOS" -> "sos_alerts"`.
+> **على الخادم:** قواعد أمان Firestore تسمح بالكتابة فقط للمستخدم المسجّل، وCloud Function تُخطر الفني الأقرب. بدونها يبقى النداء مخزناً فقط.
+
+## 3) MainViewModel: دالة الإدراج
+(إن كان `OfflineQueueManager` مُحقناً أصلاً في الـ ViewModel فاستخدمه، وإلا أضفه للمُنشئ بـ `@Inject`.)
+```kotlin
+fun enqueueSos(lat: Double, lng: Double, accuracyM: Float?, message: String) {
+    offlineQueueManager.addToQueue(
+        OfflineRequest(
+            type = "SOS",
+            priority = 1,
+            data = mapOf(
+                "lat" to lat, "lng" to lng, "accuracyM" to accuracyM?.toDouble(),
+                "message" to message, "createdAt" to System.currentTimeMillis(),
+                "status" to "OPEN"
+            )
+        )
+    )
+}
+```
+
+## 4) MapScreenContent: استبدل كتلة `if (showSosDialog) { ... }` كاملة
+imports: `com.example.utils.SosDispatcher`, `kotlinx.coroutines.flow` عند الحاجة.
+```kotlin
+if (showSosDialog) {
+    val nearest = remember(providers, safeUserLat, safeUserLng) {
+        providers
+            .filter { it.phone.isNotBlank() && it.latitude != 0.0 && it.longitude != 0.0 }
+            .minByOrNull { MapDistanceCalculator.calculateDistanceMeters(safeUserLat, safeUserLng, it.latitude, it.longitude) }
+    }
+    val sosText = SosDispatcher.buildMessage(safeUserLat, safeUserLng, null)
+
+    AlertDialog(
+        onDismissRequest = { showSosDialog = false },
+        containerColor = Color(0xFF0F172A),
+        title = { Text("🚨 نداء فزعة", color = Color.White, fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                if (!hasRealLocation) {
+                    Text("لم يتم تحديد موقعك الحقيقي بعد، فلن يُرسَل موقع. يمكنك الاتصال مباشرة.", color = Color(0xFFF59E0B), fontSize = 13.sp)
+                } else {
+                    Text("سيتم استخدام موقعك الحالي. لا يُعتبر النداء مرسلاً إلا بعد تأكيد الإرسال أدناه.", color = Color(0xFFCBD5E1), fontSize = 13.sp)
+                }
+                nearest?.let { p ->
+                    Text("أقرب فني: ${p.name}", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    Button(
+                        onClick = { SosDispatcher.safeStart(context, SosDispatcher.dialIntent(p.phone)) },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("📞 اتصل بـ ${p.name}") }
+                    if (hasRealLocation) {
+                        OutlinedButton(
+                            onClick = {
+                                if (!SosDispatcher.safeStart(context, SosDispatcher.smsIntent(p.phone, sosText))) {
+                                    coroutineScope.launch { snackbarHostState.showSnackbar("تعذر فتح تطبيق الرسائل") }
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) { Text("✉️ أرسل رسالة SMS بموقعي (تعمل بلا إنترنت)") }
+                    }
+                }
+                if (hasRealLocation) {
+                    OutlinedButton(
+                        onClick = { SosDispatcher.safeStart(context, SosDispatcher.shareIntent(sosText)) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("📤 مشاركة موقعي (واتساب وغيره)") }
+                    Button(
+                        onClick = {
+                            viewModel.enqueueSos(safeUserLat, safeUserLng, null, sosText)
+                            showSosDialog = false
+                            coroutineScope.launch {
+                                // صادق: النداء محفوظ وسيُرسل عند توفر الإنترنت، وليس "وصل لفني"
+                                snackbarHostState.showSnackbar("تم حفظ النداء وسيُرسل للخادم فور توفر الإنترنت. للأمان اتصل أيضاً بأقرب فني.")
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("🚨 إرسال نداء عبر التطبيق", fontWeight = FontWeight.Bold) }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = { TextButton(onClick = { showSosDialog = false }) { Text("إغلاق", color = Color(0xFF94A3B8)) } }
+    )
+}
+```
+وأزل المتغير `isSosBroadcasting` إن لم يعد مستخدماً (أو اتركه دون حذف إن كان مستخدماً في مكان آخر).
+
+## اختبار
+1. بدون GPS: يظهر تحذير وزر الاتصال فقط، ولا زر إرسال موقع.
+2. مع GPS: SMS يفتح برسالة جاهزة فيها رابط الموقع.
+3. وضع الطيران ثم «إرسال نداء»: رسالة «تم حفظ النداء وسيُرسل…»؛ أطفئ وضع الطيران وتحقق من ظهور المستند في مجموعة `sos_alerts` بـ Firestore.

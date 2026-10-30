@@ -1,0 +1,49 @@
+# 21 – تحسين الأداء: إزالة تخصيص `Paint` داخل الرسم
+**الملفات:** `RadarRenderer.kt` (سطر 118)، `OfflineInteractiveMap.kt` (14 موضعاً: 489، 495، 504، 513، 665، 673، 687، 692، 1040، 1150، 1249، 1264، 1269)  |  **الإجراء:** تعديل موضعي في كل موضع.
+
+## المشكلة
+`android.graphics.Paint()` يُنشأ داخل دوال الرسم (تُنفَّذ كل إطار، حتى 60 مرة/ثانية) ⇒ ضغط على Garbage Collector وتقطّع في الرادار والخريطة الاحتياطية، خصوصاً على أجهزة ضعيفة.
+
+## القاعدة
+أنشئ الـ Paint **مرة واحدة** وغيّر خصائصه المتغيرة (الحجم/اللون) فقط داخل الرسم.
+
+### أ) داخل Composable: استخدم `remember`
+قبل:
+```kotlin
+Canvas(modifier) {
+    drawIntoCanvas { canvas ->
+        val titlePaint = android.graphics.Paint().apply { isAntiAlias = true; textSize = 28f * scale; color = android.graphics.Color.WHITE }
+        canvas.nativeCanvas.drawText(title, x, y, titlePaint)
+    }
+}
+```
+بعد:
+```kotlin
+val titlePaint = remember { android.graphics.Paint().apply { isAntiAlias = true; textAlign = android.graphics.Paint.Align.CENTER } }
+Canvas(modifier) {
+    drawIntoCanvas { canvas ->
+        titlePaint.textSize = 28f * scale          // خصائص متغيرة فقط
+        titlePaint.color = android.graphics.Color.WHITE
+        canvas.nativeCanvas.drawText(title, x, y, titlePaint)
+    }
+}
+```
+### ب) داخل دوال مساعدة `DrawScope.xxx(...)` (السطور 1040، 1150، 1249، 1264، 1269)
+لا يمكن `remember` داخلها؛ اجعلها حقولاً على مستوى الملف:
+```kotlin
+private val roadTextPaint = android.graphics.Paint().apply { isAntiAlias = true; textAlign = android.graphics.Paint.Align.CENTER }
+private val roundPaint = android.graphics.Paint().apply { isAntiAlias = true }
+private val distPaint = android.graphics.Paint().apply { isAntiAlias = true }
+private val pillPaint = android.graphics.Paint().apply { isAntiAlias = true; style = android.graphics.Paint.Style.FILL }
+private val borderPaint = android.graphics.Paint().apply { isAntiAlias = true; style = android.graphics.Paint.Style.STROKE }
+```
+ثم داخل الدالة: `roadTextPaint.textSize = ...; roadTextPaint.color = ...` وتُستعمل. (الرسم على خيط واحد، فلا مشكلة تزامن.)
+
+### ج) القوائم المؤقتة
+`listOf(Color(...), Color(...))` داخل الرسم (مثل RadarRenderer 104 و224) انقلها إلى `remember` أو `private val` على مستوى الملف.
+
+## لا تغيّر
+المظهر والألوان والأحجام؛ المطلوب فقط عدم إنشاء كائنات جديدة في كل إطار.
+
+## اختبار
+شغّل الرادار 30 ثانية مع «Profile GPU Rendering» (أو Android Studio Profiler ← Memory): يجب ألا ترى نشاط GC متكرراً مع كل إطار.

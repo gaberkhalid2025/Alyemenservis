@@ -172,7 +172,7 @@ object ValhallaTileDownloader {
             }
         }
 
-    private fun installFromZip(
+    private suspend fun installFromZip(
         context: Context,
         input: InputStream,
         totalHint: Long,
@@ -232,6 +232,11 @@ object ValhallaTileDownloader {
             tmpDir.deleteRecursively()
             return Result.failure(IOException("الملف المستخرج صغير جداً أو تالف"))
         }
+
+        // [إصلاح 20] تحرير محرك Valhalla النشط قبل تبديل المجلدات
+        try {
+            RealValhallaNavigator.releaseEngine()
+        } catch (_: Throwable) {}
 
         // تبديل ذري: لا نحذف القديم إلا بعد التأكد من نقل الجديد
         val dir = valhallaDir(context)

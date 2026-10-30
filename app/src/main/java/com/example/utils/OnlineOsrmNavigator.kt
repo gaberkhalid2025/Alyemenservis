@@ -55,7 +55,7 @@ object OnlineOsrmNavigator {
         try {
             // [إصلاح ملاحة نهائي] OSRM يتطلب الترتيب lon,lat
             val coordsParam = allWaypoints.joinToString(";") { "${it.longitude},${it.latitude}" }
-            val urlString = "${NavConfig.OSRM_BASE_URL}$coordsParam?overview=full&geometries=geojson&steps=true"
+            val urlString = "${NavConfig.OSRM_BASE_URL}$coordsParam?overview=full&geometries=geojson&steps=true&alternatives=false"
             val url = URL(urlString)
 
             connection = (url.openConnection() as HttpURLConnection).apply {
@@ -170,7 +170,9 @@ object OnlineOsrmNavigator {
                 engineSource = "OSRM 🌐",
                 error = NavError.RouteNotFound
             )
-        } catch (e: Exception) {
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Throwable) {
             Log.e(TAG, "OSRM calculateRoute exception: ${e.message}", e)
             return@withContext NavRouteResult(
                 totalDistanceMeters = 0.0,
@@ -185,29 +187,30 @@ object OnlineOsrmNavigator {
         } finally {
             try {
                 connection?.disconnect()
-            } catch (e: Exception) {}
+            } catch (_: Exception) {}
         }
     }
 
     private fun mapManeuver(type: String, modifier: String): ManeuverType {
+        fun byModifier(): ManeuverType = when (modifier) {
+            "left" -> ManeuverType.LEFT
+            "right" -> ManeuverType.RIGHT
+            "sharp left" -> ManeuverType.SHARP_LEFT
+            "sharp right" -> ManeuverType.SHARP_RIGHT
+            "slight left" -> ManeuverType.SLIGHT_LEFT
+            "slight right" -> ManeuverType.SLIGHT_RIGHT
+            "uturn" -> ManeuverType.UTURN
+            else -> ManeuverType.STRAIGHT
+        }
         return when (type) {
             "depart" -> ManeuverType.START
-            "turn" -> when (modifier) {
-                "left" -> ManeuverType.LEFT
-                "right" -> ManeuverType.RIGHT
-                "sharp left" -> ManeuverType.SHARP_LEFT
-                "sharp right" -> ManeuverType.SHARP_RIGHT
-                "slight left" -> ManeuverType.SLIGHT_LEFT
-                "slight right" -> ManeuverType.SLIGHT_RIGHT
-                "uturn" -> ManeuverType.UTURN
-                else -> ManeuverType.STRAIGHT
-            }
-            "continue", "new name" -> ManeuverType.STRAIGHT
-            "roundabout", "rotary" -> ManeuverType.ROUNDABOUT
+            "arrive" -> ManeuverType.DESTINATION
+            "turn", "end of road", "fork", "continue" -> byModifier()
+            "new name" -> ManeuverType.STRAIGHT
+            "roundabout", "rotary", "roundabout turn", "exit roundabout", "exit rotary" -> ManeuverType.ROUNDABOUT
             "on ramp", "merge" -> ManeuverType.HIGHWAY_ENTER
             "off ramp" -> ManeuverType.HIGHWAY_EXIT
-            "arrive" -> ManeuverType.DESTINATION
-            else -> ManeuverType.STRAIGHT
+            else -> byModifier()
         }
     }
 }

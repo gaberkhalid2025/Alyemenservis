@@ -10,7 +10,8 @@ object ArabicInstructionFormatter {
         maneuver: ManeuverType,
         streetName: String?,
         distanceMeters: Double,
-        destinationName: String?
+        destinationName: String?,
+        roundaboutExit: Int? = null
     ): String {
         val street = if (!streetName.isNullOrBlank() && streetName != "unnamed") " في $streetName" else ""
         val distText = formatDistance(distanceMeters)
@@ -25,7 +26,18 @@ object ArabicInstructionFormatter {
             ManeuverType.SLIGHT_LEFT -> "انحرف يساراً قليلاً بعد $distText$street"
             ManeuverType.SLIGHT_RIGHT -> "انحرف يميناً قليلاً بعد $distText$street"
             ManeuverType.UTURN -> "قم بالدوران للخلف (U-turn) بعد $distText"
-            ManeuverType.ROUNDABOUT -> "ادخل الدوار لمسافة $distText ثم اسلك المخرج"
+            ManeuverType.ROUNDABOUT -> {
+                val exitTxt = when (roundaboutExit) {
+                    1 -> "الأول"
+                    2 -> "الثاني"
+                    3 -> "الثالث"
+                    4 -> "الرابع"
+                    5 -> "الخامس"
+                    else -> null
+                }
+                if (exitTxt != null) "ادخل الدوار واسلك المخرج $exitTxt$street"
+                else "ادخل الدوار لمسافة $distText ثم اسلك المخرج"
+            }
             ManeuverType.HIGHWAY_ENTER -> "اسلك المسار السريع بعد $distText$street"
             ManeuverType.HIGHWAY_EXIT -> "اخرج من المسار السريع بعد $distText$street"
             ManeuverType.DESTINATION -> "وصلت إلى وجهتك: $destinationName"

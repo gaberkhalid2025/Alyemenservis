@@ -233,9 +233,16 @@ class MainViewModel @Inject constructor(
     val userLatitude: StateFlow<Double> = _userLatitude.asStateFlow()
     internal val _userLongitude = MutableStateFlow(44.1910)
     val userLongitude: StateFlow<Double> = _userLongitude.asStateFlow()
+    private val _userLocationAccuracyM = MutableStateFlow(Float.MAX_VALUE)
+    val userLocationAccuracyM: StateFlow<Float> = _userLocationAccuracyM.asStateFlow()
+    private val _isUserLocationReal = MutableStateFlow(false)
+    val isUserLocationReal: StateFlow<Boolean> = _isUserLocationReal.asStateFlow()
     internal val _isGpsTrackingActive = MutableStateFlow(false)
     val isGpsTrackingActive: StateFlow<Boolean> = _isGpsTrackingActive.asStateFlow()
     private var locationCallback: com.google.android.gms.location.LocationCallback? = null
+    private var navTrackingJob: kotlinx.coroutines.Job? = null
+    val locationService by lazy { LocationService(appContext ?: com.example.MyApplication.instance ?: throw IllegalStateException("Context not ready")) }
+    val offlineQueueManager by lazy { OfflineQueueManager(appContext ?: com.example.MyApplication.instance ?: throw IllegalStateException("Context not ready")) }
     internal val _isProvidersLoading get() = appState._isProvidersLoading
     val isProvidersLoading: StateFlow<Boolean> = _isProvidersLoading.asStateFlow()
     internal val _isChatChannelsLoading get() = appState._isChatChannelsLoading
@@ -351,18 +358,32 @@ class MainViewModel @Inject constructor(
                     val fusedClient = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(ctx)
                     
                     fusedClient.lastLocation.addOnSuccessListener { loc ->
-                        loc?.let { updateUserLocation(it.latitude, it.longitude) }
+                        loc?.let {
+                            val isMock = if (android.os.Build.VERSION.SDK_INT >= 31) it.isMock else @Suppress("DEPRECATION") it.isFromMockProvider
+                            val real = !isMock && (!it.hasAccuracy() || it.accuracy <= 150f)
+                            if (real) {
+                                updateUserLocation(it.latitude, it.longitude)
+                                _userLocationAccuracyM.value = it.accuracy
+                            }
+                            _isUserLocationReal.value = real
+                        }
                     }
 
                     val request = com.google.android.gms.location.LocationRequest.Builder(
-                        com.google.android.gms.location.Priority.PRIORITY_HIGH_ACCURACY, 5000L
-                    ).setMinUpdateIntervalMillis(2000L).build()
+                        com.google.android.gms.location.Priority.PRIORITY_HIGH_ACCURACY, 3000L
+                    ).setMinUpdateIntervalMillis(1000L).build()
 
                     if (locationCallback == null) {
                         locationCallback = object : com.google.android.gms.location.LocationCallback() {
                             override fun onLocationResult(result: com.google.android.gms.location.LocationResult) {
                                 result.lastLocation?.let { loc ->
-                                    updateUserLocation(loc.latitude, loc.longitude)
+                                    val isMock = if (android.os.Build.VERSION.SDK_INT >= 31) loc.isMock else @Suppress("DEPRECATION") loc.isFromMockProvider
+                                    val real = !isMock && (!loc.hasAccuracy() || loc.accuracy <= 150f)
+                                    if (real) {
+                                        updateUserLocation(loc.latitude, loc.longitude)
+                                        _userLocationAccuracyM.value = loc.accuracy
+                                    }
+                                    _isUserLocationReal.value = real
                                 }
                             }
                         }
@@ -373,6 +394,47 @@ class MainViewModel @Inject constructor(
             } catch (e: Exception) {
                 android.util.Log.e("MainViewModel", "Location updates error: ", e)
             }
+        }
+    }
+
+    fun startNavigationTracking() {
+        if (navTrackingJob?.isActive == true) return
+        navTrackingJob = viewModelScope.launch {
+            try {
+                locationService.locationUpdates(intervalMs = 1000L, maxAccuracyM = 50f).collect { c ->
+                    updateUserLocation(c.latitude, c.longitude)
+                    _userLocationAccuracyM.value = c.accuracyMeters
+                    _isUserLocationReal.value = true
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("MainViewModel", "Navigation tracking error: ", e)
+            }
+        }
+    }
+
+    fun stopNavigationTracking() {
+        navTrackingJob?.cancel()
+        navTrackingJob = null
+    }
+
+    fun enqueueSos(lat: Double, lng: Double, accuracyM: Float?, message: String) {
+        try {
+            offlineQueueManager.addToQueue(
+                OfflineRequest(
+                    type = "SOS",
+                    priority = 1,
+                    data = mapOf(
+                        "lat" to lat,
+                        "lng" to lng,
+                        "accuracyM" to (accuracyM?.toDouble() ?: 0.0),
+                        "message" to message,
+                        "createdAt" to System.currentTimeMillis(),
+                        "status" to "OPEN"
+                    )
+                )
+            )
+        } catch (e: Exception) {
+            android.util.Log.e("MainViewModel", "Failed to enqueue SOS: ", e)
         }
     }
     fun refreshData(showNotification: Boolean = false) {

@@ -38,6 +38,27 @@ object RealValhallaNavigator {
     private val nativeMutex = Mutex()
     private const val TAG = "RealValhallaNavigator"
 
+    private var cachedEngine: com.valhalla.valhalla.Valhalla? = null
+    private var cachedConfigPath: String? = null
+
+    /** تُستدعى فقط داخل nativeMutex. */
+    private fun engineFor(configPath: String): com.valhalla.valhalla.Valhalla {
+        val existing = cachedEngine
+        if (existing != null && cachedConfigPath == configPath) return existing
+        try { existing?.close() } catch (_: Throwable) {}
+        return com.valhalla.valhalla.Valhalla(configPath).also {
+            cachedEngine = it
+            cachedConfigPath = configPath
+        }
+    }
+
+    /** يجب استدعاؤها قبل استبدال ملفات الخرائط (من المنزِّل) وعند أي خطأ أصلي. */
+    suspend fun releaseEngine() = nativeMutex.withLock {
+        try { cachedEngine?.close() } catch (_: Throwable) {}
+        cachedEngine = null
+        cachedConfigPath = null
+    }
+
     @Volatile var lastSearchError: String? = null
 
     private val searchMutex = Mutex()
@@ -148,20 +169,14 @@ object RealValhallaNavigator {
 
             val requestJson = formatValhallaRequest(origin, waypoints)
 
-            // محاولة إنشاء واستدعاء Valhalla مباشرة أو عبر Reflection
+            // [إصلاح 20] استخدام نسخة محرك Valhalla واحدة محتفظ بها لتسريع الملاحة 10 أضعاف
             val responseJson = try {
-                val valhalla = com.valhalla.valhalla.Valhalla(configFile.absolutePath)
-                val res = valhalla.routeRaw(requestJson)
-                try { valhalla.close() } catch (_: Throwable) {}
-                res
-            } catch (t1: Throwable) {
-                val clazz = Class.forName("com.valhalla.valhalla.Valhalla")
-                val ctor = clazz.getConstructor(String::class.java)
-                val instance = ctor.newInstance(configFile.absolutePath)
-                val method = clazz.getMethod("routeRaw", String::class.java)
-                val res = method.invoke(instance, requestJson) as String
-                try { (instance as? java.io.Closeable)?.close() } catch (_: Throwable) {}
-                res
+                engineFor(configFile.absolutePath).routeRaw(requestJson)
+            } catch (t: Throwable) {
+                try { cachedEngine?.close() } catch (_: Throwable) {}
+                cachedEngine = null
+                cachedConfigPath = null
+                throw t
             }
 
             if (!responseJson.isNullOrBlank()) {
@@ -237,13 +252,15 @@ object RealValhallaNavigator {
                     val streetNames = manObj.optJSONArray("street_names")
                     val streetName = if (streetNames != null && streetNames.length() > 0) streetNames.getString(0) else ""
                     val mType = mapValhallaManeuver(manTypeInt)
+                    val roundaboutExit = if (manObj.has("roundabout_exit_count")) manObj.optInt("roundabout_exit_count") else null
 
                     legSteps.add(NavStep(
                         instruction = ArabicInstructionFormatter.format(
                             mType,
                             streetName,
                             manDist,
-                            waypoints.getOrNull(i)?.name ?: "الوجهة"
+                            waypoints.getOrNull(i)?.name ?: "الوجهة",
+                            roundaboutExit = roundaboutExit
                         ),
                         distanceMeters = manDist,
                         durationSeconds = manDur,

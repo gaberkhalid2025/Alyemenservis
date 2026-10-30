@@ -1,0 +1,101 @@
+# 18 – البحث الصوتي والبوصلة (كانتا وهميتين)
+**الملفات:** `MapScreenContent.kt`، ملف جديد `CompassSensor.kt`، `MapControls.kt` (بلا تغيير غالباً)  |  **الإجراء:** تعديل + ملف جديد.
+
+## المشكلة
+- `onVoiceSearchClick` يعرض «المساعد الصوتي يستمع» ولا يشغّل أي تعرّف.
+- `compassBearing` لا يتغير عن 0 (لا حساس)، فأيقونة البوصلة ثابتة.
+
+## 1) البحث الصوتي (بلا صلاحية RECORD_AUDIO؛ يستخدم واجهة النظام)
+imports: `android.app.Activity`, `android.content.ActivityNotFoundException`, `android.content.Intent`, `android.speech.RecognizerIntent`, `androidx.activity.compose.rememberLauncherForActivityResult`, `androidx.activity.result.contract.ActivityResultContracts`.
+```kotlin
+val speechLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { res ->
+    if (res.resultCode == Activity.RESULT_OK) {
+        val text = res.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
+        if (!text.isNullOrBlank()) { state.searchQuery = text.trim(); searchPanelOpen = true }
+    }
+}
+```
+وفي `MapFilterBar(...)` استبدل `onVoiceSearchClick`:
+```kotlin
+onVoiceSearchClick = {
+    val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+        putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+        putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ar-YE")
+        putExtra(RecognizerIntent.EXTRA_PROMPT, "تحدث باسم الشارع أو الخدمة")
+        putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+    }
+    try { speechLauncher.launch(intent) }
+    catch (e: ActivityNotFoundException) {
+        coroutineScope.launch { snackbarHostState.showSnackbar("جهازك لا يدعم التعرف على الصوت") }
+    }
+},
+```
+> في `<manifest>` أضف لتوافق أندرويد 11+: `<queries><intent><action android:name="android.speech.action.RECOGNIZE_SPEECH"/></intent></queries>`.
+> نتيجة الصوت تمر بنفس مسار البحث (debounce ← Nominatim/محلي) لأن `state.searchQuery` تغيّر.
+
+## 2) البوصلة الحقيقية: ملف جديد `CompassSensor.kt`
+```kotlin
+package com.example.utils
+
+import android.content.Context
+import android.hardware.GeomagneticField
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+
+/** اتجاه الجهاز بالدرجات (0 = شمال حقيقي، يزداد مع عقارب الساعة). */
+@Composable
+fun rememberHeadingDegrees(enabled: Boolean, lat: Double, lng: Double): Float {
+    val context = LocalContext.current
+    var heading by remember { mutableFloatStateOf(0f) }
+    DisposableEffect(enabled) {
+        val sm = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
+        val sensor = sm.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
+        if (!enabled || sensor == null) return@DisposableEffect onDispose { }
+        val rot = FloatArray(9)
+        val orient = FloatArray(3)
+        var smoothed = 0f
+        var first = true
+        val listener = object : SensorEventListener {
+            override fun onSensorChanged(e: SensorEvent) {
+                SensorManager.getRotationMatrixFromVector(rot, e.values)
+                SensorManager.getOrientation(rot, orient)
+                val magnetic = Math.toDegrees(orient[0].toDouble()).toFloat()
+                val declination = GeomagneticField(lat.toFloat(), lng.toFloat(), 0f, System.currentTimeMillis()).declination
+                val az = (magnetic + declination + 360f) % 360f
+                if (first) { smoothed = az; first = false } else {
+                    var d = az - smoothed
+                    if (d > 180f) d -= 360f
+                    if (d < -180f) d += 360f
+                    smoothed = (smoothed + 0.15f * d + 360f) % 360f   // تنعيم مع التفاف 359→1
+                }
+                heading = smoothed
+            }
+            override fun onAccuracyChanged(s: Sensor?, accuracy: Int) {}
+        }
+        sm.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_UI)
+        onDispose { sm.unregisterListener(listener) }
+    }
+    return heading
+}
+```
+## 3) MapScreenContent
+- احذف `var compassBearing by remember { mutableFloatStateOf(0f) }` (سطر 106) واستبدله بـ:
+```kotlin
+val heading = com.example.utils.rememberHeadingDegrees(enabled = !state.isNavigating, lat = safeUserLat, lng = safeUserLng)
+```
+- عند تمرير `MapControls`: `compassBearing = -heading` (السهم يشير للشمال فيدور عكس اتجاه الجهاز).
+- في `onResetNorth` احذف `compassBearing = 0f` (لا معنى له الآن) واجعله يعيد توجيه الخريطة للشمال فقط إن كانت الخريطة تدور.
+> ملاحظة: أيقونة المنتصف في `MapControls` تدور بـ `Modifier.rotate(compassBearing)` وتعمل كما هي.
+
+## اختبار
+1. اضغط الميكروفون وقل «شارع هائل»: يُملأ حقل البحث وتظهر النتائج.
+2. دوّر الهاتف: تدور أيقونة البوصلة وتشير للشمال.
