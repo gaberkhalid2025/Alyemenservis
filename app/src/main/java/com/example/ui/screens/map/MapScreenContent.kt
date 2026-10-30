@@ -1,4 +1,4 @@
-@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class, androidx.compose.material3.ExperimentalMaterial3Api::class)
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class, androidx.compose.material3.ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 
 package com.example.ui.screens.map
 import com.example.ui.*
@@ -10,9 +10,12 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
+import com.example.utils.MapDiagnosticsDialog
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -151,6 +154,14 @@ fun MapScreenContent(
     var searchMessage by remember { mutableStateOf<String?>(null) }
     var searchPanelOpen by remember { mutableStateOf(false) }
     var searchedPlace by remember { mutableStateOf<RealValhallaNavigator.SearchAddressResult?>(null) }
+    var showDiagnostics by remember { mutableStateOf(false) }
+    val accuracyM by viewModel.userLocationAccuracyM.collectAsState()
+
+    DisposableEffect(Unit) {
+        onDispose {
+            viewModel.stopLocationUpdates()
+        }
+    }
 
     // [إصلاح 18] البحث الصوتي باستخدام محرك النظام
     val speechLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { res ->
@@ -466,7 +477,6 @@ fun MapScreenContent(
 
                 // 🇾🇪 Offline Map Status Badge
                 Surface(
-                    onClick = { if (!isTilesDownloaded) showDownloadDialog = true },
                     shape = RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp),
                     color = Color(0xFF0B0F19).copy(alpha = 0.85f),
                     border = BorderStroke(1.dp, if (isTilesDownloaded) Color(0xFF10B981).copy(alpha = 0.4f) else Color(0xFFF59E0B).copy(alpha = 0.4f)),
@@ -475,7 +485,12 @@ fun MapScreenContent(
                         .padding(top = 64.dp, end = 24.dp)
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                        modifier = Modifier
+                            .combinedClickable(
+                                onClick = { if (!isTilesDownloaded) showDownloadDialog = true else showDiagnostics = true },
+                                onLongClick = { showDiagnostics = true }
+                            )
+                            .padding(horizontal = 10.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
@@ -1080,10 +1095,13 @@ fun MapScreenContent(
                         }
                         Button(
                             onClick = {
-                                viewModel.enqueueSos(safeUserLat, safeUserLng, null, sosText)
+                                val ok = viewModel.enqueueSos(safeUserLat, safeUserLng, null, sosText)
                                 showSosDialog = false
                                 coroutineScope.launch {
-                                    snackbarHostState.showSnackbar("تم حفظ النداء وسيُرسل للخادم فور توفر الإنترنت. للأمان اتصل أيضاً بأقرب فني.")
+                                    snackbarHostState.showSnackbar(
+                                        if (ok) "تم حفظ النداء وسيُرسل للخادم فور توفر الإنترنت. للأمان اتصل أيضاً بأقرب فني."
+                                        else "تعذر حفظ النداء! اتصل بأقرب فني أو أرسل رسالة SMS الآن."
+                                    )
                                 }
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
@@ -1101,6 +1119,15 @@ fun MapScreenContent(
                 }
             }
         )
+    }
+
+    if (showDiagnostics) {
+        MapDiagnosticsDialog(
+            hasRealLocation = hasRealLocation,
+            accuracyM = accuracyM.takeIf { it < Float.MAX_VALUE }
+        ) {
+            showDiagnostics = false
+        }
     }
 
     // Provider Booking Dialog

@@ -152,9 +152,9 @@ class LocationService(
                     )
                 )
             } else {
-                // Fallback to last known location from LocationManager if available
+                // Fallback to last known location from LocationManager if available and fresh
                 val lastKnown = getLastKnownLocationFromManager()
-                if (lastKnown != null) {
+                if (lastKnown != null && System.currentTimeMillis() - lastKnown.time <= 5 * 60_000L) {
                     LocationResult.Success(
                         LocationCoordinates(
                             latitude = lastKnown.latitude,
@@ -164,7 +164,7 @@ class LocationService(
                         )
                     )
                 } else {
-                    // لا موقع متاح: لا نختلق إحداثيات
+                    // لا موقع متاح أو موقع قديم: لا نختلق إحداثيات
                     LocationResult.Error("تعذر تحديد موقعك حالياً. تأكد من تشغيل GPS ثم أعد المحاولة")
                 }
             }

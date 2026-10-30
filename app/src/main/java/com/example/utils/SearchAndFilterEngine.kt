@@ -1,7 +1,5 @@
 package com.example.utils
 
-import com.example.utils.*
-
 import android.content.Context
 import android.content.Intent
 import android.speech.RecognizerIntent
@@ -12,8 +10,8 @@ import java.util.Locale
 
 /**
  * 🔍 Problem 12 Solution: Search & Filter Optimization Engine
- * Server-side Firestore queries, Speech-to-Text voice search, local search suggestions/history,
- * and multi-level filter specifications (price, rating, distance, availability).
+ * Server-side Firestore queries, voice search, local search suggestions/history,
+ * and multi-level filter specifications (price, rating, distance, availability) with Arabic normalization.
  */
 object SearchAndFilterEngine {
 
@@ -29,7 +27,7 @@ object SearchAndFilterEngine {
         val sortBy: String = "rating" // "rating", "price_asc", "price_desc", "distance"
     )
 
-    // 2. Build Server-Side Firestore Query
+    // 2. Build Server-Side Firestore Query with Arabic Normalization & Inequality Ordering Rules
     fun buildOptimizedFirestoreQuery(
         db: FirebaseFirestore,
         collectionName: String, // "providers" or "stores"
@@ -39,8 +37,10 @@ object SearchAndFilterEngine {
         var query: Query = db.collection(collectionName)
 
         if (searchQuery.isNotBlank()) {
-            // Use array-contains for keyword indexing to find products and categories within stores/providers
-            query = query.whereArrayContains("keywords", searchQuery.lowercase().trim())
+            val token = ArabicNormalizer.normalize(searchQuery).split(" ").firstOrNull { it.length >= 2 }
+            if (token != null) {
+                query = query.whereArrayContains("keywords", token)
+            }
         }
 
         if (criteria.city.isNotBlank() && criteria.city != "الكل") {
@@ -59,12 +59,20 @@ object SearchAndFilterEngine {
             query = query.whereGreaterThanOrEqualTo("rating", criteria.minRating)
         }
 
-        // Sorting
-        query = when (criteria.sortBy) {
-            "rating" -> query.orderBy("rating", Query.Direction.DESCENDING)
-            "price_asc" -> query.orderBy("price", Query.Direction.ASCENDING)
-            "price_desc" -> query.orderBy("price", Query.Direction.DESCENDING)
-            else -> query.orderBy("rating", Query.Direction.DESCENDING)
+        // Sorting with Firestore inequality constraint compliance
+        query = if (criteria.minRating > 0.0) {
+            val byRating = query.orderBy("rating", Query.Direction.DESCENDING)
+            when (criteria.sortBy) {
+                "price_asc" -> byRating.orderBy("price", Query.Direction.ASCENDING)
+                "price_desc" -> byRating.orderBy("price", Query.Direction.DESCENDING)
+                else -> byRating
+            }
+        } else {
+            when (criteria.sortBy) {
+                "price_asc" -> query.orderBy("price", Query.Direction.ASCENDING)
+                "price_desc" -> query.orderBy("price", Query.Direction.DESCENDING)
+                else -> query.orderBy("rating", Query.Direction.DESCENDING)
+            }
         }
 
         return query.limit(10) // Cursor pagination batch of 10 items for Free-Tier cost optimization

@@ -11,6 +11,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 
@@ -22,6 +23,8 @@ import androidx.compose.ui.platform.LocalContext
 fun rememberHeadingDegrees(enabled: Boolean, lat: Double, lng: Double): Float {
     val context = LocalContext.current
     var heading by remember { mutableFloatStateOf(0f) }
+    val latNow by rememberUpdatedState(lat)
+    val lngNow by rememberUpdatedState(lng)
     DisposableEffect(enabled) {
         val sm = context.getSystemService(Context.SENSOR_SERVICE) as? SensorManager
         val sensor = sm?.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
@@ -30,21 +33,23 @@ fun rememberHeadingDegrees(enabled: Boolean, lat: Double, lng: Double): Float {
         val orient = FloatArray(3)
         var smoothed = 0f
         var first = true
+        var declination = 0f
+        var declinationAt = 0L
         val listener = object : SensorEventListener {
             override fun onSensorChanged(e: SensorEvent) {
+                val now = System.currentTimeMillis()
+                if (now - declinationAt > 60_000L) {                       // مرة كل دقيقة فقط
+                    declination = GeomagneticField(latNow.toFloat(), lngNow.toFloat(), 0f, now).declination
+                    declinationAt = now
+                }
                 SensorManager.getRotationMatrixFromVector(rot, e.values)
                 SensorManager.getOrientation(rot, orient)
-                val magnetic = Math.toDegrees(orient[0].toDouble()).toFloat()
-                val declination = GeomagneticField(lat.toFloat(), lng.toFloat(), 0f, System.currentTimeMillis()).declination
-                val az = (magnetic + declination + 360f) % 360f
-                if (first) {
-                    smoothed = az
-                    first = false
-                } else {
+                val az = (Math.toDegrees(orient[0].toDouble()).toFloat() + declination + 360f) % 360f
+                if (first) { smoothed = az; first = false } else {
                     var d = az - smoothed
                     if (d > 180f) d -= 360f
                     if (d < -180f) d += 360f
-                    smoothed = (smoothed + 0.15f * d + 360f) % 360f // تنعيم مع التفاف 359→1
+                    smoothed = (smoothed + 0.15f * d + 360f) % 360f
                 }
                 heading = smoothed
             }

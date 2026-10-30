@@ -19,11 +19,12 @@ object SosDispatcher {
         return "🚨 نداء فزعة: أحتاج مساعدة عاجلة.\nموقعي$acc:\n${mapLink(lat, lng)}"
     }
 
-    /** يفتح تطبيق الرسائل مع نص جاهز؛ المستخدم هو من يضغط «إرسال». */
-    fun smsIntent(phone: String, body: String): Intent =
-        Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:${Uri.encode(phone)}")).putExtra("sms_body", body)
+    private fun clean(phone: String) = phone.filter { it.isDigit() || it == '+' }
 
-    fun dialIntent(phone: String): Intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${Uri.encode(phone)}"))
+    fun smsIntent(phone: String, body: String): Intent =
+        Intent(Intent.ACTION_SENDTO, Uri.fromParts("smsto", clean(phone), null)).putExtra("sms_body", body)
+
+    fun dialIntent(phone: String): Intent = Intent(Intent.ACTION_DIAL, Uri.fromParts("tel", clean(phone), null))
 
     /** مشاركة عامة (واتساب...) إن لم يتوفر رقم. */
     fun shareIntent(body: String): Intent =

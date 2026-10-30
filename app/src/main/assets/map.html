@@ -290,7 +290,10 @@
             if (!map) return;
             if (userMarker) {
                 userMarker.setLatLng([lat, lng]);
-                if (userAccuracyCircle) userAccuracyCircle.setLatLng([lat, lng]);
+                if (userAccuracyCircle) {
+                    userAccuracyCircle.setLatLng([lat, lng]);
+                    userAccuracyCircle.setRadius(accuracy || 50);
+                }
                 if (pan) map.setView([lat, lng], map.getZoom());
             } else {
                 var pulseHtml = '<div class="user-pulse-marker"><div class="user-pulse"></div><div class="user-dot"></div></div>';

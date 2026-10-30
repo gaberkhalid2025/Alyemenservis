@@ -1,0 +1,80 @@
+# 29 – SearchAndFilterEngine.kt + تطبيع عربي موحّد
+**الملفات:** `SearchAndFilterEngine.kt`، ملف جديد `ArabicNormalizer.kt`، `RealValhallaNavigator.kt` (تفويض)  |  **الإجراء:** تعديل + ملف جديد.
+
+## المشاكل
+1. `buildOptimizedFirestoreQuery`: عند `minRating > 0` مع `sortBy = price_*` يصبح أول `orderBy` على `price` بينما المرشح المتباين على `rating` ⇒ Firestore يرفض الاستعلام (`InvalidArgument`: أول ترتيب يجب أن يكون على حقل المتباينة).
+2. `whereArrayContains("keywords", searchQuery.lowercase())` لا يطبّع العربية (أ/ا، ة/ه، ى/ي، التشكيل) فيفشل مع «هائل/هايل».
+3. التطبيع العربي مكرر في أكثر من مكان (مخاطرة اختلاف).
+
+## 1) ملف جديد `com/example/utils/ArabicNormalizer.kt`
+```kotlin
+package com.example.utils
+
+import java.util.Locale
+
+object ArabicNormalizer {
+    private val DIACRITICS = Regex("[\\u064B-\\u0652\\u0640]")      // تشكيل + تطويل
+    private val ALEF = Regex("[إأآٱ]")
+    private val SPACES = Regex("\\s+")
+
+    fun normalize(input: String): String = input.trim().lowercase(Locale.ROOT)
+        .replace(DIACRITICS, "")
+        .replace(ALEF, "ا")
+        .replace('ى', 'ي').replace('ئ', 'ي')
+        .replace('ؤ', 'و')
+        .replace('ة', 'ه')
+        .replace(SPACES, " ")
+
+    /** كلمات مفتاحية للتخزين في Firestore: كل كلمة + بادئاتها (2..10) ليعمل البحث الجزئي. */
+    fun buildKeywords(vararg texts: String): List<String> {
+        val out = linkedSetOf<String>()
+        texts.forEach { t ->
+            normalize(t).split(" ").filter { it.length >= 2 }.forEach { w ->
+                out.add(w)
+                for (len in 2..minOf(10, w.length)) out.add(w.substring(0, len))
+            }
+        }
+        return out.take(100).toList()                       // حد Firestore معقول لحجم المستند
+    }
+}
+```
+وفي `RealValhallaNavigator`: `private fun normalizeArabic(input: String) = ArabicNormalizer.normalize(input)`.
+
+## 2) SearchAndFilterEngine: استعلام صحيح
+استبدل بدايات الدالة وقسم الترتيب:
+```kotlin
+if (searchQuery.isNotBlank()) {
+    val token = ArabicNormalizer.normalize(searchQuery).split(" ").firstOrNull { it.length >= 2 }
+    if (token != null) query = query.whereArrayContains("keywords", token)
+}
+// ... (المرشحات كما هي)
+
+query = if (criteria.minRating > 0.0) {
+    // قيد Firestore: أول orderBy يجب أن يكون على حقل المتباينة (rating)
+    val byRating = query.orderBy("rating", Query.Direction.DESCENDING)
+    when (criteria.sortBy) {
+        "price_asc" -> byRating.orderBy("price", Query.Direction.ASCENDING)
+        "price_desc" -> byRating.orderBy("price", Query.Direction.DESCENDING)
+        else -> byRating
+    }
+} else {
+    when (criteria.sortBy) {
+        "price_asc" -> query.orderBy("price", Query.Direction.ASCENDING)
+        "price_desc" -> query.orderBy("price", Query.Direction.DESCENDING)
+        else -> query.orderBy("rating", Query.Direction.DESCENDING)
+    }
+}
+```
+## 3) ملاحظات
+- كل تركيبة جديدة (`keywords` + ترتيب) تتطلب **فهرساً مركباً** في Firestore؛ عند أول تشغيل ستظهر في السجل رسالة برابط إنشاء الفهرس.
+- الوثائق القديمة لا تحوي `keywords` مطبَّعة: عند حفظ/تحديث أي فني أو متجر احسب `keywords = ArabicNormalizer.buildKeywords(name, area, category)`. للبيانات الحالية أنشئ مهمة ترحيل مرة واحدة.
+- التعليق في رأس الملف يذكر «Speech-to-Text»؛ لا يوجد تنفيذ له هنا (البحث الصوتي في المستند 18)، فعدّل التعليق ليطابق الواقع.
+
+## اختبار وحدة
+```kotlin
+class ArabicNormalizerTest {
+    @org.junit.Test fun hamzaAndYa() { org.junit.Assert.assertEquals(ArabicNormalizer.normalize("هائل"), ArabicNormalizer.normalize("هايل")) }
+    @org.junit.Test fun alefAndTaMarbuta() { org.junit.Assert.assertEquals("مدرسه الاميل", ArabicNormalizer.normalize("مَدرسةُ الأميل")) }
+    @org.junit.Test fun keywordsHavePrefixes() { org.junit.Assert.assertTrue(ArabicNormalizer.buildKeywords("صنعاء").contains("صن")) }
+}
+```

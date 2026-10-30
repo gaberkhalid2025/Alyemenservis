@@ -1,0 +1,181 @@
+# 26 – MainViewModel.kt + LocationService.kt + MapScreenContent (الموقع الصادق والفزعة)
+**الإجراء:** تعديلات موضعية.
+
+## أ) MainViewModel: عمر الموقع + انتهاء الصلاحية
+أضف (قرب حقول الموقع، سطر ≈ 236):
+```kotlin
+private val _lastFixAtMs = MutableStateFlow(0L)
+private var freshnessJob: kotlinx.coroutines.Job? = null
+
+private fun isFresh(loc: android.location.Location, maxAgeMs: Long = 2 * 60_000L): Boolean {
+    val ageMs = (android.os.SystemClock.elapsedRealtimeNanos() - loc.elapsedRealtimeNanos) / 1_000_000L
+    return ageMs in 0..maxAgeMs
+}
+
+private fun markFix() {
+    _lastFixAtMs.value = System.currentTimeMillis()
+    _isUserLocationReal.value = true
+}
+
+/** يُسقط «الموقع الحقيقي» إن توقفت الإشارة (15 ث أثناء الملاحة، 90 ث غير ذلك). */
+private fun startFreshnessWatchdog() {
+    if (freshnessJob?.isActive == true) return
+    freshnessJob = viewModelScope.launch {
+        while (true) {
+            kotlinx.coroutines.delay(5_000L)
+            val limit = if (navTrackingJob?.isActive == true) 15_000L else 90_000L
+            if (_isUserLocationReal.value && System.currentTimeMillis() - _lastFixAtMs.value > limit) {
+                _isUserLocationReal.value = false
+            }
+        }
+    }
+}
+```
+## ب) استبدل `startLocationUpdates()` و`stopNavigationTracking()` وأضف الإيقاف
+```kotlin
+fun startLocationUpdates() {
+    val ctx = appContext ?: return
+    try {
+        val fine = androidx.core.content.ContextCompat.checkSelfPermission(ctx, android.Manifest.permission.ACCESS_FINE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        val coarse = androidx.core.content.ContextCompat.checkSelfPermission(ctx, android.Manifest.permission.ACCESS_COARSE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        if (!fine && !coarse) return
+
+        val fusedClient = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(ctx)
+
+        fusedClient.lastLocation.addOnSuccessListener { loc ->
+            if (loc == null) return@addOnSuccessListener
+            val isMock = if (android.os.Build.VERSION.SDK_INT >= 31) loc.isMock else @Suppress("DEPRECATION") loc.isFromMockProvider
+            val real = !isMock && isFresh(loc) && (!loc.hasAccuracy() || loc.accuracy <= 150f)
+            if (real) {                                   // الموقع القديم يُتجاهل تماماً ولا يغيّر الحالة
+                updateUserLocation(loc.latitude, loc.longitude)
+                _userLocationAccuracyM.value = loc.accuracy
+                markFix()
+            }
+        }
+
+        val request = com.google.android.gms.location.LocationRequest.Builder(
+            com.google.android.gms.location.Priority.PRIORITY_HIGH_ACCURACY, 3000L
+        ).setMinUpdateIntervalMillis(1000L).build()
+
+        if (locationCallback == null) {
+            locationCallback = object : com.google.android.gms.location.LocationCallback() {
+                override fun onLocationResult(result: com.google.android.gms.location.LocationResult) {
+                    val loc = result.lastLocation ?: return
+                    val isMock = if (android.os.Build.VERSION.SDK_INT >= 31) loc.isMock else @Suppress("DEPRECATION") loc.isFromMockProvider
+                    val real = !isMock && isFresh(loc, 30_000L) && (!loc.hasAccuracy() || loc.accuracy <= 150f)
+                    if (real) {
+                        updateUserLocation(loc.latitude, loc.longitude)
+                        _userLocationAccuracyM.value = loc.accuracy
+                        markFix()
+                    }
+                }
+            }
+        }
+        fusedClient.requestLocationUpdates(request, locationCallback!!, android.os.Looper.getMainLooper())
+            .addOnSuccessListener { _isGpsTrackingActive.value = true }          // لا نعلن النشاط قبل نجاح الطلب
+            .addOnFailureListener { _isGpsTrackingActive.value = false }
+        startFreshnessWatchdog()
+    } catch (e: Exception) {
+        _isGpsTrackingActive.value = false
+        android.util.Log.e("MainViewModel", "Location updates error: ", e)
+    }
+}
+
+fun stopLocationUpdates() {
+    val ctx = appContext
+    val cb = locationCallback
+    if (ctx != null && cb != null) {
+        try { com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(ctx).removeLocationUpdates(cb) } catch (_: Exception) {}
+    }
+    _isGpsTrackingActive.value = false
+}
+```
+وفي `startNavigationTracking()` استبدل `_isUserLocationReal.value = true` بـ `markFix()` وأضف `startFreshnessWatchdog()` في أوله.
+
+وفي `onCleared()` أضف داخل `try`/بعده:
+```kotlin
+stopLocationUpdates()
+stopNavigationTracking()
+freshnessJob?.cancel()
+```
+وفي `MapScreenContent` (أول الدالة) إن لم يكن للموقع مستهلك آخر خارج الخريطة:
+```kotlin
+DisposableEffect(Unit) { onDispose { viewModel.stopLocationUpdates() } }
+```
+> تحقق أن شاشة أخرى لا تعتمد على `isGpsTrackingActive` قبل إضافة هذا السطر.
+
+## ج) الفزعة: إرجاع نتيجة حقيقية + نسخة واحدة من الطابور
+### 1) استبدل `enqueueSos`:
+```kotlin
+fun enqueueSos(lat: Double, lng: Double, accuracyM: Float?, message: String): Boolean {
+    if (lat.isNaN() || lng.isNaN() || (lat == 0.0 && lng == 0.0)) return false
+    return try {
+        offlineQueueManager.addToQueue(
+            OfflineRequest(
+                type = "SOS", priority = 1,
+                data = mapOf(
+                    "lat" to lat, "lng" to lng, "accuracyM" to (accuracyM?.toDouble() ?: 0.0),
+                    "message" to message, "createdAt" to System.currentTimeMillis(), "status" to "OPEN"
+                )
+            )
+        )
+        true
+    } catch (e: Exception) {
+        android.util.Log.e("MainViewModel", "Failed to enqueue SOS: ", e)
+        false
+    }
+}
+```
+### 2) نسخة واحدة من `OfflineQueueManager` (هو `@Singleton` من Hilt):
+```kotlin
+@dagger.hilt.EntryPoint
+@dagger.hilt.InstallIn(dagger.hilt.components.SingletonComponent::class)
+interface QueueEntryPoint { fun offlineQueueManager(): OfflineQueueManager }
+
+val offlineQueueManager: OfflineQueueManager by lazy {
+    val ctx = appContext ?: com.example.MyApplication.instance ?: throw IllegalStateException("Context not ready")
+    dagger.hilt.android.EntryPointAccessors.fromApplication(ctx.applicationContext, QueueEntryPoint::class.java).offlineQueueManager()
+}
+```
+(يشترط أن التطبيق `@HiltAndroidApp`؛ وجود `@ApplicationContext` في الطابور يدل على ذلك.) احذف السطر القديم `val offlineQueueManager by lazy { OfflineQueueManager(...) }`.
+
+### 3) MapScreenContent: لا تقل «تم الحفظ» إلا إن نجح
+```kotlin
+onClick = {
+    val ok = viewModel.enqueueSos(safeUserLat, safeUserLng, null, sosText)
+    showSosDialog = false
+    coroutineScope.launch {
+        snackbarHostState.showSnackbar(
+            if (ok) "تم حفظ النداء وسيُرسل للخادم فور توفر الإنترنت. للأمان اتصل أيضاً بأقرب فني."
+            else "تعذر حفظ النداء! اتصل بأقرب فني أو أرسل رسالة SMS الآن."
+        )
+    }
+}
+```
+## د) LocationService.getCurrentCoordinates: عمر آخر موقع
+داخل فرع `lastKnown != null` أضف الشرط:
+```kotlin
+if (lastKnown != null && System.currentTimeMillis() - lastKnown.time <= 5 * 60_000L) {
+    // ... Success كما هو
+} else {
+    LocationResult.Error("تعذر تحديد موقعك حالياً. تأكد من تشغيل GPS ثم أعد المحاولة")
+}
+```
+## هـ) نقطة المستخدم والمسافات قبل الحصول على إشارة (الإحداثي الأولي = صنعاء)
+في `MapScreenContent`:
+1. لـ`RealLeafletMapView(...)`: `userCoords = if (hasRealLocation) Pair(safeUserLat, safeUserLng) else Pair(0.0, 0.0)` (الدالة تتجاهل 0.0).
+2. للبطاقة السفلية `MapBottomSheet(userLat = ..., userLng = ...)`: مرّر `if (hasRealLocation) safeUserLat else 0.0`، وداخل `MapBottomSheet`:
+```kotlin
+val hasUser = userLat != 0.0 && userLng != 0.0
+val distanceText = when { !hasValidCoords -> "الموقع غير محدد"; !hasUser -> "فعّل GPS لحساب المسافة"; else -> MapDistanceCalculator.formatDistance(distanceMeters) }
+val etaText = if (hasValidCoords && hasUser) MapDistanceCalculator.computeEta(distanceMeters) else "—"
+```
+3. للبحث: `searchAddressAndPlaces(q, providers, stores, if (hasRealLocation) safeUserLat else 0.0, if (hasRealLocation) safeUserLng else 0.0)`.
+4. تمركز الخريطة يبقى على `fallbackCityCoords` (لا مشكلة)، لكن النقطة الزرقاء لا تظهر إلا بموقع حقيقي.
+
+## اختبار
+1. أطفئ GPS ثم افتح الخريطة: لا نقطة زرقاء، وبطاقة المكان تقول «فعّل GPS».
+2. شغّل GPS في الخلاء: تظهر النقطة خلال ثوانٍ.
+3. أثناء الملاحة غطِّ الهاتف/ادخل مبنى 20 ثانية: تتحول الحالة إلى «لم يتم تحديد موقعك».
+4. اخرج من الخريطة: لا يبقى مؤشر GPS في شريط الحالة (الإيقاف).
+5. فعّل وضع الطيران واضغط «إرسال نداء»: تظهر رسالة الحفظ؛ عطّل الوضع وتأكد من وصول `sos_alerts`.

@@ -1,0 +1,93 @@
+# 28 – إصلاحات صغيرة متفرقة (6 ملفات)
+
+## 1) CompassSensor.kt: لا تُنشئ `GeomagneticField` مع كل حدث + إحداثيات حديثة
+أضف `import androidx.compose.runtime.rememberUpdatedState` واستبدل جسم الدالة:
+```kotlin
+@Composable
+fun rememberHeadingDegrees(enabled: Boolean, lat: Double, lng: Double): Float {
+    val context = LocalContext.current
+    var heading by remember { mutableFloatStateOf(0f) }
+    val latNow by rememberUpdatedState(lat)
+    val lngNow by rememberUpdatedState(lng)
+    DisposableEffect(enabled) {
+        val sm = context.getSystemService(Context.SENSOR_SERVICE) as? SensorManager
+        val sensor = sm?.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
+        if (!enabled || sm == null || sensor == null) return@DisposableEffect onDispose { }
+        val rot = FloatArray(9)
+        val orient = FloatArray(3)
+        var smoothed = 0f
+        var first = true
+        var declination = 0f
+        var declinationAt = 0L
+        val listener = object : SensorEventListener {
+            override fun onSensorChanged(e: SensorEvent) {
+                val now = System.currentTimeMillis()
+                if (now - declinationAt > 60_000L) {                       // مرة كل دقيقة فقط
+                    declination = GeomagneticField(latNow.toFloat(), lngNow.toFloat(), 0f, now).declination
+                    declinationAt = now
+                }
+                SensorManager.getRotationMatrixFromVector(rot, e.values)
+                SensorManager.getOrientation(rot, orient)
+                val az = (Math.toDegrees(orient[0].toDouble()).toFloat() + declination + 360f) % 360f
+                if (first) { smoothed = az; first = false } else {
+                    var d = az - smoothed
+                    if (d > 180f) d -= 360f
+                    if (d < -180f) d += 360f
+                    smoothed = (smoothed + 0.15f * d + 360f) % 360f
+                }
+                heading = smoothed
+            }
+            override fun onAccuracyChanged(s: Sensor?, accuracy: Int) {}
+        }
+        sm.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_UI)
+        onDispose { sm.unregisterListener(listener) }
+    }
+    return heading
+}
+```
+> يفترض الاتجاه العمودي (Portrait). إن دعمت التطبيق أفقياً فاستخدم `SensorManager.remapCoordinateSystem` حسب `display.rotation`.
+
+## 2) MockValhallaNavigator: لا ترجع صنعاء
+```kotlin
+fun snapToRoad(lat: Double, lng: Double): Pair<Double, Double> = Pair(lat, lng)
+```
+(ابحث عن أي مستدعٍ وتأكد أنه لا يعتمد على قيمة صنعاء.)
+
+## 3) NavConfig + NavigationScreen: استخدم الثوابت المعلنة
+في `NavigationScreen`:
+```kotlin
+val offRoute = remember { OffRouteDetector(NavConfig.OFF_ROUTE_THRESHOLD_METERS) }
+val arrival = remember { ArrivalDetector(NavConfig.ARRIVAL_THRESHOLD_METERS) }
+```
+وفي `NavConfig` أضف:
+```kotlin
+/** خادم OSRM العام للتجارب فقط؛ للإنتاج استبدله بخادمك. */
+const val OSRM_IS_DEMO_SERVER = true
+```
+واجعل `DEFAULT_YEMEN_LAT/LNG` مصدراً وحيداً: في `LocationService` و`OfflineMapManager` استبدل الأرقام المكررة بـ `NavConfig.DEFAULT_YEMEN_LAT/LNG`.
+
+## 4) SosDispatcher: ترميز صحيح للأرقام
+```kotlin
+private fun clean(phone: String) = phone.filter { it.isDigit() || it == '+' }
+fun smsIntent(phone: String, body: String): Intent =
+    Intent(Intent.ACTION_SENDTO, Uri.fromParts("smsto", clean(phone), null)).putExtra("sms_body", body)
+fun dialIntent(phone: String): Intent = Intent(Intent.ACTION_DIAL, Uri.fromParts("tel", clean(phone), null))
+```
+## 5) CrashReporter: لا تقص «Caused by»
+في `install`:
+```kotlin
+val trace = android.util.Log.getStackTraceString(throwable)
+val body = if (trace.length > 6000) trace.take(2500) + "\n...\n" + trace.takeLast(3500) else trace
+File(app.filesDir, FILE).writeText("${Date()}\nthread=${thread.name}\n$body")
+```
+وفي `CrashReportDialog`: `Text(text.take(6500), ...)`. وتأكد أن `MyApplication.onCreate()` يستدعي `CrashReporter.install(this)` (لم أرَ الملف).
+
+## 6) map.html: تحديث دائرة الدقة
+في `updateUserLocation`، داخل فرع `if (userMarker)`:
+```javascript
+if (userAccuracyCircle) {
+    userAccuracyCircle.setLatLng([lat, lng]);
+    userAccuracyCircle.setRadius(accuracy || 50);
+}
+```
+(واستبدل السطر الحالي الذي يحدّث الموضع فقط.)

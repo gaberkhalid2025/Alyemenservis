@@ -33,9 +33,9 @@ object CrashReporter {
         val previous = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
             try {
-                File(app.filesDir, FILE).writeText(
-                    "${Date()}\nthread=${thread.name}\n${android.util.Log.getStackTraceString(throwable)}"
-                )
+                val trace = android.util.Log.getStackTraceString(throwable)
+                val body = if (trace.length > 6000) trace.take(2500) + "\n...\n" + trace.takeLast(3500) else trace
+                File(app.filesDir, FILE).writeText("${Date()}\nthread=${thread.name}\n$body")
             } catch (_: Throwable) {}
             previous?.uncaughtException(thread, throwable)
         }
@@ -62,7 +62,7 @@ fun CrashReportDialog() {
         title = { Text("تقرير آخر انهيار", color = Color.White) },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
-                Text(text.take(4000), color = Color(0xFFCBD5E1), fontSize = 10.sp)
+                Text(text.take(6500), color = Color(0xFFCBD5E1), fontSize = 10.sp)
             }
         },
         confirmButton = {

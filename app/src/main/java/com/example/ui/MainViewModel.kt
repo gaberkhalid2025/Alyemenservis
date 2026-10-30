@@ -50,6 +50,9 @@ class MainViewModel @Inject constructor(
         super.onCleared()
         try {
             realtimeSyncHelper.clearListeners()
+            stopLocationUpdates()
+            stopNavigationTracking()
+            freshnessJob?.cancel()
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -229,6 +232,32 @@ class MainViewModel @Inject constructor(
     var selectedOfferId by androidx.compose.runtime.mutableStateOf("")
     var selectedRequestId by androidx.compose.runtime.mutableStateOf("")
     var showQuickServiceDialog by androidx.compose.runtime.mutableStateOf(false)
+    private val _lastFixAtMs = MutableStateFlow(0L)
+    private var freshnessJob: kotlinx.coroutines.Job? = null
+
+    private fun isFresh(loc: android.location.Location, maxAgeMs: Long = 2 * 60_000L): Boolean {
+        val ageMs = (android.os.SystemClock.elapsedRealtimeNanos() - loc.elapsedRealtimeNanos) / 1_000_000L
+        return ageMs in 0..maxAgeMs
+    }
+
+    private fun markFix() {
+        _lastFixAtMs.value = System.currentTimeMillis()
+        _isUserLocationReal.value = true
+    }
+
+    private fun startFreshnessWatchdog() {
+        if (freshnessJob?.isActive == true) return
+        freshnessJob = viewModelScope.launch {
+            while (true) {
+                kotlinx.coroutines.delay(5_000L)
+                val limit = if (navTrackingJob?.isActive == true) 15_000L else 90_000L
+                if (_isUserLocationReal.value && System.currentTimeMillis() - _lastFixAtMs.value > limit) {
+                    _isUserLocationReal.value = false
+                }
+            }
+        }
+    }
+
     internal val _userLatitude = MutableStateFlow(15.3694)
     val userLatitude: StateFlow<Double> = _userLatitude.asStateFlow()
     internal val _userLongitude = MutableStateFlow(44.1910)
@@ -242,7 +271,15 @@ class MainViewModel @Inject constructor(
     private var locationCallback: com.google.android.gms.location.LocationCallback? = null
     private var navTrackingJob: kotlinx.coroutines.Job? = null
     val locationService by lazy { LocationService(appContext ?: com.example.MyApplication.instance ?: throw IllegalStateException("Context not ready")) }
-    val offlineQueueManager by lazy { OfflineQueueManager(appContext ?: com.example.MyApplication.instance ?: throw IllegalStateException("Context not ready")) }
+
+    @dagger.hilt.EntryPoint
+    @dagger.hilt.InstallIn(dagger.hilt.components.SingletonComponent::class)
+    interface QueueEntryPoint { fun offlineQueueManager(): OfflineQueueManager }
+
+    val offlineQueueManager: OfflineQueueManager by lazy {
+        val ctx = appContext ?: com.example.MyApplication.instance ?: throw IllegalStateException("Context not ready")
+        dagger.hilt.android.EntryPointAccessors.fromApplication(ctx.applicationContext, QueueEntryPoint::class.java).offlineQueueManager()
+    }
     internal val _isProvidersLoading get() = appState._isProvidersLoading
     val isProvidersLoading: StateFlow<Boolean> = _isProvidersLoading.asStateFlow()
     internal val _isChatChannelsLoading get() = appState._isChatChannelsLoading
@@ -349,62 +386,71 @@ class MainViewModel @Inject constructor(
         _userLongitude.value = lng
     }
     fun startLocationUpdates() {
-        _isGpsTrackingActive.value = true
-        appContext?.let { ctx ->
-            try {
-                if (androidx.core.content.ContextCompat.checkSelfPermission(ctx, android.Manifest.permission.ACCESS_FINE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED ||
-                    androidx.core.content.ContextCompat.checkSelfPermission(ctx, android.Manifest.permission.ACCESS_COARSE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
-                    
-                    val fusedClient = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(ctx)
-                    
-                    fusedClient.lastLocation.addOnSuccessListener { loc ->
-                        loc?.let {
-                            val isMock = if (android.os.Build.VERSION.SDK_INT >= 31) it.isMock else @Suppress("DEPRECATION") it.isFromMockProvider
-                            val real = !isMock && (!it.hasAccuracy() || it.accuracy <= 150f)
-                            if (real) {
-                                updateUserLocation(it.latitude, it.longitude)
-                                _userLocationAccuracyM.value = it.accuracy
-                            }
-                            _isUserLocationReal.value = real
-                        }
-                    }
+        val ctx = appContext ?: return
+        try {
+            val fine = androidx.core.content.ContextCompat.checkSelfPermission(ctx, android.Manifest.permission.ACCESS_FINE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            val coarse = androidx.core.content.ContextCompat.checkSelfPermission(ctx, android.Manifest.permission.ACCESS_COARSE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            if (!fine && !coarse) return
 
-                    val request = com.google.android.gms.location.LocationRequest.Builder(
-                        com.google.android.gms.location.Priority.PRIORITY_HIGH_ACCURACY, 3000L
-                    ).setMinUpdateIntervalMillis(1000L).build()
+            val fusedClient = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(ctx)
 
-                    if (locationCallback == null) {
-                        locationCallback = object : com.google.android.gms.location.LocationCallback() {
-                            override fun onLocationResult(result: com.google.android.gms.location.LocationResult) {
-                                result.lastLocation?.let { loc ->
-                                    val isMock = if (android.os.Build.VERSION.SDK_INT >= 31) loc.isMock else @Suppress("DEPRECATION") loc.isFromMockProvider
-                                    val real = !isMock && (!loc.hasAccuracy() || loc.accuracy <= 150f)
-                                    if (real) {
-                                        updateUserLocation(loc.latitude, loc.longitude)
-                                        _userLocationAccuracyM.value = loc.accuracy
-                                    }
-                                    _isUserLocationReal.value = real
-                                }
-                            }
-                        }
-                    }
-
-                    fusedClient.requestLocationUpdates(request, locationCallback!!, android.os.Looper.getMainLooper())
+            fusedClient.lastLocation.addOnSuccessListener { loc ->
+                if (loc == null) return@addOnSuccessListener
+                val isMock = if (android.os.Build.VERSION.SDK_INT >= 31) loc.isMock else @Suppress("DEPRECATION") loc.isFromMockProvider
+                val real = !isMock && isFresh(loc) && (!loc.hasAccuracy() || loc.accuracy <= 150f)
+                if (real) {                                   // الموقع القديم يُتجاهل تماماً ولا يغيّر الحالة
+                    updateUserLocation(loc.latitude, loc.longitude)
+                    _userLocationAccuracyM.value = loc.accuracy
+                    markFix()
                 }
-            } catch (e: Exception) {
-                android.util.Log.e("MainViewModel", "Location updates error: ", e)
             }
+
+            val request = com.google.android.gms.location.LocationRequest.Builder(
+                com.google.android.gms.location.Priority.PRIORITY_HIGH_ACCURACY, 3000L
+            ).setMinUpdateIntervalMillis(1000L).build()
+
+            if (locationCallback == null) {
+                locationCallback = object : com.google.android.gms.location.LocationCallback() {
+                    override fun onLocationResult(result: com.google.android.gms.location.LocationResult) {
+                        val loc = result.lastLocation ?: return
+                        val isMock = if (android.os.Build.VERSION.SDK_INT >= 31) loc.isMock else @Suppress("DEPRECATION") loc.isFromMockProvider
+                        val real = !isMock && isFresh(loc, 30_000L) && (!loc.hasAccuracy() || loc.accuracy <= 150f)
+                        if (real) {
+                            updateUserLocation(loc.latitude, loc.longitude)
+                            _userLocationAccuracyM.value = loc.accuracy
+                            markFix()
+                        }
+                    }
+                }
+            }
+            fusedClient.requestLocationUpdates(request, locationCallback!!, android.os.Looper.getMainLooper())
+                .addOnSuccessListener { _isGpsTrackingActive.value = true }          // لا نعلن النشاط قبل نجاح الطلب
+                .addOnFailureListener { _isGpsTrackingActive.value = false }
+            startFreshnessWatchdog()
+        } catch (e: Exception) {
+            _isGpsTrackingActive.value = false
+            android.util.Log.e("MainViewModel", "Location updates error: ", e)
         }
+    }
+
+    fun stopLocationUpdates() {
+        val ctx = appContext
+        val cb = locationCallback
+        if (ctx != null && cb != null) {
+            try { com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(ctx).removeLocationUpdates(cb) } catch (_: Exception) {}
+        }
+        _isGpsTrackingActive.value = false
     }
 
     fun startNavigationTracking() {
         if (navTrackingJob?.isActive == true) return
+        startFreshnessWatchdog()
         navTrackingJob = viewModelScope.launch {
             try {
                 locationService.locationUpdates(intervalMs = 1000L, maxAccuracyM = 50f).collect { c ->
                     updateUserLocation(c.latitude, c.longitude)
                     _userLocationAccuracyM.value = c.accuracyMeters
-                    _isUserLocationReal.value = true
+                    markFix()
                 }
             } catch (e: Exception) {
                 android.util.Log.e("MainViewModel", "Navigation tracking error: ", e)
@@ -417,24 +463,22 @@ class MainViewModel @Inject constructor(
         navTrackingJob = null
     }
 
-    fun enqueueSos(lat: Double, lng: Double, accuracyM: Float?, message: String) {
-        try {
+    fun enqueueSos(lat: Double, lng: Double, accuracyM: Float?, message: String): Boolean {
+        if (lat.isNaN() || lng.isNaN() || (lat == 0.0 && lng == 0.0)) return false
+        return try {
             offlineQueueManager.addToQueue(
                 OfflineRequest(
-                    type = "SOS",
-                    priority = 1,
+                    type = "SOS", priority = 1,
                     data = mapOf(
-                        "lat" to lat,
-                        "lng" to lng,
-                        "accuracyM" to (accuracyM?.toDouble() ?: 0.0),
-                        "message" to message,
-                        "createdAt" to System.currentTimeMillis(),
-                        "status" to "OPEN"
+                        "lat" to lat, "lng" to lng, "accuracyM" to (accuracyM?.toDouble() ?: 0.0),
+                        "message" to message, "createdAt" to System.currentTimeMillis(), "status" to "OPEN"
                     )
                 )
             )
+            true
         } catch (e: Exception) {
             android.util.Log.e("MainViewModel", "Failed to enqueue SOS: ", e)
+            false
         }
     }
     fun refreshData(showNotification: Boolean = false) {
