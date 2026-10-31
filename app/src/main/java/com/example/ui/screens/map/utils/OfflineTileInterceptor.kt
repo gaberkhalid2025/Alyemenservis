@@ -41,7 +41,12 @@ object OfflineTileInterceptor {
         if (tile.source == "osm") readMbtile(context, tile)?.let { return png(it) }
 
         val cache = cacheFile(context, tile)
-        if (cache.exists() && cache.length() > 0) return png(cache.readBytes())
+        if (cache.exists() && cache.length() > 0) {
+            if (System.currentTimeMillis() - cache.lastModified() > 3_600_000L) {
+                cache.setLastModified(System.currentTimeMillis())
+            }
+            return png(cache.readBytes())
+        }
 
         if (tile.source == "sat") return null          // لا تخزين لصور Esri
         val bytes = download(url) ?: return null

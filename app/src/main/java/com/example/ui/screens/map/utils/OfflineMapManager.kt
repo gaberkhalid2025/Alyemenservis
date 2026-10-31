@@ -13,14 +13,14 @@ import java.util.Locale
  * 📦 OfflineMapManager
  * نظام إدارة الخرائط بدون إنترنت وتخزين البلاطات جغرافياً:
  * - تخزين تلقائي للبلاطات الجغرافية المستعرضة (Tile Cache) للعمل بدون إنترنت 100%
- * - حد أقصى للذاكرة 50 ميجابايت مع تنظيف تلقائي ذكي
+ * - حد أقصى للذاكرة 300 ميجابايت مع تنظيف تلقائي ذكي
  * - قاعدة بيانات إحداثيات رسمية لكافة المدن والمحافظات اليمنية
  */
 object OfflineMapManager {
 
     private const val TAG = "OfflineMapManager"
-    private const val MAX_CACHE_SIZE_BYTES = 50 * 1024 * 1024L // 50 MB
-    private const val PURGE_THRESHOLD_BYTES = 45 * 1024 * 1024L // 45 MB
+    private const val MAX_CACHE_SIZE_BYTES = 300 * 1024 * 1024L // 300 MB
+    private const val PURGE_THRESHOLD_BYTES = 280 * 1024 * 1024L // 280 MB
     private const val CACHE_TTL_MILLIS = 30L * 24 * 60 * 60 * 1000L // 30 days
 
     data class CityCoordinates(
@@ -130,7 +130,7 @@ object OfflineMapManager {
     }
 
     /**
-     * Inspect cache and purge expired tiles (> 30 days) or when size > 45MB
+     * Inspect cache and purge expired tiles (> 30 days) or when size > 280MB
      * لا تحذف إذا لم تتوفر شبكة حفاظاً على الخرائط أوفلاين
      */
     suspend fun purgeCacheIfNeeded(context: Context) = withContext(Dispatchers.IO) {
@@ -153,11 +153,11 @@ object OfflineMapManager {
                 }
             }
 
-            // 2. Check remaining size; if > 45MB, remove oldest files until <= 35MB
+            // 2. Check remaining size; if > 280MB, remove oldest files until <= 220MB
             var currentSize = getDirectorySize(dir)
             if (currentSize > PURGE_THRESHOLD_BYTES) {
                 val remainingFiles = getAllFilesRecursive(dir).sortedBy { it.lastModified() }
-                val targetSize = 35 * 1024 * 1024L // 35 MB
+                val targetSize = 220 * 1024 * 1024L // 220 MB
                 for (file in remainingFiles) {
                     if (currentSize <= targetSize) break
                     val len = file.length()
@@ -166,31 +166,34 @@ object OfflineMapManager {
                     }
                 }
             }
-            Log.d(TAG, "Cache purge completed successfully. Final size: ${currentSize / (1024 * 1024)} MB")
         } catch (e: Exception) {
-            Log.e(TAG, "Error purging offline map cache", e)
+            Log.e(TAG, "Error purging cache", e)
         }
-    }
-
-    private fun getAllFilesRecursive(dir: File): List<File> {
-        val fileList = mutableListOf<File>()
-        val files = dir.listFiles() ?: return fileList
-        for (f in files) {
-            if (f.isDirectory) {
-                fileList.addAll(getAllFilesRecursive(f))
-            } else {
-                fileList.add(f)
-            }
-        }
-        return fileList
     }
 
     private fun getDirectorySize(dir: File): Long {
-        var size: Long = 0
-        val files = dir.listFiles() ?: return 0
-        for (f in files) {
-            size += if (f.isDirectory) getDirectorySize(f) else f.length()
+        var size = 0L
+        val files = dir.listFiles() ?: return 0L
+        for (file in files) {
+            size += if (file.isDirectory) {
+                getDirectorySize(file)
+            } else {
+                file.length()
+            }
         }
         return size
+    }
+
+    private fun getAllFilesRecursive(dir: File): List<File> {
+        val list = mutableListOf<File>()
+        val files = dir.listFiles() ?: return list
+        for (file in files) {
+            if (file.isDirectory) {
+                list.addAll(getAllFilesRecursive(file))
+            } else {
+                list.add(file)
+            }
+        }
+        return list
     }
 }

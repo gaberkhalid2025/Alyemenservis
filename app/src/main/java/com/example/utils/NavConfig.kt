@@ -22,6 +22,7 @@ object NavConfig {
     // Default Yemen Location (Sana'a)
     const val DEFAULT_YEMEN_LAT = 15.3694
     const val DEFAULT_YEMEN_LNG = 44.1910
+    const val EMERGENCY_NUMBER = "" // الرقم الرسمي للطوارئ إن وجد
     
     // Yemen Cities Data
     data class CityCoords(val name: String, val lat: Double, val lng: Double)

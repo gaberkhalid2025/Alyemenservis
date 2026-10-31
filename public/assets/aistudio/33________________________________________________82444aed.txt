@@ -1,0 +1,93 @@
+# 33 – MapControls + MapLayersDialog + MapBottomSheet + MapBookingDialog + ربط وضع المشي
+**الملفات المفحوصة:** `MapControls_17f4f0`, `MapLayersDialog_752f63`, `MapBottomSheet_48a1cd`, `MapBookingDialog_19affc`, `MapErrorOverlay_6f6e0f`, `MapFilterBar_70853a` (+ استدعاءاتها في `MapScreenContent_f084db`)  |  **الإجراء:** تعديلات موضعية.
+
+## ما تأكدت من تطبيقه (سليم)
+`hasValidCoords` وتعطيل أزرار الملاحة/المحطة للكيانات بلا موقع، نص «المسافة المباشرة»، ربط البحث والصوت في `MapFilterBar`، ووجود زر إعادة المحاولة في `MapErrorOverlay`.
+
+## 1) ميزات تدّعي ما لا تفعله (عالية)
+### أ) «Vela 3D (مباني ثلاثية الأبعاد)»
+- `MapLayersDialog` يقول «إمالة الكاميرا بزاوية 42° مع مجسمات المباني»، و`map.html` يسمّي الطبقة «Vela 3D (مباني ثلاثية الأبعاد)». الواقع: `VELA_3D` يستخدم **نفس صور الأقمار الصناعية** (`providerKey = 'satellite'`) و`setMapPerspective` فارغة. لا إمالة ولا مباني.
+- في `MapControls` ثلاثة أزرار تؤدي لنفس الشيء: «نمط الأبعاد الثلاثية» و«زاوية الرؤية والإمالة» (كلاهما `VELA_3D`)، و«الرؤية البانورامية» (تختار فعلياً `HOT`).
+
+**الإصلاح السريع الصادق:**
+1. `MapLayersDialog`: احذف سطر `LayerInfo(MapMode.VELA_3D, ...)` من القائمة، وعدّل تعليق رأس الملف.
+2. `MapControls`: احذف زرّي `map_vela_3d_btn` و`map_visibility_btn`. وزر `map_pano_btn` يختار `HOT`: أعد تسمية `contentDescription` إلى «خريطة الشوارع (HOT)» وغيّر أيقونته لتناسب ذلك.
+3. `map.html` داخل `setLayer`: اجعل `VELA_3D` يعمل كـ`SATELLITE` بعنوانه: `title = 'أقمار صناعية'` (احذف عبارة «مباني ثلاثية الأبعاد»).
+4. `MapScreenState` (الحفظ/الاستعادة): `if (mode == MapMode.VELA_3D) MapMode.SATELLITE` حتى لا تعود حالة قديمة.
+5. اترك قيمة `VELA_3D` في الـ enum للتوافق.
+
+**لو تريد 3D حقيقياً** (مباني بارزة، إمالة): لا يمكن مع Leaflet. يتطلب MapLibre GL Native بمصدر متجهات (OpenMapTiles) وطبقة `fill-extrusion`؛ مشروع مستقل وليس إصلاحاً.
+
+### ب) رسائل نجاح غير صادقة في `MapScreenContent`
+```kotlin
+// onRecenterLocation: لا تقل «موقعك الفعلي» إن لم يوجد
+coroutineScope.launch {
+    snackbarHostState.showSnackbar(
+        if (hasRealLocation) "تمت إعادة التمركز إلى موقعك 📍" else "جارٍ تحديد موقعك… تأكد من تشغيل GPS"
+    )
+}
+// onSelectMapMode: سمِّ النمط بدل «✓» العامة
+val label = when (mode) { MapMode.SATELLITE, MapMode.VELA_3D -> "أقمار صناعية"; MapMode.HOT -> "شوارع (HOT)"; MapMode.TOPO -> "تضاريس"; else -> "خريطة قياسية" }
+coroutineScope.launch { snackbarHostState.showSnackbar("النمط: $label") }
+// onResetCompass: لا تدّعِ ضبطاً؛ اعرض الحقيقة
+coroutineScope.launch {
+    val deg = ((heading % 360f) + 360f) % 360f
+    val names = listOf("شمال", "شمال شرق", "شرق", "جنوب شرق", "جنوب", "جنوب غرب", "غرب", "شمال غرب")
+    snackbarHostState.showSnackbar("اتجاه الجهاز: ${deg.toInt()}° (${names[((deg + 22.5f) / 45f).toInt() % 8]})")
+}
+```
+## 2) وضع «المشي/القيادة» لا يؤثر على الملاحة (عالية)
+`isDrivingMode` يتغير مع رسالة «تم تفعيل وضع المشي المريح» لكنه **لا يصل** إلى `NavigationScreen` ولا إلى المحرك؛ الحساب دائماً سيارة.
+### أ) MapScreenContent: مرّره
+```kotlin
+NavigationScreen(
+    ...,
+    isDrivingMode = isDrivingMode,
+    ...
+)
+```
+### ب) NavigationScreen: معامل جديد وتمريره
+```kotlin
+isDrivingMode: Boolean = true,
+...
+val result = RealValhallaNavigator.calculateRoute(context, origin, remaining, driving = isDrivingMode)
+```
+وأضف `isDrivingMode` لمفاتيح effect حساب المسار.
+### ج) RealValhallaNavigator
+```kotlin
+suspend fun calculateRoute(
+    context: Context, origin: NavWaypoint, waypoints: List<NavWaypoint>, driving: Boolean = true
+): NavRouteResult = withContext(Dispatchers.IO) { ... computeRoute(context, origin, waypoints, driving) ... }
+
+private suspend fun computeRoute(context: Context, origin: NavWaypoint, waypoints: List<NavWaypoint>, driving: Boolean): NavRouteResult {
+    if (isReady(context)) {
+        val nativeResult = nativeMutex.withLock { tryRouteWithNativeValhalla(context, origin, waypoints, driving) }
+        if (nativeResult != null && nativeResult.error == null && nativeResult.coordinates.size >= 2) return nativeResult
+    }
+    // OSRM العام يدعم السيارة فقط → لا نستخدمه لوضع المشي
+    if (driving && isNetworkAvailable(context)) { /* كما هو */ }
+    return calculateDirectFallbackRoute(origin, waypoints, if (driving) 10.0 else 1.4)
+}
+```
+وفي `formatValhallaRequest(origin, waypoints, driving)`: `put("costing", if (driving) "auto" else "pedestrian")`. وفي `calculateDirectFallbackRoute` أضف معامل `speedMps: Double = 10.0` واستخدمه في المدة بدل `10.0`.
+> الأوفلاين يتطلب أن تكون حزمة Valhalla مبنية بـ costing المشي (الحزمة العادية تحتويه عادةً).
+## 3) MapBottomSheet: المسافة بعد إزالة الموقع المختلق (طبّق مع المستند 31)
+بعد أن صار `MapScreenContent` يمرّر `userLat/userLng = 0.0` عند غياب GPS، يعرض الكود الحالي «0 م» و«~1 دقيقة». أضف:
+```kotlin
+val hasUser = userLat != 0.0 && userLng != 0.0 && !userLat.isNaN() && !userLng.isNaN()
+val distanceMeters = if (hasValidCoords && hasUser) MapDistanceCalculator.calculateDistanceMeters(userLat, userLng, lat, lng) else 0.0
+val distanceText = when {
+    !hasValidCoords -> "الموقع غير محدد"
+    !hasUser -> "فعّل GPS لحساب المسافة"
+    else -> MapDistanceCalculator.formatDistance(distanceMeters)
+}
+val etaText = if (hasValidCoords && hasUser) MapDistanceCalculator.computeEta(distanceMeters) else "—"
+```
+وفي `MapScreenContent` عند استدعاء `MapBottomSheet`: `userLat = if (hasRealLocation) safeUserLat else 0.0` (وكذلك `userLng`).
+## 4) MapBookingDialog (غير مستخدم حالياً)
+`MapScreenContent` يستعمل `com.example.ui.dialogs.BookingDialog`؛ أما `MapBookingDialog` فلا مستدعي له. إن أردت اعتماده فأصلح: (1) `isSubmitting` لا يعود `false` عند الفشل (يعلق المؤشر)، فاجعل `onConfirmBooking` ترجع نتيجة أو مرّر `onResult`; (2) المسافة تُحسب من `userLat` بلا فحص (نفس بند 3)؛ وإلا فاحذفه.
+## اختبار
+1. قائمة الطبقات لا تحتوي «Vela 3D» ولا تظهر أزرار الإمالة.
+2. بدّل المشي ثم ابدأ ملاحة: يظهر مسار مشي، وزمن أبطأ بوضوح (≈ 5 كم/س).
+3. بلا GPS: البطاقة السفلية تقول «فعّل GPS لحساب المسافة» وليس «0 م».
+4. اضغط البوصلة: يظهر اتجاهك الحقيقي بالدرجات.

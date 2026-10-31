@@ -77,26 +77,28 @@ object RealValhallaNavigator {
         startLng: Double,
         destLat: Double,
         destLng: Double,
-        destName: String
+        destName: String,
+        driving: Boolean = true
     ): NavRouteResult {
         val origin = NavWaypoint(name = "موقعي الحالي", latitude = startLat, longitude = startLng, type = WaypointType.START)
         val destination = NavWaypoint(name = destName, latitude = destLat, longitude = destLng, type = WaypointType.BREAK)
-        return calculateRoute(context, origin, listOf(destination))
+        return calculateRoute(context, origin, listOf(destination), driving)
     }
 
     suspend fun calculateRoute(
         context: Context,
         origin: NavWaypoint,
-        waypoints: List<NavWaypoint>
+        waypoints: List<NavWaypoint>,
+        driving: Boolean = true
     ): NavRouteResult = withContext(Dispatchers.IO) {
         validateRequest(origin, waypoints)?.let { return@withContext it }
         try {
-            computeRoute(context, origin, waypoints)
+            computeRoute(context, origin, waypoints, driving)
         } catch (e: CancellationException) {
             throw e
         } catch (t: Throwable) {
             Log.e(TAG, "Route calculation failed: ${t.message}", t)
-            calculateDirectFallbackRoute(origin, waypoints)
+            calculateDirectFallbackRoute(origin, waypoints, if (driving) 10.0 else 1.4)
         }
     }
 
@@ -125,16 +127,16 @@ object RealValhallaNavigator {
         return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
     }
 
-    private suspend fun computeRoute(context: Context, origin: NavWaypoint, waypoints: List<NavWaypoint>): NavRouteResult {
+    private suspend fun computeRoute(context: Context, origin: NavWaypoint, waypoints: List<NavWaypoint>, driving: Boolean): NavRouteResult {
         // 1) أوفلاين أولاً إذا كانت الحزمة سليمة (القفل هنا فقط لأن المحرك الأصلي لا يُستدعى بالتوازي)
         if (isReady(context)) {
-            val nativeResult = nativeMutex.withLock { tryRouteWithNativeValhalla(context, origin, waypoints) }
+            val nativeResult = nativeMutex.withLock { tryRouteWithNativeValhalla(context, origin, waypoints, driving) }
             if (nativeResult != null && nativeResult.error == null && nativeResult.coordinates.size >= 2) {
                 return nativeResult
             }
         }
-        // 2) أونلاين (OSRM) مع مهلة 20 ثانية
-        if (isNetworkAvailable(context)) {
+        // 2) أونلاين (OSRM) مع مهلة 20 ثانية (يدعم القيادة فقط)
+        if (driving && isNetworkAvailable(context)) {
             val online = try {
                 withTimeoutOrNull(20_000L) { OnlineOsrmNavigator.calculateRoute(origin, waypoints) }
             } catch (e: CancellationException) {
@@ -148,13 +150,14 @@ object RealValhallaNavigator {
             }
         }
         // 3) تقريبي - مسافة مباشرة بلا تعليمات منعطفات
-        return calculateDirectFallbackRoute(origin, waypoints)
+        return calculateDirectFallbackRoute(origin, waypoints, if (driving) 10.0 else 1.4)
     }
 
     private fun tryRouteWithNativeValhalla(
         context: Context,
         origin: NavWaypoint,
-        waypoints: List<NavWaypoint>
+        waypoints: List<NavWaypoint>,
+        driving: Boolean
     ): NavRouteResult? {
         return try {
             val valhallaDir = ValhallaTileDownloader.getValhallaDir(context)
@@ -167,7 +170,7 @@ object RealValhallaNavigator {
                 return null
             }
 
-            val requestJson = formatValhallaRequest(origin, waypoints)
+            val requestJson = formatValhallaRequest(origin, waypoints, driving)
 
             // [إصلاح 20] استخدام نسخة محرك Valhalla واحدة محتفظ بها لتسريع الملاحة 10 أضعاف
             val responseJson = try {
@@ -196,7 +199,7 @@ object RealValhallaNavigator {
         }
     }
 
-    private fun formatValhallaRequest(origin: NavWaypoint, waypoints: List<NavWaypoint>): String {
+    private fun formatValhallaRequest(origin: NavWaypoint, waypoints: List<NavWaypoint>, driving: Boolean): String {
         val locations = (listOf(origin) + waypoints).map { wp ->
             org.json.JSONObject().apply {
                 put("lat", wp.latitude)
@@ -208,7 +211,7 @@ object RealValhallaNavigator {
         
         return org.json.JSONObject().apply {
             put("locations", org.json.JSONArray(locations))
-            put("costing", "auto")
+            put("costing", if (driving) "auto" else "pedestrian")
             put("directions_options", org.json.JSONObject().apply { put("units", "kilometers") })
         }.toString()
     }
@@ -344,7 +347,8 @@ object RealValhallaNavigator {
 
     private fun calculateDirectFallbackRoute(
         origin: NavWaypoint,
-        waypoints: List<NavWaypoint>
+        waypoints: List<NavWaypoint>,
+        speedMps: Double = 10.0
     ): NavRouteResult {
         val allWaypoints = listOf(origin) + waypoints
         var totalDistance = 0.0
@@ -371,7 +375,7 @@ object RealValhallaNavigator {
                 NavStep(
                     instruction = "تقريبي - مسافة مباشرة إلى ${to.name}",
                     distanceMeters = directDist,
-                    durationSeconds = (directDist / 10.0).coerceAtLeast(60.0), // ~36 km/h
+                    durationSeconds = (directDist / speedMps).coerceAtLeast(30.0),
                     maneuverType = if (i == allWaypoints.size - 2) ManeuverType.DESTINATION else ManeuverType.STRAIGHT
                 )
             )
@@ -380,14 +384,14 @@ object RealValhallaNavigator {
                 fromWaypointId = from.id,
                 toWaypointId = to.id,
                 distanceMeters = directDist,
-                durationSeconds = (directDist / 10.0).coerceAtLeast(60.0),
+                durationSeconds = (directDist / speedMps).coerceAtLeast(30.0),
                 steps = legSteps
             ))
         }
 
         return NavRouteResult(
             totalDistanceMeters = totalDistance,
-            totalDurationSeconds = (totalDistance / 10.0).coerceAtLeast(60.0),
+            totalDurationSeconds = (totalDistance / speedMps).coerceAtLeast(60.0),
             coordinates = coordsList,
             legs = legs,
             waypoints = allWaypoints,

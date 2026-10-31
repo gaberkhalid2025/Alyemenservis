@@ -1,113 +1,132 @@
 package com.example.ui.screens.map.components
 
-import androidx.compose.animation.*
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.data.ProviderEntity
 import com.example.data.StoreEntity
+import com.example.ui.screens.map.utils.MapDistanceCalculator
+import java.util.Locale
+
+private fun ratingText(r: Number) = if (r.toDouble() > 0) String.format(Locale.US, "%.1f ⭐", r.toDouble()) else "لا تقييمات بعد"
+
+private fun distText(hasUser: Boolean, uLat: Double, uLng: Double, lat: Double, lng: Double): String =
+    if (!hasUser || lat == 0.0 || lng == 0.0) "المسافة غير متاحة"
+    else MapDistanceCalculator.formatDistance(MapDistanceCalculator.calculateDistanceMeters(uLat, uLng, lat, lng)) + " (مباشرة)"
+
+private fun isMedicalStore(s: StoreEntity): Boolean {
+    val t = "${s.name} ${s.categoryId} ${s.sectionId}"
+    return t.contains("صيدلية") || t.contains("مستشفى") || t.contains("عيادة") || t.contains("medical", true) || t.contains("pharmacy", true)
+}
+
+private fun describeEntity(e: Any?, hasUser: Boolean, uLat: Double, uLng: Double): String? = when (e) {
+    is ProviderEntity -> buildString {
+        append("📍 ${e.name} — ${e.profession}\n")
+        append("المنطقة: ${e.area.ifBlank { "غير محددة" }}\n")
+        append("التقييم: ${ratingText(e.rating)}\n")
+        append("الحالة: ${if (e.isAvailable) "متاح" else "غير متاح حالياً"}\n")
+        append(distText(hasUser, uLat, uLng, e.latitude, e.longitude))
+    }
+    is StoreEntity -> buildString {
+        append("📍 ${e.name}\n")
+        if (e.description.isNotBlank()) append("${e.description}\n")
+        append("الهاتف: ${e.phone.ifBlank { "غير مسجل" }}\n")
+        append(distText(hasUser, uLat, uLng, e.latitude, e.longitude))
+    }
+    else -> null
+}
 
 /**
- * 👁️ AlephVisualAssistantDialog
- * المساعد البصري الذكي (Aleph)
- * - تحليل جغرافي وسياقي للموقع الحالي (Lat/Lng)
- * - الإجابة الفورية عن المكان، المعالم، وتوفر الخدمات
+ * ℹ️ AlephVisualAssistantDialog: ملخص المنطقة
+ * ملخص آلي صادق مبني على بيانات التطبيق الحقيقية وموقع المستخدم بدون ادعاءات ذكاء اصطناعي.
  */
 @Composable
 fun AlephVisualAssistantDialog(
     userLat: Double,
     userLng: Double,
-    selectedCity: String,
-    nearbyProviders: List<ProviderEntity>,
-    nearbyStores: List<StoreEntity>,
+    hasUserLocation: Boolean = true,
+    selectedCity: String = "الكل",
+    nearbyProviders: List<ProviderEntity> = emptyList(),
+    nearbyStores: List<StoreEntity> = emptyList(),
     targetEntity: Any? = null,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onNavigateTo: ((Double, Double, String) -> Unit)? = null
 ) {
     var queryText by remember { mutableStateOf("") }
     var currentAnswer by remember {
         mutableStateOf(
-            if (targetEntity != null) {
-                when (targetEntity) {
-                    is ProviderEntity -> "📍 تحليل المكان لـ ${targetEntity.name} (${targetEntity.profession}): يقع في نطاق $selectedCity، مسجل كفني معتمد مع تقييم ممتاز. يتوفر حجز فوري واتصال مباشر عبر التطبيق."
-                    is StoreEntity -> "📍 متجر ${targetEntity.name}: مصنف كـ ${targetEntity.description.ifEmpty { targetEntity.name }} في $selectedCity. متوافق مع خرائط Vela ويسهل الوصول إليه عبر شوارع المنطقة الرئيسية."
-                    else -> "📍 إحداثيات الموقع: [${String.format("%.4f", userLat)}, ${String.format("%.4f", userLng)}]. المنطقة نشطة ويتوفر فيها فنيون ومتاجر معتمدة."
+            describeEntity(targetEntity, hasUserLocation, userLat, userLng)
+                ?: buildString {
+                    append("ملخص آلي من بيانات التطبيق في $selectedCity:\n")
+                    append("• ${nearbyProviders.size} فني و${nearbyStores.size} متجر ضمن النتائج الحالية.\n")
+                    if (!hasUserLocation) append("• موقعك الحالي غير محدد، فالمسافات غير متاحة.")
                 }
-            } else {
-                "مرحباً بك! أنا Aleph المساعد البصري لخرائط Vela.\nأنا متصل الآن بإحداثياتك الحالية [${String.format("%.4f", userLat)}, ${String.format("%.4f", userLng)}] في $selectedCity. تم رصد ${nearbyProviders.size} فني و${nearbyStores.size} متجر في هذا النطاق.\nكيف يمكنني مساعدتك بخصوص هذا الموقع؟"
-            }
         )
     }
-    var isThinking by remember { mutableStateOf(false) }
-
-    val quickQuestions = listOf(
-        "🔍 ما هي أقرب الخدمات المتاحة هنا؟",
-        "👨‍🔧 هل تتوفر ورش صيانة أو فنيون للطوارئ؟",
-        "🏪 أين أجد أقرب صيدلية أو متجر أغذية؟",
-        "📍 تحليل جودة تغطية الموقع والوصول"
-    )
 
     fun askQuestion(q: String) {
         queryText = q
-        isThinking = true
-        when {
+        fun byDistance(lat: Double, lng: Double) =
+            if (hasUserLocation && lat != 0.0 && lng != 0.0)
+                MapDistanceCalculator.calculateDistanceMeters(userLat, userLng, lat, lng) else Double.MAX_VALUE
+
+        currentAnswer = when {
             q.contains("أقرب الخدمات") -> {
-                val pNames = nearbyProviders.take(3).joinToString("، ") { it.name }
-                val sNames = nearbyStores.take(3).joinToString("، ") { it.name }
-                currentAnswer = "📍 في هذا الموقع:\n• أقرب الفنيين: $pNames.\n• أقرب المتاجر: $sNames.\nجميع المواقع محددة بدقة عبر أقمار OAM الاصطناعية وVela 3D."
-            }
-            q.contains("فنيون") || q.contains("صيانة") -> {
-                val providersList = nearbyProviders.filter { it.isAvailable }.take(4)
-                if (providersList.isNotEmpty()) {
-                    currentAnswer = "🛠️ يتوفر ${providersList.size} فنيين متاحين حالياً للحجز الفوري:\n" +
-                            providersList.joinToString("\n") { "• ${it.name} (${it.profession}) - تقييم ${it.rating}⭐" }
-                } else {
-                    currentAnswer = "🛠️ يتوفر فنيون في المدينة ولكن يفضل الحجز المسبق عبر التطبيق لضمان التواجد الفوري."
+                val p = nearbyProviders.sortedBy { byDistance(it.latitude, it.longitude) }.take(3)
+                val s = nearbyStores.sortedBy { byDistance(it.latitude, it.longitude) }.take(3)
+                if (p.isEmpty() && s.isEmpty()) "لا توجد خدمات ضمن النتائج الحالية."
+                else buildString {
+                    if (!hasUserLocation) append("⚠️ موقعك غير محدد؛ الترتيب غير مبني على القرب.\n")
+                    if (p.isNotEmpty()) append("• فنيون: " + p.joinToString("، ") { "${it.name} (${distText(hasUserLocation, userLat, userLng, it.latitude, it.longitude)})" } + "\n")
+                    if (s.isNotEmpty()) append("• متاجر: " + s.joinToString("، ") { "${it.name} (${distText(hasUserLocation, userLat, userLng, it.latitude, it.longitude)})" })
                 }
             }
+            q.contains("فنيون") || q.contains("صيانة") -> {
+                val list = nearbyProviders.filter { it.isAvailable }.sortedBy { byDistance(it.latitude, it.longitude) }.take(4)
+                if (list.isEmpty()) "لا يوجد فنيون متاحون حالياً ضمن النتائج."
+                else "🛠️ ${list.size} فنيين متاحين:\n" + list.joinToString("\n") { "• ${it.name} (${it.profession}) — ${ratingText(it.rating)}" }
+            }
             q.contains("صيدلية") || q.contains("متجر") -> {
-                val storesList = nearbyStores.take(4)
-                currentAnswer = "🏪 المحلات الأقرب إليك:\n" +
-                        storesList.joinToString("\n") { "• ${it.name} (${it.description.ifEmpty { it.name }}) - هاتف: ${it.phone}" }
+                val list = nearbyStores.filter { isMedicalStore(it) }.sortedBy { byDistance(it.latitude, it.longitude) }.take(4)
+                if (list.isEmpty()) "لا توجد صيدليات أو مرافق طبية مسجلة ضمن النتائج الحالية."
+                else "🏪 الأقرب:\n" + list.joinToString("\n") { "• ${it.name} — هاتف: ${it.phone.ifBlank { "غير مسجل" }}" }
             }
             else -> {
-                currentAnswer = "🌐 تحليل Aleph للموقع [${String.format("%.4f", userLat)}, ${String.format("%.4f", userLng)}]: الموقع ضمن النطاق الحضري لـ $selectedCity، ومطابق في طبقة الصور الجوية OAM، مع إمكانية التبديل إلى Vela 3D لرؤية الكتل البنائية بدقة."
+                val noCoords = nearbyProviders.count { it.latitude == 0.0 || it.longitude == 0.0 } + nearbyStores.count { it.latitude == 0.0 || it.longitude == 0.0 }
+                "ملخص: ${nearbyProviders.size} فني و${nearbyStores.size} متجر. " +
+                    (if (noCoords > 0) "$noCoords منها بلا إحداثيات دقيقة (تظهر موقعاً تقريبياً على الخريطة)." else "كلها بإحداثيات مسجلة.")
             }
         }
-        isThinking = false
     }
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             shape = RoundedCornerShape(20.dp),
             color = Color(0xFF0F172A),
-            border = androidx.compose.foundation.BorderStroke(1.5.dp, Color(0xFF00E5FF).copy(alpha = 0.6f)),
+            tonalElevation = 8.dp,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 16.dp)
+                .padding(horizontal = 8.dp)
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(18.dp)
+                    .padding(20.dp)
             ) {
                 // Header
                 Row(
@@ -115,164 +134,90 @@ fun AlephVisualAssistantDialog(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Surface(
-                            shape = CircleShape,
-                            color = Color(0xFF00E5FF).copy(alpha = 0.15f),
-                            modifier = Modifier.size(36.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Text("👁️", fontSize = 18.sp)
-                            }
-                        }
-                        Column {
+                    Column {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Info, contentDescription = null, tint = Color(0xFF00E5FF), modifier = Modifier.size(20.dp))
+                            Spacer(Modifier.width(8.dp))
                             Text(
-                                "المساعد البصري Aleph",
+                                "ملخص المنطقة",
                                 color = Color.White,
-                                fontSize = 15.sp,
+                                fontSize = 18.sp,
                                 fontWeight = FontWeight.Bold
                             )
-                            Text(
-                                "تحليل ذكي لخرائط Vela & OAM",
-                                color = Color(0xFF00E5FF),
-                                fontSize = 11.sp
-                            )
                         }
+                        Text(
+                            "ملخص آلي من بيانات التطبيق",
+                            color = Color(0xFF94A3B8),
+                            fontSize = 12.sp
+                        )
                     }
-
                     IconButton(
                         onClick = onDismiss,
-                        modifier = Modifier.testTag("close_aleph_dialog_btn")
+                        modifier = Modifier
+                            .size(32.dp)
+                            .background(Color(0xFF1E293B), CircleShape)
                     ) {
-                        Icon(Icons.Default.Close, contentDescription = "إغلاق", tint = Color(0xFF94A3B8))
+                        Icon(Icons.Default.Close, contentDescription = "إغلاق", tint = Color.White, modifier = Modifier.size(18.dp))
                     }
                 }
 
-                Spacer(Modifier.height(14.dp))
+                Spacer(Modifier.height(16.dp))
 
-                // Location Coordinate Pill
+                // Answer Display Card
                 Surface(
-                    shape = RoundedCornerShape(10.dp),
+                    shape = RoundedCornerShape(12.dp),
                     color = Color(0xFF1E293B),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Icon(Icons.Default.Place, contentDescription = null, tint = Color(0xFF00E5FF), modifier = Modifier.size(16.dp))
-                        Text(
-                            text = "الموقع: $selectedCity [${String.format("%.4f", userLat)}, ${String.format("%.4f", userLng)}]",
-                            color = Color(0xFFCBD5E1),
-                            fontSize = 11.5.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
+                    Text(
+                        text = currentAnswer,
+                        color = Color(0xFFE2E8F0),
+                        fontSize = 14.sp,
+                        lineHeight = 22.sp,
+                        modifier = Modifier.padding(14.dp)
+                    )
                 }
 
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(16.dp))
 
-                // Answer Bubble
-                Surface(
-                    shape = RoundedCornerShape(14.dp),
-                    color = Color(0xFF1E293B).copy(alpha = 0.8f),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF334155)),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 90.dp, max = 180.dp)
+                Text(
+                    "استفسارات سريعة:",
+                    color = Color(0xFF94A3B8),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+
+                Spacer(Modifier.height(8.dp))
+
+                // Preset Buttons
+                val buttons = listOf(
+                    "📍 أقرب الخدمات في المنطقة",
+                    "🛠️ الفنيون المتاحون للصيانة",
+                    "🏪 الصيدليات والمتاجر القريبة",
+                    "📋 اكتمال بيانات الموقع"
+                )
+
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    LazyColumn(modifier = Modifier.padding(12.dp)) {
-                        item {
-                            if (isThinking) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(16.dp),
-                                        color = Color(0xFF00E5FF),
-                                        strokeWidth = 2.dp
-                                    )
-                                    Text("جاري فحص الصور الجوية وبيانات Vela...", color = Color(0xFF94A3B8), fontSize = 12.sp)
-                                }
-                            } else {
-                                Text(
-                                    text = currentAnswer,
-                                    color = Color.White,
-                                    fontSize = 13.sp,
-                                    lineHeight = 20.sp
-                                )
-                            }
-                        }
-                    }
-                }
-
-                Spacer(Modifier.height(12.dp))
-
-                // Quick Question Chips
-                Text("أسئلة سريعة عن المكان:", color = Color(0xFF94A3B8), fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(6.dp))
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(quickQuestions) { q ->
+                    items(buttons.size) { idx ->
+                        val label = buttons[idx]
                         Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = Color(0xFF00E5FF).copy(alpha = 0.12f),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF00E5FF).copy(alpha = 0.35f)),
-                            modifier = Modifier.clickable { askQuestion(q) }
+                            shape = RoundedCornerShape(10.dp),
+                            color = Color(0xFF1E293B).copy(alpha = 0.7f),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF334155)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { askQuestion(label) }
                         ) {
                             Text(
-                                text = q,
-                                color = Color(0xFF00E5FF),
-                                fontSize = 11.5.sp,
-                                fontWeight = FontWeight.Medium,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                text = label,
+                                color = Color(0xFF38BDF8),
+                                fontSize = 13.sp,
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
                             )
                         }
-                    }
-                }
-
-                Spacer(Modifier.height(12.dp))
-
-                // Custom Question Input
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    OutlinedTextField(
-                        value = queryText,
-                        onValueChange = { queryText = it },
-                        placeholder = { Text("اسأل Aleph عن هذا المكان...", fontSize = 12.sp, color = Color(0xFF64748B)) },
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White,
-                            focusedBorderColor = Color(0xFF00E5FF),
-                            unfocusedBorderColor = Color(0xFF334155),
-                            focusedContainerColor = Color(0xFF0B1120),
-                            unfocusedContainerColor = Color(0xFF0B1120)
-                        ),
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(48.dp)
-                            .testTag("aleph_query_input")
-                    )
-
-                    IconButton(
-                        onClick = { if (queryText.isNotBlank()) askQuestion(queryText) },
-                        modifier = Modifier
-                            .size(46.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(Color(0xFF00E5FF))
-                            .testTag("aleph_send_btn")
-                    ) {
-                        Icon(Icons.Default.Send, contentDescription = "إرسال", tint = Color(0xFF0F172A))
                     }
                 }
             }

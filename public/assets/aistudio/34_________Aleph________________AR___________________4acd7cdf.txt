@@ -1,0 +1,193 @@
+# 34 – AlephVisualAssistantDialog + ArVpsCameraOverlay: ذكاء مزيف يجب تصحيحه
+**الملفات المفحوصة:** `AlephVisualAssistantDialog_595e9b`, `ArVpsCameraOverlay_feaeee`  |  **الإجراء:** استبدال دوال + تعديلات موضعية.
+
+## المشكلة (عالية): ادعاءات «ذكاء» و«رؤية حاسوبية» لا وجود لها
+### Aleph («المساعد البصري الذكي»)
+نصوص جاهزة ثابتة، لا نموذج ولا شبكة. أمثلة من الكود:
+- لكل فني: «مسجل كفني معتمد **مع تقييم ممتاز**» دون النظر للتقييم الفعلي.
+- «المنطقة نشطة ويتوفر فيها فنيون ومتاجر معتمدة» دائماً.
+- «جميع المواقع محددة بدقة عبر أقمار OAM الاصطناعية وVela 3D» (غير صحيح).
+- «أنا متصل الآن بإحداثياتك الحالية» حتى لو كانت الإحداثيات مركز المدينة لا موقعك.
+- زر «تحليل جودة تغطية الموقع والوصول» يعطي جملة ثابتة.
+### AR («الرؤية الحاسوبية MobileNet VPS»)
+- اللافتة «تم التعرف على الشارع ومطابقة معالم Vela بنجاح» تظهر **دائماً**، والثقة `98.6%` رقم ثابت، و`scanAngle` مجرد دوران مؤقت. لا يوجد أي نموذج رؤية.
+- «المعالم المكتشفة أمامك» = أول 5 فنيين من القائمة بغض النظر عن اتجاه الكاميرا أو المسافة.
+- الكاميرا ما زالت `android.hardware.Camera` المهجورة (اتجاه ثابت 90°).
+
+**المبدأ:** إما ميزة حقيقية أو وصف صادق لما تفعله. أدناه نسخة صادقة قائمة على بيانات التطبيق وحساسات الجهاز.
+
+---
+## أ) Aleph: ملخص آلي صادق (ليس ذكاءً اصطناعياً)
+1. غيّر العنوان في الواجهة من «المساعد البصري الذكي» إلى **«ملخص المنطقة»** وأضف سطراً: «ملخص آلي من بيانات التطبيق».
+2. أضف معاملاً للدالة: `hasUserLocation: Boolean = true`، ومن `MapScreenContent` مرّر `hasUserLocation = hasRealLocation`.
+3. أضف هذه الدوال أعلى الملف (خارج الـ Composable):
+```kotlin
+import com.example.ui.screens.map.utils.MapDistanceCalculator
+import java.util.Locale
+
+private fun ratingText(r: Double) = if (r > 0) String.format(Locale.US, "%.1f ⭐", r) else "لا تقييمات بعد"
+
+private fun distText(hasUser: Boolean, uLat: Double, uLng: Double, lat: Double, lng: Double): String =
+    if (!hasUser || lat == 0.0 || lng == 0.0) "المسافة غير متاحة"
+    else MapDistanceCalculator.formatDistance(MapDistanceCalculator.calculateDistanceMeters(uLat, uLng, lat, lng)) + " (مباشرة)"
+
+private fun isMedicalStore(s: StoreEntity): Boolean {
+    val t = "${s.name} ${s.categoryId} ${s.sectionId}"
+    return t.contains("صيدلية") || t.contains("مستشفى") || t.contains("عيادة") || t.contains("medical", true) || t.contains("pharmacy", true)
+}
+
+private fun describeEntity(e: Any?, hasUser: Boolean, uLat: Double, uLng: Double): String? = when (e) {
+    is ProviderEntity -> buildString {
+        append("📍 ${e.name} — ${e.profession}\n")
+        append("المنطقة: ${e.area.ifBlank { "غير محددة" }}\n")
+        append("التقييم: ${ratingText(e.rating)}\n")
+        append("الحالة: ${if (e.isAvailable) "متاح" else "غير متاح حالياً"}\n")
+        append(distText(hasUser, uLat, uLng, e.latitude, e.longitude))
+    }
+    is StoreEntity -> buildString {
+        append("📍 ${e.name}\n")
+        if (e.description.isNotBlank()) append("${e.description}\n")
+        append("الهاتف: ${e.phone.ifBlank { "غير مسجل" }}\n")
+        append(distText(hasUser, uLat, uLng, e.latitude, e.longitude))
+    }
+    else -> null
+}
+```
+4. استبدل قيمة `currentAnswer` الابتدائية بـ:
+```kotlin
+var currentAnswer by remember {
+    mutableStateOf(
+        describeEntity(targetEntity, hasUserLocation, userLat, userLng)
+            ?: buildString {
+                append("ملخص آلي من بيانات التطبيق في $selectedCity:\n")
+                append("• ${nearbyProviders.size} فني و${nearbyStores.size} متجر ضمن النتائج الحالية.\n")
+                if (!hasUserLocation) append("• موقعك الحالي غير محدد، فالمسافات غير متاحة.")
+            }
+    )
+}
+```
+5. استبدل الدالة `askQuestion` كاملة:
+```kotlin
+fun askQuestion(q: String) {
+    queryText = q
+    fun byDistance(lat: Double, lng: Double) =
+        if (hasUserLocation && lat != 0.0 && lng != 0.0)
+            MapDistanceCalculator.calculateDistanceMeters(userLat, userLng, lat, lng) else Double.MAX_VALUE
+
+    currentAnswer = when {
+        q.contains("أقرب الخدمات") -> {
+            val p = nearbyProviders.sortedBy { byDistance(it.latitude, it.longitude) }.take(3)
+            val s = nearbyStores.sortedBy { byDistance(it.latitude, it.longitude) }.take(3)
+            if (p.isEmpty() && s.isEmpty()) "لا توجد خدمات ضمن النتائج الحالية."
+            else buildString {
+                if (!hasUserLocation) append("⚠️ موقعك غير محدد؛ الترتيب غير مبني على القرب.\n")
+                if (p.isNotEmpty()) append("• فنيون: " + p.joinToString("، ") { "${it.name} (${distText(hasUserLocation, userLat, userLng, it.latitude, it.longitude)})" } + "\n")
+                if (s.isNotEmpty()) append("• متاجر: " + s.joinToString("، ") { "${it.name} (${distText(hasUserLocation, userLat, userLng, it.latitude, it.longitude)})" })
+            }
+        }
+        q.contains("فنيون") || q.contains("صيانة") -> {
+            val list = nearbyProviders.filter { it.isAvailable }.sortedBy { byDistance(it.latitude, it.longitude) }.take(4)
+            if (list.isEmpty()) "لا يوجد فنيون متاحون حالياً ضمن النتائج."
+            else "🛠️ ${list.size} فنيين متاحين:\n" + list.joinToString("\n") { "• ${it.name} (${it.profession}) — ${ratingText(it.rating)}" }
+        }
+        q.contains("صيدلية") || q.contains("متجر") -> {
+            val list = nearbyStores.filter { isMedicalStore(it) }.sortedBy { byDistance(it.latitude, it.longitude) }.take(4)
+            if (list.isEmpty()) "لا توجد صيدليات أو مرافق طبية مسجلة ضمن النتائج الحالية."
+            else "🏪 الأقرب:\n" + list.joinToString("\n") { "• ${it.name} — هاتف: ${it.phone.ifBlank { "غير مسجل" }}" }
+        }
+        else -> {
+            val noCoords = nearbyProviders.count { it.latitude == 0.0 || it.longitude == 0.0 } + nearbyStores.count { it.latitude == 0.0 || it.longitude == 0.0 }
+            "ملخص: ${nearbyProviders.size} فني و${nearbyStores.size} متجر. " +
+                (if (noCoords > 0) "$noCoords منها بلا إحداثيات دقيقة (تظهر موقعاً تقريبياً على الخريطة)." else "كلها بإحداثيات مسجلة.")
+        }
+    }
+}
+```
+وغيّر نص الزر الرابع إلى «📋 اكتمال بيانات الموقع» بدل «تحليل جودة التغطية». احذف `isThinking` إن لم يعد مستخدماً.
+> **ذكاء حقيقي لاحقاً:** يلزم خادم وسيط يستدعي نموذجاً (لا تضع مفتاح API داخل التطبيق إطلاقاً)، ويستقبل نص السؤال + ملخصاً مجمّعاً للبيانات، ويعيد الرد. حتى ذلك الحين، اترك الواجهة «ملخصاً آلياً».
+
+---
+## ب) ArVpsCameraOverlay
+### 1) احذف المحاكاة وادعاء الرؤية الحاسوبية
+- احذف: `activeVpsConfidence` وأي نص يعرض «98.6%»، و`detectedCount` الثابتة، و`LaunchedEffect` الدوّار لـ`scanAngle` (إن كان زخرفياً فقط يمكن إبقاؤه دون نص «تعرّف»).
+- استبدل لافتة الوسط (`Column(... Alignment.Center ...)` ≈ سطر 269-290) بـ:
+```kotlin
+Surface(
+    shape = RoundedCornerShape(12.dp),
+    color = Color(0xFF0F172A).copy(alpha = 0.90f),
+    border = BorderStroke(1.5.dp, Color(0xFF00E5FF)),
+    modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 56.dp)
+) {
+    Column(Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
+        Text("الواقع المعزز (بالموقع والبوصلة)", color = Color(0xFF00E5FF), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        Text(if (hasUserLocation) "تُعرض الأماكن القريبة في اتجاه الكاميرا" else "فعّل GPS لعرض الأماكن حسب الاتجاه", color = Color.White, fontSize = 12.sp)
+    }
+}
+```
+(أضف معامل `hasUserLocation: Boolean` وتمرّره من `MapScreenContent`.)
+
+### 2) «المعالم أمامك»: حقيقية حسب الاتجاه والمسافة
+أضف دالة الاتجاه (لا تعتمد على أسماء دوال غير مؤكدة):
+```kotlin
+private fun bearingDeg(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+    val p1 = Math.toRadians(lat1); val p2 = Math.toRadians(lat2); val dl = Math.toRadians(lon2 - lon1)
+    val y = Math.sin(dl) * Math.cos(p2)
+    val x = Math.cos(p1) * Math.sin(p2) - Math.sin(p1) * Math.cos(p2) * Math.cos(dl)
+    return (Math.toDegrees(Math.atan2(y, x)) + 360.0) % 360.0
+}
+private data class InView(val provider: ProviderEntity, val distanceM: Double, val relativeDeg: Double)
+```
+وداخل الـ Composable:
+```kotlin
+val heading = com.example.utils.rememberHeadingDegrees(enabled = true, lat = userLat, lng = userLng)
+val inView = remember(nearbyProviders, userLat, userLng, heading, hasUserLocation) {
+    if (!hasUserLocation) emptyList()
+    else nearbyProviders.mapNotNull { p ->
+        if (p.latitude == 0.0 || p.longitude == 0.0) return@mapNotNull null
+        val d = com.example.ui.screens.map.utils.MapDistanceCalculator.calculateDistanceMeters(userLat, userLng, p.latitude, p.longitude)
+        if (d > 1500.0) return@mapNotNull null                                   // نطاق الرؤية 1.5 كم
+        val rel = ((bearingDeg(userLat, userLng, p.latitude, p.longitude) - heading + 540.0) % 360.0) - 180.0
+        if (kotlin.math.abs(rel) > 35.0) null else InView(p, d, rel)            // زاوية رؤية ±35°
+    }.sortedBy { it.distanceM }.take(5)
+}
+```
+واستبدل `items(nearbyProviders.take(5)) { provider -> ...}` بـ `items(inView) { v -> val provider = v.provider ... }` وأضف في البطاقة سطراً: `"${MapDistanceCalculator.formatDistance(v.distanceM)} • ${if (v.relativeDeg < 0) "يسارك" else "يمينك"}"`. وعنوان القائمة: «أماكن قريبة في اتجاه الكاميرا» وإن كانت فارغة: «لا أماكن مسجلة أمامك ضمن 1.5 كم».
+> الاتجاه يفترض الهاتف عمودياً (Portrait) والكاميرا الخلفية.
+
+### 3) CameraX بدل `android.hardware.Camera`
+gradle: `implementation("androidx.camera:camera-core:1.3.4")`, `camera-camera2:1.3.4`, `camera-lifecycle:1.3.4`, `camera-view:1.3.4`.
+احذف `import android.hardware.Camera` والمتغير `camera` وأي `camera?.release()`، واستبدل كتلة `AndroidView(...)` الخاصة بالمعاينة بـ:
+```kotlin
+@Composable
+private fun CameraXPreview(modifier: Modifier = Modifier, onError: (String) -> Unit) {
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current   // أو androidx.compose.ui.platform.LocalLifecycleOwner حسب إصدارك
+    AndroidView(
+        modifier = modifier,
+        factory = { ctx ->
+            val previewView = androidx.camera.view.PreviewView(ctx).apply {
+                scaleType = androidx.camera.view.PreviewView.ScaleType.FILL_CENTER
+            }
+            val future = androidx.camera.lifecycle.ProcessCameraProvider.getInstance(ctx)
+            future.addListener({
+                try {
+                    val provider = future.get()
+                    val preview = androidx.camera.core.Preview.Builder().build()
+                        .also { it.setSurfaceProvider(previewView.surfaceProvider) }
+                    provider.unbindAll()
+                    provider.bindToLifecycle(lifecycleOwner, androidx.camera.core.CameraSelector.DEFAULT_BACK_CAMERA, preview)
+                } catch (t: Throwable) {
+                    onError(t.message ?: "تعذر فتح الكاميرا")
+                }
+            }, androidx.core.content.ContextCompat.getMainExecutor(ctx))
+            previewView
+        }
+    )
+}
+```
+واستدعِه داخل `if (hasCameraPermission)` مع `var cameraError by remember { mutableStateOf<String?>(null) }`؛ وإن كان `cameraError != null` اعرض رسالة بدل الشاشة السوداء. (الربط بدورة الحياة يغني عن `release()` اليدوي، ويصحّح الاتجاه تلقائياً.)
+
+## اختبار
+1. افتح Aleph على فني بلا تقييم: يظهر «لا تقييمات بعد» (لا «ممتاز»).
+2. اسأل «أقرب صيدلية» في منطقة بلا صيدليات: يقول إنها غير مسجلة.
+3. AR: وجّه الكاميرا بعيداً عن فني على بعد 300 م: لا يظهر في القائمة؛ لفّ نحوه: يظهر مع «يمينك/يسارك».
+4. قلب الشاشة/تدويرها: المعاينة بالاتجاه الصحيح (CameraX).

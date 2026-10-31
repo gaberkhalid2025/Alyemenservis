@@ -1,0 +1,129 @@
+# 35 – الرادار + الخريطة الاحتياطية (OfflineInteractiveMap) + MarkerRenderer + MapScreenFilters.buildRadarPoints
+**الملفات المفحوصة:** `RadarRenderer_2c2dac`, `OfflineInteractiveMap_2dbccf`, `MarkerRenderer_4e7694`, `HeatmapRenderer_ba35a7`, `MapScreenFilters_20749f`  |  **الإجراء:** تعديلات موضعية.
+
+## ما تأكدت من تطبيقه (سليم)
+إصلاح `Paint` (نسخ `remember` وحقول الملف) في الرادار والخريطة الاحتياطية. و`HeatmapRenderer` فعلاً KDE حقيقي (لا ملاحظات).
+
+## المشاكل
+### 1) الرادار يرسم نقاطاً مختلقة (عالية)
+`buildRadarPoints` لا يتحقق من الإحداثيات: كيان بإحداثي `0,0` تعيد له `calculateDistanceMeters` القيمة `0` فيصبح نصف القطر الأدنى `5` والاتجاه نحو نقطة (0,0) في خليج غينيا، فيظهر **وميض وهمي قرب مركزك** كأنه على بُعد 500 م. كما يوضع `rating = 5.0` ثابتاً لكل العقارات، وقيمة `5.0` الافتراضية في `MapItemPoint`.
+### 2) سلّم الرادار لا علاقة له بالكيلومترات (عالية)
+- معامل `maxRangeKm` **غير مستخدم** داخل `RadarRenderer` (يظهر في التوقيع فقط): مؤشر المدى لا يغيّر شيئاً.
+- المسافة تُحوَّل إلى بكسلات بثابت `km×10` مضروباً بـ`zoomScale`، أما حلقات الرادار فنصف قطرها `min(w,h)×0.42×zoomScale` ⇒ الحلقة الخارجية لا تمثل مسافة معروفة، ولا توجد أي أرقام على الحلقات.
+- يُحسب الرادار من `safeUserLat` (مركز المدينة عند غياب GPS) ويعرض مسافات «منك» وهي من مركز المدينة.
+### 3) الخريطة الاحتياطية (متوسطة)
+- كيان بلا إحداثيات يوضع في مركز المدينة + **إزاحة عشوائية ثابتة 40–160 م** (من `hashCode`) ويُرسم كأنه موقع حقيقي بلا أي وسم.
+- دبوس المستخدم يقول دائماً «موقعك المباشر 📍» و«نظام تحديد المواقع GPS نشط» حتى بلا GPS.
+- تعليق الرأس «100% Offline… Guaranteed to NEVER show a black screen» دعائي وغير دقيق (تحتاج الخريطة الاحتياطية لعرض الأماكن فقط، بلا شوارع).
+### 4) أزرار التكبير لا تعمل في الرادار (منخفضة)
+`zoomScale` داخل الرادار حالة محلية (`remember`) مستقلة عن `state.zoomScale` الذي تغيّره أزرار +/−.
+
+---
+## الإصلاح أ) MapScreenFilters.buildRadarPoints: كاملة
+غيّر التوقيع وأضف التحقق والتطبيع بالنسبة للمدى (القيم x,y تصبح نسباً −1..1 من نصف القطر):
+```kotlin
+fun buildRadarPoints(
+    filteredProviders: List<ProviderEntity>,
+    filteredStores: List<StoreEntity>,
+    filteredProperties: List<PropertyEntity>,
+    safeUserLat: Double,
+    safeUserLng: Double,
+    maxRangeKm: Float = 25f,
+    hasUser: Boolean = true
+): List<MarkerRenderer.MapItemPoint> {
+    if (!hasUser) return emptyList()                       // لا رادار بلا موقع حقيقي
+    val rangeM = maxRangeKm.coerceAtLeast(0.5f) * 1000.0
+    val list = mutableListOf<MarkerRenderer.MapItemPoint>()
+
+    fun addPoints(items: List<Any>, typeName: String) {
+        items.forEach { item ->
+            val lat: Double; val lng: Double; val title: String
+            val rating: Double; val isAvailable: Boolean; val id: String
+            when (item) {
+                is ProviderEntity -> { id = item.id; lat = item.latitude; lng = item.longitude; title = item.name; rating = item.rating.toDouble(); isAvailable = item.isAvailable }
+                is StoreEntity -> { id = item.id; lat = item.latitude; lng = item.longitude; title = item.name; rating = item.rating.toDouble(); isAvailable = item.isActive }
+                is PropertyEntity -> { id = item.id; lat = item.latitude; lng = item.longitude; title = item.title; rating = 0.0; isAvailable = item.isActive }
+                else -> return@forEach
+            }
+            if (lat.isNaN() || lng.isNaN() || lat == 0.0 || lng == 0.0) return@forEach     // لا نقطة بلا موقع حقيقي
+
+            val d = MapDistanceCalculator.calculateDistanceMeters(safeUserLat, safeUserLng, lat, lng)
+            if (d > rangeM) return@forEach                                                   // خارج المدى المختار
+            val fraction = (d / rangeM).toFloat().coerceIn(0.03f, 1f)
+
+            val dLng = Math.toRadians(lng - safeUserLng)
+            val lat1 = Math.toRadians(safeUserLat)
+            val lat2 = Math.toRadians(lat)
+            val y = sin(dLng) * cos(lat2)
+            val x = cos(lat1) * sin(lat2) - sin(lat1) * cos(lat2) * cos(dLng)
+            val azimuth = Math.atan2(y, x)
+
+            val derivedType = when (item) {
+                is StoreEntity -> {
+                    val isMedical = item.sectionId.contains("medical") || item.categoryId.contains("medical") || item.name.contains("طبي") || item.name.contains("صيدلية")
+                    val isRestaurant = !isMedical && (item.sectionId.contains("restaurant") || item.categoryId.contains("restaurant") || item.name.contains("مطعم") || item.name.contains("كافيه"))
+                    if (isMedical) "MEDICAL" else if (isRestaurant) "RESTAURANT" else "STORE"
+                }
+                else -> typeName
+            }
+            list.add(MarkerRenderer.MapItemPoint(
+                id = id, title = title, type = derivedType,
+                x = (fraction * sin(azimuth)).toFloat(),
+                y = (-fraction * cos(azimuth)).toFloat(),
+                rating = rating, isAvailable = isAvailable, originalItem = item
+            ))
+        }
+    }
+    addPoints(filteredProviders, "PROVIDER")
+    addPoints(filteredStores, "STORE")
+    addPoints(filteredProperties, "PROPERTY")
+    return list
+}
+```
+**MarkerRenderer.MapItemPoint:** غيّر `val rating: Double = 5.0` إلى `val rating: Double = 0.0` (0 = غير معروف).
+
+## الإصلاح ب) RadarRenderer: سلّم حقيقي
+1. في `screenItems` (سطر ≈ 145-150) و`WeightedPoint` (≈ 161-164): استبدل `item.x * zoomScale` و`item.y * zoomScale` بـ `item.x * maxRadius` و`item.y * maxRadius` (فـ`maxRadius` يحوي التكبير أصلاً)، وأضف `maxRadius` لمفاتيح `remember(items, centerX, centerY, zoomScale)` ← `remember(items, centerX, centerY, maxRadius)`. (قد يلزم تعديل `bandwidth` في الـ KDE إذا كان مرتبطاً بقيم قديمة: اجعله `maxRadius * 0.08f`.)
+2. أرقام على الحلقات: أضف قبل `Canvas` ورقة رسم، وداخل الرسم بعد دوائر الرادار:
+```kotlin
+val ringLabelPaint = remember {
+    android.graphics.Paint().apply { isAntiAlias = true; textSize = 24f; color = android.graphics.Color.argb(170, 255, 255, 255) }
+}
+// داخل Canvas بعد رسم الحلقات (عدّل centerX/centerY إلى أسماء المتغيرات الموجودة عندك):
+drawIntoCanvas { c ->
+    ringRadii.forEachIndexed { i, rad ->
+        val km = maxRangeKm * (i + 1) / ringRadii.size
+        val label = if (km < 10f) String.format(java.util.Locale.US, "%.1f كم", km) else String.format(java.util.Locale.US, "%.0f كم", km)
+        c.nativeCanvas.drawText(label, centerX + 6f, centerY - rad - 6f, ringLabelPaint)
+    }
+}
+```
+(استورد `androidx.compose.ui.graphics.drawscope.drawIntoCanvas` إن لم يكن.)
+3. تعليق الرأس «يعمل بنسبة 100%…» استبدله بوصف دقيق.
+4. (اختياري) اربط أزرار +/−: أضف معاملي `zoomScale: Float` و`onZoomScaleChange: (Float)->Unit` واستخدمهما بدل الحالة المحلية، مثل `OfflineInteractiveMap`.
+
+## الإصلاح ج) MapScreenContent: استدعاء الرادار
+```kotlin
+MapScreenFilters.buildRadarPoints(
+    filteredProviders = filteredProviders, filteredStores = filteredStores, filteredProperties = filteredProperties,
+    safeUserLat = safeUserLat, safeUserLng = safeUserLng,
+    maxRangeKm = state.maxRangeKm, hasUser = hasRealLocation
+)
+```
+و`RadarRenderer(..., maxRangeKm = state.maxRangeKm)`. وعندما `state.isRadarMode && !hasRealLocation` اعرض فوقه:
+```kotlin
+Text("الرادار يحتاج موقعك الحقيقي — فعّل GPS", color = Color(0xFFF59E0B), fontSize = 14.sp,
+    modifier = Modifier.align(Alignment.Center).background(Color(0xCC0F172A), RoundedCornerShape(12.dp)).padding(16.dp))
+```
+## الإصلاح د) OfflineInteractiveMap
+1. أضف للنموذج: `data class InteractiveMapPoint(..., val isApprox: Boolean = false)` وعند الإنشاء في الكتل الثلاث (فنيون/متاجر/عقارات): `isApprox = !hasValidCoords`.
+2. عند رسم الاسم: `val shown = if (pt.isApprox) "${pt.name} (موقع تقريبي)" else pt.name` وخفّض الشفافية للتقريبية (`alpha = 0.55f`) وارسم حدّها منقطاً.
+3. معامل جديد `hasUserLocation: Boolean = true`: لا ترسم دبوس المستخدم ولا الشارة إلا إن كان `true`؛ والسطر الثاني: `"محافظة $selectedCity"` فقط، وأزل «GPS نشط» إلا عند `hasUserLocation`. في `RealLeafletMapView` مرّر `hasUserLocation = userCoords.first != 0.0 && userCoords.second != 0.0`.
+4. عدّل التعليق الدعائي في رأس الملف.
+
+## اختبار
+1. أضف فنياً بإحداثي `0,0`: لا يظهر على الرادار.
+2. غيّر مؤشر المدى من 25 إلى 5 كم: تختفي النقاط الأبعد من 5 كم وتتغير أرقام الحلقات (1.2 / 2.5 / 3.8 / 5.0 كم).
+3. فنيّ على بعد 2.5 كم نحو الشرق يظهر على الحلقة الثانية يميناً.
+4. بلا GPS: رسالة «الرادار يحتاج موقعك الحقيقي».
+5. الخريطة الاحتياطية: كيان بلا إحداثيات يظهر باهتاً مع «(موقع تقريبي)».

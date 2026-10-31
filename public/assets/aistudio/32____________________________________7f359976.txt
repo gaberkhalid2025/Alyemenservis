@@ -1,0 +1,90 @@
+# 32 – MapScreenFilters + CityAliases + OfflineMapManager + OfflineTileInterceptor
+**الملفات المفحوصة:** `MapScreenFilters_20749f`, `CityAliases_1`, `OfflineMapManager_5ccb51`, `OfflineTileInterceptor_1`, `MapJsonBuilder_453050`, `MapDistanceCalculator_e1870f`  |  **الإجراء:** تعديلات موضعية.
+
+## ما تأكدت من تطبيقه (سليم)
+`findCity` و`getCityCoordinates` (لا افتراض صنعاء)، مدة الكاش 30 يوماً، عدم التنظيف أوفلاين، رموز الضالع/المحويت (`ye_dal`/`ye_mhw`)، تقييم «جديد»، دوال `MapDistanceCalculator` الأربع، والمعترض (MBTiles ← كاش ← شبكة، بلا تخزين لـ Esri).
+
+## المشكلة 1 (عالية): فلتر المدينة يطابق «1» و«2» و«3» داخل أي نص
+`matchesCityFilter` يبني نصاً من `cityId + area + localNeighborhood` ثم يفحص `combined.contains(alias)`. القوائم في `CityAliases` تحتوي الرموز `"1"` (صنعاء) و`"2"` (عدن) و`"3"` (تعز)، فالنص الذي فيه رقم `10` أو `11` أو `21` أو «شارع 12» يُحسب **صنعاء** (والذي فيه `2x` يُحسب عدن...). النتيجة: فنيون ومحلات يظهرون في مدينة خاطئة.
+كذلك كلمات عامة كأسماء بديلة: «المدينة» و«الوادي» (مأرب) و«الميناء» (الحديدة) تطابق نصوصاً لا علاقة لها.
+
+### الإصلاح أ) استبدل `matchesCityFilter` كاملة
+```kotlin
+private fun norm(s: String): String = s.trim().lowercase(java.util.Locale.ROOT)
+    .replace(Regex("[\\u064B-\\u0652\\u0640]"), "")
+    .replace(Regex("[إأآٱ]"), "ا")
+    .replace('ى', 'ي').replace('ة', 'ه')
+
+fun matchesCityFilter(
+    cityFilter: String,
+    entityCityId: String,
+    entityArea: String,
+    entityNeighborhood: String
+): Boolean {
+    if (cityFilter.isEmpty() || cityFilter == "الكل" || cityFilter == "جميع المدن والمحافظات") return true
+    val normFilter = norm(cityFilter)
+
+    val matchingKey = CityAliases.ALIASES.keys.firstOrNull { norm(it) == normFilter }
+        ?: CityAliases.ALIASES.keys.firstOrNull { val k = norm(it); k.length >= 3 && normFilter.contains(k) }
+    val aliases = if (matchingKey != null) CityAliases.ALIASES[matchingKey] ?: listOf(cityFilter) else listOf(cityFilter)
+
+    val text = norm("$entityCityId $entityArea $entityNeighborhood")
+    val tokens = text.split(Regex("[^\\p{L}\\p{N}_]+")).filter { it.isNotEmpty() }.toSet()
+
+    return aliases.any { alias ->
+        val na = norm(alias)
+        when {
+            na.isEmpty() -> false
+            na.all { it.isDigit() } || na.startsWith("ye_") || na.length < 3 -> tokens.contains(na)   // رموز وكلمات قصيرة: كلمة كاملة فقط
+            else -> text.contains(na)                                                              // أسماء: احتواء
+        }
+    }
+}
+```
+### الإصلاح ب) CityAliases: احذف الأسماء العامة
+من قائمة **مأرب** احذف `"المدينة"` و`"الوادي"`، ومن **الحديدة** احذف `"الميناء"`. (أبقِ أسماء الأحياء المحددة.) هذه الأسماء كانت تجعل `OfflineMapManager.findCity("المدينة")` ينقل الخريطة إلى مأرب.
+
+## المشكلة 2 (متوسطة): الكاش صغير وتنظيفه يحذف الأكثر استخداماً
+- الحدّ 50 ميجابايت (عتبة التنظيف 45) ≈ بضعة آلاف بلاطة فقط؛ لا يكفي لحي واحد بمستويات تكبير متعددة، فلا فائدة أوفلاين تُذكر.
+- التنظيف حسب `lastModified` (وقت الكتابة) والمعترض لا يحدّثه عند القراءة، فالبلاطات التي تستخدمها يومياً تُحذف أولاً وفق وقت كتابتها.
+
+### أ) OfflineMapManager: ارفع الحدود
+```kotlin
+private const val MAX_CACHE_SIZE_BYTES = 300 * 1024 * 1024L
+private const val PURGE_THRESHOLD_BYTES = 280 * 1024 * 1024L
+...
+val targetSize = 220 * 1024 * 1024L   // داخل purgeCacheIfNeeded بدل 35MB
+```
+(اجعلها قابلة للضبط من الإعدادات إن أردت؛ وتأكد من مساحة التخزين المتاحة قبل الكتابة.)
+### ب) OfflineTileInterceptor: اجعل التنظيف LRU فعلياً
+```kotlin
+val cache = cacheFile(context, tile)
+if (cache.exists() && cache.length() > 0) {
+    cache.setLastModified(System.currentTimeMillis())   // لمس الملف عند القراءة (LRU)
+    return png(cache.readBytes())
+}
+```
+(تكلفة طفيفة؛ لا تلمسه إن كان آخر لمس منذ أقل من ساعة لتقليل الكتابة: `if (System.currentTimeMillis() - cache.lastModified() > 3_600_000L) cache.setLastModified(...)`.)
+
+## المشكلة 3 (منخفضة): المدى يُحسب من موقع مختلق
+عند غياب GPS، `maxRangeKm` والترتيب يعتمدان على `safeUserLat/Lng` (مركز المدينة). في استدعاءات `MapScreenFilters`/الرادار مرّر `0.0` للإحداثيين حين `!hasRealLocation` وتجاهل فلتر المدى (أو اعرض «فعّل GPS لتفعيل فلتر المسافة»).
+
+## ملاحظات
+- `MapJsonBuilder` يستورد `getProviderCoords` من `com.example.utils` ولم أرَه؛ أرسله لأتأكد أنه لا يولّد إحداثيات اصطناعية تُرسل للملاحة (`isApprox` صحيح لكن الملاحة يجب أن ترفضها — وهي ترفض 0,0 فعلاً).
+- `MapDistanceCalculator` سليم، ولا تعديل.
+
+## اختبار وحدة (JVM)
+```kotlin
+class CityFilterTest {
+    @org.junit.Test fun numericCodeIsExactToken() {
+        org.junit.Assert.assertTrue(MapScreenFilters.matchesCityFilter("صنعاء", "1", "", ""))
+        org.junit.Assert.assertFalse(MapScreenFilters.matchesCityFilter("صنعاء", "10", "شارع 21", ""))
+    }
+    @org.junit.Test fun nameContains() {
+        org.junit.Assert.assertTrue(MapScreenFilters.matchesCityFilter("عدن", "", "كريتر - عدن", ""))
+    }
+    @org.junit.Test fun genericWordDoesNotMatchMarib() {
+        org.junit.Assert.assertFalse(MapScreenFilters.matchesCityFilter("مأرب", "", "المدينة المنورة", ""))
+    }
+}
+```

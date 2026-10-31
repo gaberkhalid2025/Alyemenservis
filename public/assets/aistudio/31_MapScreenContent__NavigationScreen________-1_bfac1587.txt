@@ -1,0 +1,114 @@
+# 31 – MapScreenContent.kt + NavigationScreen.kt + RealLeafletMapView.kt (المتبقي)
+**الملفات المفحوصة:** `MapScreenContent_f084db`, `NavigationScreen_027d80`, `MapScreenState_1c369a`, `RealLeafletMapView_353ff8`  |  **الإجراء:** تعديلات موضعية.
+
+## ما تأكدت من تطبيقه (سليم)
+البحث الصوتي الحقيقي، البوصلة الحقيقية، تتبع الملاحة (`startNavigationTracking`)، `stopNavigation()` في زر الرجوع، نافذة الفزعة الصادقة (اتصال/SMS/مشاركة)، `keepScreenOn`، تأكيد الخروج، تثبيت الصوت العربي، سطر خطأ Valhalla، إزالة الرجوع إلى صنعاء من حساب المسار، جسر JS على الخيط الرئيسي، `onRelease`، وعدم إعادة التمركز عند «الكل».
+
+## أ) MapScreenContent.kt
+
+### 1) أخطر: نقطة المستخدم تُرسم في صنعاء قبل أي إشارة (سطر ≈ 341)
+```kotlin
+// قبل
+userCoords = Pair(safeUserLat, safeUserLng),
+// بعد
+userCoords = if (hasRealLocation) Pair(safeUserLat, safeUserLng) else Pair(0.0, 0.0),
+```
+(`RealLeafletMapView` يتجاهل 0.0.) ومرّر المعاملين نفسهما لـ `MapBottomSheet` (`userLat/userLng`) وللبحث: `if (hasRealLocation) safeUserLat else 0.0`.
+
+### 2) الفزعة: «أقرب فني» يُحسب من موقع مختلق ومن قائمة مفلترة (سطر ≈ 1029)
+- يستخدم `filteredProviders` (قد تستبعد الأقرب بسبب فلتر الفئة/المدينة)، و`safeUserLat` يرجع لمركز المدينة عند غياب GPS، فيظهر «أقرب فني» إلى صنعاء لا إليك.
+```kotlin
+val nearest = remember(providers, hasRealLocation, safeUserLat, safeUserLng) {
+    if (!hasRealLocation) null
+    else providers
+        .filter { it.phone.isNotBlank() && it.latitude != 0.0 && it.longitude != 0.0 }
+        .minByOrNull { MapDistanceCalculator.calculateDistanceMeters(safeUserLat, safeUserLng, it.latitude, it.longitude) }
+}
+```
+- أضف رقم طوارئ يضبطه صاحب التطبيق (لا أفترض رقماً رسمياً):
+في `NavConfig`: `const val EMERGENCY_NUMBER = ""   // ضع الرقم الرسمي المعتمد هنا`
+وفي الحوار قبل «أقرب فني»:
+```kotlin
+if (NavConfig.EMERGENCY_NUMBER.isNotBlank()) {
+    Button(
+        onClick = { SosDispatcher.safeStart(context, SosDispatcher.dialIntent(NavConfig.EMERGENCY_NUMBER)) },
+        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
+        modifier = Modifier.fillMaxWidth()
+    ) { Text("📞 اتصال بالطوارئ ${NavConfig.EMERGENCY_NUMBER}", fontWeight = FontWeight.Bold) }
+}
+```
+- نتيجة `enqueueSos`: طبّق المستند 26 (بند ج-3) كي لا تُعرض «تم الحفظ» عند الفشل.
+
+### 3) ربط الفحص الحقيقي (المستند 27)
+```kotlin
+var showDiagnostics by remember { mutableStateOf(false) }
+val accuracyM by viewModel.userLocationAccuracyM.collectAsState()
+if (showDiagnostics) com.example.utils.MapDiagnosticsDialog(hasRealLocation, accuracyM.takeIf { it < Float.MAX_VALUE }) { showDiagnostics = false }
+```
+### 4) إيقاف GPS عند مغادرة الخريطة (المستند 26)
+أول الدالة: `DisposableEffect(Unit) { onDispose { viewModel.stopLocationUpdates() } }`.
+
+## ب) NavigationScreen.kt
+
+### 1) الرسالة «سيتم المحاولة مجدداً» كاذبة: لا إعادة محاولة فعلية
+في `catch` لا يوجد أي مؤقت يعيد الحساب، و`showSnackbar` داخل `catch` **يعلّق** الـ effect حتى تختفي الرسالة (والمؤشر يبقى دائراً). والأهم: عندما يفشل المحركان يرجع `calculateRoute` مساراً «تقريبياً» (لا استثناء) فلا يُعاد الحساب أبداً حتى لو عاد الاتصال.
+أضف بعد تعريف `routeResult`:
+```kotlin
+var routeFailures by remember { mutableIntStateOf(0) }
+```
+وفي الـ effect: بعد `routeResult = result` أضف `routeFailures = 0`، واستبدل `catch (t: Throwable)`:
+```kotlin
+} catch (t: Throwable) {
+    Log.e(NAV_TAG, "Route calculation failed: ${t.message}", t)
+    routeFailures += 1
+    if (routeFailures <= 3) scope.launch { delay(5_000L * routeFailures); routeVersion += 1 }
+    else scope.launch { snackbarHostState.showSnackbar("تعذر حساب المسار. تحقق من الاتصال أو حمّل الخرائط الأوفلاين") }
+} finally { isLoadingRoute = false }
+```
+وأضف إعادة محاولة دورية حين يكون المسار «تقريبياً» (يعود الاتصال أو يُكتمل التنزيل):
+```kotlin
+LaunchedEffect(isApproximate, hasRealLocation) {
+    if (!isApproximate || !hasRealLocation) return@LaunchedEffect
+    repeat(6) {
+        delay(15_000L)
+        routeVersion += 1          // يحاول Valhalla/OSRM من جديد؛ إن نجح صار isApproximate=false وتوقفت الحلقة
+    }
+}
+```
+(ضعها بعد `val isApproximate = ...`.)
+
+### 2) إعادة حساب غير لازمة عند تذبذب GPS
+مفتاح `hasRealLocation` في effect حساب المسار يعيد الحساب (ويصفّر التنبيهات) مع كل عودة للإشارة. استبدله:
+```kotlin
+val needsFirstRoute = hasRealLocation && routeResult == null
+LaunchedEffect(routeVersion, waypoints.size, isTilesDownloaded, needsFirstRoute) { ... }
+```
+### 3) رسالة مختلفة عند ضياع الإشارة أثناء الرحلة
+في `instructionText`:
+```kotlin
+!hasRealLocation -> if (result != null) "إشارة GPS ضعيفة — سنواصل التوجيه عند عودتها" else "لم يتم تحديد موقعك بعد — فعّل GPS"
+```
+### 4) الحدّان من `NavConfig` (المستند 28)
+```kotlin
+val offRoute = remember { OffRouteDetector(NavConfig.OFF_ROUTE_THRESHOLD_METERS) }
+val arrival = remember { ArrivalDetector(NavConfig.ARRIVAL_THRESHOLD_METERS) }
+```
+### 5) نطق الوصول يُقطع بتعليمة لاحقة
+`speak` يستخدم دائماً `QUEUE_FLUSH`، فجملة «لقد وصلت…» قد تُقطع فوراً بأول تعليمة للمسار الجديد.
+```kotlin
+val speak: (String, Boolean) -> Unit = { text, urgent ->
+    if (voiceEnabled && ttsReady)
+        tts?.speak(text, if (urgent) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD, null, "nav_${System.nanoTime()}")
+}
+```
+واستخدم `speak(text, true)` لإعادة الحساب، و`speak(text, false)` للوصول والتعليمات العادية (عدّل المواضع: سطور ≈ 230، 236، 259، 310).
+
+## ج) RealLeafletMapView.kt
+- `object MapAssetMemoryCache` (آخر الملف) **مزيّف**: `isCached() = true` ودوال تعيد `""`. لا يؤثر على الخريطة، لكن `MapTestRunner` يعتمد عليه لإعلان «الكاش يعمل». احذفه مع `MapTestRunner` (المستند 27) أو أبقه معلَّماً `@Deprecated("غير مستخدم")`.
+- لا مشاكل أخرى جوهرية: التقاط الأخطاء يقتصر على الإطار الرئيسي، فلا تنتقل الخريطة للخريطة الاحتياطية لمجرد فشل بلاطة.
+
+## اختبار
+1. بلا GPS: لا نقطة زرقاء، «أقرب فني» لا يظهر، زر الطوارئ يظهر إن ضُبط الرقم.
+2. أوقف الإنترنت قبل بدء الملاحة ثم شغّله: بعد ≤ 15 ث ينتقل من «تقريبي» إلى مسار حقيقي.
+3. أثناء الرحلة غطِّ الهاتف 20 ث: تظهر «إشارة GPS ضعيفة» ولا يُعاد حساب المسار عند عودتها.
+4. محطتان متقاربتان: نطق «لقد وصلت…» يكتمل قبل التعليمة التالية.

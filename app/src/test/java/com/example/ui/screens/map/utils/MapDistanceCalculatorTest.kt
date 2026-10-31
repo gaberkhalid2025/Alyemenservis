@@ -1,60 +1,36 @@
 package com.example.ui.screens.map.utils
 
-import org.junit.Assert.*
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MapDistanceCalculatorTest {
-    
-    @Test
-    fun `calculateDistanceMeters - Sanaa to Aden is ~300km`() {
-        val sanaa = 15.3694 to 44.1910
-        val aden = 12.7855 to 45.0187
-        
-        val distance = MapDistanceCalculator.calculateDistanceMeters(
-            sanaa.first, sanaa.second, aden.first, aden.second
-        )
-        
-        // ~300 km
-        assertTrue(distance > 280_000 && distance < 320_000)
+    @Test fun formatDistance() {
+        assertEquals("999 م", MapDistanceCalculator.formatDistance(999.4))
+        assertEquals("1.5 كم", MapDistanceCalculator.formatDistance(1500.0))
+        assertEquals("—", MapDistanceCalculator.formatDistance(Double.NaN))
     }
-    
-    @Test
-    fun `calculateDistanceMeters - same point returns 0`() {
-        val distance = MapDistanceCalculator.calculateDistanceMeters(
-            15.3694, 44.1910, 15.3694, 44.1910
-        )
-        assertEquals(0.0, distance, 1.0)
+    @Test fun formatDistanceSpoken() {
+        assertEquals("50 متراً", MapDistanceCalculator.formatDistanceSpoken(47.0))
+        assertEquals("750 متراً", MapDistanceCalculator.formatDistanceSpoken(730.0))
+        assertEquals("1.5 كيلومتر", MapDistanceCalculator.formatDistanceSpoken(1500.0))
+        assertEquals("2 كيلومتر", MapDistanceCalculator.formatDistanceSpoken(2000.0))
     }
-    
-    @Test
-    fun `calculateDistanceMeters - zero coordinates returns 0`() {
-        val distance = MapDistanceCalculator.calculateDistanceMeters(
-            0.0, 0.0, 15.3694, 44.1910
-        )
-        assertEquals(0.0, distance, 1.0)
+    @Test fun formatDuration() {
+        assertEquals("أقل من دقيقة", MapDistanceCalculator.formatDuration(20.0))
+        assertEquals("2 دقيقة", MapDistanceCalculator.formatDuration(125.0))
+        assertEquals("1 س", MapDistanceCalculator.formatDuration(3600.0))
+        assertEquals("1 س 20 د", MapDistanceCalculator.formatDuration(4800.0))
     }
-    
-    @Test
-    fun `formatDistance - less than 1km shows meters`() {
-        val result = MapDistanceCalculator.formatDistance(500.0)
-        assertTrue(result.contains("500") && result.contains("م"))
+    @Test fun etaIsAlwaysLabeledApproximate() {
+        assertTrue(MapDistanceCalculator.computeEta(500.0).contains("(تقريبي)"))
+        assertTrue(MapDistanceCalculator.computeEta(5000.0).contains("(تقريبي)"))
     }
-    
-    @Test
-    fun `formatDistance - more than 1km shows km`() {
-        val result = MapDistanceCalculator.formatDistance(2500.0)
-        assertTrue(result.contains("2.5") && result.contains("كم"))
+    @Test fun zeroCoordinatesGiveZeroDistance() {
+        assertEquals(0.0, MapDistanceCalculator.calculateDistanceMeters(0.0, 0.0, 15.0, 44.0), 0.0)
+        assertEquals(0.0, MapDistanceCalculator.calculateDistanceMeters(15.0, 44.0, 0.0, 0.0), 0.0)
     }
-    
-    @Test
-    fun `computeEta - short distance uses walking`() {
-        val result = MapDistanceCalculator.computeEta(500.0)
-        assertTrue(result.contains("سيراً"))
-    }
-    
-    @Test
-    fun `computeEta - long distance uses car`() {
-        val result = MapDistanceCalculator.computeEta(15_000.0)
-        assertTrue(result.contains("بالسيارة"))
+    @Test fun oneDegreeOfLatitudeIsAbout111km() {
+        assertEquals(111_195.0, MapDistanceCalculator.calculateDistanceMeters(15.0, 44.0, 16.0, 44.0), 150.0)
     }
 }

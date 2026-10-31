@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
@@ -22,11 +23,8 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.*
 
 /**
- * 📡 RadarRenderer (نظام الرادار المتقدم - يعمل بنسبة 100% بدون تجمد مع أنيميشن المسح المزدوج)
- * [تعديل] ضمان عمل الرادار بسلاسة تامة وانيميشن مسح ونبضات مستقرة بدون أي تجمد
- * - أنيميشن مسح دائري سلس 360 درجة (Sweep Animation)
- * - 3 موجات نبضية متزامنة ونابضة تعبر عن إشارات اللاسلكي
- * - توافق تام مع التجميع اللوني لكافة فئات الفنيين والمتاجر والعقارات
+ * 📡 RadarRenderer
+ * رادار تفاعلي يعرض الكيانات المتاحة بدقة حسب المدى الفعلي وموقع المستخدم.
  */
 @Composable
 fun RadarRenderer(
@@ -122,6 +120,14 @@ fun RadarRenderer(
             }
         }
 
+        val ringLabelPaint = remember {
+            android.graphics.Paint().apply {
+                isAntiAlias = true
+                textSize = 24f
+                color = android.graphics.Color.argb(170, 255, 255, 255)
+            }
+        }
+
         val alpha1 by remember {
             derivedStateOf { ((1.0f - pulseRadius) * 0.35f).coerceIn(0f, 1f) }
         }
@@ -142,11 +148,11 @@ fun RadarRenderer(
             }
         }
 
-        val screenItems = remember(items, centerX, centerY, zoomScale) {
+        val screenItems = remember(items, centerX, centerY, maxRadius) {
             items.map { item ->
                 item.copy(
-                    x = centerX + item.x * zoomScale,
-                    y = centerY + item.y * zoomScale
+                    x = centerX + item.x * maxRadius,
+                    y = centerY + item.y * maxRadius
                 )
             }
         }
@@ -155,12 +161,12 @@ fun RadarRenderer(
             MarkerRenderer.clusterPoints(screenItems, thresholdPx = 45f * zoomScale)
         }
 
-        val weightedPoints = remember(items, centerX, centerY, zoomScale, isHeatmapActive) {
+        val weightedPoints = remember(items, centerX, centerY, maxRadius, isHeatmapActive) {
             if (isHeatmapActive) {
                 items.map { item ->
                     HeatmapRenderer.WeightedPoint(
-                        x = centerX + item.x * zoomScale,
-                        y = centerY + item.y * zoomScale,
+                        x = centerX + item.x * maxRadius,
+                        y = centerY + item.y * maxRadius,
                         weight = 1.2f
                     )
                 }
@@ -201,6 +207,14 @@ fun RadarRenderer(
                     center = centerOffset,
                     style = ringStroke
                 )
+            }
+
+            drawIntoCanvas { c ->
+                ringRadii.forEachIndexed { i, rad ->
+                    val km = maxRangeKm * (i + 1) / ringRadii.size
+                    val label = if (km < 10f) String.format(java.util.Locale.US, "%.1f كم", km) else String.format(java.util.Locale.US, "%.0f كم", km)
+                    c.nativeCanvas.drawText(label, centerX + 6f, centerY - rad - 6f, ringLabelPaint)
+                }
             }
 
             // 3. محاور التقاطع (Crosshairs)

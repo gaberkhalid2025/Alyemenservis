@@ -186,7 +186,11 @@ fun MapScreenContent(
         delay(600)
         isSearching = true
         searchPanelOpen = true
-        searchResults = RealValhallaNavigator.searchAddressAndPlaces(q, providers, stores, safeUserLat, safeUserLng)
+        searchResults = RealValhallaNavigator.searchAddressAndPlaces(
+            q, providers, stores,
+            if (hasRealLocation) safeUserLat else 0.0,
+            if (hasRealLocation) safeUserLng else 0.0
+        )
         searchMessage = if (searchResults.isEmpty()) (RealValhallaNavigator.lastSearchError ?: "لا توجد نتائج لـ «$q»") else null
         isSearching = false
     }
@@ -279,6 +283,7 @@ fun MapScreenContent(
             userLat = safeUserLat,
             userLng = safeUserLng,
             hasRealLocation = hasRealLocation,
+            isDrivingMode = isDrivingMode,
             initialWaypoints = state.navWaypoints,
             onFinishNavigation = { state.stopNavigation() },
             nearbyProviders = filteredProviders,
@@ -313,25 +318,24 @@ fun MapScreenContent(
             if (state.currentMapMode == MapMode.AR_VPS) {
                 ArVpsCameraOverlay(
                     nearbyProviders = filteredProviders,
-                    nearbyStores = filteredStores,
-                    nearbyProperties = filteredProperties,
                     userLat = safeUserLat,
                     userLng = safeUserLng,
+                    hasUserLocation = hasRealLocation,
                     onProviderSelected = { state.selectedEntity = it },
-                    onStoreSelected = { state.selectedEntity = it },
-                    onPropertySelected = { state.selectedEntity = it },
-                    onCloseAr = { state.currentMapMode = MapMode.SATELLITE },
+                    onClose = { state.currentMapMode = MapMode.SATELLITE },
                     modifier = Modifier.fillMaxSize()
                 )
             } else if (state.isRadarMode) {
                 RadarRenderer(
-                    items = remember(filteredProviders, filteredStores, filteredProperties, safeUserLat, safeUserLng) {
+                    items = remember(filteredProviders, filteredStores, filteredProperties, safeUserLat, safeUserLng, state.maxRangeKm, hasRealLocation) {
                         MapScreenFilters.buildRadarPoints(
                             filteredProviders = filteredProviders,
                             filteredStores = filteredStores,
                             filteredProperties = filteredProperties,
                             safeUserLat = safeUserLat,
-                            safeUserLng = safeUserLng
+                            safeUserLng = safeUserLng,
+                            maxRangeKm = state.maxRangeKm,
+                            hasUser = hasRealLocation
                         )
                     },
                     selectedItemId = when (val ent = state.selectedEntity) {
@@ -347,9 +351,21 @@ fun MapScreenContent(
                     maxRangeKm = state.maxRangeKm,
                     modifier = Modifier.fillMaxSize()
                 )
+                if (!hasRealLocation) {
+                    Text(
+                        "الرادار يحتاج موقعك الحقيقي — فعّل GPS",
+                        color = Color(0xFFF59E0B),
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .background(Color(0xCC0F172A), RoundedCornerShape(12.dp))
+                            .padding(16.dp)
+                    )
+                }
             } else {
                 RealLeafletMapView(
-                    userCoords = Pair(safeUserLat, safeUserLng),
+                    userCoords = if (hasRealLocation) Pair(safeUserLat, safeUserLng) else Pair(0.0, 0.0),
                     nearbyProviders = filteredProviders,
                     nearbyStores = filteredStores,
                     nearbyProperties = filteredProperties,
@@ -595,12 +611,14 @@ fun MapScreenContent(
                     val hasCoarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
                     if (hasFine || hasCoarse) {
                         viewModel.startLocationUpdates()
-                        coroutineScope.launch {
-                            snackbarHostState.showSnackbar("تمت إعادة التمركز إلى موقعك الفعلي 📍")
-                        }
                     } else {
                         locationPermissionLauncher.launch(
                             arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
+                        )
+                    }
+                    coroutineScope.launch {
+                        snackbarHostState.showSnackbar(
+                            if (hasRealLocation) "تمت إعادة التمركز إلى موقعك 📍" else "جارٍ تحديد موقعك… تأكد من تشغيل GPS"
                         )
                     }
                 },
@@ -623,8 +641,14 @@ fun MapScreenContent(
                 onSelectMapMode = { mode, tilt ->
                     state.currentMapMode = mode
                     state.isRadarMode = false
+                    val label = when (mode) {
+                        MapMode.SATELLITE, MapMode.VELA_3D -> "أقمار صناعية"
+                        MapMode.HOT -> "شوارع (HOT)"
+                        MapMode.TOPO -> "تضاريس"
+                        else -> "خريطة قياسية"
+                    }
                     coroutineScope.launch {
-                        snackbarHostState.showSnackbar("تم تطبيق النمط بنجاح ✓")
+                        snackbarHostState.showSnackbar("النمط: $label")
                     }
                 },
                 isDrivingMode = isDrivingMode,
@@ -640,7 +664,10 @@ fun MapScreenContent(
                 compassBearing = -heading,
                 onResetCompass = {
                     coroutineScope.launch {
-                        snackbarHostState.showSnackbar("🧭 اتجاه الشمال مضبوط وفق بوصلة الجهاز الحقيقية")
+                        val deg = ((heading % 360f) + 360f) % 360f
+                        val names = listOf("شمال", "شمال شرق", "شرق", "جنوب شرق", "جنوب", "جنوب غرب", "غرب", "شمال غرب")
+                        val dir = names[(((deg + 22.5f) / 45f).toInt()) % 8]
+                        snackbarHostState.showSnackbar("اتجاه الجهاز: ${deg.toInt()}° ($dir)")
                     }
                 },
                 modifier = Modifier
@@ -867,8 +894,8 @@ fun MapScreenContent(
             state.selectedEntity?.let { entity ->
                 MapBottomSheet(
                     entity = entity,
-                    userLat = safeUserLat,
-                    userLng = safeUserLng,
+                    userLat = if (hasRealLocation) safeUserLat else 0.0,
+                    userLng = if (hasRealLocation) safeUserLng else 0.0,
                     onDismiss = { state.selectedEntity = null },
                     onAddStop = { target ->
                         state.addWaypoint(target)
@@ -1040,8 +1067,9 @@ fun MapScreenContent(
 
     // 🚨 10. SOS / الفزعة Confirmation Dialog
     if (showSosDialog) {
-        val nearest = remember(filteredProviders, safeUserLat, safeUserLng) {
-            filteredProviders
+        val nearest = remember(providers, hasRealLocation, safeUserLat, safeUserLng) {
+            if (!hasRealLocation) null
+            else providers
                 .filter { it.phone.isNotBlank() && it.latitude != 0.0 && it.longitude != 0.0 }
                 .minByOrNull { MapDistanceCalculator.calculateDistanceMeters(safeUserLat, safeUserLng, it.latitude, it.longitude) }
         }
@@ -1063,6 +1091,13 @@ fun MapScreenContent(
                         Text("لم يتم تحديد موقعك الحقيقي بعد، فلن يُرسَل موقع. يمكنك الاتصال مباشرة.", color = Color(0xFFF59E0B), fontSize = 13.sp)
                     } else {
                         Text("سيتم استخدام موقعك الحالي. لا يُعتبر النداء مرسلاً إلا بعد تأكيد الإرسال أدناه.", color = Color(0xFFCBD5E1), fontSize = 13.sp)
+                    }
+                    if (com.example.utils.NavConfig.EMERGENCY_NUMBER.isNotBlank()) {
+                        Button(
+                            onClick = { SosDispatcher.safeStart(context, SosDispatcher.dialIntent(com.example.utils.NavConfig.EMERGENCY_NUMBER)) },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) { Text("📞 اتصال بالطوارئ ${com.example.utils.NavConfig.EMERGENCY_NUMBER}", fontWeight = FontWeight.Bold) }
                     }
                     nearest?.let { p ->
                         Text("أقرب فني: ${p.name}", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)

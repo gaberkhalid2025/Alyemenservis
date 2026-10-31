@@ -1,0 +1,175 @@
+# 36 – اختبارات الوحدة (JVM) للمنطق الحرج
+**الغرض:** منع رجوع الأخطاء التي أصلحناها (الوصول، الخروج عن المسار، المسافات، التطبيع، فلتر المدن...). لا تحتاج هاتفاً.
+**الإجراء:** أنشئ الملفات في `app/src/test/java/...` (انسخ الحزم كما هي أو عدّلها لتطابق مشروعك؛ أي استيراد غير موجود يضبطه AI Studio حسب أماكن الملفات الفعلية).
+
+## gradle
+```kotlin
+dependencies { testImplementation("junit:junit:4.13.2") }
+android { testOptions { unitTests.isReturnDefaultValues = true } }
+```
+التشغيل: `./gradlew testDebugUnitTest`.
+
+## 1) RouteTrackerTest.kt  (`com.example.utils`)
+```kotlin
+package com.example.utils
+
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class RouteTrackerTest {
+    // ثلاث نقاط على خط طول ثابت، كل 0.01° عرض ≈ 1112 م
+    private val route = listOf(15.00 to 44.0, 15.01 to 44.0, 15.02 to 44.0)
+
+    @Test fun totalLengthIsAbout2224m() {
+        assertEquals(2224.0, RouteTracker(route).totalMeters, 15.0)
+    }
+
+    @Test fun midpointProgressAndRemaining() {
+        val r = RouteTracker(route).update(15.01, 44.0)!!
+        assertEquals(1112.0, r.alongMeters, 10.0)
+        assertEquals(1112.0, r.remainingMeters, 10.0)
+        assertEquals(0.0, r.offRouteMeters, 1.0)
+        assertEquals(0.5f, r.progress, 0.02f)
+    }
+
+    @Test fun lateralOffsetIsMeasured() {
+        // 0.0005° شرقاً عند خط عرض 15° ≈ 53.7 م
+        val r = RouteTracker(route).update(15.01, 44.0005)!!
+        assertTrue("offRoute=${r.offRouteMeters}", r.offRouteMeters in 50.0..58.0)
+    }
+
+    @Test fun loopedRouteDoesNotJumpToEnd() {
+        val loop = listOf(15.0 to 44.0, 15.01 to 44.0, 15.01 to 44.01, 15.0 to 44.01, 15.0 to 44.0)
+        val r = RouteTracker(loop).update(15.0, 44.0)!!
+        assertEquals(0.0, r.alongMeters, 1.0)      // البداية لا النهاية
+    }
+
+    @Test fun emptyOrSinglePointIsNotUsable() {
+        assertFalse(RouteTracker(emptyList()).isUsable)
+        assertFalse(RouteTracker(listOf(15.0 to 44.0)).isUsable)
+    }
+}
+
+class DetectorsTest {
+    @Test fun offRouteNeedsSustainedDeviation() {
+        val d = OffRouteDetector(thresholdM = 40.0, holdMs = 5_000L)
+        assertFalse(d.update(100.0, 0L))
+        assertFalse(d.update(100.0, 4_999L))
+        assertTrue(d.update(100.0, 5_000L))
+        assertFalse(d.update(10.0, 6_000L))       // العودة تصفّر العدّاد
+        assertFalse(d.update(100.0, 6_100L))
+    }
+
+    @Test fun arrivalFiresOncePerWaypoint() {
+        val a = ArrivalDetector(radiusM = 30.0)
+        assertTrue(a.check(0, 10.0))
+        assertFalse(a.check(0, 5.0))
+        assertFalse(a.check(1, 50.0))
+        assertTrue(a.check(1, 20.0))
+    }
+
+    @Test fun speedIsZeroWhenStationaryAndPositiveWhenMoving() {
+        val s = SpeedEstimator()
+        s.update(15.0, 44.0, 1_000L)
+        assertEquals(0, s.update(15.0, 44.0, 2_000L))
+        val m = SpeedEstimator()
+        m.update(15.0, 44.0, 1_000L)
+        val kmh = m.update(15.0, 44.0001, 2_000L)   // ≈ 10.7 م في ثانية ≈ 38 كم/س
+        assertTrue("kmh=$kmh", kmh in 35..42)
+    }
+}
+```
+## 2) MapDistanceCalculatorTest.kt  (`com.example.ui.screens.map.utils`)
+```kotlin
+package com.example.ui.screens.map.utils
+
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class MapDistanceCalculatorTest {
+    @Test fun formatDistance() {
+        assertEquals("999 م", MapDistanceCalculator.formatDistance(999.4))
+        assertEquals("1.5 كم", MapDistanceCalculator.formatDistance(1500.0))
+        assertEquals("—", MapDistanceCalculator.formatDistance(Double.NaN))
+    }
+    @Test fun formatDistanceSpoken() {
+        assertEquals("50 متراً", MapDistanceCalculator.formatDistanceSpoken(47.0))
+        assertEquals("750 متراً", MapDistanceCalculator.formatDistanceSpoken(730.0))
+        assertEquals("1.5 كيلومتر", MapDistanceCalculator.formatDistanceSpoken(1500.0))
+        assertEquals("2 كيلومتر", MapDistanceCalculator.formatDistanceSpoken(2000.0))
+    }
+    @Test fun formatDuration() {
+        assertEquals("أقل من دقيقة", MapDistanceCalculator.formatDuration(20.0))
+        assertEquals("2 دقيقة", MapDistanceCalculator.formatDuration(125.0))
+        assertEquals("1 س", MapDistanceCalculator.formatDuration(3600.0))
+        assertEquals("1 س 20 د", MapDistanceCalculator.formatDuration(4800.0))
+    }
+    @Test fun etaIsAlwaysLabeledApproximate() {
+        assertTrue(MapDistanceCalculator.computeEta(500.0).contains("(تقريبي)"))
+        assertTrue(MapDistanceCalculator.computeEta(5000.0).contains("(تقريبي)"))
+    }
+    @Test fun zeroCoordinatesGiveZeroDistance() {
+        assertEquals(0.0, MapDistanceCalculator.calculateDistanceMeters(0.0, 0.0, 15.0, 44.0), 0.0)
+        assertEquals(0.0, MapDistanceCalculator.calculateDistanceMeters(15.0, 44.0, 0.0, 0.0), 0.0)
+    }
+    @Test fun oneDegreeOfLatitudeIsAbout111km() {
+        assertEquals(111_195.0, MapDistanceCalculator.calculateDistanceMeters(15.0, 44.0, 16.0, 44.0), 150.0)
+    }
+}
+```
+## 3) ArabicNormalizerTest.kt  (`com.example.utils`) — بعد المستند 29
+```kotlin
+package com.example.utils
+
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class ArabicNormalizerTest {
+    @Test fun hamzaOnYaMatchesPlainYa() = assertEquals(ArabicNormalizer.normalize("هائل"), ArabicNormalizer.normalize("هايل"))
+    @Test fun alefTaMarbutaAndDiacritics() = assertEquals("مدرسه الاميل", ArabicNormalizer.normalize("مَدرسةُ الأميل"))
+    @Test fun keywordsHavePrefixes() = assertTrue(ArabicNormalizer.buildKeywords("صنعاء").contains("صن"))
+}
+```
+## 4) CityFilterAndFinderTest.kt — بعد المستند 32 (اضبط الحزم)
+```kotlin
+class CityFilterAndFinderTest {
+    @org.junit.Test fun numericCodeIsExactToken() {
+        org.junit.Assert.assertTrue(MapScreenFilters.matchesCityFilter("صنعاء", "1", "", ""))
+        org.junit.Assert.assertFalse(MapScreenFilters.matchesCityFilter("صنعاء", "10", "شارع 21", ""))
+    }
+    @org.junit.Test fun nameContains() =
+        org.junit.Assert.assertTrue(MapScreenFilters.matchesCityFilter("عدن", "", "كريتر - عدن", ""))
+    @org.junit.Test fun genericWordDoesNotMatchMarib() =
+        org.junit.Assert.assertFalse(MapScreenFilters.matchesCityFilter("مأرب", "", "المدينة المنورة", ""))
+    @org.junit.Test fun findCityRejectsDigitsAndEmpty() {
+        org.junit.Assert.assertNull(OfflineMapManager.findCity("1"))
+        org.junit.Assert.assertNull(OfflineMapManager.findCity(""))
+        org.junit.Assert.assertNull(OfflineMapManager.findCity("المدينة"))
+    }
+    @org.junit.Test fun findCityFindsSanaa() = org.junit.Assert.assertNotNull(OfflineMapManager.findCity("صنعاء"))
+}
+```
+> إن فشل تحميل `OfflineMapManager` في JVM بسبب أصناف أندرويد في التهيئة فأضف Robolectric أو انقل `findCity` والبيانات إلى كائن نقي.
+
+## 5) SosDispatcherTest.kt  (`com.example.utils`)
+```kotlin
+package com.example.utils
+
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class SosDispatcherTest {
+    @Test fun messageContainsLinkAndCoordinates() {
+        val m = SosDispatcher.buildMessage(15.3694, 44.1910, 12f)
+        assertTrue(m.contains("mlat=15.369400"))
+        assertTrue(m.contains("mlon=44.191000"))
+        assertTrue(m.contains("12"))
+    }
+}
+```
+## القبول
+كل الاختبارات خضراء قبل أي إصدار؛ وأي إصلاح مستقبلي في هذه الدوال يضيف اختباراً قبل التعديل.

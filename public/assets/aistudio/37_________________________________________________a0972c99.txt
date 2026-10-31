@@ -1,0 +1,62 @@
+# 37 – البرومبت الرئيسي للمرحلة الرابعة + قائمة القبول + المتبقي
+
+## 1) البرومبت الرئيسي (الصقه في AI Studio مرة واحدة)
+```
+ROLE
+You are a senior Android engineer (Kotlin 2.1+, Jetpack Compose, Coroutines, Hilt, Firestore, Google Play Services Location, CameraX). The project source is available. I will give you FIX DOCUMENTS one at a time (numbers 31 to 36). Apply each exactly, without breaking anything that works.
+
+HOW TO WORK
+1. For each document: open the target files from the project first, then apply the document.
+   - "patch": output the complete modified functions AND say exactly where each goes (file + function + replace / insert-after).
+   - "new file": output the complete file with package and path.
+2. If a name differs from the document, ADAPT the document's code to the project's real names. Never rename public APIs. Fix imports for the project's real packages.
+3. Never invent APIs. Unverifiable assumptions go under ASSUMPTIONS (one line each).
+4. No placeholders, no TODO, no "rest unchanged". Complete compilable code with imports.
+5. Honesty rules (strict):
+   - Never claim something happened (sent / saved / detected / recognized / AI analysis) unless it truly happened.
+   - Never substitute default coordinates (city center / Sana'a) for the user's location.
+   - Anything not computed from real data must be labeled "تقريبي".
+   - Never keep UI that promises a feature the code does not implement (3D buildings, computer vision, AI): remove it or relabel it truthfully.
+6. All user text in Arabic (RTL). Catch Throwable (rethrow CancellationException). Network/native/IO off the main thread.
+
+OUTPUT PER DOCUMENT
+File path heading, code, "DONE: <file>". At the end (max 6 lines): ASSUMPTIONS, behavior changes, gradle/manifest changes, a 3-step phone test. Then STOP and wait for the next document.
+
+Reply "READY" and wait.
+```
+
+## 2) ترتيب التنفيذ المقترح
+1. **26 → 28 → 31** (الموقع والفزعة والملاحة): الأساس.
+2. **32** (فلتر المدن والكاش).
+3. **33** (أزرار الخريطة، وضع المشي، البطاقة السفلية).
+4. **35** (الرادار والخريطة الاحتياطية).
+5. **34** (Aleph وAR بالمصداقية و CameraX).
+6. **27** (فحص حقيقي بدل MapTestRunner) ثم **29** (Firestore).
+7. **36** (الاختبارات) في النهاية، وشغّلها.
+
+## 3) قائمة القبول على الهاتف (بعد كل التعديلات)
+| # | الاختبار | المتوقع |
+|---|---|---|
+| 1 | افتح الخريطة بلا GPS | لا نقطة زرقاء، لا مسافات، رسالة «فعّل GPS» |
+| 2 | شغّل GPS خارج المبنى | تظهر النقطة، وتصبح المسافات حقيقية |
+| 3 | ابدأ ملاحة بلا إنترنت (الحزمة مثبتة) | شارة «أوفلاين Valhalla»، مسار مرسوم، أرقام غير مستديرة |
+| 4 | ابدأ ملاحة بلا حزمة وبلا إنترنت | «تقريبي»، بلا تعليمات منعطفات، يعيد المحاولة كل 15 ث |
+| 5 | امشِ 100 م | تتناقص المسافة تدريجياً |
+| 6 | اخرج عن المسار 5 ث | «جارٍ إعادة حساب المسار» |
+| 7 | أضف محطتين ووصل للأولى | «لقد وصلت… الوجهة التالية…» كاملة بلا قطع |
+| 8 | زر الفزعة | اتصال/SMS/مشاركة حقيقية؛ لا «تم الإرسال» كاذبة |
+| 9 | قائمة الطبقات | بلا «Vela 3D»؛ التبديل يعمل |
+| 10 | الرادار | أرقام على الحلقات؛ تغيير المدى يغيّر النقاط |
+| 11 | Aleph وAR | لا ادعاءات ذكاء؛ AR يعرض ما في اتجاه الكاميرا فقط |
+| 12 | `./gradlew testDebugUnitTest` | كلها ناجحة |
+
+## 4) ما سيبقى خارج هذه الحزمة (قرارات منتج لا إصلاحات)
+- **3D حقيقي** (مباني بارزة وإمالة): يتطلب MapLibre GL ومصدر متجهات؛ مشروع مستقل.
+- **ذكاء اصطناعي حقيقي في Aleph**: يتطلب خادماً وسيطاً (لا مفتاح API في التطبيق).
+- **رؤية حاسوبية/VPS حقيقية في AR**: مشروع بحثي منفصل؛ الحزمة تجعل AR صادقاً (موقع + بوصلة).
+- **خرائط عرض أوفلاين كاملة**: تتطلب ملف MBTiles خاصاً بك (بيانات OSM لليمن) وفق ترخيص مناسب.
+- **خادم توجيه خاص للإنتاج** بدل خادم OSRM العام.
+- **إخطار الفنيين تلقائياً عند الفزعة**: يتطلب Cloud Function وقواعد أمان Firestore.
+
+## 5) ما سأحتاجه لأكمل الحكم
+الملفات العشرة المتبقية عندك، ثم `MyApplication` و`AndroidManifest.xml` و`build.gradle.kts` و`proguard-rules.pro` و`NavModels` و`ArabicInstructionFormatter` و`HaversinePrecisionNavigator`. وإن حدث انهيار: نص «تقرير آخر انهيار» من التطبيق.

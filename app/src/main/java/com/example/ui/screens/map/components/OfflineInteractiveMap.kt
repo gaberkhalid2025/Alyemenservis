@@ -87,6 +87,7 @@ private val sBorderPaint = android.graphics.Paint().apply {
 @Composable
 fun OfflineInteractiveMap(
     userCoords: Pair<Double, Double>,
+    hasUserLocation: Boolean = true,
     nearbyProviders: List<ProviderEntity>,
     nearbyStores: List<StoreEntity>,
     nearbyProperties: List<PropertyEntity>,
@@ -263,7 +264,8 @@ fun OfflineInteractiveMap(
                     yMeters = yMeters,
                     rating = p.rating.toDouble().coerceAtLeast(1.0),
                     phone = p.phone,
-                    originalEntity = p
+                    originalEntity = p,
+                    isApprox = !hasValidCoords
                 )
             )
         }
@@ -328,7 +330,8 @@ fun OfflineInteractiveMap(
                     yMeters = yMeters,
                     rating = s.rating.toDouble().coerceAtLeast(1.0),
                     phone = s.phone,
-                    originalEntity = s
+                    originalEntity = s,
+                    isApprox = !hasValidCoords
                 )
             )
         }
@@ -378,7 +381,8 @@ fun OfflineInteractiveMap(
                     yMeters = yMeters,
                     rating = 5.0,
                     phone = prop.phone,
-                    originalEntity = prop
+                    originalEntity = prop,
+                    isApprox = !hasValidCoords
                 )
             )
         }
@@ -621,18 +625,19 @@ fun OfflineInteractiveMap(
                         drawPath(needlePath, color = if (isSelected) Color.White else pt.color)
 
                         // Outer glowing aura / halo
+                        val pointAlpha = if (pt.isApprox) 0.55f else 1.0f
                         if (isSelected) {
-                            drawCircle(pt.color.copy(alpha = 0.30f), baseRadius * 2.8f, pinHeadCenter)
-                            drawCircle(pt.color.copy(alpha = 0.65f), baseRadius * 1.9f, pinHeadCenter)
-                            drawCircle(Color.White, baseRadius * 1.35f, pinHeadCenter, style = Stroke(4f))
+                            drawCircle(pt.color.copy(alpha = 0.30f * pointAlpha), baseRadius * 2.8f, pinHeadCenter)
+                            drawCircle(pt.color.copy(alpha = 0.65f * pointAlpha), baseRadius * 1.9f, pinHeadCenter)
+                            drawCircle(Color.White.copy(alpha = pointAlpha), baseRadius * 1.35f, pinHeadCenter, style = Stroke(4f))
                         } else {
-                            drawCircle(pt.color.copy(alpha = 0.35f), baseRadius * 1.7f, pinHeadCenter)
+                            drawCircle(pt.color.copy(alpha = 0.35f * pointAlpha), baseRadius * 1.7f, pinHeadCenter)
                         }
 
                         // Badge core
-                        drawCircle(Color(0xFF0F172A), baseRadius, pinHeadCenter)
+                        drawCircle(Color(0xFF0F172A).copy(alpha = pointAlpha), baseRadius, pinHeadCenter)
                         drawCircle(
-                            color = if (isSelected) Color.White else pt.color,
+                            color = if (isSelected) Color.White.copy(alpha = pointAlpha) else pt.color.copy(alpha = pointAlpha),
                             radius = baseRadius,
                             center = pinHeadCenter,
                             style = Stroke(if (isSelected) 3.5f else 2.5f)
@@ -656,7 +661,8 @@ fun OfflineInteractiveMap(
 
                         // Legible multi-attribute label with dark pill background
                         if (safeZoom >= 0.50f) {
-                            val displayName = if (pt.name.length > 20) pt.name.take(19) + "…" else pt.name
+                            val baseName = if (pt.name.length > 20) pt.name.take(19) + "…" else pt.name
+                            val displayName = if (pt.isApprox) "$baseName (موقع تقريبي)" else baseName
                             val titleWidth = titlePaint.measureText(displayName)
                             val subText = "${pt.category} • $distString"
                             val subWidth = subtitlePaint.measureText(subText)
@@ -699,7 +705,7 @@ fun OfflineInteractiveMap(
                 }
 
                 // 6. User GPS location with pulsating neon cyan animation & halo
-                if (userPin.x in minX..maxX && userPin.y in minY..maxY) {
+                if (hasUserLocation && userPin.x in minX..maxX && userPin.y in minY..maxY) {
                     val pulseRadiusMax = 44f
                     val currentPulse = pulseProgress * pulseRadiusMax
                     val pulseAlpha = (1f - pulseProgress).coerceIn(0f, 1f) * 0.55f
@@ -735,7 +741,7 @@ fun OfflineInteractiveMap(
 
                     // User location title badge
                     val uLabel = "موقعك المباشر 📍"
-                    val uSubLabel = if (selectedCity != "الكل") "محافظة $selectedCity" else "نظام تحديد المواقع GPS نشط"
+                    val uSubLabel = if (selectedCity != "الكل") "محافظة $selectedCity" else if (hasUserLocation) "نظام تحديد المواقع GPS نشط" else ""
                     val uW = uTitlePaint.measureText(uLabel).coerceAtLeast(uSubPaint.measureText(uSubLabel))
                     val uRect = android.graphics.RectF(
                         userPin.x - (uW / 2f) - 14f,
@@ -1315,6 +1321,7 @@ data class InteractiveMapPoint(
     val rating: Double,
     val phone: String,
     val originalEntity: Any,
+    val isApprox: Boolean = false,
     val screenX: Float = 0f,
     val screenY: Float = 0f
 )

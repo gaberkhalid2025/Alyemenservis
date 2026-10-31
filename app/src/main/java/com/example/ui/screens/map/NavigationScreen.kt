@@ -77,6 +77,7 @@ fun NavigationScreen(
     nearbyStores: List<StoreEntity> = emptyList(),
     initialWaypoints: List<NavWaypoint> = emptyList(),
     hasRealLocation: Boolean = true,
+    isDrivingMode: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -121,8 +122,10 @@ fun NavigationScreen(
         }
     }
 
-    val speak: (String) -> Unit = { text ->
-        if (voiceEnabled && ttsReady) tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "nav_${System.nanoTime()}")
+    val speak: (String, Boolean) -> Unit = { text, urgent ->
+        if (voiceEnabled && ttsReady) {
+            tts?.speak(text, if (urgent) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD, null, "nav_${System.nanoTime()}")
+        }
     }
 
     // ───────── المحطات ─────────
@@ -184,14 +187,16 @@ fun NavigationScreen(
     var showDownloadDialog by remember { mutableStateOf(false) }
 
     val speedEstimator = remember { SpeedEstimator() }
-    val offRoute = remember { OffRouteDetector() }
-    val arrival = remember { ArrivalDetector() }
+    val offRoute = remember { OffRouteDetector(NavConfig.OFF_ROUTE_THRESHOLD_METERS) }
+    val arrival = remember { ArrivalDetector(NavConfig.ARRIVAL_THRESHOLD_METERS) }
     var currentSpeedKmh by remember { mutableIntStateOf(0) }
     var lastRerouteAt by remember { mutableLongStateOf(0L) }
     val announced = remember { mutableSetOf<String>() }
+    var routeFailures by remember { mutableIntStateOf(0) }
 
     // ───────── حساب المسار (من الموقع الحالي عبر المحطات المتبقية) ─────────
-    LaunchedEffect(routeVersion, waypoints.size, isTilesDownloaded, hasRealLocation) {
+    val needsFirstRoute = hasRealLocation && routeResult == null
+    LaunchedEffect(routeVersion, waypoints.size, isTilesDownloaded, needsFirstRoute, isDrivingMode) {
         val remaining = waypoints.drop(currentWaypointIndex)
         if (remaining.isEmpty()) return@LaunchedEffect
         if (!hasRealLocation) {
@@ -201,8 +206,9 @@ fun NavigationScreen(
         isLoadingRoute = true
         try {
             val origin = NavWaypoint(name = "موقعي الحالي", latitude = latestLat, longitude = latestLng, type = WaypointType.START)
-            val result = RealValhallaNavigator.calculateRoute(context, origin, remaining)
+            val result = RealValhallaNavigator.calculateRoute(context, origin, remaining, driving = isDrivingMode)
             routeResult = result
+            routeFailures = 0
             tracker = RouteTracker(result.coordinates)
             trackerState = null
             offRoute.reset()
@@ -211,7 +217,17 @@ fun NavigationScreen(
             throw e
         } catch (t: Throwable) {
             Log.e(NAV_TAG, "Route calculation failed: ${t.message}", t)
-            snackbarHostState.showSnackbar("تعذر حساب المسار، سيتم المحاولة مجدداً")
+            routeFailures += 1
+            if (routeFailures <= 3) {
+                scope.launch {
+                    delay(5_000L * routeFailures)
+                    routeVersion += 1
+                }
+            } else {
+                scope.launch {
+                    snackbarHostState.showSnackbar("تعذر حساب المسار. تحقق من الاتصال أو حمّل الخرائط الأوفلاين")
+                }
+            }
         } finally {
             isLoadingRoute = false
         }
@@ -221,19 +237,27 @@ fun NavigationScreen(
     val isApproximate = result == null || result.error != null
     val target = waypoints.getOrNull(currentWaypointIndex)
 
+    LaunchedEffect(isApproximate, hasRealLocation) {
+        if (!isApproximate || !hasRealLocation) return@LaunchedEffect
+        repeat(6) {
+            delay(15_000L)
+            routeVersion += 1 // يحاول Valhalla/OSRM من جديد؛ إن نجح صار isApproximate=false وتوقفت الحلقة
+        }
+    }
+
     // ───────── الوصول إلى محطة ─────────
     val handleArrival: () -> Unit = {
         val arrived = waypoints.getOrNull(currentWaypointIndex)
         val next = waypoints.getOrNull(currentWaypointIndex + 1)
         if (arrived != null) {
             if (next == null) {
-                speak("لقد وصلت إلى ${arrived.name}. اكتملت الرحلة")
+                speak("لقد وصلت إلى ${arrived.name}. اكتملت الرحلة", false)
                 navigationFinished = true
             } else {
                 val legMeters = routeResult?.legs?.getOrNull(1)?.distanceMeters
                     ?: HaversinePrecisionNavigator.calculateDistance(arrived.latitude, arrived.longitude, next.latitude, next.longitude)
                 val km = String.format(Locale.US, "%.1f", legMeters / 1000.0)
-                speak("لقد وصلت إلى ${arrived.name}. الوجهة التالية هي ${next.name}، وتبعد $km كم")
+                speak("لقد وصلت إلى ${arrived.name}. الوجهة التالية هي ${next.name}، وتبعد $km كم", false)
                 currentWaypointIndex += 1
                 routeVersion += 1
             }
@@ -256,7 +280,7 @@ fun NavigationScreen(
         ) {
             lastRerouteAt = now
             offRoute.reset()
-            speak("جارٍ إعادة حساب المسار")
+            speak("جارٍ إعادة حساب المسار", true)
             routeVersion += 1
         }
     }
@@ -307,8 +331,11 @@ fun NavigationScreen(
         }
         val key = "$routeVersion:${currentStepIndex + 1}:$level"
         if (announced.add(key)) {
-            speak(if (level == "N") upcoming.instruction
-            else "بعد ${MapDistanceCalculator.formatDistanceSpoken(distToManeuver)}، ${upcoming.instruction}")
+            speak(
+                if (level == "N") upcoming.instruction
+                else "بعد ${MapDistanceCalculator.formatDistanceSpoken(distToManeuver)}، ${upcoming.instruction}",
+                false
+            )
         }
     }
 
@@ -320,7 +347,7 @@ fun NavigationScreen(
     }
     val nativeError = if (isTilesDownloaded && result != null && !result.isOffline) NativeValhallaStatus.lastError else null
     val instructionText = when {
-        !hasRealLocation -> "لم يتم تحديد موقعك بعد — فعّل GPS"
+        !hasRealLocation -> if (result != null) "إشارة GPS ضعيفة — سنواصل التوجيه عند عودتها" else "لم يتم تحديد موقعك بعد — فعّل GPS"
         result == null -> "جارٍ حساب المسار..."
         isApproximate -> "تقريبي: ${MapDistanceCalculator.formatDistance(distToTarget)} مباشرة إلى ${target?.name ?: ""} (بدون تعليمات منعطفات)"
         upcoming != null -> "بعد ${MapDistanceCalculator.formatDistanceSpoken(distToManeuver)}، ${upcoming.instruction}"

@@ -105,29 +105,14 @@ fun MapControls(
 
             HorizontalDivider(modifier = Modifier.width(30.dp), color = Color.White.copy(alpha = 0.08f))
 
-            // 3. 🏙️ نمط الأبعاد الثلاثية المائل
-            IconButton(
-                onClick = { onSelectMapMode(MapMode.VELA_3D, 42f) },
-                modifier = Modifier.size(40.dp).testTag("map_vela_3d_btn")
-            ) {
-                Icon(
-                    imageVector = Icons.Default.ViewInAr,
-                    contentDescription = "نمط الأبعاد الثلاثية المائل",
-                    tint = if (currentMapMode == MapMode.VELA_3D) Color(0xFF10B981) else Color.White,
-                    modifier = Modifier.size(22.dp)
-                )
-            }
-
-            HorizontalDivider(modifier = Modifier.width(30.dp), color = Color.White.copy(alpha = 0.08f))
-
-            // 4. 🛰️ التبديل السريع للأقمار الصناعية
+            // 3. 🛰️ التبديل السريع للأقمار الصناعية
             IconButton(
                 onClick = { onSelectMapMode(MapMode.SATELLITE, 0f) },
                 modifier = Modifier.size(40.dp).testTag("map_satellite_btn")
             ) {
                 Icon(
                     imageVector = Icons.Default.Satellite,
-                    contentDescription = "التبديل السريع للأقمار الصناعية",
+                    contentDescription = "الأقمار الصناعية",
                     tint = if (currentMapMode == MapMode.SATELLITE) Color(0xFF10B981) else Color.White,
                     modifier = Modifier.size(22.dp)
                 )
@@ -135,44 +120,29 @@ fun MapControls(
 
             HorizontalDivider(modifier = Modifier.width(30.dp), color = Color.White.copy(alpha = 0.08f))
 
-            // 5. 🌐 الرؤية البانورامية الشاملة
+            // 4. 🗺️ خريطة الشوارع (HOT)
             IconButton(
                 onClick = { onSelectMapMode(MapMode.HOT, 0f) },
                 modifier = Modifier.size(40.dp).testTag("map_pano_btn")
             ) {
                 Icon(
-                    imageVector = Icons.Default.PanoramaHorizontal,
-                    contentDescription = "الرؤية البانورامية الشاملة",
-                    tint = Color.White,
+                    imageVector = Icons.Default.Map,
+                    contentDescription = "خريطة الشوارع (HOT)",
+                    tint = if (currentMapMode == MapMode.HOT) Color(0xFF10B981) else Color.White,
                     modifier = Modifier.size(22.dp)
                 )
             }
 
             HorizontalDivider(modifier = Modifier.width(30.dp), color = Color.White.copy(alpha = 0.08f))
 
-            // 6. 👁️ زاوية الرؤية والإمالة التفاعلية
-            IconButton(
-                onClick = { onSelectMapMode(MapMode.VELA_3D, 35f) },
-                modifier = Modifier.size(40.dp).testTag("map_visibility_btn")
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Visibility,
-                    contentDescription = "زاوية الرؤية والإمالة التفاعلية",
-                    tint = Color(0xFF38BDF8),
-                    modifier = Modifier.size(22.dp)
-                )
-            }
-
-            HorizontalDivider(modifier = Modifier.width(30.dp), color = Color.White.copy(alpha = 0.08f))
-
-            // 7. ☁️ مؤشر المزامنة السحابية والخريطة الحرارية
+            // 5. ☁️ الخريطة الحرارية
             IconButton(
                 onClick = onToggleHeatmap,
                 modifier = Modifier.size(40.dp).testTag("map_heatmap_sync_btn")
             ) {
                 Icon(
                     imageVector = if (isHeatmapActive) Icons.Default.CloudDone else Icons.Default.CloudQueue,
-                    contentDescription = "مؤشر المزامنة والخريطة الحرارية",
+                    contentDescription = "الخريطة الحرارية",
                     tint = if (isHeatmapActive) Color(0xFF10B981) else Color(0xFF38BDF8),
                     modifier = Modifier.size(22.dp)
                 )
@@ -180,7 +150,7 @@ fun MapControls(
 
             HorizontalDivider(modifier = Modifier.width(30.dp), color = Color.White.copy(alpha = 0.08f))
 
-            // 8. Map Layers (🗺️ بلون ذهبي #FBBF24)
+            // 6. Map Layers (🗺️ بلون ذهبي #FBBF24)
             IconButton(
                 onClick = onOpenLayerDialog,
                 modifier = Modifier.size(40.dp).testTag("map_layers_btn")
@@ -195,7 +165,7 @@ fun MapControls(
 
             HorizontalDivider(modifier = Modifier.width(30.dp), color = Color.White.copy(alpha = 0.08f))
 
-            // 9. GPS Button
+            // 7. GPS Button
             IconButton(
                 onClick = onRecenterLocation,
                 modifier = Modifier.size(40.dp).testTag("recenter_location_btn")
@@ -216,56 +186,6 @@ fun MapControls(
                         modifier = Modifier.size(20.dp)
                     )
                 }
-            }
-
-            HorizontalDivider(modifier = Modifier.width(30.dp), color = Color.White.copy(alpha = 0.08f))
-
-            // 10. Zoom In (+)
-            IconButton(
-                onClick = onZoomIn,
-                modifier = Modifier.size(40.dp).testTag("map_zoom_in_btn")
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "تكبير الخريطة", tint = Color.White, modifier = Modifier.size(20.dp))
-            }
-
-            HorizontalDivider(modifier = Modifier.width(30.dp), color = Color.White.copy(alpha = 0.08f))
-
-            // 11. Zoom Out (-)
-            IconButton(
-                onClick = onZoomOut,
-                modifier = Modifier.size(40.dp).testTag("map_zoom_out_btn")
-            ) {
-                Icon(Icons.Default.Remove, contentDescription = "تصغير الخريطة", tint = Color.White, modifier = Modifier.size(20.dp))
-            }
-
-            HorizontalDivider(modifier = Modifier.width(30.dp), color = Color.White.copy(alpha = 0.08f))
-
-            // 12. Compass
-            IconButton(
-                onClick = onResetCompass,
-                modifier = Modifier.size(40.dp).testTag("map_compass_btn")
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Explore,
-                    contentDescription = "البوصلة وتوجيه الشمال",
-                    tint = Color(0xFF10B981),
-                    modifier = Modifier.size(20.dp).rotate(compassBearing)
-                )
-            }
-
-            HorizontalDivider(modifier = Modifier.width(30.dp), color = Color.White.copy(alpha = 0.08f))
-
-            // 13. Context Mode (Driving vs Walking)
-            IconButton(
-                onClick = onToggleDrivingMode,
-                modifier = Modifier.size(40.dp).testTag("map_context_mode_btn")
-            ) {
-                Icon(
-                    imageVector = if (isDrivingMode) Icons.Default.DirectionsCar else Icons.Default.DirectionsWalk,
-                    contentDescription = if (isDrivingMode) "وضع القيادة" else "وضع المشي",
-                    tint = if (isDrivingMode) Color(0xFF38BDF8) else Color(0xFFF59E0B),
-                    modifier = Modifier.size(19.dp)
-                )
             }
         }
     }

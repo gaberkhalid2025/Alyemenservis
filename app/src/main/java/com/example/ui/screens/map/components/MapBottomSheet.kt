@@ -109,10 +109,15 @@ fun MapBottomSheet(
         }
     }
     val hasValidCoords = lat != 0.0 && lng != 0.0 && !lat.isNaN() && !lng.isNaN()
-    val distanceMeters = if (hasValidCoords)
+    val hasUser = userLat != 0.0 && userLng != 0.0 && !userLat.isNaN() && !userLng.isNaN()
+    val distanceMeters = if (hasValidCoords && hasUser)
         MapDistanceCalculator.calculateDistanceMeters(userLat, userLng, lat, lng) else 0.0
-    val distanceText = if (hasValidCoords) MapDistanceCalculator.formatDistance(distanceMeters) else "الموقع غير محدد"
-    val etaText = if (hasValidCoords) MapDistanceCalculator.computeEta(distanceMeters) else "—"
+    val distanceText = when {
+        !hasValidCoords -> "الموقع غير محدد"
+        !hasUser -> "فعّل GPS لحساب المسافة"
+        else -> MapDistanceCalculator.formatDistance(distanceMeters)
+    }
+    val etaText = if (hasValidCoords && hasUser) MapDistanceCalculator.computeEta(distanceMeters) else "—"
 
     Surface(
         shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),

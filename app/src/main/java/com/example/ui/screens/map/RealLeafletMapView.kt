@@ -378,6 +378,7 @@ fun RealLeafletMapView(
             // الخريطة التفاعلية المحلية البديلة في حالة الطوارئ (100% بدون شاشة سوداء)
             OfflineInteractiveMap(
                 userCoords = userCoords,
+                hasUserLocation = userCoords.first != 0.0 && userCoords.second != 0.0,
                 nearbyProviders = nearbyProviders,
                 nearbyStores = nearbyStores,
                 nearbyProperties = nearbyProperties,
@@ -399,6 +400,7 @@ fun RealLeafletMapView(
     }
 }
 
+@Deprecated("غير مستخدم")
 object MapAssetMemoryCache {
     fun isCached(): Boolean = true
     fun invalidate() {}

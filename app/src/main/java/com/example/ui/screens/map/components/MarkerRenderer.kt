@@ -24,7 +24,7 @@ object MarkerRenderer {
         val type: String, // "PROVIDER", "STORE", "RESTAURANT", "MEDICAL", "PROPERTY", "JOB"
         val x: Float,
         val y: Float,
-        val rating: Double = 5.0,
+        val rating: Double = 0.0,
         val isAvailable: Boolean = true,
         val originalItem: Any
     )

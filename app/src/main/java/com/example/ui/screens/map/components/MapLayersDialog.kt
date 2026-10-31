@@ -17,12 +17,7 @@ import androidx.compose.ui.unit.sp
 import com.example.ui.screens.map.MapMode
 
 /**
- * 🗺️ MapLayersDialog (نظام الطبقات الخمس)
- * 1. أقمار صناعية (عالي الدقة) - tiltAngle = 0f
- * 2. Vela 3D (مباني ثلاثية الأبعاد) - tiltAngle = 42f
- * 3. خريطة الشوارع الحية (HOT) - tiltAngle = 0f
- * 4. التضاريس والارتفاعات (Topo) - tiltAngle = 0f
- * 5. خريطة الشوارع القياسية (OSM) - tiltAngle = 0f
+ * 🗺️ MapLayersDialog (نظام الطبقات الصادق للخرائط)
  */
 @Composable
 fun MapLayersDialog(
@@ -46,21 +41,20 @@ fun MapLayersDialog(
                     contentDescription = null,
                     tint = Color(0xFFFBBF24) // Golden #FBBF24
                 )
-                Text("🗺️ نظام الطبقات الخمس للخرائط", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                Text("🗺️ نظام طبقات الخرائط", fontSize = 16.sp, fontWeight = FontWeight.Bold)
             }
         },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 val layers = listOf(
-                    LayerInfo(MapMode.SATELLITE, "🛰️ أقمار صناعية (عالي الدقة)", "عرض الخريطة مسطح تماماً بدقة فضائية فائقة وتسميات عربية (Tilt: 0°)", 0f),
-                    LayerInfo(MapMode.VELA_3D, "🏙️ Vela 3D (مباني ثلاثية الأبعاد)", "تفعيل المنظور ثلاثي الأبعاد وإمالة الكاميرا بزاوية 42 درجة مع مجسمات المباني (Tilt: 42°)", 42f),
-                    LayerInfo(MapMode.HOT, "🗺️ خريطة الشوارع الحية (HOT)", "متجهات الشوارع الإنسانية المحدثة مع إمالة مسطحة (Tilt: 0°)", 0f),
-                    LayerInfo(MapMode.TOPO, "⛰️ التضاريس والارتفاعات (Topo)", "خريطة OpenTopoMap الجغرافية بخطوط الكنتور وظلال الجبال (Tilt: 0°)", 0f),
-                    LayerInfo(MapMode.OSM, "🌐 خريطة الشوارع القياسية (OSM)", "خريطة OpenStreetMap القياسية مع تسميات عربية (Tilt: 0°)", 0f)
+                    LayerInfo(MapMode.SATELLITE, "🛰️ أقمار صناعية (عالي الدقة)", "عرض الخريطة بدقة فضائية فائقة وتسميات عربية", 0f),
+                    LayerInfo(MapMode.HOT, "🗺️ خريطة الشوارع الحية (HOT)", "متجهات الشوارع الإنسانية المحدثة", 0f),
+                    LayerInfo(MapMode.TOPO, "⛰️ التضاريس والارتفاعات (Topo)", "خريطة OpenTopoMap الجغرافية بخطوط الكنتور وظلال الجبال", 0f),
+                    LayerInfo(MapMode.OSM, "🌐 خريطة الشوارع القياسية (OSM)", "خريطة OpenStreetMap القياسية مع تسميات عربية", 0f)
                 )
 
                 layers.forEach { layer ->
-                    val isSelected = currentMapMode == layer.mode
+                    val isSelected = currentMapMode == layer.mode || (currentMapMode == MapMode.VELA_3D && layer.mode == MapMode.SATELLITE)
                     Surface(
                         onClick = {
                             onSelectLayer(layer.mode, layer.tilt)
@@ -100,9 +94,4 @@ fun MapLayersDialog(
     )
 }
 
-data class LayerInfo(
-    val mode: MapMode,
-    val title: String,
-    val desc: String,
-    val tilt: Float
-)
+data class LayerInfo(val mode: MapMode, val title: String, val desc: String, val tilt: Float)
