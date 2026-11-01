@@ -10,11 +10,8 @@ object MockValhallaNavigator {
 
     private const val ASSUMED_SPEED_MPS = 10.0 // 36 كم/س – لتقدير زمن تقريبي فقط
 
-    /** يُبقي الاسم للتوافق. لا يوجد "طريق" هنا؛ يعيد الإحداثي كما هو (مع قيمة صنعاء إن كان 0,0). */
-    fun snapToRoad(lat: Double, lng: Double): Pair<Double, Double> {
-        if (lat == 0.0 && lng == 0.0) return Pair(15.3694, 44.1910)
-        return Pair(lat, lng)
-    }
+    /** يُبقي الاسم للتوافق. يعيد الإحداثي كما هو بدون اختلاق موقع. */
+    fun snapToRoad(lat: Double, lng: Double): Pair<Double, Double> = Pair(lat, lng)
 
     fun calculateRoute(
         context: Context,

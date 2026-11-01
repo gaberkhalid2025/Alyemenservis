@@ -65,6 +65,7 @@ fun RealLeafletMapView(
     onDeselect: () -> Unit = {},
     onSwitchToRadar: (() -> Unit)? = null,
     onMapLoadFailed: (() -> Unit)? = null,
+    onTilesStatus: ((failing: Boolean) -> Unit)? = null,
     tilt: Float = 35f,
     rotation: Float = 0f,
     routeCoordinates: List<Pair<Double, Double>> = emptyList(),
@@ -91,6 +92,20 @@ fun RealLeafletMapView(
     val onPropertySelectedState by rememberUpdatedState(onPropertySelected)
     val onDeselectState by rememberUpdatedState(onDeselect)
     val onUserPannedState by rememberUpdatedState(onUserPanned)
+    val onTilesStatusState by rememberUpdatedState(onTilesStatus)
+
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, webViewRef) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            when (event) {
+                androidx.lifecycle.Lifecycle.Event.ON_PAUSE -> webViewRef?.onPause()
+                androidx.lifecycle.Lifecycle.Event.ON_RESUME -> webViewRef?.onResume()
+                else -> {}
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     // [المحور الثالث] حماية الشاشة السوداء: مؤقت 6 ثوانٍ. إذا لم تصل إشارة onMapReady يتم التحويل تلقائياً لـ OfflineInteractiveMap
     LaunchedEffect(isMapReady) {
@@ -297,6 +312,11 @@ fun RealLeafletMapView(
                             }
 
                             @JavascriptInterface
+                            fun onTilesFailing(failing: Boolean) {
+                                mainHandler.post { onTilesStatusState?.invoke(failing) }
+                            }
+
+                            @JavascriptInterface
                             fun onMapModeChanged(newMode: String) {
                                 android.util.Log.d("LeafletBridge", "Map mode: $newMode")
                             }
@@ -308,6 +328,8 @@ fun RealLeafletMapView(
                         }, "AndroidBridge")
 
                         webViewClient = object : WebViewClient() {
+                            private val ALLOWED_HOSTS = setOf("www.openstreetmap.org", "www.hotosm.org", "opentopomap.org", "www.esri.com")
+
                             override fun shouldInterceptRequest(
                                 view: WebView?,
                                 request: WebResourceRequest?
@@ -321,11 +343,22 @@ fun RealLeafletMapView(
                             }
 
                             override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+                                val uri = request?.url ?: return true
+                                if (uri.scheme == "file") return false
+                                if (uri.scheme == "https" && uri.host in ALLOWED_HOSTS) {
+                                    try { context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, uri).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) } catch (_: Exception) {}
+                                }
                                 return true
                             }
 
                             @Deprecated("Deprecated in Java")
                             override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
+                                if (url == null) return true
+                                val uri = android.net.Uri.parse(url)
+                                if (uri.scheme == "file") return false
+                                if (uri.scheme == "https" && uri.host in ALLOWED_HOSTS) {
+                                    try { context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, uri).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) } catch (_: Exception) {}
+                                }
                                 return true
                             }
 

@@ -1,0 +1,144 @@
+# 38 – قلب الملاحة: ArabicInstructionFormatter + RealValhallaNavigator + OnlineOsrmNavigator + NavConfig + Mock
+**الملفات المفحوصة:** `ArabicInstructionFormatter`, `RealValhallaNavigator_6b13da`, `OnlineOsrmNavigator_1542b9`, `NavConfig_1`, `MockValhallaNavigator_61ced4`, `RouteTracker_1`  |  **الإجراء:** استبدال ملف + تعديلات موضعية.
+
+## ما تأكدت من تطبيقه (سليم)
+محرك Valhalla المخزَّن مع `releaseEngine`، وسلّم `driving/pedestrian` (costing)، وتمرير `roundabout_exit_count`، ومهلة OSRM 20 ث، `Throwable` في OSRM، و`alternatives=false`، ومفتاح `EMERGENCY_NUMBER`، وعدم استخدام OSRM لوضع المشي.
+
+## الخطأ الأخطر (عالية): المسافة داخل نص كل منعطف خاطئة المعنى
+في Valhalla حقل `length` للمناورة رقم j هو **طول المقطع الذي يبدأ بعد هذا المنعطف** (من المنعطف إلى المنعطف التالي)، وكذلك `distance` في خطوات OSRM. لكن الكود يمرّر هذه القيمة للصياغة فيخرج نص مثل:
+> «انعطف يساراً **بعد 2.3 كيلومتر** في شارع الزبيري»
+بينما المنعطف نفسه هو **الآن** والـ 2.3 كم هي ما بعده. وعند نطق `upcoming.instruction` عند مسافة 30 م يسمع السائق «انعطف يساراً بعد 2.3 كم» وهو يقف عند المنعطف. كما أن `NavigationScreen` يضيف مقدمته «بعد 250 متراً،…» فتتكرر مسافتان متناقضتان.
+**الحل:** نص المنعطف بلا مسافة (المسافة تضيفها الواجهة من التتبع الحقيقي)، وتبقى المسافة فقط في «واصل السير مباشرة لمسافة X» حيث معناها صحيح.
+
+## خطأ ثانٍ: `null` يظهر في الجملة
+`destinationName: String?` يُدرج في النص مباشرة، فينتج «انطلق باتجاه null» و«وصلت إلى وجهتك: null» عند غياب الاسم. وكذلك `"%.1f".format()` بلا `Locale` يعطي أرقاماً هندية و«،» حسب لغة الجهاز.
+## ثالثاً: محطة وسطية تُنطق «وصلت إلى وجهتك»
+كل ساق تنتهي بمناورة `DESTINATION`، فالمحطات الوسطى تُقرأ كأنها نهاية الرحلة.
+
+## 1) استبدل `ArabicInstructionFormatter.kt` بالكامل
+```kotlin
+package com.example.utils
+
+import java.util.Locale
+import kotlin.math.roundToInt
+
+/**
+ * محوّل المناورات إلى جمل عربية.
+ * قاعدة: نص المنعطف لا يحمل مسافة (المسافة إلى المنعطف تأتي من التتبع الحي).
+ * المسافة تُذكر فقط في «واصل السير» لأن معناها طول المقطع التالي.
+ */
+object ArabicInstructionFormatter {
+
+    fun format(
+        maneuver: ManeuverType,
+        streetName: String?,
+        distanceMeters: Double,
+        destinationName: String?,
+        roundaboutExit: Int? = null,
+        isIntermediateStop: Boolean = false
+    ): String {
+        val street = if (!streetName.isNullOrBlank() && streetName != "unnamed") " في $streetName" else ""
+        val dest = destinationName?.takeIf { it.isNotBlank() } ?: "الوجهة"
+
+        return when (maneuver) {
+            ManeuverType.START -> "انطلق باتجاه $dest$street"
+            ManeuverType.STRAIGHT -> "واصل السير مباشرة لمسافة ${spoken(distanceMeters)}$street"
+            ManeuverType.LEFT -> "انعطف يساراً$street"
+            ManeuverType.RIGHT -> "انعطف يميناً$street"
+            ManeuverType.SHARP_LEFT -> "انعطف يساراً بشكل حاد$street"
+            ManeuverType.SHARP_RIGHT -> "انعطف يميناً بشكل حاد$street"
+            ManeuverType.SLIGHT_LEFT -> "انحرف يساراً قليلاً$street"
+            ManeuverType.SLIGHT_RIGHT -> "انحرف يميناً قليلاً$street"
+            ManeuverType.UTURN -> "قم بالدوران للخلف"
+            ManeuverType.ROUNDABOUT -> {
+                val exitTxt = roundaboutExit?.let { ordinal(it) }
+                if (exitTxt != null) "ادخل الدوار واسلك المخرج $exitTxt$street"
+                else "ادخل الدوار ثم اسلك المخرج المناسب"
+            }
+            ManeuverType.HIGHWAY_ENTER -> "اسلك المسار السريع$street"
+            ManeuverType.HIGHWAY_EXIT -> "اخرج من المسار السريع$street"
+            ManeuverType.DESTINATION ->
+                if (isIntermediateStop) "وصلت إلى المحطة: $dest" else "وصلت إلى وجهتك: $dest"
+            ManeuverType.MERGE -> "اندمج مع حركة السير$street"
+        }
+    }
+
+    /** صياغة «قبل المنعطف»: تحافظ على المعنى الصحيح مع الوصول (مستقبل) بدل الماضي. */
+    fun upcomingText(instruction: String, maneuver: ManeuverType, distanceMeters: Double): String {
+        val d = spoken(distanceMeters)
+        return if (maneuver == ManeuverType.DESTINATION) {
+            "بعد $d ستصل إلى " + instruction.removePrefix("وصلت إلى ")
+        } else "بعد $d، $instruction"
+    }
+
+    private val ORDINALS = listOf("الأول", "الثاني", "الثالث", "الرابع", "الخامس", "السادس", "السابع", "الثامن", "التاسع", "العاشر")
+    private fun ordinal(n: Int): String? = when {
+        n in 1..10 -> ORDINALS[n - 1]
+        n > 10 -> "رقم $n"
+        else -> null
+    }
+
+    /** نطق المسافة: <100 م تقريب لـ10، حتى 1 كم لـ50، وما فوق بالكيلومتر (Locale.US). */
+    fun spoken(meters: Double): String {
+        val m = if (meters.isNaN() || meters < 0) 0.0 else meters
+        return when {
+            m < 30 -> "أقل من 30 متراً"
+            m < 100 -> "${(m / 10).roundToInt() * 10} متراً"
+            m < 1000 -> "${(m / 50).roundToInt() * 50} متراً"
+            else -> {
+                val km = String.format(Locale.US, "%.1f", m / 1000.0).removeSuffix(".0")
+                "$km كيلومتر"
+            }
+        }
+    }
+}
+```
+> إن كان `ManeuverType` يحوي قيماً أخرى غير المذكورة، أضف لها فروعاً (الـ `when` شامل حالياً).
+
+## 2) RealValhallaNavigator.parseValhallaResponse
+أ) المحطة الوسطى + عدم تكرار نقطة الربط بين الأرجل. استبدل الجزء الذي ينشئ `legCoords` و`currentCoordOffset` و`NavStep`:
+```kotlin
+val legShapeEncoded = legObj.getString("shape")
+val legCoords = decodePolyline(legShapeEncoded)
+val isLastLeg = i == legsArr.length() - 1
+// تجنّب تكرار نقطة نهاية الساق السابقة (هي نفسها بداية هذه الساق)
+val toAdd = if (i > 0 && legCoords.isNotEmpty()) legCoords.drop(1) else legCoords
+val currentCoordOffset = allCoords.size - (if (i > 0) 1 else 0)
+allCoords.addAll(toAdd)
+...
+instruction = ArabicInstructionFormatter.format(
+    mType, streetName, manDist,
+    allWaypoints.getOrNull(i + 1)?.name ?: "الوجهة",       // اسم وجهة هذه الساق (كان waypoints[i] وهو صحيح؛ احتفظ بما يطابق مشروعك)
+    roundaboutExit = roundaboutExit,
+    isIntermediateStop = !isLastLeg
+),
+```
+ب) في `NavStep` كل ما سبق كما هو.
+## 3) OnlineOsrmNavigator
+في حلقة الخطوات (قرب السطر 119-123):
+```kotlin
+val exitNum = maneuver?.optInt("exit", 0)?.takeIf { it > 0 }
+val mType = mapManeuver(type, modifier)
+val instruction = ArabicInstructionFormatter.format(
+    mType, streetName, stepDist, toWp.name,
+    roundaboutExit = exitNum,
+    isIntermediateStop = legIdx < (legs.length() - 1)
+)
+```
+> OSRM يُرجع `exit` فقط للدوّارات؛ بدونه كان يقول «ادخل الدوار» دون رقم المخرج.
+
+## 4) NavConfig: مصدر واحد للمدن
+القائمة `YEMEN_CITIES` (8 مدن) مكررة مع `OfflineMapManager.MAJOR_YEMENI_CITIES` ومع `CityAliases`: ثلاثة مصادر قد تختلف. اجعل `OfflineMapManager` يستعمل قائمة واحدة (إما NavConfig أو العكس) وأبقِ `DEFAULT_YEMEN_LAT/LNG` المصدر الوحيد (استبدل الأرقام في `LocationService` و`OfflineMapManager`). الثابت `MIN_SPEED_FOR_DIRECTION_KMH` غير مستخدم: إما استخدمه في `CompassSensor/اتجاه GPS` أو احذفه. وأضف:
+```kotlin
+const val OSRM_IS_DEMO_SERVER = true   // اضبطه false عند استخدام خادمك الخاص
+```
+## 5) MockValhallaNavigator
+`snapToRoad` ما زال يعيد صنعاء للإحداثي (0,0) (سطر 15). غيّره إلى `fun snapToRoad(lat: Double, lng: Double) = Pair(lat, lng)` وتأكد أن لا مستدعي يتوقع صنعاء.
+## 6) RouteTracker_1
+بلا تغيير جوهري (يطابق المستند 03). ملاحظة تحسين: عند رحلة طويلة جداً (> 5000 نقطة) البحث الكامل `scan(0, last)` عند الابتعاد > 80 م يكلّف؛ يكفي لاحقاً تخزين مؤشر آخر مطابقة جيدة وتوسيع النافذة تدريجياً. ليس عاجلاً.
+
+## اختبار
+1. انعطاف: التعليمة المنطوقة عند 30 م «انعطف يساراً في شارع X» (لا مسافة بعدها)، وعند 250 م «بعد 250 متراً، انعطف يساراً…».
+2. رحلة بمحطة وسطية: عند نهاية الساق الأولى «وصلت إلى المحطة: X».
+3. دوّار على OSRM: «ادخل الدوار واسلك المخرج الثالث».
+4. نص لا يحتوي كلمة `null` أبداً (اختبر وجهة بلا اسم).

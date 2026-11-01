@@ -1,0 +1,140 @@
+# 43 – CrossFuzzySearchEngine + SearchAndFilterEngine + ArabicNormalizer + SessionManager + Analytics
+**الملفات المفحوصة:** `CrossFuzzySearchEngine_1`, `SearchAndFilterEngine_1`, `ArabicNormalizer`, `SessionManagerAndUxEnhancer_1`, `AnalyticsAndReportingEngine_f5f99f`, `SyncStatusTracker`  |  **الإجراء:** تعديلات موضعية.
+
+## ما تأكدت من تطبيقه (سليم)
+`ArabicNormalizer` كاملاً، واستعلام Firestore الصحيح (`rating` أولاً في `orderBy` مع كلمة مفتاحية مطبَّعة).
+
+## 1) CrossFuzzySearchEngine: مطابقة ضبابية ضعيفة (متوسطة)
+- **لا تطبيع عربي**: «هايل» ≠ «هائل» (مسافة 2)، «مدرسة» ≠ «مدرسه»، «أحمد» ≠ «احمد».
+- منطق **OR** لكل كلمة استعلام مع أي كلمة هدف: «سباك صنعاء» تُظهر كل السبّاكين وكل من في صنعاء.
+- **لا ترتيب** للنتائج (تصفية فقط)؛ الأقرب تطابقاً لا يظهر أولاً.
+- كاش يحتفظ بمفتاح لكل زوج (استعلام، هدف) لمدة 30 ث ولا يُخلى إلا بعد تجاوز 500 مدخل منتهي ⇒ نمو بلا حد أثناء الكتابة.
+- يحسب على الخيط الرئيسي مع كل حرف (`remember(query)`) ومصفوفة `dp` كاملة لكل زوج كلمات.
+### استبدل `object LevenshteinMatcher` بالكامل:
+```kotlin
+object LevenshteinMatcher {
+
+    /** مسافة تحرير بصفين (ذاكرة O(n)) على نصين مطبَّعين مسبقاً. */
+    private fun rawDistance(s: String, t: String): Int {
+        if (s == t) return 0
+        if (s.isEmpty()) return t.length
+        if (t.isEmpty()) return s.length
+        var prev = IntArray(t.length + 1) { it }
+        var cur = IntArray(t.length + 1)
+        for (i in 1..s.length) {
+            cur[0] = i
+            for (j in 1..t.length) {
+                val cost = if (s[i - 1] == t[j - 1]) 0 else 1
+                cur[j] = minOf(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost)
+            }
+            val tmp = prev; prev = cur; cur = tmp
+        }
+        return prev[t.length]
+    }
+
+    fun calculateDistance(a: String, b: String): Int =
+        rawDistance(ArabicNormalizer.normalize(a), ArabicNormalizer.normalize(b))
+
+    /** درجة التطابق (0 الأفضل) أو null عند عدم التطابق. كل كلمات الاستعلام يجب أن تتطابق (AND). */
+    fun score(query: String, target: String): Int? {
+        val q = ArabicNormalizer.normalize(query)
+        if (q.isEmpty()) return 0
+        val t = ArabicNormalizer.normalize(target)
+        if (t.isEmpty()) return null
+        if (t == q) return 0
+        if (t.startsWith(q)) return 1
+        if (t.contains(q)) return 2
+        if (t.length > 100) return null
+        val qWords = q.split(" ").filter { it.isNotEmpty() }
+        val tWords = t.split(" ").filter { it.isNotEmpty() }
+        var total = 0
+        for (qw in qWords) {
+            val allowed = when { qw.length <= 3 -> 0; qw.length <= 5 -> 1; else -> 2 }
+            val best = tWords.minOfOrNull { tw ->
+                if (kotlin.math.abs(tw.length - qw.length) > allowed) Int.MAX_VALUE else rawDistance(qw, tw)
+            } ?: Int.MAX_VALUE
+            if (best > allowed) return null
+            total += best
+        }
+        return 3 + total
+    }
+
+    fun isFuzzyMatch(query: String, target: String, maxDistance: Int = 3): Boolean = score(query, target) != null
+}
+```
+### الشاشة: حساب خارج الخيط الرئيسي + ترتيب (للقوائم الثلاث؛ مثال الفنيين)
+```kotlin
+val filteredTechnicians by produceState(initialValue = allTechnicians, query, allTechnicians) {
+    value = if (query.isBlank()) allTechnicians else {
+        kotlinx.coroutines.delay(200)                                   // debounce
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            allTechnicians.mapNotNull { t ->
+                val s = listOfNotNull(LevenshteinMatcher.score(query, t.name), LevenshteinMatcher.score(query, t.profession)).minOrNull()
+                if (s == null) null else t to s
+            }.sortedBy { it.second }.map { it.first }
+        }
+    }
+}
+```
+(نفس النمط للمحلات `name/category/address` والمقالات `title/summary/category`.)
+
+## 2) Firestore: ترحيل الكلمات المفتاحية القديمة (متوسطة)
+الوثائق الحالية بلا `keywords` مطبَّعة فلا يجد استعلام `whereArrayContains` شيئاً. أنشئ مرة واحدة (من أداة المشرف فقط):
+```kotlin
+suspend fun migrateKeywords(db: FirebaseFirestore) {
+    suspend fun run(collection: String, fields: List<String>) {
+        var last: DocumentSnapshot? = null
+        while (true) {
+            var q = db.collection(collection).orderBy(FieldPath.documentId()).limit(300)
+            if (last != null) q = q.startAfter(last)
+            val snap = q.get().await()                           // kotlinx-coroutines-play-services
+            if (snap.isEmpty) break
+            val batch = db.batch()
+            snap.documents.forEach { d ->
+                val texts = fields.map { d.getString(it).orEmpty() }.toTypedArray()
+                batch.update(d.reference, "keywords", ArabicNormalizer.buildKeywords(*texts))
+            }
+            batch.commit().await()
+            last = snap.documents.last()
+        }
+    }
+    run("providers", listOf("name", "area", "profession"))    // عدّل أسماء المجموعات والحقول لمشروعك
+    run("stores", listOf("name", "categoryId"))
+}
+```
+وعند إنشاء/تعديل أي فني أو متجر استخدم `ArabicNormalizer.buildKeywords(...)` ذاته.
+
+## 3) الجلسة والأمان (عالية للأمان)
+في `SessionManagerAndUxEnhancer`:
+- `USER_TOKEN` يُحفظ في SharedPreferences **نصاً صريحاً** (بينما يوجد `SecureStorage` لجلسة المشرف). استخدم تخزيناً مشفراً:
+```kotlin
+// gradle: implementation("androidx.security:security-crypto:1.1.0-alpha06")
+val masterKey = MasterKey.Builder(context).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build()
+val securePrefs = EncryptedSharedPreferences.create(
+    context, "secure_session", masterKey,
+    EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+    EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+)
+```
+- `ADMIN_LOGGED` علم منطقي في تخزين عادي على الجهاز: **لا يصلح كحماية**. صلاحيات المشرف يجب أن تُفرض في **قواعد Firestore** (مثلاً `request.auth.token.admin == true` عبر Custom Claims)، والعلم المحلي لواجهة فقط.
+- `executeCleanLogout` يحذف المفتاح `KEY_OFFLINE_QUEUE` وهو **غير موجود** (الطابور يُخزَّن في ملف `app_offline_queue_prefs` بمفتاح آخر) فتبقى طلبات المستخدم السابق وتُرسل لاحقاً. ولا يجوز مسح نداءات الفزعة. أضف في `OfflineQueueManager`:
+```kotlin
+fun clearForLogout() {
+    _pendingRequests.update { list -> list.filter { it.type == "SOS" } }   // نُبقي الفزعة فقط
+    saveQueueToStorage()
+}
+```
+واستدعِها في الخروج بدل `remove("KEY_OFFLINE_QUEUE")`.
+
+## 4) Analytics (متوسطة)
+- `logUserBehaviorEvent` يكتب **مستنداً واحداً في Firestore لكل حدث** (تكلفة وحصص). اجمع الأحداث في دفعات (حتى 20 حدثاً أو كل 60 ث) بـ`db.batch()`.
+- أضف مفتاح موافقة/إلغاء اشتراك محفوظاً، ولا تدرج إحداثيات المستخدم في الأحداث أبداً.
+
+## 5) SyncStatusTracker
+سليم (حالة فقط). اربطه بمؤشر «النداء/الطلبات قيد الإرسال» (المستند 39) بدل إنشاء حالة موازية.
+
+## اختبار
+1. اكتب «هايل» ثم «هائل»: النتائج نفسها.
+2. «سباك صنعاء»: يظهر من يطابق الكلمتين فقط ومرتباً بالأقرب تطابقاً.
+3. بعد تشغيل الترحيل: البحث بكلمة جزئية («صن») في Firestore يعيد النتائج.
+4. بعد الخروج من الحساب: تبقى نداءات الفزعة فقط في الطابور.

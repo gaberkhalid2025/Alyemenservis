@@ -1,0 +1,59 @@
+# 42 – MapLayersDialog + MapControls + MapFilterBar + ArVpsCameraOverlay + MapBookingDialog + ملفات MVI
+**الملفات المفحوصة:** `MapLayersDialog_db29c6`, `MapControls_db37c0`, `MapFilterBar_d18772`, `ArVpsCameraOverlay_00874b`, `AlephVisualAssistantDialog_9220e0`, `MapBottomSheet_584807`, `MapScreenFilters_36a0e2`, `HeatmapRenderer_7a03f0`, `MapBookingDialog_bf880f`, `MapErrorOverlay_8077ae`, `MapScreenViewModel_4a55e7`/`Events`/`UiState`/`Layout`/`MapScreen`  |  **الإجراء:** تعديلات موضعية.
+
+## ما تأكدت من تطبيقه (سليم)
+حذف «Vela 3D» من الطبقات وأزرار الإمالة، تسمية زر HOT بصدق، فلتر المدن بالرموز الكاملة، `buildRadarPoints` بالمدى و`hasUser`، `MapBottomSheet` (`hasUser` و«فعّل GPS»)، Aleph «ملخص المنطقة» الصادق، وAR بـCameraX وزاوية رؤية ±35°.
+
+## 1) نصوص طبقات غير صحيحة (متوسطة)
+`MapLayersDialog` ما زال يقول: الأقمار الصناعية «**بتسميات عربية**» (صور Esri بلا تسميات إطلاقاً)، وHOT «**متجهات** الشوارع» (بلاطات نقطية Raster لا متجهات).
+```kotlin
+LayerInfo(MapMode.SATELLITE, "🛰️ أقمار صناعية", "صور جوية للمناطق (بلا أسماء شوارع). تحتاج إنترنت", 0f),
+LayerInfo(MapMode.HOT, "🗺️ خريطة الشوارع (HOT)", "خريطة شوارع بأسماء المعالم من OpenStreetMap", 0f),
+```
+وأضف لـ`OSM` نصاً مماثلاً إن كانت الطبقة في القائمة («الخريطة القياسية من OpenStreetMap»).
+## 2) AR: اتجاه الكاميرا يُحسب خطأً عند حمل الهاتف عمودياً (عالية للميزة)
+`rememberHeadingDegrees` يستخدم `getOrientation` المباشر: هذا اتجاه **رأس الهاتف (محور Y)**، وهو يشير للسماء عند حمله عمودياً فيصبح الاتجاه غير مستقر (gimbal) بدل اتجاه الكاميرا. لاتجاه الكاميرا يجب إعادة تعيين الإحداثيات.
+في `CompassSensor.kt` أضف معاملاً وأعد استخدام الدالة:
+```kotlin
+@Composable
+fun rememberHeadingDegrees(enabled: Boolean, lat: Double, lng: Double, cameraMode: Boolean = false): Float {
+    ...
+    val remapped = FloatArray(9)
+    ...
+    override fun onSensorChanged(e: SensorEvent) {
+        ...
+        SensorManager.getRotationMatrixFromVector(rot, e.values)
+        val matrix = if (cameraMode) {
+            // الكاميرا الخلفية تنظر على محور −Z؛ نربط X→X و Z→Y ليُحسب الاتجاه الأفقي الذي تنظر إليه الكاميرا
+            SensorManager.remapCoordinateSystem(rot, SensorManager.AXIS_X, SensorManager.AXIS_Z, remapped)
+            remapped
+        } else rot
+        SensorManager.getOrientation(matrix, orient)
+        ...
+```
+وفي `ArVpsCameraOverlay`: `rememberHeadingDegrees(enabled = true, lat = userLat, lng = userLng, cameraMode = true)`. أبقِ البوصلة العادية على الوضع الافتراضي (`false`).
+## 3) AR: لا إعادة محاولة ولا مسار لرفض الإذن النهائي (متوسطة)
+- `cameraError` لا يمكن مسحه؛ أضف زر «إعادة المحاولة»: `Button(onClick = { cameraError = null }) { Text("إعادة المحاولة") }`.
+- عند رفض الإذن نهائياً لا يظهر الحوار؛ أضف بجانب زر الطلب زر «فتح الإعدادات»: `context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null)))`.
+## 4) لوحة الأزرار (MapControls) (متوسطة)
+- أهداف اللمس `40.dp` أقل من الحد الموصى به **48dp** لإمكانية الوصول: `Modifier.size(48.dp)` أو `Modifier.minimumInteractiveComponentSize()`.
+- العمود قد يتجاوز ارتفاع الشاشات الصغيرة (ظهر مقصوصاً سابقاً): أضف `.verticalScroll(rememberScrollState())` إلى `Column` الخاص بالقاعدة.
+## 5) شريط البحث: لوحة المفاتيح تبقى مفتوحة (منخفضة)
+في `MapFilterBar` عند `onSearch` وفي `MapScreenContent` عند اختيار نتيجة:
+```kotlin
+val keyboard = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+keyboardActions = KeyboardActions(onSearch = { onSearchExecute(searchQuery); keyboard?.hide() })
+// وعند اختيار نتيجة: keyboard?.hide()
+```
+## 6) كود ميت يجب الحسم بشأنه
+- `MapBookingDialog`: غير مستخدم (التطبيق يستعمل `com.example.ui.dialogs.BookingDialog`) و`isSubmitting` لا يُعاد لـ`false` عند الفشل. **احذفه** أو أصلحه (مرّر `onResult`).
+- `MapScreenViewModel/Events/UiState/Layout` (MVI): غير مستخدمة؛ أبقِها أو احذفها، لكن لا تُدخلها للإنتاج دون ربط. تحقق من `resetFilters` (يضبط `isRadarMode = true` دون سبب).
+- `MapScreen`: التعليق يذكر MVI والواقع غير ذلك؛ صحّح التعليق.
+## 7) تحسينات اختيارية سريعة
+- زر «طبقة OSM القياسية» في اللوحة (حالياً HOT فقط) ليتمكن من يريد الخريطة الأوضح.
+- حفظ آخر نمط خريطة اختاره المستخدم في `DataStore` (يُستعاد عند فتح التطبيق).
+- `HeatmapRenderer` سليم (KDE حقيقي)؛ أضف شرحاً صغيراً «كثافة الخدمات» لتوضيح معنى الألوان.
+## اختبار
+1. وجّه الهاتف عمودياً نحو فني على بعد 200 م أمامك: يظهر مع «أمامك»؛ استدر 90°: يختفي.
+2. ارفض إذن الكاميرا نهائياً: يظهر «فتح الإعدادات».
+3. هاتف صغير (≤ 5.5″): كل أزرار اللوحة قابلة للوصول بالتمرير.

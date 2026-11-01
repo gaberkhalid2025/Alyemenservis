@@ -105,7 +105,7 @@ fun ArVpsCameraOverlay(
         }
     }
 
-    val heading = rememberHeadingDegrees(enabled = true, lat = userLat, lng = userLng)
+    val heading = rememberHeadingDegrees(enabled = true, lat = userLat, lng = userLng, cameraMode = true)
 
     val inView = remember(nearbyProviders, userLat, userLng, heading, hasUserLocation) {
         if (!hasUserLocation) emptyList()
@@ -123,7 +123,13 @@ fun ArVpsCameraOverlay(
         if (hasCameraPermission) {
             if (cameraError != null) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(cameraError ?: "خطأ في الكاميرا", color = Color.White)
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(cameraError ?: "خطأ في الكاميرا", color = Color.White, fontSize = 14.sp)
+                        Spacer(Modifier.height(12.dp))
+                        Button(onClick = { cameraError = null }) {
+                            Text("إعادة المحاولة")
+                        }
+                    }
                 }
             } else {
                 CameraXPreview(modifier = Modifier.fillMaxSize(), onError = { cameraError = it })
@@ -133,8 +139,21 @@ fun ArVpsCameraOverlay(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("يلزم إذن الكاميرا لتشغيل الواقع المعزز", color = Color.White, fontSize = 14.sp)
                     Spacer(Modifier.height(12.dp))
-                    Button(onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) }) {
-                        Text("منح الإذن")
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) }) {
+                            Text("منح الإذن")
+                        }
+                        OutlinedButton(onClick = {
+                            try {
+                                val intent = android.content.Intent(
+                                    android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                    android.net.Uri.fromParts("package", context.packageName, null)
+                                )
+                                context.startActivity(intent)
+                            } catch (_: Exception) {}
+                        }) {
+                            Text("فتح الإعدادات", color = Color.White)
+                        }
                     }
                 }
             }

@@ -7,6 +7,7 @@ package com.example.utils
 object NavConfig {
     // Endpoints
     const val OSRM_BASE_URL = "https://router.project-osrm.org/route/v1/driving/"
+    const val OSRM_IS_DEMO_SERVER = true // اضبطه false عند استخدام خادمك الخاص
     const val NOMINATIM_BASE_URL = "https://nominatim.openstreetmap.org/search"
     
     // Valhalla Local Config

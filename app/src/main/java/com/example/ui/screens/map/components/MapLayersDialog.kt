@@ -47,8 +47,8 @@ fun MapLayersDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 val layers = listOf(
-                    LayerInfo(MapMode.SATELLITE, "🛰️ أقمار صناعية (عالي الدقة)", "عرض الخريطة بدقة فضائية فائقة وتسميات عربية", 0f),
-                    LayerInfo(MapMode.HOT, "🗺️ خريطة الشوارع الحية (HOT)", "متجهات الشوارع الإنسانية المحدثة", 0f),
+                    LayerInfo(MapMode.SATELLITE, "🛰️ أقمار صناعية", "صور جوية للمناطق (بلا أسماء شوارع). تحتاج إنترنت", 0f),
+                    LayerInfo(MapMode.HOT, "🗺️ خريطة الشوارع (HOT)", "خريطة شوارع بأسماء المعالم من OpenStreetMap", 0f),
                     LayerInfo(MapMode.TOPO, "⛰️ التضاريس والارتفاعات (Topo)", "خريطة OpenTopoMap الجغرافية بخطوط الكنتور وظلال الجبال", 0f),
                     LayerInfo(MapMode.OSM, "🌐 خريطة الشوارع القياسية (OSM)", "خريطة OpenStreetMap القياسية مع تسميات عربية", 0f)
                 )

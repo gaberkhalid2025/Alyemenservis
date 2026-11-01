@@ -241,8 +241,11 @@ object RealValhallaNavigator {
             
             val legShapeEncoded = legObj.getString("shape")
             val legCoords = decodePolyline(legShapeEncoded)
-            val currentCoordOffset = allCoords.size
-            allCoords.addAll(legCoords)
+            val isLastLeg = i == legsArr.length() - 1
+            // تجنّب تكرار نقطة نهاية الساق السابقة (هي نفسها بداية هذه الساق)
+            val toAdd = if (i > 0 && legCoords.isNotEmpty()) legCoords.drop(1) else legCoords
+            val currentCoordOffset = allCoords.size - (if (i > 0) 1 else 0)
+            allCoords.addAll(toAdd)
             
             val legSteps = mutableListOf<NavStep>()
             val maneuversArr = legObj.optJSONArray("maneuvers")
@@ -263,7 +266,8 @@ object RealValhallaNavigator {
                             streetName,
                             manDist,
                             waypoints.getOrNull(i)?.name ?: "الوجهة",
-                            roundaboutExit = roundaboutExit
+                            roundaboutExit = roundaboutExit,
+                            isIntermediateStop = !isLastLeg
                         ),
                         distanceMeters = manDist,
                         durationSeconds = manDur,

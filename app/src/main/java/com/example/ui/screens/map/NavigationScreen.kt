@@ -203,7 +203,7 @@ fun NavigationScreen(
             isLoadingRoute = false
             return@LaunchedEffect // [إصلاح 19] لا مسار بلا موقع GPS حقيقي
         }
-        isLoadingRoute = true
+        if (routeResult == null) isLoadingRoute = true
         try {
             val origin = NavWaypoint(name = "موقعي الحالي", latitude = latestLat, longitude = latestLng, type = WaypointType.START)
             val result = RealValhallaNavigator.calculateRoute(context, origin, remaining, driving = isDrivingMode)
@@ -273,10 +273,16 @@ fun NavigationScreen(
         if (t != null) trackerState = t.update(userLat, userLng)
         val tgt = waypoints.getOrNull(currentWaypointIndex) ?: return@LaunchedEffect
         val d = HaversinePrecisionNavigator.calculateDistance(userLat, userLng, tgt.latitude, tgt.longitude)
-        if (arrival.check(currentWaypointIndex, d)) {
+
+        val ts = trackerState
+        val legEnd = routeResult?.legs?.firstOrNull()?.distanceMeters ?: 0.0
+        val reachedByRoute = !isApproximate && ts != null && legEnd > 0.0 &&
+                (legEnd - ts.alongMeters) < 20.0 && ts.offRouteMeters < 40.0
+
+        if (arrival.check(currentWaypointIndex, if (reachedByRoute) 0.0 else d)) {
             handleArrival()
-        } else if (!isApproximate && trackerState != null &&
-            offRoute.update(trackerState!!.offRouteMeters, now) && now - lastRerouteAt > 10_000L
+        } else if (!isApproximate && ts != null && !isLoadingRoute &&
+            offRoute.update(ts.offRouteMeters, now) && now - lastRerouteAt > 10_000L
         ) {
             lastRerouteAt = now
             offRoute.reset()
@@ -331,11 +337,12 @@ fun NavigationScreen(
         }
         val key = "$routeVersion:${currentStepIndex + 1}:$level"
         if (announced.add(key)) {
-            speak(
-                if (level == "N") upcoming.instruction
-                else "بعد ${MapDistanceCalculator.formatDistanceSpoken(distToManeuver)}، ${upcoming.instruction}",
-                false
-            )
+            val isDest = upcoming.maneuverType == ManeuverType.DESTINATION
+            when {
+                isDest && level == "N" -> { /* الوصول ينطقه كاشف الوصول عند handleArrival */ }
+                level == "N" -> speak(upcoming.instruction, false)
+                else -> speak(ArabicInstructionFormatter.upcomingText(upcoming.instruction, upcoming.maneuverType, distToManeuver), false)
+            }
         }
     }
 
@@ -350,7 +357,7 @@ fun NavigationScreen(
         !hasRealLocation -> if (result != null) "إشارة GPS ضعيفة — سنواصل التوجيه عند عودتها" else "لم يتم تحديد موقعك بعد — فعّل GPS"
         result == null -> "جارٍ حساب المسار..."
         isApproximate -> "تقريبي: ${MapDistanceCalculator.formatDistance(distToTarget)} مباشرة إلى ${target?.name ?: ""} (بدون تعليمات منعطفات)"
-        upcoming != null -> "بعد ${MapDistanceCalculator.formatDistanceSpoken(distToManeuver)}، ${upcoming.instruction}"
+        upcoming != null -> ArabicInstructionFormatter.upcomingText(upcoming.instruction, upcoming.maneuverType, distToManeuver)
         else -> "واصل حتى الوصول إلى ${target?.name ?: "الوجهة"}"
     }
     val etaClock = remember(remainingSeconds) {

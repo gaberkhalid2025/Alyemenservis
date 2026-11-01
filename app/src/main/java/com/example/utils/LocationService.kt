@@ -66,9 +66,9 @@ class LocationService(
     }
 
     companion object {
-        // Default Yemen / Sana'a coordinates fallback
-        const val DEFAULT_YEMEN_LAT = 15.3694
-        const val DEFAULT_YEMEN_LNG = 44.1910
+        // Default Yemen coordinates reference NavConfig
+        const val DEFAULT_YEMEN_LAT = NavConfig.DEFAULT_YEMEN_LAT
+        const val DEFAULT_YEMEN_LNG = NavConfig.DEFAULT_YEMEN_LNG
         const val EARTH_RADIUS_KM = 6371.0
     }
 

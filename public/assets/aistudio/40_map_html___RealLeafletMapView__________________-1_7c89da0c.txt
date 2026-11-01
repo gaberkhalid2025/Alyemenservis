@@ -1,0 +1,137 @@
+# 40 – map.html + RealLeafletMapView.kt + OfflineTileInterceptor (إسناد، بلاطات، دورة حياة)
+**الملفات المفحوصة:** `map_e0a697.html`, `RealLeafletMapView_0df866`  |  **الإجراء:** تعديلات موضعية.
+
+## ما تأكدت من تطبيقه (سليم)
+دائرة الدقة تتحدّث، `esc` وعقد العلامات، دوال المسار والمحطات ودبوس البحث، `dragstart`، التمركز الأولي مرة واحدة، عدم القفز لصنعاء عند «الكل»، `allowFileAccess=false`، وعدم تفعيل تصحيح WebView.
+
+## المشاكل
+### 1) الإسناد (Attribution) غير كافٍ ومخفي (عالية: ترخيص)
+- نصوص الإسناد في الطبقات: `'OSM'` و`'HOT'` و`'Topo'` و`'Esri'` فقط. رخصة OSM (ODbL) تشترط عبارة «© مساهمو OpenStreetMap» ظاهرة مع رابط لصفحة الحقوق؛ OpenTopoMap (CC-BY-SA) تشترط ذكر OSM وSRTM والنمط؛ وEsri تشترط نص مصدر الصور.
+- CSS يجعل الخط **7.5px** بلون رمادي على أسود، و`pointer-events: none` فلا يمكن فتح أي رابط.
+- شريط الوضع يكتب «الأقمار الاصطناعية (OAM)» بينما المصدر Esri (وصف خاطئ للمصدر).
+- «Vela 3D (مباني ثلاثية الأبعاد)» ما زال في `setLayer` (المستند 33).
+### 2) الخادم
+- `https://{s}.tile.openstreetmap.org` بالنطاقات a/b/c: سياسة OSM الحالية توصي بالنطاق الواحد `tile.openstreetmap.org`. وتعبير المعترض (`[a-c]\.`) سيفشل إن تغيّر العنوان.
+- Esri World Imagery: الاستخدام في تطبيق إنتاجي يخضع لشروط Esri وقد يتطلب مفتاح ArcGIS؛ راجعها قبل النشر.
+### 3) لا إشعار عند فشل البلاطات
+بلا إنترنت وبلا كاش تظهر خريطة سوداء بلا تفسير (الصفحة المحلية تُحمَّل، فلا يظهر أي خطأ).
+### 4) لا إيقاف للـ WebView عند خلفية التطبيق
+لا `onPause()/onResume()`: يبقى JavaScript والمؤقتات (والبلاطات) تعمل والتطبيق في الخلفية ⇒ استهلاك بطارية.
+### 5) `object MapAssetMemoryCache` مزيّف (يعيد `true`/`""`) — احذفه مع `MapTestRunner`.
+
+---
+## أ) map.html
+```javascript
+var ATTR_OSM = '© <a href="https://www.openstreetmap.org/copyright">مساهمو OpenStreetMap</a>';
+var providers = {
+    'osm': L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 24, maxNativeZoom: 19, attribution: ATTR_OSM
+    }),
+    'hot': L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
+        maxZoom: 24, maxNativeZoom: 19, subdomains: ['a', 'b', 'c'],
+        attribution: ATTR_OSM + ' — نمط <a href="https://www.hotosm.org/">HOT</a>'
+    }),
+    'topo': L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+        maxZoom: 24, maxNativeZoom: 17, subdomains: ['a', 'b', 'c'],
+        attribution: ATTR_OSM + ' — SRTM | نمط © <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA)'
+    }),
+    'satellite': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        maxZoom: 24, maxNativeZoom: 19,
+        attribution: 'صور © <a href="https://www.esri.com">Esri</a> — Maxar, Earthstar Geographics ومجتمع GIS'
+    })
+};
+```
+- شريط الوضع (HTML): غيّر «الأقمار الاصطناعية (OAM)» إلى «أقمار صناعية».
+- في `setLayer`: `title = 'أقمار صناعية'` للفرعين `VELA_3D` و`SATELLITE` (احذف «مباني ثلاثية الأبعاد»).
+- CSS الإسناد (استبدل الكتلة الحالية):
+```css
+.leaflet-control-attribution {
+    background: rgba(15, 23, 42, 0.85) !important;
+    color: #CBD5E1 !important;
+    font-size: 10px !important;
+    line-height: 14px !important;
+    padding: 2px 8px !important;
+    border-radius: 8px 0 0 0;
+    max-width: 85vw;
+}
+.leaflet-control-attribution a { color: #7DD3FC !important; text-decoration: underline !important; pointer-events: auto !important; }
+```
+- كشف فشل البلاطات (أضف بعد تعريف `providers` وفي نهاية `setLayer` بعد `addTo(map)` استدعِ `watchLayer(currentBaseLayer)`):
+```javascript
+var tileOk = 0, tileErr = 0, tilesFailingNotified = false;
+function notifyTiles(failing) {
+    if (window.AndroidBridge && window.AndroidBridge.onTilesFailing) window.AndroidBridge.onTilesFailing(failing);
+}
+function watchLayer(layer) {
+    tileOk = 0; tileErr = 0; tilesFailingNotified = false;
+    layer.off('tileload'); layer.off('tileerror');
+    layer.on('tileload', function () {
+        tileOk++;
+        if (tilesFailingNotified && tileOk >= 4) { tilesFailingNotified = false; notifyTiles(false); }
+    });
+    layer.on('tileerror', function () {
+        tileErr++;
+        if (!tilesFailingNotified && tileErr >= 6 && tileOk < tileErr / 4) { tilesFailingNotified = true; notifyTiles(true); }
+    });
+}
+```
+## ب) OfflineTileInterceptor
+```kotlin
+private val OSM = Regex("^https://(?:[a-c]\\.)?tile\\.openstreetmap\\.org/(\\d+)/(\\d+)/(\\d+)\\.png$")
+```
+(يغطي العنوان القديم والجديد.)
+## ج) RealLeafletMapView.kt
+1. معامل جديد وربطه:
+```kotlin
+onTilesStatus: ((failing: Boolean) -> Unit)? = null,
+...
+val onTilesStatusState by rememberUpdatedState(onTilesStatus)
+// داخل addJavascriptInterface:
+@JavascriptInterface fun onTilesFailing(failing: Boolean) { mainHandler.post { onTilesStatusState?.invoke(failing) } }
+```
+2. فتح روابط الإسناد خارجياً بقائمة بيضاء (داخل `shouldOverrideUrlLoading` بالنسختين):
+```kotlin
+private val ALLOWED_HOSTS = setOf("www.openstreetmap.org", "www.hotosm.org", "opentopomap.org", "www.esri.com")
+...
+override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+    val uri = request?.url ?: return true
+    if (uri.scheme == "file") return false                         // الصفحة المحلية فقط
+    if (uri.scheme == "https" && uri.host in ALLOWED_HOSTS) {
+        try { context.startActivity(Intent(Intent.ACTION_VIEW, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } catch (_: Exception) {}
+    }
+    return true                                                   // لا يُحمَّل أي رابط آخر داخل الخريطة
+}
+```
+(وبالمثل للنسخة ذات `url: String?`.)
+3. إيقاف/استئناف حسب دورة الحياة:
+```kotlin
+val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current   // أو androidx.compose.ui.platform.LocalLifecycleOwner حسب إصدارك
+DisposableEffect(lifecycleOwner, webViewRef) {
+    val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+        when (event) {
+            androidx.lifecycle.Lifecycle.Event.ON_PAUSE -> webViewRef?.onPause()
+            androidx.lifecycle.Lifecycle.Event.ON_RESUME -> webViewRef?.onResume()
+            else -> {}
+        }
+    }
+    lifecycleOwner.lifecycle.addObserver(observer)
+    onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+}
+```
+4. احذف `object MapAssetMemoryCache`.
+## د) MapScreenContent: لافتة «بلا بلاطات»
+```kotlin
+var tilesFailing by remember { mutableStateOf(false) }
+// في RealLeafletMapView(...): onTilesStatus = { tilesFailing = it },
+if (tilesFailing) {
+    Surface(color = Color(0xCC7C2D12), shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 96.dp, start = 16.dp, end = 16.dp)) {
+        Text("الخريطة تحتاج إنترنت أو حزمة عرض أوفلاين (MBTiles). المسارات والأماكن ما زالت تعمل.",
+            color = Color.White, fontSize = 12.sp, modifier = Modifier.padding(12.dp))
+    }
+}
+```
+## اختبار
+1. اضغط على الإسناد: يفتح صفحة حقوق OSM في المتصفح.
+2. وضع الطيران وبلا كاش: تظهر اللافتة بعد ثوانٍ؛ وتختفي بعد عودة الإنترنت.
+3. أرسل التطبيق للخلفية 5 دقائق: لا نشاط شبكة من الخريطة (Network Profiler).

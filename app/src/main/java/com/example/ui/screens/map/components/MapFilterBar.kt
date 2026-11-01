@@ -46,6 +46,7 @@ fun MapFilterBar(
     onSearchExecute: (String) -> Unit = {}
 ) {
     var showFilterDialog by remember { mutableStateOf(false) }
+    val keyboardController = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
 
     val categories = remember {
         listOf(
@@ -138,7 +139,10 @@ fun MapFilterBar(
                         imeAction = androidx.compose.ui.text.input.ImeAction.Search
                     ),
                     keyboardActions = androidx.compose.foundation.text.KeyboardActions(
-                        onSearch = { onSearchExecute(searchQuery) }
+                        onSearch = {
+                            keyboardController?.hide()
+                            onSearchExecute(searchQuery)
+                        }
                     ),
                     modifier = Modifier
                         .weight(1f)

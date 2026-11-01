@@ -150,6 +150,19 @@ class MyApplication : Application() {
         } catch (e: Throwable) {
             Log.e("MyApplication", "❌ Failed to schedule periodic sync: ${e.message}")
         }
+
+        // ===================== الخطوة 6: جدولة معالجة طابور الأوفلاين =====================
+        try {
+            val qManager = dagger.hilt.android.EntryPointAccessors.fromApplication(
+                this,
+                com.example.utils.QueueWorkerEntryPoint::class.java
+            ).offlineQueueManager()
+            if (qManager.getQueueSize() > 0) {
+                qManager.scheduleSyncWhenOnline()
+            }
+        } catch (e: Throwable) {
+            Log.e("MyApplication", "❌ Failed to schedule offline queue sync: ${e.message}")
+        }
     }
 
     /**

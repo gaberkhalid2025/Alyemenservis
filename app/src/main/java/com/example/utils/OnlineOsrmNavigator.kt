@@ -116,9 +116,12 @@ object OnlineOsrmNavigator {
                                         val type = maneuver?.optString("type", "") ?: ""
                                         val modifier = maneuver?.optString("modifier", "") ?: ""
 
+                                        val exitNum = maneuver?.optInt("exit", 0)?.takeIf { it > 0 }
                                         val mType = mapManeuver(type, modifier)
                                         val instruction = ArabicInstructionFormatter.format(
-                                            mType, streetName, stepDist, toWp.name
+                                            mType, streetName, stepDist, toWp.name,
+                                            roundaboutExit = exitNum,
+                                            isIntermediateStop = legIdx < (legs.length() - 1)
                                         )
 
                                         legSteps.add(

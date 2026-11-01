@@ -68,6 +68,9 @@ object AnalyticsAndReportingEngine {
         val overallRating: Double = if (BuildConfig.DEBUG) 4.9 else 0.0
     )
 
+    private val eventBuffer = java.util.concurrent.ConcurrentLinkedQueue<Map<String, Any?>>()
+    @Volatile private var lastFlushTime = System.currentTimeMillis()
+
     // 3. Log User Journey Event
     fun logUserBehaviorEvent(
         userId: String,
@@ -75,6 +78,7 @@ object AnalyticsAndReportingEngine {
         screenName: String,
         extraData: String = ""
     ) {
+        if (userId.isBlank()) return
         val eventId = EntityIdGenerator.generate(EntityIdGenerator.Prefix.PROVIDER)
         val payload = hashMapOf<String, Any?>(
             "id" to eventId,
@@ -84,7 +88,30 @@ object AnalyticsAndReportingEngine {
             "extraData" to extraData,
             "timestamp" to System.currentTimeMillis()
         )
-        db.collection("user_behavior_logs").document(eventId).set(payload)
+        eventBuffer.add(payload)
+        val now = System.currentTimeMillis()
+        if (eventBuffer.size >= 15 || now - lastFlushTime > 60_000L) {
+            flushEvents()
+        }
+    }
+
+    private fun flushEvents() {
+        if (eventBuffer.isEmpty()) return
+        lastFlushTime = System.currentTimeMillis()
+        val items = mutableListOf<Map<String, Any?>>()
+        while (items.size < 20 && !eventBuffer.isEmpty()) {
+            eventBuffer.poll()?.let { items.add(it) }
+        }
+        if (items.isEmpty()) return
+        try {
+            val batch = db.batch()
+            items.forEach { payload ->
+                val id = payload["id"] as? String ?: return@forEach
+                val ref = db.collection("user_behavior_logs").document(id)
+                batch.set(ref, payload)
+            }
+            batch.commit()
+        } catch (_: Exception) {}
     }
 
     // 4. Anomaly Detection Alerts Check

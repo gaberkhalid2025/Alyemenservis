@@ -1,0 +1,89 @@
+# 41 – NavigationScreen.kt: منطق الوصول والنطق والتحسينات المتبقية
+**الملف المفحوص:** `NavigationScreen_2b3ac2` (675 سطراً)  |  **الإجراء:** تعديلات موضعية (لا تعد كتابة الملف).
+
+## ما تأكدت من تطبيقه (سليم)
+إعادة المحاولة الفعلية للحساب (3 مرات + حلقة كل 15 ث للمسار «التقريبي»)، مفتاح `needsFirstRoute`، `speak(text, urgent)` مع `QUEUE_ADD`، `OffRouteDetector/ArrivalDetector` من `NavConfig`، تمرير `isDrivingMode`، ورسالة «إشارة GPS ضعيفة».
+
+## المشاكل المتبقية
+### 1) تكرار نطق الوصول (متوسطة)
+خطوة `DESTINATION` تُنطق عند 30 م («وصلت إلى وجهتك: X») ثم يعمل كاشف الوصول عند 25 م وينطق «لقد وصلت إلى X. اكتملت الرحلة» ⇒ جملتان متتاليتان.
+### 2) قد لا يُعتبر الوصول أبداً (عالية)
+الوصول يُحسب فقط بمسافة **خط مستقيم < 25 م** من إحداثي المحطة. المحلات والفنيون غالباً خلف الطريق؛ Valhalla/OSRM يُسقطان الوجهة على أقرب طريق، فقد يقترب السائق إلى 35–60 م فقط من الإحداثي ويقف المسار «لم تصل» إلى الأبد (لا تحديث للمحطة التالية).
+### 3) إعادة حساب متكررة أثناء حساب جارٍ (متوسطة)
+عند الخروج عن المسار يُطلب مسار جديد، وإن استغرق أكثر من 10 ث (مهلة OSRM 20 ث) يُطلب مجدداً قبل انتهاء الأول.
+### 4) وميض مؤشر التحميل مع كل تحديث صامت (منخفضة)
+حلقة إعادة المحاولة وإعادة الحساب تضبط `isLoadingRoute = true` حتى عندما يوجد مسار معروض.
+### 5) صياغة «قبل المنعطف» (مرتبطة بالمستند 38)
+`"بعد X، ${upcoming.instruction}"` تعطي «بعد 250 متراً، وصلت إلى وجهتك…» عند الوجهة؛ والحل `ArabicInstructionFormatter.upcomingText`.
+
+## الإصلاحات
+### أ) النطق والنص (بعد تطبيق المستند 38)
+في مؤثر النطق (سطر ≈ 318-340):
+```kotlin
+val key = "$routeVersion:${currentStepIndex + 1}:$level"
+if (announced.add(key)) {
+    val isDest = upcoming.maneuverType == ManeuverType.DESTINATION
+    when {
+        isDest && level == "N" -> { /* الوصول ينطقه كاشف الوصول؛ لا تكرار */ }
+        level == "N" -> speak(upcoming.instruction, false)
+        else -> speak(ArabicInstructionFormatter.upcomingText(upcoming.instruction, upcoming.maneuverType, distToManeuver), false)
+    }
+}
+```
+وفي `instructionText` (سطر ≈ 353):
+```kotlin
+upcoming != null -> ArabicInstructionFormatter.upcomingText(upcoming.instruction, upcoming.maneuverType, distToManeuver)
+```
+(احذف دالة التنسيق المحلية المكررة إن وُجدت، ويكفي `ArabicInstructionFormatter.spoken` لأي نص مسافة آخر.)
+### ب) الوصول بالمسار وليس بالخط المستقيم فقط
+استبدل مؤثر التتبع (من `LaunchedEffect(userLat, userLng, tracker)`):
+```kotlin
+LaunchedEffect(userLat, userLng, tracker) {
+    val now = System.currentTimeMillis()
+    if (!hasRealLocation) return@LaunchedEffect
+    currentSpeedKmh = speedEstimator.update(userLat, userLng, now)
+    val t = tracker
+    if (t != null) trackerState = t.update(userLat, userLng)
+    val tgt = waypoints.getOrNull(currentWaypointIndex) ?: return@LaunchedEffect
+    val d = HaversinePrecisionNavigator.calculateDistance(userLat, userLng, tgt.latitude, tgt.longitude)
+
+    // وصول بالمسار: الساق الحالية هي legs[0] (المسار يُحسب دائماً من موقعك عبر المحطات المتبقية)
+    val ts = trackerState
+    val legEnd = routeResult?.legs?.firstOrNull()?.distanceMeters ?: 0.0
+    val reachedByRoute = !isApproximate && ts != null && legEnd > 0.0 &&
+            (legEnd - ts.alongMeters) < 20.0 && ts.offRouteMeters < 40.0
+
+    if (arrival.check(currentWaypointIndex, if (reachedByRoute) 0.0 else d)) {
+        handleArrival()
+    } else if (!isApproximate && ts != null && !isLoadingRoute &&
+        offRoute.update(ts.offRouteMeters, now) && now - lastRerouteAt > 10_000L
+    ) {
+        lastRerouteAt = now
+        offRoute.reset()
+        speak("جارٍ إعادة حساب المسار", true)
+        routeVersion += 1
+    }
+}
+```
+(`!isLoadingRoute` يمنع الطلبات المتراكمة.)
+### ج) تحديث صامت
+في بداية مؤثر حساب المسار: بدل `isLoadingRoute = true` اكتب:
+```kotlin
+if (routeResult == null) isLoadingRoute = true   // لا تُظهر المؤشر عند التحديث الصامت
+```
+### د) تحسين: مسافة المنعطف الكبيرة (تجربة قيادة أوضح)
+في بطاقة التعليمات تحت أيقونة المنعطف (داخل `Surface` الدائري أو بجانبه):
+```kotlin
+if (!isApproximate && upcoming != null) {
+    Text(MapDistanceCalculator.formatDistance(distToManeuver), color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
+}
+```
+### هـ) تحسين: اهتزاز عند المنعطف القريب (اختياري)
+عند مستوى `"N"` استدعِ `vibrator.vibrate(VibrationEffect.createOneShot(120, VibrationEffect.DEFAULT_AMPLITUDE))` (صلاحية `VIBRATE` في المانيفست) لمن يقود والصوت مكتوم.
+### و) تحسين: عدم تكرار «الوجهة التالية» عند ضياع الإشارة
+`handleArrival` يزيد المؤشر ويعيد الحساب دون اعتبار حالة التحميل؛ ضع حارساً: `if (isLoadingRoute && routeVersion == lastArrivalVersion) return` بحيث لا تُعالَج محطتان في اللحظة نفسها عند قرب المحطات من بعضها.
+## اختبار
+1. وجهة خلف الطريق بـ 40 م: عند نهاية الطريق عند الوجهة تُعتبر وصلت (وصل بالمسار) وتنتقل للمحطة التالية.
+2. نطق الوجهة الأخيرة: جملة واحدة فقط.
+3. اخرج عن المسار وأبقِ الإنترنت بطيئاً: طلب واحد فقط لإعادة الحساب.
+4. تحديث المسار الصامت لا يُظهر دائرة التحميل.

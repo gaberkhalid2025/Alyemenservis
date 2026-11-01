@@ -18,7 +18,7 @@ object OfflineTileInterceptor {
     private const val USER_AGENT = "AlYemenServicesApp/1.0 (Android)"
     private const val MAX_TILE_BYTES = 2 * 1024 * 1024
 
-    private val OSM = Regex("^https://[a-c]\\.tile\\.openstreetmap\\.org/(\\d+)/(\\d+)/(\\d+)\\.png$")
+    private val OSM = Regex("^https://(?:[a-c]\\.)?tile\\.openstreetmap\\.org/(\\d+)/(\\d+)/(\\d+)\\.png$")
     private val HOT = Regex("^https://[a-c]\\.tile\\.openstreetmap\\.fr/hot/(\\d+)/(\\d+)/(\\d+)\\.png$")
     private val TOPO = Regex("^https://[a-c]\\.tile\\.opentopomap\\.org/(\\d+)/(\\d+)/(\\d+)\\.png$")
     private val SAT = Regex("^https://server\\.arcgisonline\\.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/(\\d+)/(\\d+)/(\\d+)$")

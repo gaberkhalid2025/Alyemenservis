@@ -221,8 +221,15 @@ object CleanLogoutManager {
                 .remove("USER_TOKEN")
                 .remove("USER_LOGGED")
                 .remove("ADMIN_LOGGED")
-                .remove("KEY_OFFLINE_QUEUE")
                 .apply()
+
+            try {
+                val qManager = dagger.hilt.android.EntryPointAccessors.fromApplication(
+                    context.applicationContext,
+                    QueueWorkerEntryPoint::class.java
+                ).offlineQueueManager()
+                qManager.clearForLogout()
+            } catch (_: Exception) {}
 
             _sessionState.value = SessionState(
                 isLoggedIn = false,

@@ -32,76 +32,52 @@ import kotlin.math.min
  */
 object LevenshteinMatcher {
 
-    private val searchCache = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, Boolean>>()
-    private const val CACHE_TTL = 30_000L // 30 seconds
-
-    fun calculateDistance(s1: String, s2: String): Int {
-        val str1 = s1.lowercase().trim()
-        val str2 = s2.lowercase().trim()
-        val dp = Array(str1.length + 1) { IntArray(str2.length + 1) }
-
-        for (i in 0..str1.length) dp[i][0] = i
-        for (j in 0..str2.length) dp[0][j] = j
-
-        for (i in 1..str1.length) {
-            for (j in 1..str2.length) {
-                val cost = if (str1[i - 1] == str2[j - 1]) 0 else 1
-                dp[i][j] = minOf(
-                    dp[i - 1][j] + 1,      // deletion
-                    dp[i][j - 1] + 1,      // insertion
-                    dp[i - 1][j - 1] + cost // substitution
-                )
+    /** مسافة تحرير بصفين (ذاكرة O(n)) على نصين مطبَّعين مسبقاً. */
+    private fun rawDistance(s: String, t: String): Int {
+        if (s == t) return 0
+        if (s.isEmpty()) return t.length
+        if (t.isEmpty()) return s.length
+        var prev = IntArray(t.length + 1) { it }
+        var cur = IntArray(t.length + 1)
+        for (i in 1..s.length) {
+            cur[0] = i
+            for (j in 1..t.length) {
+                val cost = if (s[i - 1] == t[j - 1]) 0 else 1
+                cur[j] = minOf(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost)
             }
+            val tmp = prev; prev = cur; cur = tmp
         }
-        return dp[str1.length][str2.length]
+        return prev[t.length]
     }
 
-    fun isFuzzyMatch(query: String, target: String, maxDistance: Int = 3): Boolean {
-        if (query.isBlank()) return true
-        val q = query.lowercase().trim()
-        val t = target.lowercase().trim()
+    fun calculateDistance(a: String, b: String): Int =
+        rawDistance(ArabicNormalizer.normalize(a), ArabicNormalizer.normalize(b))
 
-        if (searchCache.size > 500) {
-            val now = System.currentTimeMillis()
-            searchCache.entries.removeIf { now - it.value.first > CACHE_TTL }
+    /** درجة التطابق (0 الأفضل) أو null عند عدم التطابق. كل كلمات الاستعلام يجب أن تتطابق (AND). */
+    fun score(query: String, target: String): Int? {
+        val q = ArabicNormalizer.normalize(query)
+        if (q.isEmpty()) return 0
+        val t = ArabicNormalizer.normalize(target)
+        if (t.isEmpty()) return null
+        if (t == q) return 0
+        if (t.startsWith(q)) return 1
+        if (t.contains(q)) return 2
+        if (t.length > 100) return null
+        val qWords = q.split(" ").filter { it.isNotEmpty() }
+        val tWords = t.split(" ").filter { it.isNotEmpty() }
+        var total = 0
+        for (qw in qWords) {
+            val allowed = when { qw.length <= 3 -> 0; qw.length <= 5 -> 1; else -> 2 }
+            val best = tWords.minOfOrNull { tw ->
+                if (kotlin.math.abs(tw.length - qw.length) > allowed) Int.MAX_VALUE else rawDistance(qw, tw)
+            } ?: Int.MAX_VALUE
+            if (best > allowed) return null
+            total += best
         }
-
-        val cacheKey = "$q::$t::$maxDistance"
-        val cached = searchCache[cacheKey]
-        if (cached != null && System.currentTimeMillis() - cached.first < CACHE_TTL) {
-            return cached.second
-        }
-
-        if (t.contains(q)) {
-            searchCache[cacheKey] = Pair(System.currentTimeMillis(), true)
-            return true
-        }
-
-        if (t.length > 100) {
-            val result = t.contains(q)
-            searchCache[cacheKey] = Pair(System.currentTimeMillis(), result)
-            return result
-        }
-
-        val queryWords = q.split("\\s+".toRegex())
-        val targetWords = t.split("\\s+".toRegex())
-
-        for (qw in queryWords) {
-            for (tw in targetWords) {
-                val allowedDist = when {
-                    qw.length <= 3 -> 1
-                    qw.length <= 5 -> 2
-                    else -> maxDistance
-                }
-                if (calculateDistance(qw, tw) <= allowedDist) {
-                    searchCache[cacheKey] = Pair(System.currentTimeMillis(), true)
-                    return true
-                }
-            }
-        }
-        searchCache[cacheKey] = Pair(System.currentTimeMillis(), false)
-        return false
+        return 3 + total
     }
+
+    fun isFuzzyMatch(query: String, target: String, maxDistance: Int = 3): Boolean = score(query, target) != null
 }
 
 data class SearchTechnicianItem(

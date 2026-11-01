@@ -1,8 +1,12 @@
 package com.example.utils
 
+import java.util.Locale
+import kotlin.math.roundToInt
+
 /**
- * 🗣️ ArabicInstructionFormatter
- * محول أنواع المناورات والمسافات إلى جمل عربية احترافية للملاحة.
+ * محوّل المناورات إلى جمل عربية.
+ * قاعدة: نص المنعطف لا يحمل مسافة (المسافة إلى المنعطف تأتي من التتبع الحي).
+ * المسافة تُذكر فقط في «واصل السير» لأن معناها طول المقطع التالي.
  */
 object ArabicInstructionFormatter {
 
@@ -11,46 +15,61 @@ object ArabicInstructionFormatter {
         streetName: String?,
         distanceMeters: Double,
         destinationName: String?,
-        roundaboutExit: Int? = null
+        roundaboutExit: Int? = null,
+        isIntermediateStop: Boolean = false
     ): String {
         val street = if (!streetName.isNullOrBlank() && streetName != "unnamed") " في $streetName" else ""
-        val distText = formatDistance(distanceMeters)
+        val dest = destinationName?.takeIf { it.isNotBlank() } ?: "الوجهة"
 
         return when (maneuver) {
-            ManeuverType.START -> "انطلق باتجاه $destinationName$street"
-            ManeuverType.STRAIGHT -> "واصل السير مباشرة لمسافة $distText$street"
-            ManeuverType.LEFT -> "انعطف يساراً بعد $distText$street"
-            ManeuverType.RIGHT -> "انعطف يميناً بعد $distText$street"
-            ManeuverType.SHARP_LEFT -> "انعطف يساراً بشكل حاد بعد $distText$street"
-            ManeuverType.SHARP_RIGHT -> "انعطف يميناً بشكل حاد بعد $distText$street"
-            ManeuverType.SLIGHT_LEFT -> "انحرف يساراً قليلاً بعد $distText$street"
-            ManeuverType.SLIGHT_RIGHT -> "انحرف يميناً قليلاً بعد $distText$street"
-            ManeuverType.UTURN -> "قم بالدوران للخلف (U-turn) بعد $distText"
+            ManeuverType.START -> "انطلق باتجاه $dest$street"
+            ManeuverType.STRAIGHT -> "واصل السير مباشرة لمسافة ${spoken(distanceMeters)}$street"
+            ManeuverType.LEFT -> "انعطف يساراً$street"
+            ManeuverType.RIGHT -> "انعطف يميناً$street"
+            ManeuverType.SHARP_LEFT -> "انعطف يساراً بشكل حاد$street"
+            ManeuverType.SHARP_RIGHT -> "انعطف يميناً بشكل حاد$street"
+            ManeuverType.SLIGHT_LEFT -> "انحرف يساراً قليلاً$street"
+            ManeuverType.SLIGHT_RIGHT -> "انحرف يميناً قليلاً$street"
+            ManeuverType.UTURN -> "قم بالدوران للخلف"
             ManeuverType.ROUNDABOUT -> {
-                val exitTxt = when (roundaboutExit) {
-                    1 -> "الأول"
-                    2 -> "الثاني"
-                    3 -> "الثالث"
-                    4 -> "الرابع"
-                    5 -> "الخامس"
-                    else -> null
-                }
+                val exitTxt = roundaboutExit?.let { ordinal(it) }
                 if (exitTxt != null) "ادخل الدوار واسلك المخرج $exitTxt$street"
-                else "ادخل الدوار لمسافة $distText ثم اسلك المخرج"
+                else "ادخل الدوار ثم اسلك المخرج المناسب"
             }
-            ManeuverType.HIGHWAY_ENTER -> "اسلك المسار السريع بعد $distText$street"
-            ManeuverType.HIGHWAY_EXIT -> "اخرج من المسار السريع بعد $distText$street"
-            ManeuverType.DESTINATION -> "وصلت إلى وجهتك: $destinationName"
+            ManeuverType.HIGHWAY_ENTER -> "اسلك المسار السريع$street"
+            ManeuverType.HIGHWAY_EXIT -> "اخرج من المسار السريع$street"
+            ManeuverType.DESTINATION ->
+                if (isIntermediateStop) "وصلت إلى المحطة: $dest" else "وصلت إلى وجهتك: $dest"
             ManeuverType.MERGE -> "اندمج مع حركة السير$street"
         }
     }
 
-    private fun formatDistance(meters: Double): String {
+    /** صياغة «قبل المنعطف»: تحافظ على المعنى الصحيح مع الوصول (مستقبل) بدل الماضي. */
+    fun upcomingText(instruction: String, maneuver: ManeuverType, distanceMeters: Double): String {
+        val d = spoken(distanceMeters)
+        return if (maneuver == ManeuverType.DESTINATION) {
+            "بعد $d ستصل إلى " + instruction.removePrefix("وصلت إلى ")
+        } else "بعد $d، $instruction"
+    }
+
+    private val ORDINALS = listOf("الأول", "الثاني", "الثالث", "الرابع", "الخامس", "السادس", "السابع", "الثامن", "التاسع", "العاشر")
+    private fun ordinal(n: Int): String? = when {
+        n in 1..10 -> ORDINALS[n - 1]
+        n > 10 -> "رقم $n"
+        else -> null
+    }
+
+    /** نطق المسافة: <100 م تقريب لـ10، حتى 1 كم لـ50، وما فوق بالكيلومتر (Locale.US). */
+    fun spoken(meters: Double): String {
+        val m = if (meters.isNaN() || meters < 0) 0.0 else meters
         return when {
-            meters < 50 -> "أقل من 50 متر"
-            meters < 100 -> "100 متر"
-            meters < 1000 -> "${(meters / 50).toInt() * 50} متر"
-            else -> "%.1f كيلومتر".format(meters / 1000.0)
+            m < 30 -> "أقل من 30 متراً"
+            m < 100 -> "${(m / 10).roundToInt() * 10} متراً"
+            m < 1000 -> "${(m / 50).roundToInt() * 50} متراً"
+            else -> {
+                val km = String.format(Locale.US, "%.1f", m / 1000.0).removeSuffix(".0")
+                "$km كيلومتر"
+            }
         }
     }
 }

@@ -147,18 +147,19 @@
             color: #64748B !important;
             font-size: 7.5px !important;
             padding: 1px 6px !important;
-            border-radius: 6px 0 0 0;
-            line-height: 10px !important;
-            user-select: none !important;
-            -webkit-user-select: none !important;
-            pointer-events: none !important;
+        .leaflet-control-attribution {
+            background: rgba(15, 23, 42, 0.85) !important;
+            color: #CBD5E1 !important;
+            font-size: 10px !important;
+            line-height: 14px !important;
+            padding: 2px 8px !important;
+            border-radius: 8px 0 0 0;
+            max-width: 85vw;
         }
-        .leaflet-control-attribution a,
-        .leaflet-control-attribution span {
-            color: #64748B !important;
-            text-decoration: none !important;
-            pointer-events: none !important;
-            cursor: default !important;
+        .leaflet-control-attribution a {
+            color: #7DD3FC !important;
+            text-decoration: underline !important;
+            pointer-events: auto !important;
         }
     </style>
 </head>
@@ -167,7 +168,7 @@
         <div id="map"></div>
         <div id="modeIndicator" class="mode-indicator">
             <span id="modeIcon">🛰️</span>
-            <span id="modeTitle">الأقمار الاصطناعية (OAM)</span>
+            <span id="modeTitle">أقمار صناعية</span>
         </div>
     </div>
 
@@ -183,20 +184,42 @@
         var userLng = 44.1910;
         var activeMode = 'SATELLITE';
 
+        var ATTR_OSM = '© <a href="https://www.openstreetmap.org/copyright">مساهمو OpenStreetMap</a>';
         var providers = {
-            'osm': L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                maxZoom: 24, maxNativeZoom: 19, subdomains: ['a', 'b', 'c'], attribution: 'OSM'
+            'osm': L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 24, maxNativeZoom: 19, attribution: ATTR_OSM
             }),
             'hot': L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
-                maxZoom: 24, maxNativeZoom: 19, subdomains: ['a', 'b', 'c'], attribution: 'HOT'
+                maxZoom: 24, maxNativeZoom: 19, subdomains: ['a', 'b', 'c'],
+                attribution: ATTR_OSM + ' — نمط <a href="https://www.hotosm.org/">HOT</a>'
             }),
             'topo': L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
-                maxZoom: 24, maxNativeZoom: 17, subdomains: ['a', 'b', 'c'], attribution: 'Topo'
+                maxZoom: 24, maxNativeZoom: 17, subdomains: ['a', 'b', 'c'],
+                attribution: ATTR_OSM + ' — SRTM | نمط © <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA)'
             }),
             'satellite': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-                maxZoom: 24, maxNativeZoom: 19, attribution: 'Esri'
+                maxZoom: 24, maxNativeZoom: 19,
+                attribution: 'صور © <a href="https://www.esri.com">Esri</a> — Maxar, Earthstar Geographics'
             })
         };
+
+        var tileOk = 0, tileErr = 0, tilesFailingNotified = false;
+        function notifyTiles(failing) {
+            if (window.AndroidBridge && window.AndroidBridge.onTilesFailing) window.AndroidBridge.onTilesFailing(failing);
+        }
+        function watchLayer(layer) {
+            tileOk = 0; tileErr = 0; tilesFailingNotified = false;
+            if (!layer) return;
+            layer.off('tileload'); layer.off('tileerror');
+            layer.on('tileload', function () {
+                tileOk++;
+                if (tilesFailingNotified && tileOk >= 4) { tilesFailingNotified = false; notifyTiles(false); }
+            });
+            layer.on('tileerror', function () {
+                tileErr++;
+                if (!tilesFailingNotified && tileErr >= 6 && tileOk < tileErr / 4) { tilesFailingNotified = true; notifyTiles(true); }
+            });
+        }
 
         function initMap(lat, lng, mode) {
             userLat = lat || 15.3694;
@@ -244,7 +267,7 @@
             }
 
             var providerKey = 'satellite';
-            var title = 'أقمار صناعية (عالي الدقة)';
+            var title = 'أقمار صناعية';
             var icon = '🛰️';
 
             if (mode === 'OSM') {
@@ -261,17 +284,18 @@
                 icon = '⛰️';
             } else if (mode === 'VELA_3D') {
                 providerKey = 'satellite';
-                title = 'Vela 3D (مباني ثلاثية الأبعاد)';
-                icon = '🏙️';
+                title = 'أقمار صناعية';
+                icon = '🛰️';
             } else if (mode === 'SATELLITE') {
                 providerKey = 'satellite';
-                title = 'أقمار صناعية (عالي الدقة)';
+                title = 'أقمار صناعية';
                 icon = '🛰️';
             }
 
             if (providers[providerKey] && map) {
                 currentBaseLayer = providers[providerKey];
                 currentBaseLayer.addTo(map);
+                watchLayer(currentBaseLayer);
             }
 
             var iconEl = document.getElementById('modeIcon');

@@ -20,16 +20,17 @@ import androidx.compose.ui.platform.LocalContext
  * [إصلاح 18] بوصلة حقيقية باستخدام حساس تدوير الجهاز (Rotation Vector) مع حساب زاوية الميل المغناطيسي
  */
 @Composable
-fun rememberHeadingDegrees(enabled: Boolean, lat: Double, lng: Double): Float {
+fun rememberHeadingDegrees(enabled: Boolean, lat: Double, lng: Double, cameraMode: Boolean = false): Float {
     val context = LocalContext.current
     var heading by remember { mutableFloatStateOf(0f) }
     val latNow by rememberUpdatedState(lat)
     val lngNow by rememberUpdatedState(lng)
-    DisposableEffect(enabled) {
+    DisposableEffect(enabled, cameraMode) {
         val sm = context.getSystemService(Context.SENSOR_SERVICE) as? SensorManager
         val sensor = sm?.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
         if (!enabled || sm == null || sensor == null) return@DisposableEffect onDispose { }
         val rot = FloatArray(9)
+        val remapped = FloatArray(9)
         val orient = FloatArray(3)
         var smoothed = 0f
         var first = true
@@ -43,7 +44,11 @@ fun rememberHeadingDegrees(enabled: Boolean, lat: Double, lng: Double): Float {
                     declinationAt = now
                 }
                 SensorManager.getRotationMatrixFromVector(rot, e.values)
-                SensorManager.getOrientation(rot, orient)
+                val matrix = if (cameraMode) {
+                    SensorManager.remapCoordinateSystem(rot, SensorManager.AXIS_X, SensorManager.AXIS_Z, remapped)
+                    remapped
+                } else rot
+                SensorManager.getOrientation(matrix, orient)
                 val az = (Math.toDegrees(orient[0].toDouble()).toFloat() + declination + 360f) % 360f
                 if (first) { smoothed = az; first = false } else {
                     var d = az - smoothed

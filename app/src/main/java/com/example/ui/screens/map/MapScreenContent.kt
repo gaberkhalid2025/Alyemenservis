@@ -156,6 +156,15 @@ fun MapScreenContent(
     var searchedPlace by remember { mutableStateOf<RealValhallaNavigator.SearchAddressResult?>(null) }
     var showDiagnostics by remember { mutableStateOf(false) }
     val accuracyM by viewModel.userLocationAccuracyM.collectAsState()
+    val queuedRequests by viewModel.offlineQueueManager.pendingRequests.collectAsState()
+    val sosPending = queuedRequests.any { it.type == "SOS" }
+    var wasSosPending by remember { mutableStateOf(false) }
+    LaunchedEffect(sosPending) {
+        if (wasSosPending && !sosPending) {
+            snackbarHostState.showSnackbar("✅ وصل نداء الفزعة إلى الخادم بنجاح")
+        }
+        wasSosPending = sosPending
+    }
 
     DisposableEffect(Unit) {
         onDispose {
@@ -754,6 +763,26 @@ fun MapScreenContent(
                 }
             }
 
+            if (sosPending) {
+                Surface(
+                    color = Color(0xFF7F1D1D),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, Color(0xFFEF4444)),
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .statusBarsPadding()
+                        .padding(top = 110.dp)
+                ) {
+                    Text(
+                        "🚨 نداء الفزعة محفوظ وقيد الإرسال تلقائياً…",
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
+                    )
+                }
+            }
+
             // 🚗 7. Smart Companion Bar for Intercity Trips (Discreet, triggers on toggle or driving mode)
             if (isDrivingMode && state.selectedEntity == null) {
                 Surface(
@@ -1130,7 +1159,12 @@ fun MapScreenContent(
                         }
                         Button(
                             onClick = {
-                                val ok = viewModel.enqueueSos(safeUserLat, safeUserLng, null, sosText)
+                                val ok = viewModel.enqueueSos(
+                                    safeUserLat,
+                                    safeUserLng,
+                                    accuracyM.takeIf { it < Float.MAX_VALUE },
+                                    sosText
+                                )
                                 showSosDialog = false
                                 coroutineScope.launch {
                                     snackbarHostState.showSnackbar(

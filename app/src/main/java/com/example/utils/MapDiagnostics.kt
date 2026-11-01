@@ -58,13 +58,14 @@ object MapDiagnostics {
                 val dest = NavWaypoint(name = "ب", latitude = 15.3500, longitude = 44.2000, type = WaypointType.BREAK)
                 val r = try { RealValhallaNavigator.calculateRoute(context, origin, listOf(dest)) } catch (t: Throwable) { null }
                 val viaValhalla = r != null && r.error == null && r.coordinates.size >= 2 && r.engineSource.contains("Valhalla")
-                out += if (viaValhalla) DiagnosticItem("محرك Valhalla", DiagStatus.OK, "مسار تجريبي ${r!!.totalDistanceMeters.toInt()} م")
-                else DiagnosticItem("محرك Valhalla", DiagStatus.FAIL, NativeValhallaStatus.lastError ?: "لم يُنتج مساراً (المصدر: ${r?.engineSource ?: "—"})")
+                out += if (viaValhalla) DiagnosticItem("محرك Valhalla (اختبار في صنعاء)", DiagStatus.OK, "مسار تجريبي ${r!!.totalDistanceMeters.toInt()} م")
+                else DiagnosticItem("محرك Valhalla (اختبار في صنعاء)", DiagStatus.FAIL, NativeValhallaStatus.lastError ?: "لم يُنتج مساراً (المصدر: ${r?.engineSource ?: "—"})")
             }
 
             // 3) الاتصال بخادم التوجيه
             val netOk = try {
-                (URL("https://router.project-osrm.org/").openConnection() as HttpURLConnection).run {
+                val hostUrl = NavConfig.OSRM_BASE_URL.substringBefore("/route")
+                (URL(hostUrl).openConnection() as HttpURLConnection).run {
                     connectTimeout = 4000; readTimeout = 4000; requestMethod = "HEAD"
                     setRequestProperty("User-Agent", "AlYemenServicesApp/1.0")
                     val code = responseCode; disconnect(); code < 500

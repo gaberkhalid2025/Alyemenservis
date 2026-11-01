@@ -253,6 +253,7 @@ class MainViewModel @Inject constructor(
                 val limit = if (navTrackingJob?.isActive == true) 15_000L else 90_000L
                 if (_isUserLocationReal.value && System.currentTimeMillis() - _lastFixAtMs.value > limit) {
                     _isUserLocationReal.value = false
+                    _userLocationAccuracyM.value = Float.MAX_VALUE
                 }
             }
         }
@@ -412,6 +413,7 @@ class MainViewModel @Inject constructor(
             if (locationCallback == null) {
                 locationCallback = object : com.google.android.gms.location.LocationCallback() {
                     override fun onLocationResult(result: com.google.android.gms.location.LocationResult) {
+                        if (navTrackingJob?.isActive == true) return // أثناء الملاحة المصدر الوحيد هو التدفق المفلتر
                         val loc = result.lastLocation ?: return
                         val isMock = if (android.os.Build.VERSION.SDK_INT >= 31) loc.isMock else @Suppress("DEPRECATION") loc.isFromMockProvider
                         val real = !isMock && isFresh(loc, 30_000L) && (!loc.hasAccuracy() || loc.accuracy <= 150f)
@@ -452,6 +454,8 @@ class MainViewModel @Inject constructor(
                     _userLocationAccuracyM.value = c.accuracyMeters
                     markFix()
                 }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: Exception) {
                 android.util.Log.e("MainViewModel", "Navigation tracking error: ", e)
             }
@@ -466,13 +470,23 @@ class MainViewModel @Inject constructor(
     fun enqueueSos(lat: Double, lng: Double, accuracyM: Float?, message: String): Boolean {
         if (lat.isNaN() || lng.isNaN() || (lat == 0.0 && lng == 0.0)) return false
         return try {
+            val data = mutableMapOf<String, Any>(
+                "lat" to lat,
+                "lng" to lng,
+                "message" to message,
+                "createdAt" to System.currentTimeMillis(),
+                "status" to "OPEN",
+                "uid" to (auth.currentUser?.uid ?: ""),
+                "phone" to (auth.currentUser?.phoneNumber ?: currentUserPhone.value)
+            )
+            if (accuracyM != null && accuracyM < Float.MAX_VALUE) {
+                data["accuracyM"] = accuracyM.toDouble()
+            }
             offlineQueueManager.addToQueue(
                 OfflineRequest(
-                    type = "SOS", priority = 1,
-                    data = mapOf(
-                        "lat" to lat, "lng" to lng, "accuracyM" to (accuracyM?.toDouble() ?: 0.0),
-                        "message" to message, "createdAt" to System.currentTimeMillis(), "status" to "OPEN"
-                    )
+                    type = "SOS",
+                    priority = 1,
+                    data = data
                 )
             )
             true

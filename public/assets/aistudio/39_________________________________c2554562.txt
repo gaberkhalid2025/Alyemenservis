@@ -1,0 +1,122 @@
+# 39 – MainViewModel + OfflineQueueManager + LocationService + MapDiagnostics + SOS
+**الملفات المفحوصة:** `MainViewModel_1`, `OfflineQueueManager_a7f769`, `LocationService_646b0e`, `CompassSensor_1`, `CrashReporter_1`, `SosDispatcher_1`, `MapDiagnostics`, `SyncStatusTracker`  |  **الإجراء:** تعديلات موضعية.
+
+## ما تأكدت من تطبيقه (سليم)
+عمر الموقع (`isFresh`) وانتهاء صلاحية «الموقع الحقيقي» (`freshnessJob`)، إيقاف التحديثات في `onCleared`، `enqueueSos` يرجع Boolean، نسخة واحدة من الطابور عبر Hilt EntryPoint، عدم إعلان GPS قبل نجاح الطلب، فحص عمر آخر موقع في `LocationService`، `CompassSensor` المحسّن، `CrashReporter` (رأس + ذيل التتبع)، `SosDispatcher` (`Uri.fromParts`)، و`MapDiagnostics`.
+
+## أ) أخطاء الفزعة والطابور (عالية — ميزة طوارئ)
+1. **النداء يُحذف نهائياً بعد 5 محاولات فاشلة** (`MAX_RETRIES = 5`) والواجهة قالت «تم حفظ النداء». نداء الفزعة لا يجوز أن يسقط أبداً.
+2. **لا شيء يعالج الطابور عند عودة الإنترنت** داخل الملفات التي رأيتها: `processQueue()` لا يُستدعى إلا من `addToQueue` عند وجود إنترنت لحظتها، ولا يوجد `NetworkCallback` أو جدولة. حالة الفزعة الأساسية (إرسال بلا إنترنت) تبقى معلّقة حتى يُضاف طلب آخر. (التعليق يذكر `SyncWorker`، ولم أره؛ إن كان موجوداً ومجدولاً بقيد الشبكة فلا تضف ثانياً.)
+3. `addToQueue` يقرأ ويكتب `_pendingRequests.value` بلا ذرّية ⇒ قد تضيع إضافة عند تزامن خيطين.
+4. لا هوية في النداء: بلا `uid` ولا هاتف، فلا يعرف المستلم من هو. وحقل `accuracyM` يُكتب `0.0` عند الجهل (يعني «دقة مثالية» وهو غير معروف).
+5. بلا مؤشر مرئي: المستخدم لا يعرف أن النداء ما زال «قيد الإرسال».
+
+### OfflineQueueManager
+```kotlin
+import kotlinx.coroutines.flow.update
+
+fun addToQueue(request: OfflineRequest) {
+    _pendingRequests.update { (it + request).sortedBy { r -> r.priority } }     // ذرّي
+    saveQueueToStorage()
+    Log.d(TAG, "Request added to offline queue: ${request.id} (Type: ${request.type})")
+    if (isOnline()) processQueue() else scheduleSyncWhenOnline()
+}
+```
+داخل `processQueueSuspend` عند الفشل:
+```kotlin
+val nextRetry = req.retryCount + 1
+val isCritical = req.type == "SOS"                 // لا يُسقَط أبداً
+if (isCritical || nextRetry < MAX_RETRIES) {
+    updatedFailedItems[req.id] = req.copy(retryCount = nextRetry, status = "FAILED")
+    val backoffDelayMs = BASE_RETRY_DELAY_MS * (1L shl (nextRetry - 1).coerceIn(0, 4))   // سقف 32 ث
+    delay(backoffDelayMs)
+} else {
+    Log.w(TAG, "Request ${req.id} exceeded max retries and will be dropped.")
+    completedOrDroppedIds.add(req.id)
+}
+```
+**جدولة عند عودة الإنترنت** (إن لم يوجد `SyncWorker` مجدول بقيد الشبكة):
+```kotlin
+// داخل OfflineQueueManager
+fun scheduleSyncWhenOnline() {
+    val req = androidx.work.OneTimeWorkRequestBuilder<QueueSyncWorker>()
+        .setConstraints(androidx.work.Constraints.Builder().setRequiredNetworkType(androidx.work.NetworkType.CONNECTED).build())
+        .setBackoffCriteria(androidx.work.BackoffPolicy.EXPONENTIAL, 15, java.util.concurrent.TimeUnit.SECONDS)
+        .build()
+    androidx.work.WorkManager.getInstance(context)
+        .enqueueUniqueWork("offline_queue_sync", androidx.work.ExistingWorkPolicy.KEEP, req)
+}
+
+// ملف جديد QueueSyncWorker.kt
+@dagger.hilt.EntryPoint
+@dagger.hilt.InstallIn(dagger.hilt.components.SingletonComponent::class)
+interface QueueWorkerEntryPoint { fun offlineQueueManager(): OfflineQueueManager }
+
+class QueueSyncWorker(ctx: android.content.Context, params: androidx.work.WorkerParameters) :
+    androidx.work.CoroutineWorker(ctx, params) {
+    override suspend fun doWork(): Result {
+        val q = dagger.hilt.android.EntryPointAccessors
+            .fromApplication(applicationContext, QueueWorkerEntryPoint::class.java).offlineQueueManager()
+        return if (q.processQueueSuspend()) Result.success() else Result.retry()
+    }
+}
+```
+gradle: `implementation("androidx.work:work-runtime-ktx:2.9.1")`. وفي `MyApplication.onCreate()` (بعد تهيئة Hilt) استدعِ `queue.scheduleSyncWhenOnline()` إن كان `queue.getQueueSize() > 0` (حتى تستمر المحاولة بعد إعادة تشغيل التطبيق).
+> **قواعد Firestore:** اسمح بإنشاء `sos_alerts` للمستخدم المسجّل فقط، وأضف Cloud Function تُخطر الفني/الإدارة. بدونها يبقى النداء مخزناً بلا مستلم.
+
+### MainViewModel.enqueueSos
+```kotlin
+fun enqueueSos(lat: Double, lng: Double, accuracyM: Float?, message: String): Boolean {
+    if (lat.isNaN() || lng.isNaN() || (lat == 0.0 && lng == 0.0)) return false
+    return try {
+        val data = mutableMapOf<String, Any>(
+            "lat" to lat, "lng" to lng, "message" to message,
+            "createdAt" to System.currentTimeMillis(), "status" to "OPEN",
+            "uid" to (auth.currentUser?.uid ?: ""),
+            "phone" to (auth.currentUser?.phoneNumber ?: "")
+        )
+        if (accuracyM != null && accuracyM < Float.MAX_VALUE) data["accuracyM"] = accuracyM.toDouble()   // لا نكتب 0 عند الجهل
+        offlineQueueManager.addToQueue(OfflineRequest(type = "SOS", priority = 1, data = data))
+        true
+    } catch (e: Exception) {
+        android.util.Log.e("MainViewModel", "Failed to enqueue SOS: ", e); false
+    }
+}
+```
+وفي `MapScreenContent`: `viewModel.enqueueSos(safeUserLat, safeUserLng, accuracyM.takeIf { it < Float.MAX_VALUE }, sosText)` (`accuracyM` من `userLocationAccuracyM.collectAsState()`).
+### مؤشر «قيد الإرسال» (MapScreenContent)
+```kotlin
+val queued by viewModel.offlineQueueManager.pendingRequests.collectAsState()
+val sosPending = queued.any { it.type == "SOS" }
+var wasPending by remember { mutableStateOf(false) }
+LaunchedEffect(sosPending) {
+    if (wasPending && !sosPending) snackbarHostState.showSnackbar("✅ وصل نداء الفزعة إلى الخادم")
+    wasPending = sosPending
+}
+if (sosPending) {
+    Surface(color = Color(0xFF7F1D1D), shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 120.dp)) {
+        Text("🚨 نداء الفزعة محفوظ وقيد الإرسال…", color = Color.White, fontSize = 12.sp, modifier = Modifier.padding(10.dp))
+    }
+}
+```
+(بما أن SOS لا يُسقَط الآن، اختفاؤه من الطابور = نجاح الإرسال.)
+
+## ب) الموقع (متوسطة)
+1. **مصدران يكتبان الموقع معاً أثناء الملاحة**: `startLocationUpdates()` (دقة حتى 150 م بلا فلتر قفزات) و`startNavigationTracking()` (≤ 50 م + فلتر قفزات) كلاهما يستدعي `updateUserLocation` ⇒ تذبذب بين قراءة نظيفة وأخرى رديئة ⇒ تنبيهات خروج عن المسار كاذبة وسرعة متقلبة. في `onLocationResult` للمستمع العام أضف أول سطر:
+```kotlin
+if (navTrackingJob?.isActive == true) return        // أثناء الملاحة المصدر الوحيد هو التدفق المفلتر
+```
+2. `catch (e: Exception)` في `startNavigationTracking` يبتلع `CancellationException`: أضف قبله `catch (e: kotlinx.coroutines.CancellationException) { throw e }`.
+3. عند سقوط صلاحية الموقع في `startFreshnessWatchdog` أعد الدقة للقيمة غير المعروفة: `_userLocationAccuracyM.value = Float.MAX_VALUE`.
+4. `LocationService.DEFAULT_YEMEN_LAT/LNG` ما زالا مكرّرين: استبدلهما بـ`NavConfig.DEFAULT_YEMEN_LAT/LNG`.
+## ج) MapDiagnostics (منخفضة)
+- عنوان خادم الفحص مكتوب نصاً `router.project-osrm.org`: استخدم `NavConfig.OSRM_BASE_URL.substringBefore("/route")`.
+- مسار الفحص ثابت في صنعاء: سمِّ البند «محرك Valhalla (اختبار في صنعاء)» لأن الحزمة قد لا تغطي غيرها.
+## د) ملفات سليمة بلا تعديل
+`CompassSensor_1` (يفترض الاتجاه العمودي)، `CrashReporter_1`، `SosDispatcher_1`، `SyncStatusTracker`.
+
+## اختبار
+1. وضع الطيران ← «إرسال نداء» ← ظهور الشارة «قيد الإرسال» ← أغلق التطبيق وافتحه: ما زالت موجودة ← عطّل وضع الطيران: تتحول إلى «وصل النداء» وتظهر وثيقة `sos_alerts` فيها `uid`.
+2. اجعل Firestore يرفض الكتابة 10 مرات: النداء يبقى في الطابور (لا يُحذف).
+3. أثناء ملاحة بسرعة ثابتة: لا قفزات «خروج عن المسار» (سجّل 5 دقائق).

@@ -10,6 +10,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
@@ -128,13 +129,35 @@ class OfflineQueueManager @Inject constructor(
      * 1. إضافة طلب إلى قائمة الانتظار
      */
     fun addToQueue(request: OfflineRequest) {
-        val updated = (_pendingRequests.value + request).sortedBy { it.priority }
-        _pendingRequests.value = updated
+        _pendingRequests.update { (it + request).sortedBy { r -> r.priority } }
         saveQueueToStorage()
         Log.d(TAG, "Request added to offline queue: ${request.id} (Type: ${request.type})")
 
         if (isOnline()) {
             processQueue()
+        } else {
+            scheduleSyncWhenOnline()
+        }
+    }
+
+    fun scheduleSyncWhenOnline() {
+        try {
+            val req = androidx.work.OneTimeWorkRequestBuilder<QueueSyncWorker>()
+                .setConstraints(
+                    androidx.work.Constraints.Builder()
+                        .setRequiredNetworkType(androidx.work.NetworkType.CONNECTED)
+                        .build()
+                )
+                .setBackoffCriteria(
+                    androidx.work.BackoffPolicy.EXPONENTIAL,
+                    15,
+                    java.util.concurrent.TimeUnit.SECONDS
+                )
+                .build()
+            androidx.work.WorkManager.getInstance(context)
+                .enqueueUniqueWork("offline_queue_sync", androidx.work.ExistingWorkPolicy.KEEP, req)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed scheduling offline queue work: ${e.message}")
         }
     }
 
@@ -197,9 +220,10 @@ class OfflineQueueManager @Inject constructor(
                         onItemProcessed?.invoke(req, true)
                     } else {
                         val nextRetry = req.retryCount + 1
-                        if (nextRetry < MAX_RETRIES) {
+                        val isCritical = req.type == "SOS" // لا يُسقط أبداً
+                        if (isCritical || nextRetry < MAX_RETRIES) {
                             updatedFailedItems[req.id] = req.copy(retryCount = nextRetry, status = "FAILED")
-                            val backoffDelayMs = BASE_RETRY_DELAY_MS * (1L shl (nextRetry - 1).coerceAtMost(4))
+                            val backoffDelayMs = BASE_RETRY_DELAY_MS * (1L shl (nextRetry - 1).coerceIn(0, 4))
                             delay(backoffDelayMs)
                         } else {
                             Log.w(TAG, "Request ${req.id} exceeded max retries and will be dropped.")
@@ -292,6 +316,14 @@ class OfflineQueueManager @Inject constructor(
     fun clearQueue() {
         _pendingRequests.value = emptyList()
         prefs.edit().remove(KEY_QUEUE).apply()
+    }
+
+    /**
+     * 6-ب. مسح عند الخروج من الحساب مع الإبقاء على نداءات الفزعة SOS فقط
+     */
+    fun clearForLogout() {
+        _pendingRequests.update { list -> list.filter { it.type == "SOS" } }
+        saveQueueToStorage()
     }
 
     /**
