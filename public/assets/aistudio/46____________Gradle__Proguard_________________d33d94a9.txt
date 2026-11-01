@@ -1,0 +1,181 @@
+# 46 – AndroidManifest.xml + app/build.gradle.kts + proguard-rules.pro (+ متطلبات Google Play)
+**الملفات المفحوصة:** `AndroidManifest.xml`, `build_gradle.kts`, `proguard-rules.pro`  |  **الإجراء:** استبدال المانيفست + تعديلات Gradle + استبدال Proguard.
+
+## أ) ما يهدد النشر (عالية)
+1. **`targetSdk = 35`**: صفحة Google Play الرسمية تنص على أن التطبيقات الجديدة **وتحديثاتها** يجب أن تستهدف **Android 16 (API 36)** ابتداءً من 31 أغسطس 2026، مع إمكانية تمديد حتى 1 نوفمبر 2026. (اليوم 1 نوفمبر 2026): أي تحديث يستهدف 35 سيُرفض عند الرفع.
+   - غيّر `targetSdk = 36` (الـ `compileSdk = 36` موجود). أنجز: (أ) الحافة-إلى-الحافة إلزامية (راجع كل شاشة: لا محتوى تحت أشرطة النظام؛ تستخدم الشاشات `statusBarsPadding/navigationBarsPadding` وهذا جيد، تأكد من `enableEdgeToEdge()` في `MainActivity`)، (ب) فعّل الرجوع التنبؤي `android:enableOnBackInvokedCallback="true"` وجرّب `BackHandler`، (ج) راجع قائمة تغييرات سلوك Android 16، (د) تحقق من توافق AGP/Gradle/Kotlin مع 36.
+2. **صفحات الذاكرة 16KB**: مطلوب لأي تحديث يستهدف 35+ ويحوي مكتبات native. Valhalla (`valhalla-mobile:0.6.4`) و`libc++_shared.so` وأي SDK آخر يجب أن تكون محاذاة 16KB. تحقق على APK الإصدار:
+```bash
+# محاذاة الأرشيف
+zipalign -c -P 16 -v 4 app-release.apk
+# محاذاة مقاطع LOAD في كل .so (يجب أن تكون 0x4000 أو أكثر)
+unzip -o app-release.apk 'lib/arm64-v8a/*.so' -d /tmp/so && for f in /tmp/so/lib/arm64-v8a/*.so; do echo $f; llvm-readelf -l "$f" | grep LOAD | awk '{print $NF}' | sort -u; done
+```
+   إن فشلت `libvalhalla*.so`: حدّث المكتبة لإصدار مبني بـ NDK r28+ أو راسل مطوّرها؛ وإلا لن يُقبل الرفع. وأبقِ AGP ≥ 8.5.1 (يحاذي الأرشيف تلقائياً).
+3. **`firebase-appcheck-debug` كـ `implementation`** يُشحن داخل نسخة الإصدار. غيّره إلى `debugImplementation(libs.firebase.appcheck.debug)` وتأكد أن `DebugAppCheckProviderFactory` لا يُنشأ إلا في `BuildConfig.DEBUG`.
+4. **`GEMINI_API_KEY` داخل `BuildConfig`**: أي مفتاح هناك يُستخرج من الـ APK. لا تضعه؛ استخدم Firebase AI Logic (مع App Check) أو خادماً وسيطاً. (مساعد Aleph الحالي لا يحتاجه.)
+5. **`usesCleartextTraffic="true"`**: يسمح بـ HTTP العادي لكل التطبيق (اعتراض/تعديل الاستجابات). كل روابط الخرائط والمسارات HTTPS. اجعله `false` واترك استثناءات النطاقات (إن لزمت) في `network_security_config.xml` فقط، وراجع محتوى ذلك الملف (لم أره).
+6. **`ACCESS_BACKGROUND_LOCATION`**: لا يوجد في التطبيق ما يستخدمه (لا خدمة موقع خلفية)، ويستوجب مراجعة سياسات Play وتصريحاً خاصاً. **احذفه.**
+
+## ب) مشاكل البناء والأمان (متوسطة)
+1. **`isMinifyEnabled = false` للإصدار**: R8 معطّل، فملف Proguard لا يُستخدم أصلاً، والكود قابل للقراءة (يكشف منطق الأمان). فعّله على مراحل (انظر ج).
+2. **`abiFilters`**: `arm64-v8a` و`armeabi-v7a` فقط. تحقق أن `valhalla-mobile` تشحن `armeabi-v7a` فعلاً (`unzip -l valhalla-mobile-0.6.4.aar | grep jni`)؛ إن لم تفعل فأجهزة 32-بت ستفشل عند تحميل المحرك (يُلتقط الخطأ ويعود للتقريبي، لكن الأوفلاين لا يعمل). وأضف `x86_64` لنسخة debug فقط ليعمل المحاكي: `buildTypes { debug { ndk { abiFilters += "x86_64" } } }`.
+3. **`lint { abortOnError = false; checkReleaseBuilds = false }`** يعطّل الفحص تماماً. أعده للإصدار على الأقل (`checkReleaseBuilds = true`) واعالج التحذيرات الحرجة.
+4. **توقيع الإصدار يرجع بصمت إلى مفتاح debug** إن لم يوجد مفتاح الإصدار (يمكن نشر نسخة بمفتاح debug). أضف فحصاً: إن كان `storeFile` هو `debug.keystore` ومهمة `bundleRelease` تعمل ⇒ `throw GradleException`.
+5. **`kotlinx-coroutines-play-services:1.7.3`** مثبّت يدوياً بينما بقية coroutines من الكتالوج: وحّد الإصدار في `libs.versions.toml` لتفادي تعارض الإصدارات.
+6. **تصحيح لتوصيتي السابقة (المستند 13):** لا تضف `packaging { jniLibs { useLegacyPackaging = true } }`. الإعداد الافتراضي الحديث (بلا ضغط، محاذاة 16KB) هو المطلوب لمتطلب 16KB.
+7. **Crashlytics** مفعّل أصلاً: `CrashReporter` المحلي يلتف على معالجه (يستدعي السابق) فلا تعارض، لكن استدعِ `CrashReporter.install(this)` **بعد** تهيئة Firebase في `MyApplication.onCreate()` ليلتف على معالج Crashlytics لا العكس.
+
+## ج) AndroidManifest.xml — استبدل بالكامل
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <!-- يحتاجها WorkManager للعمل المُعجَّل (فزعة) على الأجهزة القديمة -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.location.gps" android:required="false" />
+    <uses-feature android:name="android.hardware.microphone" android:required="false" />
+
+    <application
+        android:name=".MyApplication"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.AlYemenServices"
+        android:usesCleartextTraffic="false"
+        android:enableOnBackInvokedCallback="true"
+        android:networkSecurityConfig="@xml/network_security_config">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher"
+            android:roundIcon="@mipmap/ic_launcher_round"
+            android:screenOrientation="portrait"
+            android:windowSoftInputMode="adjustResize"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode"
+            android:theme="@style/Theme.AlYemenServices">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- خدمة FCM لا تُعدّ خدمة أمامية؛ أُزيل foregroundServiceType (أعده فقط إن كانت تستدعي startForeground) -->
+        <service android:name=".FCMService" android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />
+        </provider>
+    </application>
+
+    <queries>
+        <intent><action android:name="android.speech.action.RECOGNIZE_SPEECH" /></intent>
+    </queries>
+</manifest>
+```
+> `screenOrientation="portrait"`: البوصلة والـ AR تفترض الوضع العمودي (المستندان 28 و42). إن أردت دعم الأجهزة اللوحية أفقياً فتحتاج `remapCoordinateSystem` حسب دوران الشاشة.
+> تأكد في الكود من طلب `POST_NOTIFICATIONS` وقت التشغيل (Android 13+)، وإلا لا يظهر إشعار المزامنة ولا FCM.
+
+## د) proguard-rules.pro — استبدل عند تفعيل R8
+قواعد `-keep class ... { *; }` الشاملة على Firebase وgms وCompose وHilt وcoroutines **تلغي فائدة التصغير** وليست لازمة (المكتبات تحمل قواعدها). نسخة أدق:
+```proguard
+# ===== أساسيات =====
+-keepattributes *Annotation*, Signature, InnerClasses, EnclosingMethod, Exceptions
+-keepattributes SourceFile, LineNumberTable            # تتبع الانهيارات في Crashlytics (يرفع mapping تلقائياً)
+-renamesourcefileattribute SourceFile
+
+# ===== نماذج البيانات (Firestore / Room / Moshi) =====
+-keep class com.example.data.** { *; }
+-keep class com.example.domain.** { *; }
+-keepclassmembers class * { @com.google.firebase.firestore.PropertyName <fields>; @com.google.firebase.firestore.PropertyName <methods>; }
+-keep @com.squareup.moshi.JsonClass class * { *; }
+-keepclassmembers class * { @com.squareup.moshi.Json <fields>; }
+-keep class * extends androidx.room.RoomDatabase
+-keep @androidx.room.Entity class *
+
+# ===== الخرائط والملاحة =====
+-keepattributes JavascriptInterface
+-keepclassmembers class * { @android.webkit.JavascriptInterface <methods>; }   # جسر Leaflet
+-keepclasseswithmembernames class * { native <methods>; }
+-keep class com.valhalla.** { *; }
+-keep class io.github.rallista.** { *; }
+-dontwarn com.valhalla.**
+-dontwarn io.github.rallista.**
+-keep class com.example.utils.Nav** { *; }            # NavWaypoint/NavRouteResult/NavConfig...
+-keep class com.example.utils.ManeuverType { *; }
+-keep class com.example.utils.OfflineRequest { *; }   # يُسلسل في الطابور (تحقق من طريقة التسلسل)
+-keep class com.example.utils.QueueSyncWorker { <init>(android.content.Context, androidx.work.WorkerParameters); }
+-keep class com.example.utils.QueueWorkerEntryPoint { *; }
+-keep class com.example.ui.MainViewModel$QueueEntryPoint { *; }
+
+# ===== التطبيق (أسماء مستخدمة بالانعكاس أو الأمان) =====
+-keep class com.example.security.** { *; }
+-keep class com.example.utils.PasswordHasher { *; }
+-keep class com.example.utils.SecureHasher { *; }
+-keep class com.example.utils.PinHasher { *; }
+-keep class com.example.utils.SecurityCryptoUtils { *; }
+-keep class com.example.utils.ChatCryptoManager { *; }
+-keep class com.example.utils.FirestoreLocalBackupWorker { *; }
+
+# ===== تقليل أثر السجلات في الإصدار (إحداثيات المستخدم لا تُكتب) =====
+-assumenosideeffects class android.util.Log {
+    public static int v(...);
+    public static int d(...);
+    public static int i(...);
+}
+
+-dontwarn okhttp3.**
+-dontwarn retrofit2.**
+-dontwarn okio.**
+-dontwarn com.squareup.moshi.**
+```
+حذفتُ عمداً: `-keep class com.example.ui.screens.map.** { *; }` (لا انعكاس فيها؛ الجسر JS محمي بقاعدته)، و`androidx.compose.**`, `dagger.hilt.**`, `javax.inject.**`, `kotlinx.coroutines.**`, `com.google.firebase.**`, `com.google.android.gms.**`.
+### خطة التفعيل الآمنة
+1. `isMinifyEnabled = true` و`isShrinkResources = false` أولاً (للإصدار).
+2. ابنِ `assembleRelease` وجرّب **كل** المسارات: تسجيل الدخول، الحجز، الدردشة/الاتصال (Agora)، الخريطة (نقر الدبابيس = الجسر)، الملاحة أوفلاين وأونلاين، الفزعة، البحث الصوتي، AR، الإشعارات.
+3. إن ظهر `ClassNotFoundException/NoSuchMethodException` أضف `-keep` لذلك الصنف تحديداً (لا شاملة).
+4. بعد الاستقرار فعّل `isShrinkResources = true`.
+
+## هـ) تعديلات Gradle (ملخص)
+```kotlin
+android {
+  defaultConfig { targetSdk = 36 }
+  lint { checkReleaseBuilds = true; abortOnError = true }       // أو abortOnError=false في الـ CI الأول فقط
+  buildTypes {
+    release { isMinifyEnabled = true; isShrinkResources = false /* ثم true بعد الاختبار */ }
+    debug { ndk { abiFilters += "x86_64" } }
+  }
+}
+dependencies {
+  debugImplementation(libs.firebase.appcheck.debug)             // بدل implementation
+  // احذف buildConfigField("GEMINI_API_KEY") وأي استخدام له
+}
+```
+## اختبار
+1. `./gradlew bundleRelease` ينجح، و`zipalign -c -P 16` يمر، وكل `.so` بمحاذاة 0x4000.
+2. رفع حزمة تجريبية إلى مسار الاختبار الداخلي في Play Console: لا تظهر أخطاء الهدف أو صفحة 16KB.
+3. نسخة الإصدار المصغَّرة: نقر الدبابيس يعمل، الملاحة الأوفلاين تعمل، الفزعة تُحفظ.

@@ -66,115 +66,115 @@ fun MapControls(
         color = Color(0xFF0F172A).copy(alpha = 0.94f),
         border = BorderStroke(1.dp, Color.White.copy(alpha = 0.12f)),
         shadowElevation = 14.dp,
-        modifier = modifier.width(52.dp).heightIn(max = 560.dp)
+        modifier = modifier.width(56.dp).heightIn(max = 560.dp)
     ) {
         Column(
             modifier = Modifier
                 .padding(vertical = 6.dp)
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             // 1. 🧭 سهم اتجاه الملاحة
             IconButton(
                 onClick = onToggleNavigation,
-                modifier = Modifier.size(40.dp).testTag("map_nav_toggle_btn")
+                modifier = Modifier.size(48.dp).testTag("map_nav_toggle_btn")
             ) {
                 Icon(
                     imageVector = Icons.Default.Navigation,
                     contentDescription = "سهم اتجاه الملاحة",
                     tint = if (isNavigationActive) Color(0xFF38BDF8) else Color.White,
-                    modifier = Modifier.size(22.dp)
+                    modifier = Modifier.size(24.dp)
                 )
             }
 
-            HorizontalDivider(modifier = Modifier.width(30.dp), color = Color.White.copy(alpha = 0.08f))
+            HorizontalDivider(modifier = Modifier.width(32.dp), color = Color.White.copy(alpha = 0.08f))
 
             // 2. 🎯 رادار المسح والاستكشاف الحي
             IconButton(
                 onClick = onToggleRadarMode,
-                modifier = Modifier.size(40.dp).testTag("map_radar_btn")
+                modifier = Modifier.size(48.dp).testTag("map_radar_btn")
             ) {
                 Icon(
                     imageVector = Icons.Default.TrackChanges,
                     contentDescription = "رادار المسح والاستكشاف الحي",
                     tint = if (isRadarMode) Color(0xFF10B981) else Color.White,
-                    modifier = Modifier.size(22.dp)
+                    modifier = Modifier.size(24.dp)
                 )
             }
 
-            HorizontalDivider(modifier = Modifier.width(30.dp), color = Color.White.copy(alpha = 0.08f))
+            HorizontalDivider(modifier = Modifier.width(32.dp), color = Color.White.copy(alpha = 0.08f))
 
             // 3. 🛰️ التبديل السريع للأقمار الصناعية
             IconButton(
                 onClick = { onSelectMapMode(MapMode.SATELLITE, 0f) },
-                modifier = Modifier.size(40.dp).testTag("map_satellite_btn")
+                modifier = Modifier.size(48.dp).testTag("map_satellite_btn")
             ) {
                 Icon(
                     imageVector = Icons.Default.Satellite,
                     contentDescription = "الأقمار الصناعية",
                     tint = if (currentMapMode == MapMode.SATELLITE) Color(0xFF10B981) else Color.White,
-                    modifier = Modifier.size(22.dp)
+                    modifier = Modifier.size(24.dp)
                 )
             }
 
-            HorizontalDivider(modifier = Modifier.width(30.dp), color = Color.White.copy(alpha = 0.08f))
+            HorizontalDivider(modifier = Modifier.width(32.dp), color = Color.White.copy(alpha = 0.08f))
 
             // 4. 🗺️ خريطة الشوارع (HOT)
             IconButton(
                 onClick = { onSelectMapMode(MapMode.HOT, 0f) },
-                modifier = Modifier.size(40.dp).testTag("map_pano_btn")
+                modifier = Modifier.size(48.dp).testTag("map_pano_btn")
             ) {
                 Icon(
                     imageVector = Icons.Default.Map,
                     contentDescription = "خريطة الشوارع (HOT)",
                     tint = if (currentMapMode == MapMode.HOT) Color(0xFF10B981) else Color.White,
-                    modifier = Modifier.size(22.dp)
+                    modifier = Modifier.size(24.dp)
                 )
             }
 
-            HorizontalDivider(modifier = Modifier.width(30.dp), color = Color.White.copy(alpha = 0.08f))
+            HorizontalDivider(modifier = Modifier.width(32.dp), color = Color.White.copy(alpha = 0.08f))
 
             // 5. ☁️ الخريطة الحرارية
             IconButton(
                 onClick = onToggleHeatmap,
-                modifier = Modifier.size(40.dp).testTag("map_heatmap_sync_btn")
+                modifier = Modifier.size(48.dp).testTag("map_heatmap_sync_btn")
             ) {
                 Icon(
                     imageVector = if (isHeatmapActive) Icons.Default.CloudDone else Icons.Default.CloudQueue,
                     contentDescription = "الخريطة الحرارية",
                     tint = if (isHeatmapActive) Color(0xFF10B981) else Color(0xFF38BDF8),
-                    modifier = Modifier.size(22.dp)
+                    modifier = Modifier.size(24.dp)
                 )
             }
 
-            HorizontalDivider(modifier = Modifier.width(30.dp), color = Color.White.copy(alpha = 0.08f))
+            HorizontalDivider(modifier = Modifier.width(32.dp), color = Color.White.copy(alpha = 0.08f))
 
             // 6. Map Layers (🗺️ بلون ذهبي #FBBF24)
             IconButton(
                 onClick = onOpenLayerDialog,
-                modifier = Modifier.size(40.dp).testTag("map_layers_btn")
+                modifier = Modifier.size(48.dp).testTag("map_layers_btn")
             ) {
                 Icon(
                     imageVector = Icons.Default.Layers,
                     contentDescription = "طبقات الخريطة",
                     tint = Color(0xFFFBBF24), // Golden #FBBF24
-                    modifier = Modifier.size(22.dp)
+                    modifier = Modifier.size(24.dp)
                 )
             }
 
-            HorizontalDivider(modifier = Modifier.width(30.dp), color = Color.White.copy(alpha = 0.08f))
+            HorizontalDivider(modifier = Modifier.width(32.dp), color = Color.White.copy(alpha = 0.08f))
 
             // 7. GPS Button
             IconButton(
                 onClick = onRecenterLocation,
-                modifier = Modifier.size(40.dp).testTag("recenter_location_btn")
+                modifier = Modifier.size(48.dp).testTag("recenter_location_btn")
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     if (isGpsActive) {
                         Box(
                             modifier = Modifier
-                                .size(32.dp)
+                                .size(34.dp)
                                 .clip(CircleShape)
                                 .background(Color(0xFF10B981).copy(alpha = gpsPulseAlpha))
                         )
@@ -183,7 +183,7 @@ fun MapControls(
                         imageVector = if (isGpsActive) Icons.Default.GpsFixed else Icons.Default.MyLocation,
                         contentDescription = "موقعي الحالي (GPS)",
                         tint = if (isGpsActive) Color(0xFF10B981) else Color.White,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(22.dp)
                     )
                 }
             }

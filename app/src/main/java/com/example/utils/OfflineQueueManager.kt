@@ -133,16 +133,20 @@ class OfflineQueueManager @Inject constructor(
         saveQueueToStorage()
         Log.d(TAG, "Request added to offline queue: ${request.id} (Type: ${request.type})")
 
+        val urgent = request.type == "SOS"
         if (isOnline()) {
             processQueue()
         } else {
-            scheduleSyncWhenOnline()
+            scheduleSyncWhenOnline(urgent)
+        }
+        if (urgent && !isOnline()) {
+            scheduleSyncWhenOnline(true)
         }
     }
 
-    fun scheduleSyncWhenOnline() {
+    fun scheduleSyncWhenOnline(urgent: Boolean = false) {
         try {
-            val req = androidx.work.OneTimeWorkRequestBuilder<QueueSyncWorker>()
+            val builder = androidx.work.OneTimeWorkRequestBuilder<QueueSyncWorker>()
                 .setConstraints(
                     androidx.work.Constraints.Builder()
                         .setRequiredNetworkType(androidx.work.NetworkType.CONNECTED)
@@ -153,9 +157,12 @@ class OfflineQueueManager @Inject constructor(
                     15,
                     java.util.concurrent.TimeUnit.SECONDS
                 )
-                .build()
+            if (urgent) {
+                builder.setExpedited(androidx.work.OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+            }
+            val workName = if (urgent) "offline_queue_sos_sync" else "offline_queue_sync"
             androidx.work.WorkManager.getInstance(context)
-                .enqueueUniqueWork("offline_queue_sync", androidx.work.ExistingWorkPolicy.KEEP, req)
+                .enqueueUniqueWork(workName, androidx.work.ExistingWorkPolicy.KEEP, builder.build())
         } catch (e: Exception) {
             Log.e(TAG, "Failed scheduling offline queue work: ${e.message}")
         }

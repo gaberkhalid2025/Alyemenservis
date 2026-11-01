@@ -1,0 +1,89 @@
+# 45 – الختام: المتبقي النهائي + تحسينات مقترحة + اختبارات + برومبت المرحلة الخامسة
+**ما فحصته في الدفعة الأخيرة:** `MapScreenContent_e96993`, `NavigationScreen_7a3c08`, `RealValhallaNavigator_f32a47`, `ArabicInstructionFormatter_1`, `RealLeafletMapView_acf13b`, `MapScreenState_e3f99d`, `MapScreenFilters_747f37`, `OfflineQueueManager_724486`, `QueueSyncWorker`, `FullSyncManager`, `SessionManager_110d8e`, `ValhallaTileDownloader_54a67d`, `SosDispatcher_496bdd`, `SyncStatusTracker_1`, `ArabicNormalizer_1`.
+
+## أولاً: ما أصبح سليماً (للتأكيد)
+أخطاء المسافة داخل المنعطفات (38)، الوصول بالمسار والنطق (41)، عمر الموقع وانتهاؤه والفزعة والطابور (39)، الإسناد والروابط الآمنة و`onPause` (40)، الطبقات والـ AR وCameraX (42)، البحث الضبابي والترحيل (43)، تنظيف الطابور عند الخروج (44)، والمنزِّل الآمن.
+
+## ثانياً: المتبقي فعلاً (قصير، بالترتيب)
+| # | الملف | المطلوب |
+|---|---|---|
+| 1 | `MapScreenContent` | **لم يُربط** `onTilesStatus` من `RealLeafletMapView` (المستند 40-د): خريطة سوداء بلا تفسير بلا إنترنت وبلا كاش. أضف `tilesFailing` واللافتة. |
+| 2 | `MapScreenContent` | لوحة المفاتيح تبقى مفتوحة بعد البحث/اختيار نتيجة (المستند 42-5): `LocalSoftwareKeyboardController?.hide()`. |
+| 3 | `MyApplication` | تأكد من `CrashReporter.install(this)` (لا أراه في أي ملف مرفوع) ومن جدولة الطابور عند الإقلاع (44-1). |
+| 4 | `OfflineQueueManager` + `QueueSyncWorker` | جدولة الفزعة **المُعجَّلة** و`getForegroundInfo` (44-1). |
+| 5 | `RealLeafletMapView` + `MapTestRunner` | احذف `MapAssetMemoryCache` المزيّف و`MapTestRunner`. |
+| 6 | المشروع | احذف النسخ المكررة من الملفات (`*_1.kt`, `*_353ff8.kt`...): تُسبب `Redeclaration` عند البناء. |
+| 7 | `SessionManager` | تشفير `USER_TOKEN` (44-3). |
+| 8 | `FullSyncManager` | إما تفعيل السحب الحقيقي أو حذف المزامنة الدورية الوهمية (44-2). |
+| 9 | `MapScreenState` | تحويل `VELA_3D` المحفوظ إلى `SATELLITE`. |
+| 10 | `ManeuverType` | تحقق أن كل قيمة لها فرع في `ArabicInstructionFormatter` (الـ `when` شامل حالياً). |
+
+## ثالثاً: تحسينات مقترحة (بعد الإصلاحات)
+1. **ملخص نهاية الرحلة**: شاشة قصيرة (المسافة الفعلية، المدة الفعلية، سرعة متوسطة) من بيانات التتبع الحقيقية — لا أرقام تقديرية.
+2. **مشاركة الوصول المتوقع**: زر يرسل رابط OSM + وقت الوصول (تقديري) عبر `Intent.ACTION_SEND` (لا خادم).
+3. **الأماكن المحفوظة** (المنزل/العمل) محلياً في DataStore ليبدأ المستخدم بنقرة واحدة.
+4. **وضع ليلي تلقائي** للطبقة والواجهة حسب `UiModeManager` أو الساعة (الخريطة الحالية فاتحة أو أقمار صناعية).
+5. **حفظ آخر نمط خريطة** واختيار المدى للرادار.
+6. **حد التحذير بسرعة الطريق**: عرض سرعة الطريق فقط إن وفّرها Valhalla (`speed_limit`) وبدون ادعاء؛ بلا بيانات لا يُعرض.
+7. **تسجيل مسارات للتشخيص** (خيار للمطور): ملف GPX محلي لآخر رحلة لإعادة تشغيل الأخطاء بلا سيارة.
+8. **حدود المزامنة**: تنزيل حزمة Valhalla على Wi‑Fi فقط افتراضياً، وبإشعار عند توفر تحديث (المستندات 10 و20).
+9. **تقرير صحة ملاحة داخل الإعدادات** باستخدام `MapDiagnosticsDialog` (المستند 27).
+
+## رابعاً: اختبار وحدة للمنسّق (يكمل المستند 36)
+```kotlin
+package com.example.utils
+
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class ArabicInstructionFormatterTest {
+    @Test fun turnHasNoDistance() {
+        val s = ArabicInstructionFormatter.format(ManeuverType.LEFT, "شارع الزبيري", 2300.0, "الوجهة")
+        assertEquals("انعطف يساراً في شارع الزبيري", s)
+        assertFalse(s.contains("بعد"))
+    }
+    @Test fun straightMentionsSegmentLength() =
+        assertEquals("واصل السير مباشرة لمسافة 1.5 كيلومتر", ArabicInstructionFormatter.format(ManeuverType.STRAIGHT, "", 1500.0, "x"))
+    @Test fun neverPrintsNull() {
+        ManeuverType.values().forEach { m ->
+            assertFalse(m.name, ArabicInstructionFormatter.format(m, null, 100.0, null).contains("null"))
+        }
+    }
+    @Test fun intermediateStopWording() {
+        assertTrue(ArabicInstructionFormatter.format(ManeuverType.DESTINATION, null, 0.0, "س", isIntermediateStop = true).startsWith("وصلت إلى المحطة"))
+        assertTrue(ArabicInstructionFormatter.format(ManeuverType.DESTINATION, null, 0.0, "س").startsWith("وصلت إلى وجهتك"))
+    }
+    @Test fun roundaboutExitOrdinal() =
+        assertTrue(ArabicInstructionFormatter.format(ManeuverType.ROUNDABOUT, null, 0.0, null, roundaboutExit = 3).contains("الثالث"))
+    @Test fun upcomingTextForDestinationIsFutureTense() =
+        assertEquals("بعد 250 متراً ستصل إلى وجهتك: س",
+            ArabicInstructionFormatter.upcomingText("وصلت إلى وجهتك: س", ManeuverType.DESTINATION, 250.0))
+    @Test fun spokenDistances() {
+        assertEquals("أقل من 30 متراً", ArabicInstructionFormatter.spoken(12.0))
+        assertEquals("750 متراً", ArabicInstructionFormatter.spoken(730.0))
+        assertEquals("2 كيلومتر", ArabicInstructionFormatter.spoken(2000.0))
+    }
+}
+```
+## خامساً: البرومبت الرئيسي للمرحلة الخامسة (الصقه مرة واحدة)
+```
+ROLE
+You are a senior Android engineer (Kotlin 2.1+, Jetpack Compose, Coroutines, Hilt, WorkManager, Firestore, Location, CameraX). The project is available. I will give you FIX DOCUMENTS one at a time (numbers 38 to 45). Apply each exactly without breaking working code.
+
+RULES
+1. Open the target files first; adapt document code to the project's real names/packages; never rename public APIs.
+2. No placeholders, no TODO, no "rest unchanged". Complete compilable code with imports.
+3. Honesty (strict): never claim sent/saved/detected/AI unless it truly happened; never substitute default coordinates for the user's location; mark approximations "تقريبي"; remove UI that promises unimplemented features.
+4. Emergency (SOS) data must never be dropped silently.
+5. Arabic UI (RTL). Catch Throwable (rethrow CancellationException). IO/native/network off the main thread.
+6. Delete duplicate or dead files only when I confirm; list them instead.
+
+OUTPUT PER DOCUMENT
+File path heading, code, "DONE: <file>". End with max 6 lines: ASSUMPTIONS, behavior changes, gradle/manifest changes, 3-step phone test. Then STOP and wait.
+
+Reply "READY".
+```
+## سادساً: ما أحتاجه لأحكم نهائياً
+`MyApplication`, `AndroidManifest.xml`, `app/build.gradle.kts`, `proguard-rules.pro`, `NavModels`, `HaversinePrecisionNavigator`, و`map.html` المحدَّث، وتقرير الانهيار من التطبيق إن حدث. وبعد تطبيق المستندات: أرسل أي خطأ بناء كما هو.

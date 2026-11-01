@@ -12,7 +12,6 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreSettings
 import com.google.firebase.appcheck.FirebaseAppCheck
 import com.google.firebase.appcheck.playintegrity.PlayIntegrityAppCheckProviderFactory
-import com.google.firebase.appcheck.debug.DebugAppCheckProviderFactory
 import dagger.hilt.android.HiltAndroidApp
 
 @HiltAndroidApp
@@ -56,9 +55,15 @@ class MyApplication : Application() {
             try {
                 val firebaseAppCheck = FirebaseAppCheck.getInstance()
                 if (BuildConfig.DEBUG) {
-                    firebaseAppCheck.installAppCheckProviderFactory(
-                        DebugAppCheckProviderFactory.getInstance()
-                    )
+                    try {
+                        val debugFactoryClass = Class.forName("com.google.firebase.appcheck.debug.DebugAppCheckProviderFactory")
+                        val getInstanceMethod = debugFactoryClass.getMethod("getInstance")
+                        val factory = getInstanceMethod.invoke(null) as com.google.firebase.appcheck.AppCheckProviderFactory
+                        firebaseAppCheck.installAppCheckProviderFactory(factory)
+                        Log.d("MyApplication", "✅ DebugAppCheckProviderFactory installed via reflection")
+                    } catch (e: Throwable) {
+                        Log.w("MyApplication", "⚠️ Debug AppCheck provider unavailable: ${e.message}")
+                    }
                 } else {
                     firebaseAppCheck.installAppCheckProviderFactory(
                         PlayIntegrityAppCheckProviderFactory.getInstance()
@@ -158,7 +163,8 @@ class MyApplication : Application() {
                 com.example.utils.QueueWorkerEntryPoint::class.java
             ).offlineQueueManager()
             if (qManager.getQueueSize() > 0) {
-                qManager.scheduleSyncWhenOnline()
+                val hasSos = qManager.getPendingRequests().any { it.type == "SOS" }
+                qManager.scheduleSyncWhenOnline(hasSos)
             }
         } catch (e: Throwable) {
             Log.e("MyApplication", "❌ Failed to schedule offline queue sync: ${e.message}")

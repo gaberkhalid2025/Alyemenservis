@@ -330,12 +330,11 @@ fun MapBottomSheet(
                 if (phone.isNotBlank()) {
                     OutlinedButton(
                         onClick = {
-                            try {
-                                val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone"))
-                                context.startActivity(intent)
-                            } catch (e: Exception) {
-                                e.printStackTrace()
-                            }
+                            val clean = phone.filter { it.isDigit() || it == '+' }
+                            val ok = clean.isNotEmpty() && com.example.utils.SosDispatcher.safeStart(
+                                context, com.example.utils.SosDispatcher.dialIntent(clean)
+                            )
+                            if (!ok) android.widget.Toast.makeText(context, "تعذر فتح تطبيق الاتصال", android.widget.Toast.LENGTH_SHORT).show()
                         },
                         shape = RoundedCornerShape(12.dp),
                         border = BorderStroke(1.dp, Color(0xFF38BDF8)),

@@ -74,8 +74,7 @@ private val sBorderPaint = android.graphics.Paint().apply {
 
 /**
  * 🗺️ OfflineInteractiveMap (Full Entity Overload)
- * Native Jetpack Compose Canvas Interactive Map
- * 100% Offline, Zero WebViews, Instant 60FPS, Guaranteed to NEVER show a black screen!
+ * خريطة احتياطية مبسّطة تعرض الأماكن بلا شوارع، تعمل بلا إنترنت
  * Features:
  * - Real Geographic Projection (Equirectangular / Flat Earth approximation with latitude cosine)
  * - True coordinate mapping without distance clamping or artificial offset distortions

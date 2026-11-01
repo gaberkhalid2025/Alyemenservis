@@ -36,6 +36,13 @@ fun MapBookingDialog(
     var notes by remember { mutableStateOf("") }
     var isSubmitting by remember { mutableStateOf(false) }
 
+    LaunchedEffect(isSubmitting) {
+        if (isSubmitting) {
+            kotlinx.coroutines.delay(15000L)
+            isSubmitting = false
+        }
+    }
+
     val distanceMeters = MapDistanceCalculator.calculateDistanceMeters(userLat, userLng, provider.latitude, provider.longitude)
     val distanceText = MapDistanceCalculator.formatDistance(distanceMeters)
     val etaText = MapDistanceCalculator.computeEta(distanceMeters)

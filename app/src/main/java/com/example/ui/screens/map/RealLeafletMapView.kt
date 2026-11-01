@@ -118,16 +118,22 @@ fun RealLeafletMapView(
         }
     }
 
-    // تحويل البيانات إلى JSON مهيأ للبلاطات والعلامات
-    val markersJson = remember(nearbyProviders, nearbyStores, nearbyProperties, selectedCity) {
-        MapJsonBuilder.buildMarkersJson(
-            nearbyProviders = nearbyProviders,
-            nearbyStores = nearbyStores,
-            nearbyProperties = nearbyProperties,
-            dynamicOffsets = dynamicOffsets,
-            safeUserLat = userCoords.first,
-            safeUserLng = userCoords.second
-        )
+    // تحويل البيانات إلى JSON مهيأ للبلاطات والعلامات على خيط الخلفية لمنع أي تقطيع أثناء التمرير والبحث
+    val offsetsSnapshot = dynamicOffsets.toMap()
+    val markersJson by produceState(
+        initialValue = "",
+        nearbyProviders, nearbyStores, nearbyProperties, selectedCity, offsetsSnapshot
+    ) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            MapJsonBuilder.buildMarkersJson(
+                nearbyProviders = nearbyProviders.take(MapJsonBuilder.MAX_PER_TYPE),
+                nearbyStores = nearbyStores.take(MapJsonBuilder.MAX_PER_TYPE),
+                nearbyProperties = nearbyProperties.take(MapJsonBuilder.MAX_PER_TYPE),
+                dynamicOffsets = offsetsSnapshot,
+                safeUserLat = userCoords.first,
+                safeUserLng = userCoords.second
+            )
+        }
     }
 
     // إرسال العلامات للخريطة عند اكتمال الجاهزية أو تغير البيانات بأمان تام عبر Base64

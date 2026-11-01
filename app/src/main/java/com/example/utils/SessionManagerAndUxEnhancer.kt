@@ -210,12 +210,45 @@ object CleanLogoutManager {
         isCacheInitialized = true
     }
 
+    private fun securePrefs(context: Context): android.content.SharedPreferences {
+        return try {
+            val masterKey = androidx.security.crypto.MasterKey.Builder(context)
+                .setKeyScheme(androidx.security.crypto.MasterKey.KeyScheme.AES256_GCM)
+                .build()
+            androidx.security.crypto.EncryptedSharedPreferences.create(
+                context,
+                "secure_session",
+                masterKey,
+                androidx.security.crypto.EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                androidx.security.crypto.EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+            )
+        } catch (_: Exception) {
+            context.getSharedPreferences("secure_session_fallback", Context.MODE_PRIVATE)
+        }
+    }
+
+    fun saveToken(context: Context, token: String) {
+        securePrefs(context).edit().putString("USER_TOKEN", token).apply()
+    }
+
+    fun readToken(context: Context): String? {
+        val old = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        old.getString("USER_TOKEN", null)?.let { legacy ->
+            saveToken(context, legacy)
+            old.edit().remove("USER_TOKEN").apply()
+            return legacy
+        }
+        return securePrefs(context).getString("USER_TOKEN", null)
+    }
+
     fun executeCleanLogout(context: Context, onComplete: () -> Unit) {
         try {
             // 1. Clear encrypted admin session in SecureStorage
             SecureStorage(context).clearAdminSession()
 
-            // 2. Clear SharedPreferences session tokens and update StateFlow cache
+            // 2. Clear secure token and SharedPreferences session tokens
+            securePrefs(context).edit().remove("USER_TOKEN").apply()
+
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             prefs.edit()
                 .remove("USER_TOKEN")

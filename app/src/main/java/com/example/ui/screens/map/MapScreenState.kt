@@ -118,7 +118,8 @@ class MapScreenState(
                 )
             },
             restore = {
-                val mode = try { MapMode.valueOf(it.getOrNull(6) as? String ?: "SATELLITE") } catch (e: Exception) { MapMode.SATELLITE }
+                val rawMode = try { MapMode.valueOf(it.getOrNull(6) as? String ?: "SATELLITE") } catch (e: Exception) { MapMode.SATELLITE }
+                val mode = if (rawMode == MapMode.VELA_3D) MapMode.SATELLITE else rawMode
                 MapScreenState(
                     isRadarMode = it[0] as Boolean,
                     isHeatmapActive = it[1] as Boolean,

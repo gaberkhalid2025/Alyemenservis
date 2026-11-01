@@ -18,6 +18,11 @@ import org.json.JSONObject
  */
 object MapJsonBuilder {
 
+    const val MAX_PER_TYPE = 400
+
+    private fun idTokens(id: String) = id.lowercase().split('_', '-', ' ', '.').filter { it.isNotEmpty() }.toSet()
+    private fun hasId(id: String, vararg keys: String): Boolean = idTokens(id).any { it in keys }
+
     fun buildMarkersJson(
         nearbyProviders: List<ProviderEntity>,
         nearbyStores: List<StoreEntity>,
@@ -54,16 +59,18 @@ object MapJsonBuilder {
             if (rawLat.isNaN() || rawLng.isNaN()) return@forEach
             val isApproximate = p.latitude == 0.0 || p.longitude == 0.0
 
-            val categoryEmoji = when {
-                p.categoryId.contains("spaka") || p.profession.contains("سباك") -> "🔧"
-                p.categoryId.contains("kahraba") || p.profession.contains("كهربا") -> "⚡"
-                p.categoryId.contains("solar") || p.profession.contains("طاقة") -> "☀️"
-                p.categoryId.contains("dehan") || p.profession.contains("دهان") -> "🎨"
-                p.categoryId.contains("hadada") || p.profession.contains("حداد") -> "🔨"
-                p.categoryId.contains("ac") || p.categoryId.contains("tabreed") || p.profession.contains("تكييف") -> "❄️"
-                p.categoryId.contains("car") || p.categoryId.contains("mechanic") || p.profession.contains("ميكانيك") -> "🚗"
-                p.categoryId.contains("carpentry") || p.categoryId.contains("najjara") || p.profession.contains("نجار") -> "🪚"
-                else -> "👷"
+            val categoryEmoji = p.categoryId.let { cid ->
+                when {
+                    hasId(cid, "spaka", "plumber") || p.profession.contains("سباك") -> "🔧"
+                    hasId(cid, "kahraba", "electric") || p.profession.contains("كهربا") -> "⚡"
+                    hasId(cid, "solar") || p.profession.contains("طاقة") -> "☀️"
+                    hasId(cid, "dehan", "paint") || p.profession.contains("دهان") -> "🎨"
+                    hasId(cid, "hadada") || p.profession.contains("حداد") -> "🔨"
+                    hasId(cid, "ac", "tabreed") || p.profession.contains("تكييف") -> "❄️"
+                    hasId(cid, "carpentry", "najjara") || p.profession.contains("نجار") -> "🪚" // قبل car لتفادي التطابق الجزئي
+                    hasId(cid, "car", "mechanic") || p.profession.contains("ميكانيك") -> "🚗"
+                    else -> "👷"
+                }
             }
 
             val pSpec = p.customCategoryName.ifEmpty { p.specialization.ifEmpty { p.profession } }

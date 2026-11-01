@@ -100,6 +100,9 @@ fun MapScreenContent(
         }
     }
 
+    val keyboardController = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+    var areTilesFailing by remember { mutableStateOf(false) }
+
     var isDrivingMode by remember { mutableStateOf(true) }
     var isHudMode by remember { mutableStateOf(false) }
     var isHudMirrored by remember { mutableStateOf(false) }
@@ -391,9 +394,40 @@ fun MapScreenContent(
                     onPropertySelected = { state.selectedEntity = it },
                     onDeselect = { state.selectedEntity = null },
                     onSwitchToRadar = { state.isRadarMode = true },
+                    onTilesStatus = { areTilesFailing = it },
                     focusPoint = searchedPlace?.let { Triple(it.shortName, it.latitude, it.longitude) },
                     modifier = Modifier.fillMaxSize()
                 )
+
+                if (areTilesFailing && !state.isRadarMode) {
+                    Surface(
+                        color = Color(0xDD7F1D1D),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .padding(top = 95.dp)
+                            .padding(horizontal = 16.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.CloudOff,
+                                contentDescription = null,
+                                tint = Color(0xFFFCA5A5),
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                "تعذر جلب بلاطات الخريطة (تحقق من اتصال الإنترنت)",
+                                color = Color.White,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                }
             }
 
             // 🌙 2. HUD Mode Overlay (Night Windshield Reflection)
@@ -497,6 +531,7 @@ fun MapScreenContent(
                         val q = query.trim()
                         if (q.length >= 3) searchPanelOpen = true
                         OfflineMapManager.findCity(q)?.let { city -> state.selectedCity = city.nameAr }
+                        keyboardController?.hide()
                     }
                 )
 
@@ -569,6 +604,7 @@ fun MapScreenContent(
                                                 searchedPlace = res
                                                 searchPanelOpen = false
                                                 state.searchQuery = ""
+                                                keyboardController?.hide()
                                             }
                                             .padding(horizontal = 14.dp, vertical = 10.dp),
                                         verticalAlignment = Alignment.CenterVertically,

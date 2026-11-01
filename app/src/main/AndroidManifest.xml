@@ -5,13 +5,16 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.CAMERA" />
-    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.location.gps" android:required="false" />
+    <uses-feature android:name="android.hardware.microphone" android:required="false" />
 
     <application
         android:name=".MyApplication"
@@ -23,15 +26,16 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.AlYemenServices"
-        android:usesCleartextTraffic="true"
+        android:usesCleartextTraffic="false"
+        android:enableOnBackInvokedCallback="true"
         android:networkSecurityConfig="@xml/network_security_config">
-        <!-- [إصلاح ملاحة نهائي] السماح بحركة مرور الشبكة الآمنة وحزم الخرائط -->
 
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:icon="@mipmap/ic_launcher"
             android:roundIcon="@mipmap/ic_launcher_round"
+            android:screenOrientation="portrait"
             android:windowSoftInputMode="adjustResize"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode"
             android:theme="@style/Theme.AlYemenServices">
@@ -43,9 +47,7 @@
 
         <service
             android:name=".FCMService"
-            android:exported="false"
-            android:foregroundServiceType="dataSync">
-            <!-- [FIX-MEDIUM] نوع الخدمة الأمامية لـ Android 14+ -->
+            android:exported="false">
             <intent-filter>
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>

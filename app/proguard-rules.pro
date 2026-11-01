@@ -107,4 +107,12 @@
 -keep class com.example.utils.Nav** { *; }
 -keep class com.example.utils.RouteTracker** { *; }
 -keep class com.example.utils.TrackerResult { *; }
+-keep class com.example.utils.ManeuverType { *; }
+
+# ===== Queue & Sync Worker EntryPoints =====
+-keep class com.example.utils.OfflineRequest { *; }
+-keep class com.example.utils.QueueSyncWorker { <init>(android.content.Context, androidx.work.WorkerParameters); }
+-keep class com.example.utils.QueueWorkerEntryPoint { *; }
+-keep class com.example.ui.MainViewModel$QueueEntryPoint { *; }
+
 

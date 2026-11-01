@@ -1,0 +1,81 @@
+# 47 – RealLeafletMapView (أداء العلامات) + MapJsonBuilder + MapBottomSheet + MapControls + Layers + OfflineInteractiveMap
+**الملفات المفحوصة:** `RealLeafletMapView_acf13b`, `MapJsonBuilder_eccbc7`, `MapBottomSheet_689769`, `MapControls_c708bf`, `MapLayersDialog_85bdbf`, `OfflineInteractiveMap_464dda`, `MapFilterBar_c2c802`, `MapBookingDialog_7ee69b`, `AlephVisualAssistantDialog_3703da`, `HeatmapRenderer_9f9d87`, `MapErrorOverlay_aaffb0`, `MapDistanceCalculator_551be3`, `OfflineMapManager_ffbcae`, `OfflineTileInterceptor_bc9bd5`, `map_ef43ff.html`, `MainViewModel_882742`  |  **الإجراء:** تعديلات موضعية.
+
+## ما تأكدت من تطبيقه (سليم)
+`map_ef43ff.html` (إسناد صحيح وكاشف فشل البلاطات وبلا «OAM» ولا «مباني»)، المعترض (نطاق OSM الجديد + لمس LRU)، `MainViewModel` (حظر المصدر العام أثناء الملاحة، `uid/phone`، الدقة غير المعروفة)، شريط البحث (`keyboardController`)، AR (`cameraMode`، إعادة المحاولة، فتح الإعدادات)، الخريطة الاحتياطية (`isApprox` و«موقع تقريبي» و`hasUserLocation`)، الكاش 300MB، ولوحة الأزرار بتمرير.
+
+## 1) بناء JSON العلامات على الخيط الرئيسي (عالية للأداء)
+في `RealLeafletMapView` (سطر ≈ 121):
+```kotlin
+val markersJson = remember(nearbyProviders, nearbyStores, nearbyProperties, selectedCity) {
+    MapJsonBuilder.buildMarkersJson(...)
+}
+```
+`remember` يعمل أثناء التركيب (Composition) على **الخيط الرئيسي** ويمرّ على كل المزودين والمتاجر والعقارات؛ مع آلاف السجلات وكل ضغطة في البحث/الفلتر ⇒ تقطّع. كذلك `dynamicOffsets` (إزاحة تباعد العلامات) **ليست ضمن المفاتيح** فلا تُحدَّث العلامات عند تغيّرها.
+```kotlin
+val offsetsSnapshot = dynamicOffsets.toMap()          // قراءة تُتتبَّع في التركيب
+val markersJson by produceState(initialValue = "", nearbyProviders, nearbyStores, nearbyProperties, selectedCity, offsetsSnapshot) {
+    value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+        MapJsonBuilder.buildMarkersJson(
+            nearbyProviders = nearbyProviders.take(MapJsonBuilder.MAX_PER_TYPE),
+            nearbyStores = nearbyStores.take(MapJsonBuilder.MAX_PER_TYPE),
+            nearbyProperties = nearbyProperties.take(MapJsonBuilder.MAX_PER_TYPE),
+            dynamicOffsets = offsetsSnapshot,
+            safeUserLat = userCoords.first, safeUserLng = userCoords.second
+        )
+    }
+}
+```
+وفي `MapJsonBuilder`: `const val MAX_PER_TYPE = 400` (التجميع Cluster يتولى الكثافة؛ الحد يحمي الذاكرة وحجم نص Base64 المرسل للـ WebView). **لا** تُضف `userCoords` للمفاتيح (يتغير كل ثانية).
+
+## 2) MapJsonBuilder: مطابقة الفئات بالسلاسل الجزئية (متوسطة)
+`p.categoryId.contains("ac")` يطابق أي معرّف فيه «ac» (مثل `tractor` أو `pharmacy`) فيأخذ أيقونة ❄️ خطأً، وبالمثل `"car"` داخل `carpentry` (يأخذ 🚗 لأن فرع السيارات يسبق النجارة في الـ `when`).
+```kotlin
+private fun idTokens(id: String) = id.lowercase().split('_', '-', ' ', '.').filter { it.isNotEmpty() }.toSet()
+private fun hasId(id: String, vararg keys: String): Boolean = idTokens(id).any { it in keys }
+// استعمل:
+p.categoryId.let { cid ->
+    when {
+        hasId(cid, "spaka", "plumber") || p.profession.contains("سباك") -> "🔧"
+        hasId(cid, "kahraba", "electric") || p.profession.contains("كهربا") -> "⚡"
+        hasId(cid, "solar") || p.profession.contains("طاقة") -> "☀️"
+        hasId(cid, "dehan", "paint") || p.profession.contains("دهان") -> "🎨"
+        hasId(cid, "hadada") || p.profession.contains("حداد") -> "🔨"
+        hasId(cid, "ac", "tabreed") || p.profession.contains("تكييف") -> "❄️"
+        hasId(cid, "carpentry", "najjara") || p.profession.contains("نجار") -> "🪚"     // قبل السيارات
+        hasId(cid, "car", "mechanic") || p.profession.contains("ميكانيك") -> "🚗"
+        else -> "👷"
+    }
+}
+```
+**ما زلت لا أرى `getProviderCoords/getStoreCoords/getPropertyCoords`** (في `com.example.utils`): أرسلها لأتأكد أنها لا تولّد إحداثيات اصطناعية؛ والعقد: إن كان الإحداثي الحقيقي 0 فتُعيد مركز المدينة **مع** `isApprox = true` (موجود)، ولا تُستعمل أبداً في الملاحة (الملاحة ترفض 0,0 فعلاً).
+
+## 3) MapBottomSheet: اتصال بترميز صحيح (متوسطة)
+`Uri.parse("tel:$phone")` يتعطل مع المسافات أو `#`/`*`، ويُخفي الفشل بـ`printStackTrace`:
+```kotlin
+onClick = {
+    val clean = phone.filter { it.isDigit() || it == '+' }
+    val ok = clean.isNotEmpty() && com.example.utils.SosDispatcher.safeStart(
+        context, com.example.utils.SosDispatcher.dialIntent(clean))
+    if (!ok) android.widget.Toast.makeText(context, "تعذر فتح تطبيق الاتصال", android.widget.Toast.LENGTH_SHORT).show()
+}
+```
+(`Toast` هنا على الخيط الرئيسي ضمن onClick فلا مشكلة.)
+
+## 4) تفاصيل صغيرة (منخفضة)
+- **MapControls**: أهداف اللمس ما زالت `40.dp` (الحد الموصى 48): استبدل `Modifier.size(40.dp)` بـ`Modifier.size(48.dp)` في كل الأزرار؛ التمرير الرأسي موجود فلا مشكلة ارتفاع.
+- **MapLayersDialog**: وصف OSM «مع تسميات عربية» غير مضمون (OSM يعرض اسم المعلم كما هو مدخل؛ قد يكون بالإنجليزية). اجعله: «خريطة OpenStreetMap القياسية (الأسماء كما في قاعدة البيانات)».
+- **OfflineInteractiveMap**: تعليق الرأس ما زال «100% Offline… Guaranteed to NEVER show a black screen!» — استبدله بوصف دقيق («خريطة احتياطية مبسّطة تعرض الأماكن بلا شوارع، تعمل بلا إنترنت»).
+- **MapBookingDialog**: غير مستخدم (لا استدعاء في `MapScreenContent`) و`isSubmitting` لا يعود `false` عند الفشل. **احذفه** (يؤكد المستند 42-6).
+- **Aleph**: اجعل عناصر «أقرب الخدمات» قابلة للنقر لفتح بطاقة الكيان (تحسين تجربة)، بدل نص ثابت.
+- **HeatmapRenderer / MapErrorOverlay / MapDistanceCalculator / OfflineMapManager**: سليمة بلا تعديل.
+
+## 5) تحسينات أداء إضافية (اختيارية)
+- إرسال **الفروقات** فقط للعلامات بدل الاستبدال الكامل عند كل تغيّر (JS: `Map<id, marker>` وتحديث ما تغيّر)؛ يقلل زمن إعادة الرسم مع آلاف العلامات.
+- تأجيل بناء `markersJson` أثناء السحب السريع للخريطة (debounce 150 ms).
+- استخدم `Bitmap` مخزّناً لأيقونات الدبابيس في الخريطة الاحتياطية بدل رسم النص لكل علامة في كل إطار (كاش `ImageBitmap` حسب الرمز واللون).
+
+## اختبار
+1. اكتب في البحث بسرعة على قائمة 3000 سجل: لا تقطّع في الكتابة (Profile GPU Rendering).
+2. نجّار (`carpentry`) يظهر بأيقونة 🪚 لا 🚗؛ مزوّد `tractor` لا يظهر ❄️.
+3. اتصال برقم فيه مسافات `+967 77 123 4567`: يفتح الطالب الرقم كاملاً.

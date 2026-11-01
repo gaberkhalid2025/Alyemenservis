@@ -17,7 +17,7 @@ android {
   defaultConfig {
     applicationId = "com.alyemenservices"
     minSdk = 24
-    targetSdk = 35
+    targetSdk = 36
     versionCode = 5
     versionName = "1.2.0"
 
@@ -162,7 +162,7 @@ dependencies {
   implementation(libs.firebase.auth)
   implementation(libs.firebase.appcheck)
   implementation(libs.firebase.appcheck.playintegrity)
-  implementation(libs.firebase.appcheck.debug)
+  debugImplementation(libs.firebase.appcheck.debug)
   implementation(libs.firebase.firestore)
   implementation("com.google.firebase:firebase-database")
   implementation(libs.firebase.storage)

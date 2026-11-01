@@ -10,6 +10,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.tasks.await
 import java.util.Locale
 
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -69,8 +70,21 @@ class FullSyncManager @Inject constructor(
      * لا يقوم بالكتابة على Firestore، مما يحمي إعدادات الأدمن ويتجنب أخطاء PERMISSION_DENIED لدى العملاء.
      */
     suspend fun pullRemoteSettingsToLocalCache(): Boolean = withContext(Dispatchers.IO) {
-        // [DISABLED] for pure Firestore sync
-        true
+        try {
+            val snap = firestore.collection(COLLECTION_ADMIN_SETTINGS).document(DOC_MAIN_CONFIG).get().await()
+            if (!snap.exists()) return@withContext false
+            val data = snap.data ?: emptyMap<String, Any>()
+            val json = org.json.JSONObject(data).toString()
+            val now = System.currentTimeMillis()
+            prefs.edit().putString(KEY_LOCAL_SETTINGS_CACHE, json).putLong(KEY_LAST_SYNC_TS, now).apply()
+            _lastSyncTimestamp.value = now
+            true
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.e(TAG, "pull failed: ${e.message}", e)
+            false
+        }
     }
 
     fun stopAutoSync() {
@@ -117,37 +131,36 @@ class FullSyncManager @Inject constructor(
     }
 
     private suspend fun syncAdminSettingsInternal(settings: AdminSettingsEntity? = null): Boolean = suspendCancellableCoroutine { continuation ->
-        val dataToSync = HashMap<String, Any>()
-        if (settings != null) {
-            dataToSync["appName"] = settings.appName
-            dataToSync["welcomeMessage"] = settings.welcomeMessage
-            dataToSync["footerMessage"] = settings.footerMessage
-            dataToSync["footerBgColorHex"] = settings.footerBgColorHex
-            dataToSync["footerItemsOrder"] = settings.footerItemsOrder
-            dataToSync["showInfoIcon"] = settings.showInfoIcon
-            dataToSync["showBookingsIcon"] = settings.showBookingsIcon
-            dataToSync["showLangIcon"] = settings.showLangIcon
-            dataToSync["showAdminIcon"] = settings.showAdminIcon
-            dataToSync["showFooterText"] = settings.showFooterText
-            dataToSync["activeThemeId"] = settings.activeThemeId
-            dataToSync["customPrimaryHex"] = settings.customPrimaryHex
-            dataToSync["customSecondaryHex"] = settings.customSecondaryHex
-            dataToSync["customBackgroundHex"] = settings.customBackgroundHex
-            dataToSync["customSurfaceHex"] = settings.customSurfaceHex
-            dataToSync["isMaintenanceActive"] = settings.isMaintenanceActive
-            dataToSync["supportPhone"] = settings.supportPhone
-            dataToSync["supportWhatsapp"] = settings.supportWhatsapp
-            dataToSync["supportEmail"] = settings.supportEmail
-            dataToSync["adminUsername"] = settings.adminUsername
-            dataToSync["allowVoiceInput"] = settings.allowVoiceInput
-            dataToSync["allowTextToSpeech"] = settings.allowTextToSpeech
-            dataToSync["isAssistantEnabled"] = settings.isAssistantEnabled
-            dataToSync["isMapFeatureEnabled"] = settings.isMapFeatureEnabled
-            dataToSync["registrationRequirements"] = settings.registrationRequirements
-            dataToSync["updatedAt"] = System.currentTimeMillis()
-        } else {
-            dataToSync["updatedAt"] = System.currentTimeMillis()
+        if (settings == null) {
+            if (continuation.isActive) continuation.resume(false) {}
+            return@suspendCancellableCoroutine
         }
+        val dataToSync = HashMap<String, Any>()
+        dataToSync["appName"] = settings.appName
+        dataToSync["welcomeMessage"] = settings.welcomeMessage
+        dataToSync["footerMessage"] = settings.footerMessage
+        dataToSync["footerBgColorHex"] = settings.footerBgColorHex
+        dataToSync["footerItemsOrder"] = settings.footerItemsOrder
+        dataToSync["showInfoIcon"] = settings.showInfoIcon
+        dataToSync["showBookingsIcon"] = settings.showBookingsIcon
+        dataToSync["showLangIcon"] = settings.showLangIcon
+        dataToSync["showAdminIcon"] = settings.showAdminIcon
+        dataToSync["showFooterText"] = settings.showFooterText
+        dataToSync["activeThemeId"] = settings.activeThemeId
+        dataToSync["customPrimaryHex"] = settings.customPrimaryHex
+        dataToSync["customSecondaryHex"] = settings.customSecondaryHex
+        dataToSync["customBackgroundHex"] = settings.customBackgroundHex
+        dataToSync["customSurfaceHex"] = settings.customSurfaceHex
+        dataToSync["isMaintenanceActive"] = settings.isMaintenanceActive
+        dataToSync["supportPhone"] = settings.supportPhone
+        dataToSync["supportWhatsapp"] = settings.supportWhatsapp
+        dataToSync["supportEmail"] = settings.supportEmail
+        dataToSync["allowVoiceInput"] = settings.allowVoiceInput
+        dataToSync["allowTextToSpeech"] = settings.allowTextToSpeech
+        dataToSync["isAssistantEnabled"] = settings.isAssistantEnabled
+        dataToSync["isMapFeatureEnabled"] = settings.isMapFeatureEnabled
+        dataToSync["registrationRequirements"] = settings.registrationRequirements
+        dataToSync["updatedAt"] = System.currentTimeMillis()
 
         firestore.collection(COLLECTION_ADMIN_SETTINGS)
             .document(DOC_MAIN_CONFIG)

@@ -1,0 +1,105 @@
+# 44 – QueueSyncWorker + OfflineQueueManager + FullSyncManager + SessionManager + بقايا التنظيف
+**الملفات المفحوصة:** `QueueSyncWorker`, `OfflineQueueManager_724486`, `FullSyncManager`, `SessionManagerAndUxEnhancer_110d8e`, `RealLeafletMapView_acf13b`, `MapScreenState_e3f99d`, `ValhallaTileDownloader_54a67d`, `SosDispatcher_496bdd`, `ArabicNormalizer_1`, `SyncStatusTracker_1`  |  **الإجراء:** تعديلات موضعية.
+
+## ما تأكدت من تطبيقه (سليم)
+`addToQueue` ذرّي، SOS لا يُسقَط (`isCritical`)، `scheduleSyncWhenOnline` و`QueueSyncWorker`، `clearForLogout` (يستدعيه الخروج)، المنزِّل الآمن مع `releaseEngine`، عناوين الإسناد وقائمة الروابط المسموحة و`onTilesFailing` و`ON_PAUSE`، `ArabicNormalizer` و`ArabicInstructionFormatter` و`SosDispatcher`.
+
+## 1) نداء الفزعة قد يتأخر بسبب Doze (عالية)
+عمل `WorkManager` العادي بقيد الشبكة يُؤجَّل في وضع توفير الطاقة. نداء الطوارئ يحتاج عملاً **مُعجَّلاً** وبمعرّف مستقل عن بقية الطابور (حتى لا يتجاهله `ExistingWorkPolicy.KEEP` إن كان عمل عادي معلقاً).
+### OfflineQueueManager
+```kotlin
+fun addToQueue(request: OfflineRequest) {
+    _pendingRequests.update { (it + request).sortedBy { r -> r.priority } }
+    saveQueueToStorage()
+    val urgent = request.type == "SOS"
+    if (isOnline()) processQueue() else scheduleSyncWhenOnline(urgent)
+    if (urgent && !isOnline()) scheduleSyncWhenOnline(true)      // احتياط
+}
+
+fun scheduleSyncWhenOnline(urgent: Boolean = false) {
+    try {
+        val builder = androidx.work.OneTimeWorkRequestBuilder<QueueSyncWorker>()
+            .setConstraints(androidx.work.Constraints.Builder().setRequiredNetworkType(androidx.work.NetworkType.CONNECTED).build())
+            .setBackoffCriteria(androidx.work.BackoffPolicy.EXPONENTIAL, 15, java.util.concurrent.TimeUnit.SECONDS)
+        if (urgent) builder.setExpedited(androidx.work.OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+        androidx.work.WorkManager.getInstance(context).enqueueUniqueWork(
+            if (urgent) "offline_queue_sos_sync" else "offline_queue_sync",
+            androidx.work.ExistingWorkPolicy.KEEP, builder.build()
+        )
+    } catch (e: Exception) { Log.e(TAG, "Failed scheduling offline queue work: ${e.message}") }
+}
+```
+### QueueSyncWorker (مطلوب للأجهزة < أندرويد 12 مع العمل المُعجَّل)
+```kotlin
+override suspend fun getForegroundInfo(): androidx.work.ForegroundInfo {
+    val nm = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+    if (android.os.Build.VERSION.SDK_INT >= 26) {
+        nm.createNotificationChannel(android.app.NotificationChannel("queue_sync", "مزامنة الطلبات", android.app.NotificationManager.IMPORTANCE_LOW))
+    }
+    val n = androidx.core.app.NotificationCompat.Builder(applicationContext, "queue_sync")
+        .setSmallIcon(android.R.drawable.stat_notify_sync)
+        .setContentTitle("جارٍ إرسال طلباتك المحفوظة")
+        .setOngoing(true).build()
+    return androidx.work.ForegroundInfo(7101, n)
+}
+```
+(`POST_NOTIFICATIONS` على أندرويد 13+ مذكور في المستند 13؛ بدونه يعمل الإرسال لكن الإشعار لا يظهر.)
+### ربط التشغيل بعد إعادة تشغيل التطبيق
+في `MyApplication.onCreate()` بعد تهيئة Hilt: `if (queue.getQueueSize() > 0) queue.scheduleSyncWhenOnline(queue.getPendingRequests().any { it.type == "SOS" })`.
+
+## 2) FullSyncManager: مزامنة وهمية (متوسطة)
+1. `pullRemoteSettingsToLocalCache()` معطّلة (`// [DISABLED] ... true`) بينما `startAutoSync()` تشغّل حلقة كل 5 دقائق **لا تفعل شيئاً** وتُعيد «نجاح» (التعليق يقول إنها تسحب الإعدادات).
+2. `syncAllSettings()` تستدعي `syncAdminSettingsInternal(null)` فيكتب `updatedAt` فقط ثم يسجّل «تمت مزامنة كل الإعدادات» ويحدّث وقت آخر مزامنة رغم عدم مزامنة شيء.
+3. يُرسل للمستند العام `settings/main_settings` الحقل `adminUsername` (ويُقرأ غالباً من العملاء).
+### الإصلاحات
+```kotlin
+suspend fun pullRemoteSettingsToLocalCache(): Boolean = withContext(Dispatchers.IO) {
+    try {
+        val snap = firestore.collection(COLLECTION_ADMIN_SETTINGS).document(DOC_MAIN_CONFIG).get().await()
+        if (!snap.exists()) return@withContext false
+        val json = org.json.JSONObject(snap.data ?: emptyMap<String, Any>()).toString()
+        val now = System.currentTimeMillis()
+        prefs.edit().putString(KEY_LOCAL_SETTINGS_CACHE, json).putLong(KEY_LAST_SYNC_TS, now).apply()
+        _lastSyncTimestamp.value = now
+        true
+    } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+    catch (e: Exception) { Log.e(TAG, "pull failed: ${e.message}", e); false }
+}
+```
+وفي `syncAdminSettingsInternal` أول سطر داخل `suspendCancellableCoroutine`:
+```kotlin
+if (settings == null) { continuation.resume(false); return@suspendCancellableCoroutine }   // لا شيء لمزامنته
+```
+وانقل `adminUsername` إلى مستند خاص بالمشرف (قاعدة Firestore تمنع القراءة العامة). إن لم تُرد المزامنة الدورية أصلاً فاحذف `startAutoSync()`.
+
+## 3) SessionManager: التوكن ما زال نصاً صريحاً (عالية للأمان)
+`USER_TOKEN` في SharedPreferences عادية. استبدل الحفظ/القراءة (مع ترحيل تلقائي):
+```kotlin
+private fun securePrefs(context: Context) = EncryptedSharedPreferences.create(
+    context, "secure_session",
+    MasterKey.Builder(context).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build(),
+    EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+    EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+)
+fun saveToken(context: Context, token: String) = securePrefs(context).edit().putString("USER_TOKEN", token).apply()
+fun readToken(context: Context): String? {
+    val old = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    old.getString("USER_TOKEN", null)?.let { legacy ->           // ترحيل
+        saveToken(context, legacy); old.edit().remove("USER_TOKEN").apply(); return legacy
+    }
+    return securePrefs(context).getString("USER_TOKEN", null)
+}
+```
+(gradle: `androidx.security:security-crypto:1.1.0-alpha06`). وفي الخروج: `securePrefs(context).edit().remove("USER_TOKEN").apply()`. و`ADMIN_LOGGED` يبقى مؤشراً للواجهة فقط؛ الصلاحية تُفرض في قواعد Firestore (Custom Claims).
+
+## 4) بقايا يجب تنظيفها (متوسطة)
+- `object MapAssetMemoryCache` ما زال في `RealLeafletMapView` (يعيد قيماً مزيّفة) ويستعمله `MapTestRunner` فقط: **احذفهما معاً** (البديل `MapDiagnostics`).
+- `CrashReporter.install(...)`: لا أرى أي استدعاء له في الملفات المرفوعة (ولا ملف `MyApplication`)؛ بدونه لا يظهر تقرير الانهيار أبداً. تأكد أن `MyApplication.onCreate()` يحتوي `CrashReporter.install(this)`.
+- `MapScreenState`: ما زال `VELA_3D` في الـ enum؛ في استعادة الحالة حوّله: `val mode = ...; if (mode == MapMode.VELA_3D) MapMode.SATELLITE else mode`.
+- `MapAssetMemoryCache` ومعه نسخ قديمة من الملفات (`RealLeafletMapView_1/353ff8/0df866`): احذف النسخ المكررة من المشروع (كلها تُترجم وتُسبب «Redeclaration»).
+
+## اختبار
+1. وضع الطيران ← «إرسال نداء» ← قفل الهاتف 10 دقائق (Doze) ← إعادة الإنترنت: يصل النداء خلال دقيقة.
+2. أغلق التطبيق قسراً ثم افتحه والنداء معلّق: يُستأنف الإرسال.
+3. فتح التطبيق بعد تحديث إعدادات من لوحة المشرف: تظهر خلال ≤ 5 دقائق (المزامنة الدورية الحقيقية).
+4. استخراج `shared_prefs` من جهاز Root: لا يوجد `USER_TOKEN` نصاً.
