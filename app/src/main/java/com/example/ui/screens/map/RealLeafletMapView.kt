@@ -66,6 +66,7 @@ fun RealLeafletMapView(
     onSwitchToRadar: (() -> Unit)? = null,
     onMapLoadFailed: (() -> Unit)? = null,
     onTilesStatus: ((failing: Boolean) -> Unit)? = null,
+    reloadTilesKey: Int = 0,
     tilt: Float = 35f,
     rotation: Float = 0f,
     routeCoordinates: List<Pair<Double, Double>> = emptyList(),
@@ -197,6 +198,13 @@ fun RealLeafletMapView(
     LaunchedEffect(panOffset) {
         if (isMapReady && webViewRef != null && panOffset == Offset.Zero) {
             webViewRef?.evaluateJavascript("if (window.recenterUser) { window.recenterUser(); }", null)
+        }
+    }
+
+    // إعادة تحميل البلاطات الأساسية عند طلب المستخدم
+    LaunchedEffect(reloadTilesKey) {
+        if (isMapReady && webViewRef != null && reloadTilesKey > 0) {
+            webViewRef?.evaluateJavascript("if (window.reloadBaseLayer) { window.reloadBaseLayer(); }", null)
         }
     }
 

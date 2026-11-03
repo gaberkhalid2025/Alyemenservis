@@ -1,0 +1,60 @@
+# 50 – نتيجة فحص ملفات الخريطة الأخيرة وما تبقى
+**الملفات المفحوصة (20):** `MapScreenContent_f65dfe`, `NavigationScreen_a9830f`, `RealLeafletMapView_ae726d`, `MapScreenState_8756d5`, `MapScreenFilters_398a91`, `MapBottomSheet_db1bd1`, `MapControls_f16d1b`, `MapLayersDialog_e3b05a`, `OfflineInteractiveMap_36157a`, `RadarRenderer_3a31aa`, `MarkerRenderer_cb4420`, `HeatmapRenderer_850f20`, `MapFilterBar_aa2e1d`, `MapErrorOverlay_1212f8`, `MapBookingDialog_ffb08d`, `MapScreen_66ed75`, `MapScreenViewModel/Events/UiState/Layout`.
+> فحصت بالقراءة والبحث النصي فقط؛ لم أبنِ المشروع ولم أشغّل التطبيق.
+
+## 1) ما تأكدت من اكتماله ✅
+- **MapScreenContent:** نقطة المستخدم لا تُرسم بلا موقع حقيقي، فزعة بأقرب فني من كل المزودين ومع رقم الطوارئ، مؤشر «قيد الإرسال»، لافتة فشل البلاطات (`areTilesFailing`)، لوحة المفاتيح، رسائل الأزرار الصادقة، تمرير وضع المشي، فحص الخرائط (`MapDiagnosticsDialog`)، إيقاف GPS عند المغادرة، والرادار مع رسالة «يحتاج موقعك الحقيقي».
+- **NavigationScreen:** `upcomingText`، الوصول بالمسار، منع إعادة الحساب المتراكمة، التحديث الصامت، عدم تكرار نطق الوجهة، وإبقاء الشاشة مضاءة.
+- **RealLeafletMapView:** بناء العلامات في الخلفية (`produceState`) مع حد `MAX_PER_TYPE`، قائمة الروابط المسموحة، `ON_PAUSE`، وجسر `onTilesFailing`.
+- **MapScreenState:** تحويل `VELA_3D` إلى `SATELLITE` عند الاستعادة.
+- **MapScreenFilters:** مطابقة الرموز بالكلمة الكاملة، `buildRadarPoints` بالمدى و`hasUser`.
+- **الرادار:** أرقام الحلقات وسلّم المسافة الحقيقي. **MarkerRenderer:** تقييم افتراضي 0. **MapBottomSheet:** اتصال بترميز صحيح و`hasUser`. **MapControls:** كل الأزرار 48dp. **الطبقات:** نصوص صادقة.
+- **MapFilterBar / MapErrorOverlay / HeatmapRenderer:** سليمة بلا تعديل.
+
+## 2) خطأ حقيقي متبقٍ (عالية): قفز المحطات بعد الوصول — سببه كود اقترحتُه أنا في المستند 41-ب
+بعد الوصول لمحطة تزيد `currentWaypointIndex` لكن يبقى المتتبع (`tracker/trackerState`) والمسار القديم كما هو إلى أن يصل المسار الجديد (قد يستغرق ثواني). شرط `reachedByRoute` (آخر الساق الحالية = `legs[0]` من المسار **القديم**) ما زال صحيحاً، فيُعدّ الوصول للمحطة **التالية** فوراً، ثم التي بعدها... فتقفز كل المحطات دفعة واحدة وتنتهي الرحلة.
+### الإصلاح في `NavigationScreen.kt`
+1) حالة جديدة بجانب بقية الحالات:
+```kotlin
+var routeForIndex by remember { mutableIntStateOf(0) }     // رقم المحطة التي حُسب لها المسار الحالي
+var lastArrivalAt by remember { mutableLongStateOf(0L) }
+```
+2) في مؤثر حساب المسار: في أول المؤثر `val computeIndex = currentWaypointIndex`، وبعد `routeResult = result` أضف: `routeForIndex = computeIndex`.
+3) في `handleArrival`، قبل `currentWaypointIndex += 1` أضف:
+```kotlin
+tracker = null; trackerState = null            // أبطل المسار القديم فوراً
+lastArrivalAt = System.currentTimeMillis()
+```
+4) في مؤثر التتبع استبدل تعريف `reachedByRoute` وشرط الوصول:
+```kotlin
+val reachedByRoute = !isApproximate && ts != null && routeForIndex == currentWaypointIndex &&
+        legEnd > 0.0 && (legEnd - ts.alongMeters) < 20.0 && ts.offRouteMeters < 40.0
+val cooldownOk = now - lastArrivalAt > 4_000L          // لا وصولان خلال 4 ثوانٍ
+if (cooldownOk && arrival.check(currentWaypointIndex, if (reachedByRoute) 0.0 else d)) {
+    handleArrival()
+} else if (...) { /* إعادة الحساب كما هي */ }
+```
+**اختبار:** مسار بثلاث محطات متقاربة (≈150 م بينها): عند الوصول للأولى يُنطق «الوجهة التالية هي…» مرة واحدة ولا تُتخطى الثانية، وتنتهي الرحلة عند الأخيرة فقط.
+
+## 3) بقايا تنظيف (متوسطة/منخفضة)
+- **`object MapAssetMemoryCache`** ما زال في آخر `RealLeafletMapView` (يعيد `true` و`""` زوراً). احذفه (ومعه `MapTestRunner` إن وُجد).
+- **`MapBookingDialog`**: لا أحد يستدعيه. احذفه.
+- **ملفات MVI** (`MapScreenViewModel`, `MapScreenEvents`, `MapScreenUiState`, `MapScreenLayout`): غير مستخدمة (يذكرها تعليق `MapScreen` فقط). `MapScreenViewModel` يضبط `isRadarMode = true` عند إعادة الضبط (سطور 57 و133) وهذا سلوك خاطئ لو استُعمل. تأكد قبل الحذف:
+```bash
+grep -rn "MapScreenLayout\|MapScreenViewModel\|MapScreenEvent\|MapScreenUiState" app/src --include=*.kt | grep -v "^app/src/.*/MapScreen\(Layout\|ViewModel\|Events\|UiState\)\.kt"
+```
+إن لم يظهر شيء فاحذفها وصحّح تعليق `MapScreen.kt`.
+- **`OfflineInteractiveMap`** ما زال تعليق الرأس «100% Offline… Guaranteed to NEVER show a black screen!»: غيّره إلى «خريطة احتياطية مبسّطة تعرض الأماكن بلا شوارع وتعمل بلا إنترنت».
+
+## 4) تحسينات صغيرة لم تُطبَّق
+- **مسافة المنعطف الكبيرة** تحت أيقونة المنعطف في بطاقة التعليمات (المستند 41-د):
+```kotlin
+if (!isApproximate && upcoming != null) {
+    Text(MapDistanceCalculator.formatDistance(distToManeuver), color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
+}
+```
+- **لافتة «تعذر جلب البلاطات»** تبقى بلا إجراء: أضف زرّين «إعادة المحاولة» (يعيد تحميل طبقة الخريطة بإرسال `window.reloadBaseLayer()` من Kotlin) و«فحص» (يفتح `MapDiagnosticsDialog`)، وأخفِها تلقائياً أثناء الرادار (موجود).
+- **الإسناد على الخريطة الاحتياطية**: الخريطة الاحتياطية لا تعرض خريطة OSM فلا حاجة له، لكن أضف سطراً «بيانات الأماكن من تطبيقنا».
+
+## 5) ما بقي خارج هذه الملفات
+`getProviderCoords`, `MyApplication`, `MainActivity`, `network_security_config.xml`, `NavModels`, `libs.versions.toml`: ما زلت لم أرها. وتنفيذ المستندات 46 إلى 49 (إعدادات المتجر والتوقيع) لم أتحقق منه بعد لأن ملفات الإعداد لم تتغير في هذه الدفعة.

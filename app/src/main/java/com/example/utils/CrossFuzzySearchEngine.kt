@@ -32,22 +32,30 @@ import kotlin.math.min
  */
 object LevenshteinMatcher {
 
-    /** مسافة تحرير بصفين (ذاكرة O(n)) على نصين مطبَّعين مسبقاً. */
+    /** مسافة تحرير Damerau-Levenshtein مع دعم تبديل الحروف المتجاورة (Transposition) لتصحيح الأخطاء المطبعية العربية. */
     private fun rawDistance(s: String, t: String): Int {
         if (s == t) return 0
         if (s.isEmpty()) return t.length
         if (t.isEmpty()) return s.length
-        var prev = IntArray(t.length + 1) { it }
-        var cur = IntArray(t.length + 1)
+        val d = Array(s.length + 1) { IntArray(t.length + 1) }
+        for (i in 0..s.length) d[i][0] = i
+        for (j in 0..t.length) d[0][j] = j
+
         for (i in 1..s.length) {
-            cur[0] = i
             for (j in 1..t.length) {
                 val cost = if (s[i - 1] == t[j - 1]) 0 else 1
-                cur[j] = minOf(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost)
+                var minVal = minOf(
+                    d[i - 1][j] + 1,       // حذف
+                    d[i][j - 1] + 1,       // إدراج
+                    d[i - 1][j - 1] + cost // استبدال
+                )
+                if (i > 1 && j > 1 && s[i - 1] == t[j - 2] && s[i - 2] == t[j - 1]) {
+                    minVal = minOf(minVal, d[i - 2][j - 2] + 1) // تبديل موضعي
+                }
+                d[i][j] = minVal
             }
-            val tmp = prev; prev = cur; cur = tmp
         }
-        return prev[t.length]
+        return d[s.length][t.length]
     }
 
     fun calculateDistance(a: String, b: String): Int =

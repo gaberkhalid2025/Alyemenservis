@@ -40,7 +40,8 @@ object DeepSystemDiagnosticOrchestrator {
             lineNumber: Int,
             functionName: String,
             probableCause: String,
-            suggestedFix: String
+            suggestedFix: String,
+            stepDurationMs: Long = 0L
         ): TestDetail {
             val err = if (!passed) {
                 TestError(
@@ -55,10 +56,12 @@ object DeepSystemDiagnosticOrchestrator {
                     fullMessage = notes,
                     probableCause = probableCause,
                     suggestedFix = suggestedFix,
-                    expectedOutcome = desc.ifBlank { "نجاح الخطوة والتحقق منها في Firestore بنسبة 100%" },
+                    expectedOutcome = desc.ifBlank { "نجاح الخطوة وتأكيدها في Firestore" },
                     actualOutcome = notes
                 ).also { allErrors.add(it) }
             } else null
+
+            val calculatedDuration = if (stepDurationMs > 0L) stepDurationMs else if (totalDurationMs > 0L) (totalDurationMs / 12).coerceAtLeast(40L) else 150L
 
             return TestDetail(
                 id = "${fileName}_$lineNumber",
@@ -70,7 +73,7 @@ object DeepSystemDiagnosticOrchestrator {
                 functionName = functionName,
                 status = if (passed) "SUCCESS" else "FAILED",
                 message = notes,
-                durationMs = 350L,
+                durationMs = calculatedDuration,
                 expectedOutcome = desc.ifBlank { "اكتمال العملية بنجاح في Firestore" },
                 actualOutcome = notes,
                 error = err
@@ -420,7 +423,7 @@ object DeepSystemDiagnosticOrchestrator {
             sb.append("⚙️ خامساً: تشخيص حقول الإعدادات ومزامنتها (AdminSettingsEntity):\n")
             sb.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
             report.settingsDiagnostics.forEachIndexed { idx, f ->
-                val badge = if (f.status == "WORKING") "✅ يعمل 100%" else "⚠️ مهجور أمنياً"
+                val badge = if (f.status == "WORKING") "✅ نشط ومفعّل" else "⚠️ مهجور أمنياً"
                 sb.append("${idx + 1}. [${f.category}] ${f.fieldName} (${f.arabicLabel}) -> $badge\n")
                 sb.append("   • الحفظ: ${if (f.isSaved) "نعم" else "لا"} | القراءة: ${if (f.isRead) "نعم" else "لا"} | التطبيق بالواجهة: ${if (f.isAppliedInUi) "نعم" else "لا"} | المزامنة اللحظية: ${if (f.isSyncedRealtime) "نعم" else "لا"}\n")
                 sb.append("   • مكان الاستخدام: ${f.whereUsedInCode}\n")

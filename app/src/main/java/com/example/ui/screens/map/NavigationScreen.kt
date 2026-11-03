@@ -173,6 +173,8 @@ fun NavigationScreen(
     }
 
     var currentWaypointIndex by remember { mutableIntStateOf(0) }
+    var routeForIndex by remember { mutableIntStateOf(0) }
+    var lastArrivalAt by remember { mutableLongStateOf(0L) }
     var routeVersion by remember { mutableIntStateOf(0) }
     var routeResult by remember { mutableStateOf<NavRouteResult?>(null) }
     var isLoadingRoute by remember { mutableStateOf(true) }
@@ -209,6 +211,7 @@ fun NavigationScreen(
             val result = RealValhallaNavigator.calculateRoute(context, origin, remaining, driving = isDrivingMode)
             routeResult = result
             routeFailures = 0
+            routeForIndex = currentWaypointIndex
             tracker = RouteTracker(result.coordinates)
             trackerState = null
             offRoute.reset()
@@ -247,6 +250,10 @@ fun NavigationScreen(
 
     // ───────── الوصول إلى محطة ─────────
     val handleArrival: () -> Unit = {
+        val now = System.currentTimeMillis()
+        lastArrivalAt = now
+        tracker = null
+        trackerState = null
         val arrived = waypoints.getOrNull(currentWaypointIndex)
         val next = waypoints.getOrNull(currentWaypointIndex + 1)
         if (arrived != null) {
@@ -276,12 +283,14 @@ fun NavigationScreen(
 
         val ts = trackerState
         val legEnd = routeResult?.legs?.firstOrNull()?.distanceMeters ?: 0.0
-        val reachedByRoute = !isApproximate && ts != null && legEnd > 0.0 &&
+        val isCurrentLegRoute = (routeForIndex == currentWaypointIndex)
+        val reachedByRoute = !isApproximate && isCurrentLegRoute && ts != null && legEnd > 0.0 &&
                 (legEnd - ts.alongMeters) < 20.0 && ts.offRouteMeters < 40.0
 
-        if (arrival.check(currentWaypointIndex, if (reachedByRoute) 0.0 else d)) {
+        val canCheckArrival = (now - lastArrivalAt > 4000L)
+        if (canCheckArrival && isCurrentLegRoute && arrival.check(currentWaypointIndex, if (reachedByRoute) 0.0 else d)) {
             handleArrival()
-        } else if (!isApproximate && ts != null && !isLoadingRoute &&
+        } else if (!isApproximate && isCurrentLegRoute && ts != null && !isLoadingRoute &&
             offRoute.update(ts.offRouteMeters, now) && now - lastRerouteAt > 10_000L
         ) {
             lastRerouteAt = now
@@ -481,8 +490,9 @@ fun NavigationScreen(
                         }
                     }
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        val maneuverDistancePrompt = if (!isApproximate && upcoming != null) " · بعد ${MapDistanceCalculator.formatDistance(distToManeuver)}" else ""
                         Text(
-                            text = (if (voiceEnabled) "🔊 صوت مفعل" else "🔇 صوت مكتوم") + " · $currentSpeedKmh كم/س",
+                            text = (if (voiceEnabled) "🔊 صوت مفعل" else "🔇 صوت مكتوم") + " · $currentSpeedKmh كم/س" + maneuverDistancePrompt,
                             color = Color(0xFF00E5FF), fontSize = 12.sp, fontWeight = FontWeight.Bold
                         )
                         Text(instructionText, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 3, overflow = TextOverflow.Ellipsis)

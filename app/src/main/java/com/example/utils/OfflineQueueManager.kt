@@ -339,13 +339,7 @@ class OfflineQueueManager @Inject constructor(
     fun getQueueSize(): Int = _pendingRequests.value.size
 
     /**
-     * 8. التحقق من توفر الإنترنت
+     * 8. التحقق من توفر وسيط اتصال الإنترنت
      */
-    fun isOnline(): Boolean {
-        val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return false
-        val network = connectivityManager.activeNetwork ?: return false
-        val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
-        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-                capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
-    }
+    fun isOnline(): Boolean = com.example.NetworkUtils.hasInternetTransport(context)
 }

@@ -395,6 +395,7 @@ fun MapScreenContent(
                     onDeselect = { state.selectedEntity = null },
                     onSwitchToRadar = { state.isRadarMode = true },
                     onTilesStatus = { areTilesFailing = it },
+                    reloadTilesKey = state.reloadTilesTrigger,
                     focusPoint = searchedPlace?.let { Triple(it.shortName, it.latitude, it.longitude) },
                     modifier = Modifier.fillMaxSize()
                 )
@@ -409,7 +410,7 @@ fun MapScreenContent(
                             .padding(horizontal = 16.dp)
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
@@ -420,11 +421,21 @@ fun MapScreenContent(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                "تعذر جلب بلاطات الخريطة (تحقق من اتصال الإنترنت)",
+                                "تعذر جلب بلاطات الخريطة",
                                 color = Color.White,
                                 fontSize = 12.sp,
-                                fontWeight = FontWeight.Medium
+                                fontWeight = FontWeight.Medium,
+                                modifier = Modifier.weight(1f)
                             )
+                            TextButton(
+                                onClick = {
+                                    areTilesFailing = false
+                                    state.reloadTilesTrigger += 1
+                                },
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                            ) {
+                                Text("إعادة المحاولة", color = Color(0xFF93C5FD), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
                         }
                     }
                 }

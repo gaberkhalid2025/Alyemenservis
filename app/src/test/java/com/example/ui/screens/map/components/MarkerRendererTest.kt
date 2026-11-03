@@ -8,11 +8,11 @@ class MarkerRendererTest {
 
     @Test
     fun testGetColorForType() {
-        assertEquals(Color(0xFF00E5FF), MarkerRenderer.getColorForType("PROVIDER"))
-        assertEquals(Color(0xFF00E5FF), MarkerRenderer.getColorForType("TECHNICIAN"))
+        assertEquals(Color(0xFF2563EB), MarkerRenderer.getColorForType("PROVIDER"))
+        assertEquals(Color(0xFF2563EB), MarkerRenderer.getColorForType("TECHNICIAN"))
         assertEquals(Color(0xFF10B981), MarkerRenderer.getColorForType("STORE"))
-        assertEquals(Color(0xFFF59E0B), MarkerRenderer.getColorForType("RESTAURANT"))
-        assertEquals(Color(0xFFEC4899), MarkerRenderer.getColorForType("MEDICAL"))
+        assertEquals(Color(0xFFF97316), MarkerRenderer.getColorForType("RESTAURANT"))
+        assertEquals(Color(0xFFEF4444), MarkerRenderer.getColorForType("MEDICAL"))
         assertEquals(Color(0xFF8B5CF6), MarkerRenderer.getColorForType("PROPERTY"))
         assertEquals(Color(0xFF6366F1), MarkerRenderer.getColorForType("JOB"))
     }

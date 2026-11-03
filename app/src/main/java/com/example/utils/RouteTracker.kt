@@ -94,13 +94,13 @@ class RouteTracker(private val points: List<Pair<Double, Double>>) {
 
 /** خروج عن المسار: أكثر من thresholdM لمدة holdMs متواصلة (هستيريسيس). */
 class OffRouteDetector(private val thresholdM: Double = 40.0, private val holdMs: Long = 5_000L) {
-    private var since = 0L
+    private var since = -1L
     fun update(offRouteM: Double, nowMs: Long): Boolean {
-        if (offRouteM <= thresholdM) { since = 0L; return false }
-        if (since == 0L) since = nowMs
+        if (offRouteM <= thresholdM) { since = -1L; return false }
+        if (since == -1L) since = nowMs
         return nowMs - since >= holdMs
     }
-    fun reset() { since = 0L }
+    fun reset() { since = -1L }
 }
 
 /** وصول: مرة واحدة فقط لكل فهرس محطة. */

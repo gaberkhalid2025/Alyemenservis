@@ -308,6 +308,16 @@
             setLayer(mode);
         }
 
+        function reloadBaseLayer() {
+            if (currentBaseLayer && map) {
+                map.removeLayer(currentBaseLayer);
+                currentBaseLayer.addTo(map);
+                watchLayer(currentBaseLayer);
+                notifyTiles(false);
+            }
+        }
+        window.reloadBaseLayer = reloadBaseLayer;
+
         function updateUserLocation(lat, lng, accuracy, pan) {
             userLat = lat;
             userLng = lng;

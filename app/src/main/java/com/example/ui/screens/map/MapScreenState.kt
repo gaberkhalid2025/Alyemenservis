@@ -37,6 +37,7 @@ class MapScreenState(
     var selectedEntity by mutableStateOf<Any?>(null)
     var bookingProviderTarget by mutableStateOf<ProviderEntity?>(null)
     var isNavigating by mutableStateOf(false)
+    var reloadTilesTrigger by mutableIntStateOf(0)
     val dynamicOffsets = mutableStateMapOf<String, Pair<Double, Double>>()
     val selectedWaypoints = mutableStateListOf<NavWaypoint>()
 

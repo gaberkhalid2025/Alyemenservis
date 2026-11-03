@@ -1,0 +1,113 @@
+# 51 – المتبقي النهائي (ملفات الخرائط + ملفات المنطق + التطبيق)
+**فُحص:** `MainActivity`, `MyApplication`, `NetworkUtils`, `MainViewModel_710aa9`, `LocationService_b26df0`, `RealValhallaNavigator_1cd266`, `OnlineOsrmNavigator_3c6ab1`, `MockValhallaNavigator_639272`, `NavConfig_afc1f1`, `RouteTracker_1b9e33`, `OfflineQueueManager_192fda`, `QueueSyncWorker_1`, `SessionManager_78f151`, `CompassSensor_90bfd0`, `CrashReporter_6a45f8`, `SearchAndFilterEngine_19e1e1`, `CrossFuzzySearchEngine_0ea2ff`, `MapDiagnostics_1`, `ValhallaTileDownloader_006b4b`, `AnalyticsAndReportingEngine_641d55`, `DeepSystemDiagnosticOrchestrator`, `ReviewsAndRatingsEngine`, `map_ab2aad.html`, `OfflineTileInterceptor_9daa82`, `CityAliases_4a08e3`, `MapJsonBuilder_44726a`, `MapDistanceCalculator_d365dc`, `OfflineMapManager_b6e869`, `ArVpsCameraOverlay_9ad5ab`, `AlephVisualAssistantDialog_62a229`.
+> قراءة وبحث نصي فقط؛ لم أبنِ المشروع ولم أشغّل التطبيق. الملفات المكتبية (`leaflet*.js/css` و`MarkerCluster*`) لم أفحصها.
+
+## 1) ما تأكدت من تطبيقه ✅
+- **الملاحة:** المنسّق بلا مسافة في المنعطفات، المحطة الوسطى («وصلت إلى المحطة»)، رقم مخرج الدوّار، إزالة تكرار نقطة الربط، وضع المشي، محرك Valhalla المخزَّن، `NativeValhallaStatus`، وحذف صنعاء من `MockValhallaNavigator`.
+- **الموقع والفزعة:** عمر الموقع وانتهاؤه، حظر المصدر العام أثناء الملاحة، `uid/phone` في النداء، الدقة غير المعروفة، النداء لا يُسقَط، الجدولة المُعجَّلة و`getForegroundInfo`، **جدولة الطابور عند الإقلاع في `MyApplication`**، `clearForLogout`.
+- **الأمان:** تشفير التوكن (`EncryptedSharedPreferences`)، `CrashReporter` مركّب في `MyApplication`، `AppCheck` التجريبي بالانعكاس في DEBUG فقط.
+- **البحث:** `LevenshteinMatcher.score` مع التطبيع العربي، استعلام Firestore الصحيح.
+- **الخرائط:** `CityAliases` بلا كلمات عامة، `MapJsonBuilder` بالمطابقة بالرموز و`MAX_PER_TYPE`، المعترض بنطاق OSM الجديد ولمس LRU، AR بـ`cameraMode` وإعادة المحاولة وفتح الإعدادات، Aleph بنتائج قابلة للنقر، التشخيص بعنوان من `NavConfig`.
+- **التطبيق:** `enableEdgeToEdge()` وطلب `POST_NOTIFICATIONS` في `MainActivity`.
+
+## 2) المتبقي (بالأولوية)
+
+### أ) مصدر ثالث للموقع في `MainActivity` (عالية)
+`startFusedLocationUpdates` يعمل **موازياً** لمسار `MainViewModel` المفلتر ويكتب `viewModel.updateUserLocation(...)` مباشرة، فيعود الخلل الذي أصلحناه في المستند 39:
+- يقبل `lastLocation` و`LocationManager.getLastKnownLocation(GPS/NETWORK)` **بلا فحص العمر** (قد يكون عمرهما أياماً) وبلا فحص الدقة ولا تجاهل مواقع المحاكاة.
+- لا يمرّ عبر `markFix()` فيختلط مع الفلاتر؛ وأثناء الملاحة يكتب كل 2–4 ث قراءات غير مفلترة بجانب تدفق الملاحة (تذبذب وانحراف كاذب).
+- يعمل بدقة عالية **طوال عمر النشاط** (استنزاف بطارية) حتى خارج الخريطة.
+**الحل: مسار واحد يملكه `MainViewModel`، ويتحكم النشاط بدورة الحياة فقط.**
+في `MainActivity`:
+```kotlin
+// 1) احذف: الدالة startFusedLocationUpdates كاملة، والحقل locationCallback، وكتلة إلغائه في onDestroy.
+// 2) أضف:
+private fun hasLocationPermission() =
+    androidx.core.content.ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED ||
+    androidx.core.content.ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_COARSE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+override fun onStart() {
+    super.onStart()
+    if (hasLocationPermission()) viewModel.startLocationUpdates()      // viewModel = نفس مرجع النشاط الحالي
+}
+override fun onStop() {
+    viewModel.stopLocationUpdates()                                    // لا تتبّع والتطبيق في الخلفية
+    super.onStop()
+}
+```
+وفي الموضعين (سطر 405 و416) استبدل `startFusedLocationUpdates(this@MainActivity, viewModel)` بـ`viewModel.startLocationUpdates()`.
+ولتوحيد المالك احذف من `MapScreenContent` سطر `DisposableEffect(Unit) { onDispose { viewModel.stopLocationUpdates() } }` الذي أضفناه في المستند 26/31 (النشاط صار صاحب الإيقاف).
+> إن كان `viewModel` في النشاط يُعرَّف داخل `setContent` فعرّفه حقلاً في الصنف (`private val viewModel: MainViewModel by viewModels()`).
+**اختبار:** بدّل الخريطة/الخروج للشاشة الرئيسية: يختفي مؤشر GPS في شريط الحالة خلال ثوانٍ، ولا قفزات للموقع أثناء الملاحة.
+
+### ب) App Check والتوزيع من GitHub (عالية، تحقق منها الآن)
+المزوّد في الإصدار هو **Play Integrity**. التطبيقات المثبّتة من ملف APK خارج Google Play (كنسخ GitHub) **تفشل عادةً** في هذا الفحص. إن كان «Enforce» مفعّلاً في Firebase لـ Firestore/Storage/Auth فستفشل كل طلبات النسخة الموزّعة خارج المتجر (لا بيانات ولا فزعة). قبل التوزيع:
+1. افتح Firebase Console ← App Check، وتحقق هل التطبيق في وضع Enforce.
+2. إن كنت ستوزّع APK من GitHub فاترك الـ Enforce معطّلاً (وضع المراقبة فقط)، أو اعتمد مزوّداً مخصصاً؛ ولا تفعّل الإنفاذ إلا لنسخ المتجر.
+3. اختبر نسخة موقّعة مثبّتة يدوياً قبل النشر.
+
+### ج) `NetworkUtils.isNetworkAvailable` صارمة أكثر من اللازم (متوسطة)
+تشترط `NET_CAPABILITY_VALIDATED`. هذه العلامة لا تُضبط إن كان فحص الاتصال الخاص بأندرويد محجوباً أو بطيئاً عند المزوّد، فتظهر الشبكة «بلا إنترنت» رغم أنها تعمل (شائع مع بعض مزودي الخدمة). النتيجة: يُعتبر التطبيق «أوفلاين» خطأً وتتأخر المزامنة.
+```kotlin
+object NetworkUtils {
+    /** وجود شبكة قد تحمل إنترنت (بلا اشتراط التحقق). استخدمها للقرار؛ وأي فشل فعلي يُعالَج عند الطلب. */
+    fun hasInternetTransport(context: Context): Boolean = try {
+        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+        val caps = cm?.activeNetwork?.let { cm.getNetworkCapabilities(it) }
+        caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
+    } catch (e: Exception) { false }
+
+    /** شبكة مُتحقَّق منها (للعرض فقط: «متصل ومستقر»). */
+    fun isValidatedNetwork(context: Context): Boolean = try {
+        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+        val caps = cm?.activeNetwork?.let { cm.getNetworkCapabilities(it) }
+        caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true &&
+            caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+    } catch (e: Exception) { false }
+
+    fun isNetworkAvailable(context: Context) = hasInternetTransport(context)     // للتوافق مع المستدعين الحاليين
+}
+```
+وفي `OfflineQueueManager.isOnline()` استعمل `hasInternetTransport` (وليس VALIDATED)، فالمحاولة الفعلية مع `backoff` هي الحكم.
+
+### د) Analytics بلا موافقة (متوسطة)
+`AnalyticsAndReportingEngine` يجمّع الأحداث (جيد) لكن لا يوجد مفتاح موافقة/إلغاء اشتراك. أضف:
+```kotlin
+object AnalyticsConsent {
+    private const val KEY = "analytics_consent"
+    fun isEnabled(ctx: Context) = ctx.getSharedPreferences("privacy", Context.MODE_PRIVATE).getBoolean(KEY, true)
+    fun set(ctx: Context, enabled: Boolean) {
+        ctx.getSharedPreferences("privacy", Context.MODE_PRIVATE).edit().putBoolean(KEY, enabled).apply()
+        com.google.firebase.analytics.FirebaseAnalytics.getInstance(ctx).setAnalyticsCollectionEnabled(enabled)
+        com.google.firebase.crashlytics.FirebaseCrashlytics.getInstance().setCrashlyticsCollectionEnabled(enabled)
+    }
+}
+```
+وفي أول `logUserBehaviorEvent`: `if (!AnalyticsConsent.isEnabled(context)) return`. أضف مفتاحاً في الإعدادات («مشاركة بيانات الاستخدام المجهولة»). وعدّل نموذج «أمان البيانات» في Play ليطابق ذلك.
+
+### هـ) إفصاح الموقع قبل طلب الصلاحية (متوسطة، للمتجر)
+`MainActivity` يطلب الموقع عبر `permissionLauncher` مباشرة. أضف قبله حواراً قصيراً: «نستخدم موقعك لعرض الأماكن القريبة والملاحة، ويُرسَل فقط عند طلبك مساراً أو نداء فزعة». (مطلوب لتوافق سياسة بيانات المستخدم في Play ولثقة المستخدم.)
+
+### و) `DeepSystemDiagnosticOrchestrator` (متوسطة)
+- `durationMs = 350L` **ثابت** لكل خطوة (زمن مختلق في التقارير)، وتسمية «يعمل 100%» و«نجاح التحقق بنسبة 100%». اجعل الزمن مقيساً: `val t0 = android.os.SystemClock.elapsedRealtime()` حول جسم كل خطوة و`durationMs = SystemClock.elapsedRealtime() - t0`، واحذف عبارات «100%».
+- `passed` يأتي من المستدعي؛ تأكد أن كل خطوة تقرأ نتيجة حقيقية (قراءة من Firestore/تحقق) وليس `true` مباشرة.
+
+### ز) تحسين: «إعادة المحاولة» للافتة البلاطات (منخفضة)
+في `map_ab2aad.html` لا توجد `reloadBaseLayer`:
+```javascript
+function reloadBaseLayer() {
+    if (!map || !currentBaseLayer) return;
+    try { currentBaseLayer.redraw(); } catch (e) { console.error(e); }
+    watchLayer(currentBaseLayer);
+}
+```
+وفي Kotlin عند ضغط «إعادة المحاولة» في اللافتة: `webViewRef?.evaluateJavascript("window.reloadBaseLayer && window.reloadBaseLayer()", null)` (يتطلب إتاحة المرجع للدالة عبر معامل رد نداء أو حالة).
+
+### ح) ملاحظات صغيرة
+- `NavConfig`: قائمة `YEMEN_CITIES` ما زالت مكررة مع `OfflineMapManager` و`CityAliases`؛ وحّد المصدر عند أول فرصة (لا خطر وظيفي الآن).
+- `MyApplication`: يوجد ثلاثة مساعدين لقنوات الإشعارات (`NotificationChannels` و`NotificationHelper` و`ChatNotificationHelper`)؛ لا مشكلة، لكن وحّدها لاحقاً.
+- `ReviewsAndRatingsEngine`: ليس من الخرائط؛ اطّلعت عليه جزئياً. تحقق أن `voteReviewHelpful` يستخدم **معاملة (transaction)** وتخزين تصويت لكل مستخدم لمنع التصويت المتكرر، وأن متوسط تقييم المزوّد يُحسب في الخادم أو بمعاملة.
+
+## 3) تنفيذ سريع (ترتيب)
+1. أ (مصدر الموقع الثالث) ← 2. ب (App Check قبل التوزيع) ← 3. ج ← 4. د و هـ ← 5. و و ز.
+ثم نفّذ المستندات 46 إلى 50 المعلّقة وأرسل أي خطأ بناء كما هو.

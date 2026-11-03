@@ -1,0 +1,110 @@
+# 49 – شرح «مشاكل الإعدادات» + التوقيع وبناء GitHub + التوافق مع أندرويد 6 و7
+
+## أ) ماذا قصدت بـ«مشاكل الإعدادات» في المستند 46؟
+ليست أخطاء في الكود؛ هي **إعدادات في ملفات المشروع** (Manifest وGradle وProguard) تؤثر على الأمان والنشر. لا شيء منها يمنعك من التعديل والاختبار الآن. مرتبة بحسب موعد أهميتها:
+
+| البند | معناه ببساطة | متى يهمّك |
+|---|---|---|
+| `targetSdk = 35` | رقم يخبر أندرويد أي إصدار صُمّم له التطبيق. **متجر Google Play وحده** يشترط 36 للتحديثات منذ أغسطس 2026 | فقط إن نشرت على Google Play. إن وزّعت APK من GitHub فقط فلا يوجد شرط متجر |
+| محاذاة 16KB | شرط Play على مكتبات C++ (مثل Valhalla) | فقط عند النشر على Play |
+| `firebase-appcheck-debug` داخل الإصدار | مكتبة تجارب تُشحن مع نسخة المستخدمين | قبل أول إصدار للناس |
+| `GEMINI_API_KEY` في `BuildConfig` | أي مفتاح يوضع هناك يمكن استخراجه من الـ APK | قبل أول إصدار (أو لا تستخدمه) |
+| `usesCleartextTraffic="true"` | يسمح باتصالات HTTP غير مشفّرة | قبل أول إصدار |
+| `ACCESS_BACKGROUND_LOCATION` | صلاحية موقع في الخلفية لا يستخدمها التطبيق، وتسبب أسئلة في مراجعة Play | قبل أول إصدار |
+| `isMinifyEnabled=false` | تصغير/تشويش الكود معطّل (لا خطر الآن) | اختياري، بعد إنهاء التعديلات |
+
+## ب) «مفتاح APK» (التوقيع): لا مشكلة الآن، وهذا ما قصدته
+كل APK يجب أن يُوقَّع بملف مفتاح (`.jks`/keystore) ليُثبَّت. وضعك الحالي سليم: تؤجل التوقيع للنهاية. القلق الوحيد في `build.gradle.kts`:
+- إن لم يجد البناء مفتاح الإصدار، **يوقّع بمفتاح الاختبار (debug) بصمت** بدل أن يفشل. فلو بنيت على GitHub دون إعداد الأسرار قد تحصل على APK «إصدار» موقّع بمفتاح اختبار.
+- نتيجتها: Google Play يرفض هذا التوقيع، ولو وزّعته من GitHub فمن ثبّته لن يستطيع التحديث لاحقاً إلى نسخة بمفتاحك الحقيقي (يحتاج حذف التطبيق وإعادة تثبيته).
+- الحل: عند الوصول للمرحلة الأخيرة اجعل بناء الإصدار **يفشل** إن غاب المفتاح الحقيقي (أدناه).
+
+### خطوات التوقيع في نهاية المشروع
+1. أنشئ المفتاح مرة واحدة (احتفظ بنسختين خارج المستودع، فضياعه = لا تستطيع تحديث التطبيق أبداً):
+```bash
+keytool -genkeypair -v -keystore release.jks -keyalg RSA -keysize 2048 -validity 10000 -alias alyemen
+base64 -w0 release.jks > release.jks.b64     # لاستخدامه كسر في GitHub
+```
+2. **لا ترفع** `release.jks` ولا كلمات المرور إلى المستودع (أضف `*.jks` و`local.properties` إلى `.gitignore`).
+3. في GitHub: Settings ← Secrets and variables ← Actions، أضف:
+   `KEYSTORE_BASE64` و`RELEASE_KEYSTORE_PASSWORD` و`RELEASE_KEY_ALIAS` و`RELEASE_KEY_PASSWORD`، وأيضاً `GOOGLE_SERVICES_JSON_BASE64` (محتوى `google-services.json`) و`AGORA_APP_ID` إن استعملته.
+4. ملف البناء `.github/workflows/release.yml` (يطابق أسماء المتغيرات التي يقرؤها `build.gradle.kts` عندك):
+```yaml
+name: Build Release
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { submodules: false }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Restore secrets
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/release.jks"
+          echo "${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}" | base64 -d > app/google-services.json
+      - name: Build AAB + APK
+        env:
+          KEYSTORE_PATH: ${{ runner.temp }}/release.jks
+          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+          AGORA_APP_ID: ${{ secrets.AGORA_APP_ID }}
+        run: ./gradlew testDebugUnitTest bundleRelease assembleRelease
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release
+          path: |
+            app/build/outputs/bundle/release/*.aab
+            app/build/outputs/apk/release/*.apk
+```
+5. اجعل البناء يفشل إن كان التوقيع بمفتاح اختبار (داخل `build.gradle.kts`، بعد تعريف `signingConfigs`):
+```kotlin
+gradle.taskGraph.whenReady {
+    if (allTasks.any { it.name.contains("Release") && (it.name.startsWith("assemble") || it.name.startsWith("bundle")) }) {
+        val sc = android.signingConfigs.getByName("releaseConfig")
+        if (sc.storeFile == null || sc.storeFile!!.name == "debug.keystore")
+            throw GradleException("لا يوجد مفتاح إصدار حقيقي: اضبط أسرار التوقيع قبل بناء الإصدار")
+    }
+}
+```
+6. **بعد التوقيع الحقيقي**: أضف بصمتي `SHA-1` و`SHA-256` لمفتاح الإصدار في Firebase Console ← Project settings ← Your apps (وفي Play Integrity إن استعملته). بدونها قد تفشل مصادقة الهاتف أو App Check في نسخة الإصدار فقط.
+7. إن نشرت على **Google Play**: فعّل «Play App Signing» (تحتفظ Google بمفتاح التوقيع النهائي ويمكنك استبدال مفتاح الرفع إن ضاع). إن وزّعت APK من GitHub فقط فمفتاحك هو الأصل: احفظه بعناية.
+
+## ج) التوافق مع أندرويد 6 و7 وما بعدهما
+**وضعك الحالي:** `minSdk = 24` = **أندرويد 7.0 فما فوق** ✅ (يشمل 7 و8 و9 ... حتى 16).
+**أندرويد 6 (API 23):** ممكن نظرياً بتغيير `minSdk = 23`، لكنه يتطلب التحقق من المكتبات:
+1. غيّر الرقم ثم ابنِ: إن كانت مكتبة تحتاج أعلى فسيفشل البناء برسالة مثل `minSdkVersion 23 cannot be smaller than version 24 declared in library [...]` وتذكر اسم المكتبة. **لا أعرف** الحد الأدنى لـ`valhalla-mobile` ولا لإصدار Firebase عندك (لم أستطع التحقق)، فهذا الاختبار هو الحكم. إن كانت Valhalla تتطلب 24 فسيعمل التطبيق على أندرويد 6 بلا ملاحة أوفلاين فقط إذا فصلتها (غير موصى).
+2. فعّل ترجمة مكتبات جافا الحديثة للأجهزة القديمة (مثل `Collection.removeIf` المستخدمة في الكود، وهي من API 24):
+```kotlin
+android { compileOptions { isCoreLibraryDesugaringEnabled = true } }
+dependencies { coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5") }
+```
+3. `EncryptedSharedPreferences` (تشفير التوكن، المستند 44) يعمل من API 23 فما فوق ✅.
+**هل يستحق الأمر؟** أندرويد 6 نسبة صغيرة عالمياً، وقد تكون أعلى في اليمن. القرار الصحيح: افتح **Firebase Analytics** ← توزيع إصدارات أندرويد لمستخدميك الحاليين، وإن كانت نسبة 6 أقل من ~3% فابقَ على 24.
+
+### ما أضفناه ومدى توافقه مع القديم
+| الميزة | الحماية | الحالة |
+|---|---|---|
+| `Location.isMock` | شرط `SDK_INT >= 31` | ✅ |
+| قنوات الإشعار (مزامنة الفزعة) | شرط `SDK_INT >= 26` | ✅ |
+| `enableOnBackInvokedCallback` | يتجاهله الإصدار < 33 | ✅ |
+| CameraX / Compose / Hilt / WorkManager | يدعم API 21+ | ✅ |
+| العمل المُعجَّل في WorkManager | يستخدم خدمة أمامية < 31 (أضفنا الصلاحيات) | ✅ |
+| `POST_NOTIFICATIONS` | تُتجاهل < 33 | ✅ |
+
+### مخاطر خاصة بالأجهزة القديمة (اختبرها فعلياً)
+- **معالج 32-بت (armeabi-v7a):** موجود في `abiFilters` لكن يجب التأكد أن Valhalla تشحنه: `unzip -l valhalla-mobile-0.6.4.aar | grep jni`.
+- **ذاكرة 1–2 جيجا:** ملف Valhalla يُحمَّل في الذاكرة؛ اختبر مساراً طويلاً على جهاز ضعيف، وإن انهار أبقِ المسار التقريبي (الكود يلتقط الأخطاء ويعود له).
+- **WebView قديم:** الخريطة تعتمد على WebView؛ على أجهزة بلا تحديثات قد يعرض Leaflet ببطء. اعرض تنبيهاً إن كان إصدار WebView قديماً جداً (`WebView.getCurrentWebViewPackage()`).
+- **شهادات TLS على 7.0/7.1.0:** الأجهزة الأقدم من 7.1.1 قد لا تثق بجذر Let's Encrypt الحديث؛ إن فشل البحث/البلاطات على 7.0 فقط، أضف الجذر في `network_security_config.xml`. اختبر على محاكي API 24.
+- **الصوت العربي (TTS):** قد لا يكون مثبتاً على الأجهزة القديمة؛ التطبيق يعرض رسالة التثبيت (مطبّق).
+- **اتجاه الشاشة والحساسات:** بعض الأجهزة الرخيصة بلا حساس `ROTATION_VECTOR`: البوصلة تتوقف بهدوء (الكود يتحقق من وجوده).
+
+### خطة اختبار التوافق
+محاكيات: API 24 و26 و29 و31 و34 و36 (وAPI 23 إن غيّرت `minSdk`)، + جهاز حقيقي ضعيف. في كل منها: فتح الخريطة، بحث، ملاحة (أونلاين وأوفلاين)، الفزعة (وضع الطيران)، الكاميرا (AR)، الصوت العربي.

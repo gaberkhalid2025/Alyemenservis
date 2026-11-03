@@ -56,7 +56,6 @@ import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
-    private var locationCallback: com.google.android.gms.location.LocationCallback? = null
     private var networkCallback: android.net.ConnectivityManager.NetworkCallback? = null
     private var fallbackSpeechRecognizer: android.speech.SpeechRecognizer? = null
     private val pendingNavigationIntent = kotlinx.coroutines.flow.MutableStateFlow<Intent?>(null)
@@ -160,78 +159,8 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun startFusedLocationUpdates(activity: ComponentActivity, viewModel: MainViewModel) {
-        try {
-            val context = activity.applicationContext
-            val fusedLocationClient = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(context)
-            if (androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_FINE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED ||
-                androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_COARSE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
-                
-                // [إصلاح ملاحة نهائي] الحصول الفوري على آخر موقع معروف من FusedLocation
-                fusedLocationClient.lastLocation.addOnSuccessListener { location ->
-                    if (location != null && location.latitude != 0.0 && location.longitude != 0.0) {
-                        viewModel.updateUserLocation(location.latitude, location.longitude)
-                    }
-                }
-
-                // [إصلاح ملاحة نهائي] فحص LocationManager فوراً لتجاوز أي تأخير في Play Services
-                val lm = context.getSystemService(android.content.Context.LOCATION_SERVICE) as? android.location.LocationManager
-                lm?.let {
-                    val gpsLoc = it.getLastKnownLocation(android.location.LocationManager.GPS_PROVIDER)
-                    val netLoc = it.getLastKnownLocation(android.location.LocationManager.NETWORK_PROVIDER)
-                    val best = gpsLoc ?: netLoc
-                    if (best != null && best.latitude != 0.0 && best.longitude != 0.0) {
-                        viewModel.updateUserLocation(best.latitude, best.longitude)
-                    }
-                }
-                
-                locationCallback?.let { existingCallback ->
-                    try {
-                        fusedLocationClient.removeLocationUpdates(existingCallback)
-                    } catch (_: Exception) {}
-                }
-
-                // [إصلاح ملاحة نهائي] دقة عالية وتحديث حي متوافق مع الملاحة الحقيقية
-                val locationRequest = com.google.android.gms.location.LocationRequest.Builder(
-                    com.google.android.gms.location.Priority.PRIORITY_HIGH_ACCURACY, 4000L
-                ).setMinUpdateIntervalMillis(2000L).build()
-                
-                locationCallback = object : com.google.android.gms.location.LocationCallback() {
-                    override fun onLocationResult(result: com.google.android.gms.location.LocationResult) {
-                        for (loc in result.locations) {
-                            if (loc.latitude != 0.0 && loc.longitude != 0.0) {
-                                viewModel.updateUserLocation(loc.latitude, loc.longitude)
-                            }
-                        }
-                    }
-                }
-                
-                locationCallback?.let { callback ->
-                    fusedLocationClient.requestLocationUpdates(
-                        locationRequest,
-                        callback,
-                        android.os.Looper.getMainLooper()
-                    )
-                }
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-    }
-
     override fun onDestroy() {
         try {
-            // إلغاء تسجيل تحديثات الموقع
-            locationCallback?.let { callback ->
-                try {
-                    val fusedLocationClient = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(applicationContext)
-                    fusedLocationClient.removeLocationUpdates(callback)
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
-            }
-            locationCallback = null
-
             // إلغاء تسجيل مستمع الشبكة لمنع تسريب الذاكرة
             networkCallback?.let { cb ->
                 try {
@@ -392,6 +321,8 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
+            var showLocationDisclosureDialog by remember { mutableStateOf(false) }
+
             val locationPermissions = arrayOf(
                 android.Manifest.permission.ACCESS_FINE_LOCATION,
                 android.Manifest.permission.ACCESS_COARSE_LOCATION
@@ -402,10 +333,39 @@ class MainActivity : ComponentActivity() {
                 val granted = results.values.any { it }
                 if (granted) {
                     viewModel.triggerNotification("📌 تم تفعيل تحديد الموقع التلقائي بدقة عالية!")
-                    startFusedLocationUpdates(this@MainActivity, viewModel)
+                    viewModel.startLocationUpdates()
                 } else {
                     viewModel.triggerNotification("⚠️ تم رفض إذن الموقع، يمكنك تحديد مدينتك يدوياً")
                 }
+            }
+
+            if (showLocationDisclosureDialog) {
+                AlertDialog(
+                    onDismissRequest = { showLocationDisclosureDialog = false },
+                    title = {
+                        Text("📍 إذن الوصول إلى الموقع", fontWeight = FontWeight.Bold)
+                    },
+                    text = {
+                        Text("يحتاج التطبيق للوصول إلى موقعك لعرض الخدمات والمتاجر القريبة منك، وتوفير التوجيه الملاحي الدقيق وحساب المسافات.")
+                    },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                showLocationDisclosureDialog = false
+                                permissionLauncher.launch(locationPermissions)
+                            }
+                        ) {
+                            Text("متابعة", fontWeight = FontWeight.Bold)
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(
+                            onClick = { showLocationDisclosureDialog = false }
+                        ) {
+                            Text("ليس الآن")
+                        }
+                    }
+                )
             }
 
             LaunchedEffect(Unit) {
@@ -413,7 +373,14 @@ class MainActivity : ComponentActivity() {
                     val hasFine = androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_FINE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED
                     val hasCoarse = androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_COARSE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED
                     if (hasFine || hasCoarse) {
-                        startFusedLocationUpdates(this@MainActivity, viewModel)
+                        viewModel.startLocationUpdates()
+                    } else {
+                        val prefs = context.getSharedPreferences("app_location_disclosure_prefs", Context.MODE_PRIVATE)
+                        val alreadyAsked = prefs.getBoolean("has_prompted_location", false)
+                        if (!alreadyAsked) {
+                            prefs.edit().putBoolean("has_prompted_location", true).apply()
+                            showLocationDisclosureDialog = true
+                        }
                     }
                 } catch (e: Exception) {
                     e.printStackTrace()

@@ -71,14 +71,26 @@ object AnalyticsAndReportingEngine {
     private val eventBuffer = java.util.concurrent.ConcurrentLinkedQueue<Map<String, Any?>>()
     @Volatile private var lastFlushTime = System.currentTimeMillis()
 
+    fun isAnalyticsEnabled(context: Context): Boolean {
+        val prefs = context.getSharedPreferences("app_privacy_consent_prefs", Context.MODE_PRIVATE)
+        return prefs.getBoolean("analytics_collection_enabled", true)
+    }
+
+    fun setAnalyticsEnabled(context: Context, enabled: Boolean) {
+        val prefs = context.getSharedPreferences("app_privacy_consent_prefs", Context.MODE_PRIVATE)
+        prefs.edit().putBoolean("analytics_collection_enabled", enabled).apply()
+    }
+
     // 3. Log User Journey Event
     fun logUserBehaviorEvent(
         userId: String,
         eventName: String, // "VIEW_SCREEN", "CLICK_BOOKING_BTN", "CALL_PROVIDER", "FILTER_SEARCH"
         screenName: String,
-        extraData: String = ""
+        extraData: String = "",
+        context: Context? = null
     ) {
         if (userId.isBlank()) return
+        if (context != null && !isAnalyticsEnabled(context)) return
         val eventId = EntityIdGenerator.generate(EntityIdGenerator.Prefix.PROVIDER)
         val payload = hashMapOf<String, Any?>(
             "id" to eventId,
