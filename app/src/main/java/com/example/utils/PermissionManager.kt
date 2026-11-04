@@ -50,8 +50,8 @@ object PermissionManager {
         return when (permission) {
             PERMISSION_CAMERA -> "يحتاج التطبيق إلى الوصول لكاميرا الجهاز لالتقاط صور المعرض، الهوية أو الترخيص مباشرة."
             PERMISSION_RECORD_AUDIO -> "يحتاج التطبيق لإذن الميكروفون لتسجيل وإرسال الرسائل الصوتية والفويس نوت في المحادثات المباشرة."
-            PERMISSION_STORAGE_IMAGES, Manifest.permission.READ_EXTERNAL_STORAGE -> "يحتاج التطبيق لإذن الوصول للصغار والمعرض لاختيار الصور وإرفاق السير الذاتية."
-            PERMISSION_FINE_LOCATION, PERMISSION_COARSE_LOCATION -> "يحتاج التطبيق لتحديد موقعك الجغرافي لعرض الفنيين والمتاجر القريبة منك باليمن."
+            PERMISSION_STORAGE_IMAGES, Manifest.permission.READ_EXTERNAL_STORAGE -> "يحتاج التطبيق لإذن الوصول للصور والمعرض لاختيار الصور وإرفاق السير الذاتية."
+            PERMISSION_FINE_LOCATION, PERMISSION_COARSE_LOCATION -> "نستخدم موقعك لعرض الفنيين والمتاجر القريبة وحساب المسارات والملاحة. لا يغادر موقعك جهازك إلا عند طلبك مساراً عبر الإنترنت أو إرسالك نداء فزعة بموافقتك."
             PERMISSION_NOTIFICATIONS -> "يحتاج التطبيق لإذن الإشعارات لتنبيهك بجديد العروض والرسائل وتحديثات طلبات الانضمام."
             else -> "يحتاج التطبيق إلى هذا الإذن لضمان تقديم كافة الخدمات بكفاءة عالية."
         }

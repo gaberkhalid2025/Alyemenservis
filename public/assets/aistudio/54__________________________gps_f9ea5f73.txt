@@ -1,0 +1,720 @@
+# 54 – ميزة «العنوان بالمعلم»: حل عملي لتشويش GPS في اليمن
+**الفكرة (من وثيقتك):** المستخدم لا يعتمد على إشارة GPS؛ يختار معلماً معروفاً (مسجد/مدرسة/محل/سوق) ثم يضغط على الخريطة ليحدد موقع منزله، فيحسب التطبيق الإزاحة ويحفظ **«عنواناً مرئياً»**: «على بعد 80 م شمال مسجد النور، البوابة الحمراء». يراه السائق/الفني ويملك نقطتين على الخريطة (المعلم + الموقع).
+**القيود:** بلا مفاتيح API ولا خدمات مدفوعة. الاعتماد على: خريطة OSM الموجودة، بحث Nominatim (موجود)، وOverpass API العام (اختياري، مجاني بلا مفتاح) لاقتراح المعالم القريبة.
+**مبدأ الأمان من الأخطاء:** كل التعديلات على الملفات الموجودة **إضافات بقيم افتراضية** (معاملات اختيارية)، والباقي ملفات جديدة. لا يتغير سلوك أي شاشة حالية إن لم تُستعمل الميزة.
+
+## 0) ما سيُضاف
+| النوع | الملف | الغرض |
+|---|---|---|
+| جديد | `com/example/utils/LandmarkAddress.kt` | النموذج + حساب الإزاحة + الوصف النصي + التحقق |
+| جديد | `com/example/utils/LandmarkAddressStore.kt` | حفظ مشفّر على الجهاز (حتى 10 عناوين) |
+| جديد | `com/example/utils/LandmarkFinder.kt` | اقتراح معالم قريبة من OSM عبر Overpass (اختياري) |
+| جديد | `ui/screens/map/LandmarkAddressScreen.kt` | معالج 3 خطوات + «عناويني» + بطاقة العرض للسائق |
+| تعديل | `map.html` + `RealLeafletMapView.kt` | وضع «اختيار نقطة» (النقر يعيد الإحداثيات) — بمعاملات افتراضية |
+| تعديل | `MapScreenState.kt` | دالة `startNavigationViaLandmark` |
+| تعديل | `MapScreenContent.kt` | زر «عنواني» + لافتة GPS الضعيف |
+
+---
+## 1) ملف جديد: `LandmarkAddress.kt`
+```kotlin
+package com.example.utils
+
+import org.json.JSONObject
+import java.util.Locale
+import java.util.UUID
+import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.roundToInt
+import kotlin.math.sqrt
+
+/**
+ * عنوان مرئي: معلم مرجعي + نقطة المستخدم + وصف نصي.
+ * لا يعتمد على GPS؛ النقطة يحددها المستخدم على الخريطة، والإزاحة تُحسب منها.
+ */
+data class LandmarkAddress(
+    val id: String = UUID.randomUUID().toString(),
+    val label: String,                 // «منزلي»، «عملي»
+    val landmarkName: String,          // «مسجد النور»
+    val landmarkLat: Double,
+    val landmarkLng: Double,
+    val pointLat: Double,              // موقع المنزل كما حدده المستخدم
+    val pointLng: Double,
+    val description: String,           // «البوابة الحمراء» (إلزامي)
+    val createdAt: Long = System.currentTimeMillis()
+) {
+    val northMeters: Double get() = (pointLat - landmarkLat) * METERS_PER_DEG
+    val eastMeters: Double get() = (pointLng - landmarkLng) * METERS_PER_DEG * cos(Math.toRadians(landmarkLat))
+    val distanceMeters: Double get() = sqrt(northMeters * northMeters + eastMeters * eastMeters)
+
+    /** أحد الاتجاهات الثمانية بالعربية (من المعلم إلى النقطة). */
+    fun directionArabic(): String {
+        val bearing = (Math.toDegrees(atan2(eastMeters, northMeters)) + 360.0) % 360.0
+        return DIRECTIONS[(((bearing + 22.5) / 45.0).toInt()) % 8]
+    }
+
+    /** «على بعد 80 م شمال مسجد النور، البوابة الحمراء» */
+    fun describe(): String {
+        val d = distanceMeters
+        val where = if (d < 15.0) "عند $landmarkName" else "على بعد ${roundMeters(d)} ${directionArabic()} $landmarkName"
+        val desc = description.trim()
+        return if (desc.isEmpty()) where else "$where، $desc"
+    }
+
+    /** null = صالح، وإلا رسالة الخطأ بالعربية. */
+    fun validate(): String? = when {
+        label.isBlank() -> "اسم العنوان مطلوب"
+        landmarkName.isBlank() -> "اسم المعلم مطلوب"
+        !isValid(landmarkLat, landmarkLng) -> "موقع المعلم غير صالح"
+        !isValid(pointLat, pointLng) -> "موقع النقطة غير صالح"
+        description.trim().length < 3 -> "الوصف النصي مطلوب (مثل: البوابة الحمراء، الدور الثاني)"
+        distanceMeters > MAX_OFFSET_METERS -> "النقطة بعيدة عن المعلم أكثر من ${MAX_OFFSET_METERS.toInt()} م؛ اختر معلماً أقرب"
+        else -> null
+    }
+
+    fun toJson(): JSONObject = JSONObject()
+        .put("id", id).put("label", label).put("landmarkName", landmarkName)
+        .put("landmarkLat", landmarkLat).put("landmarkLng", landmarkLng)
+        .put("pointLat", pointLat).put("pointLng", pointLng)
+        .put("description", description).put("createdAt", createdAt)
+
+    /** للإرسال مع الحجز (Firestore): يحمل الإحداثيات والوصف الجاهز للعرض. */
+    fun toMap(): Map<String, Any> = mapOf(
+        "id" to id, "label" to label, "landmarkName" to landmarkName,
+        "landmarkLat" to landmarkLat, "landmarkLng" to landmarkLng,
+        "pointLat" to pointLat, "pointLng" to pointLng,
+        "description" to description.trim(),
+        "northM" to northMeters.roundToInt(), "eastM" to eastMeters.roundToInt(),
+        "text" to describe(), "createdAt" to createdAt
+    )
+
+    companion object {
+        const val METERS_PER_DEG = 111_195.0
+        const val MAX_OFFSET_METERS = 1500.0
+        private val DIRECTIONS = listOf("شمال", "شمال شرق", "شرق", "جنوب شرق", "جنوب", "جنوب غرب", "غرب", "شمال غرب")
+
+        fun isValid(lat: Double, lng: Double) =
+            !lat.isNaN() && !lng.isNaN() && lat in -90.0..90.0 && lng in -180.0..180.0 && !(lat == 0.0 && lng == 0.0)
+
+        fun roundMeters(d: Double): String = when {
+            d < 100.0 -> "${((d / 5.0).roundToInt() * 5).coerceAtLeast(5)} م"
+            d < 1000.0 -> "${(d / 10.0).roundToInt() * 10} م"
+            else -> String.format(Locale.US, "%.1f", d / 1000.0).removeSuffix(".0") + " كم"
+        }
+
+        fun fromJson(o: JSONObject): LandmarkAddress? = try {
+            LandmarkAddress(
+                id = o.optString("id").ifBlank { UUID.randomUUID().toString() },
+                label = o.getString("label"), landmarkName = o.getString("landmarkName"),
+                landmarkLat = o.getDouble("landmarkLat"), landmarkLng = o.getDouble("landmarkLng"),
+                pointLat = o.getDouble("pointLat"), pointLng = o.getDouble("pointLng"),
+                description = o.optString("description"), createdAt = o.optLong("createdAt", System.currentTimeMillis())
+            )
+        } catch (e: Exception) { null }
+
+        /** قراءة عنوان وصل من Firestore (حقل landmarkAddress في الحجز). */
+        fun fromMap(m: Map<String, Any?>): LandmarkAddress? {
+            fun d(k: String) = (m[k] as? Number)?.toDouble()
+            return try {
+                LandmarkAddress(
+                    id = (m["id"] as? String) ?: UUID.randomUUID().toString(),
+                    label = (m["label"] as? String) ?: "العنوان",
+                    landmarkName = m["landmarkName"] as? String ?: return null,
+                    landmarkLat = d("landmarkLat") ?: return null, landmarkLng = d("landmarkLng") ?: return null,
+                    pointLat = d("pointLat") ?: return null, pointLng = d("pointLng") ?: return null,
+                    description = (m["description"] as? String).orEmpty(),
+                    createdAt = (m["createdAt"] as? Number)?.toLong() ?: System.currentTimeMillis()
+                )
+            } catch (e: Exception) { null }
+        }
+    }
+}
+```
+## 2) ملف جديد: `LandmarkAddressStore.kt` (تخزين مشفّر على الجهاز)
+عنوان المنزل بيانات حساسة؛ يُحفظ مشفّراً (المكتبة `security-crypto` موجودة في مشروعك). **لا يُرسل لأي خادم إلا عند إرفاقه بحجز.**
+```kotlin
+package com.example.utils
+
+import android.content.Context
+import android.content.SharedPreferences
+import android.util.Log
+import androidx.security.crypto.EncryptedSharedPreferences
+import androidx.security.crypto.MasterKey
+import org.json.JSONArray
+
+class LandmarkAddressStore(context: Context) {
+
+    private val prefs: SharedPreferences? = try {
+        EncryptedSharedPreferences.create(
+            context, "landmark_addresses",
+            MasterKey.Builder(context).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build(),
+            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+        )
+    } catch (e: Exception) {
+        Log.e(TAG, "Encrypted prefs unavailable: ${e.message}")
+        null                                   // لا نخزن بيانات حساسة نصاً صريحاً عند فشل التشفير
+    }
+
+    @Synchronized fun getAll(): List<LandmarkAddress> {
+        val raw = prefs?.getString(KEY, null) ?: return emptyList()
+        return try {
+            val arr = JSONArray(raw)
+            (0 until arr.length()).mapNotNull { LandmarkAddress.fromJson(arr.getJSONObject(it)) }
+        } catch (e: Exception) { emptyList() }
+    }
+
+    /** true عند نجاح الحفظ (والعنوان صالح). */
+    @Synchronized fun save(address: LandmarkAddress): Boolean {
+        val p = prefs ?: return false
+        if (address.validate() != null) return false
+        val list = (listOf(address) + getAll().filterNot { it.id == address.id }).take(MAX_ADDRESSES)
+        val arr = JSONArray().also { a -> list.forEach { a.put(it.toJson()) } }
+        return p.edit().putString(KEY, arr.toString()).commit()
+    }
+
+    @Synchronized fun delete(id: String): Boolean {
+        val p = prefs ?: return false
+        val arr = JSONArray().also { a -> getAll().filterNot { it.id == id }.forEach { a.put(it.toJson()) } }
+        return p.edit().putString(KEY, arr.toString()).commit()
+    }
+
+    companion object { private const val TAG = "LandmarkStore"; private const val KEY = "addresses_json"; const val MAX_ADDRESSES = 10 }
+}
+```
+> إنشاء `EncryptedSharedPreferences` قد يستغرق عشرات الملّي ثانية؛ أنشئ الـ Store مرة واحدة (`remember`) واقرأ/اكتب داخل `Dispatchers.IO` كما في الشاشة أدناه.
+
+## 3) ملف جديد: `LandmarkFinder.kt` (اقتراح معالم قريبة، مجاني بلا مفتاح)
+يستعلم **Overpass API العام** عن المساجد والمدارس والأسواق والمستشفيات والصيدليات والبنوك ذات الاسم حول نقطة. استعمال عادل: كاش 5 دقائق وطلب واحد في كل مرة؛ وإن فشل (لا إنترنت/ازدحام) يرجع المستخدم للبحث أو للنقر اليدوي على الخريطة.
+```kotlin
+package com.example.utils
+
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
+import java.net.HttpURLConnection
+import java.net.URL
+import java.net.URLEncoder
+import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
+
+data class LandmarkCandidate(val name: String, val lat: Double, val lng: Double, val kind: String, val distanceM: Double)
+
+object LandmarkFinder {
+    @Volatile var lastError: String? = null
+    private val cache = ConcurrentHashMap<String, Pair<Long, List<LandmarkCandidate>>>()
+    private val mutex = Mutex()
+    private const val ENDPOINT = "https://overpass-api.de/api/interpreter"     // يمكن تغييره لخادم Overpass آخر مجاني
+
+    suspend fun nearby(lat: Double, lng: Double, radiusM: Int = 1200): List<LandmarkCandidate> = withContext(Dispatchers.IO) {
+        lastError = null
+        if (!LandmarkAddress.isValid(lat, lng)) return@withContext emptyList()
+        val key = String.format(Locale.US, "%.3f_%.3f_%d", lat, lng, radiusM)
+        cache[key]?.let { (t, v) -> if (System.currentTimeMillis() - t < 5 * 60_000L) return@withContext v }
+
+        mutex.withLock {
+            var c: HttpURLConnection? = null
+            try {
+                val la = String.format(Locale.US, "%.6f", lat)
+                val lo = String.format(Locale.US, "%.6f", lng)
+                val q = "[out:json][timeout:15];nwr(around:$radiusM,$la,$lo)[\"amenity\"~\"^(place_of_worship|school|marketplace|hospital|pharmacy|bank)\$\"][\"name\"];out center 40;"
+                c = (URL(ENDPOINT).openConnection() as HttpURLConnection).apply {
+                    requestMethod = "POST"; doOutput = true
+                    connectTimeout = 10_000; readTimeout = 20_000
+                    setRequestProperty("User-Agent", "AlYemenServicesApp/1.0")
+                    setRequestProperty("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
+                }
+                c.outputStream.use { it.write(("data=" + URLEncoder.encode(q, "UTF-8")).toByteArray(Charsets.UTF_8)) }
+                when (val code = c.responseCode) {
+                    200 -> {
+                        val root = JSONObject(c.inputStream.bufferedReader().use { it.readText() })
+                        val els = root.optJSONArray("elements")
+                        val out = mutableListOf<LandmarkCandidate>()
+                        if (els != null) for (i in 0 until els.length()) {
+                            val e = els.getJSONObject(i)
+                            val tags = e.optJSONObject("tags") ?: continue
+                            val name = tags.optString("name:ar").ifBlank { tags.optString("name") }
+                            if (name.isBlank()) continue
+                            val center = e.optJSONObject("center")
+                            val la2 = if (e.has("lat")) e.optDouble("lat") else center?.optDouble("lat") ?: Double.NaN
+                            val lo2 = if (e.has("lon")) e.optDouble("lon") else center?.optDouble("lon") ?: Double.NaN
+                            if (!LandmarkAddress.isValid(la2, lo2)) continue
+                            val kind = when (tags.optString("amenity")) {
+                                "place_of_worship" -> if (tags.optString("religion") == "muslim" || tags.optString("religion").isBlank()) "مسجد" else "دار عبادة"
+                                "school" -> "مدرسة"; "marketplace" -> "سوق"; "hospital" -> "مستشفى"
+                                "pharmacy" -> "صيدلية"; "bank" -> "بنك"; else -> "معلم"
+                            }
+                            out.add(LandmarkCandidate(name, la2, lo2, kind, HaversinePrecisionNavigator.calculateDistance(lat, lng, la2, lo2)))
+                        }
+                        val result = out.distinctBy { "${it.name}_${"%.4f".format(Locale.US, it.lat)}" }.sortedBy { it.distanceM }.take(15)
+                        cache[key] = System.currentTimeMillis() to result
+                        result
+                    }
+                    429, 504 -> { lastError = "خدمة المعالم مشغولة، حاول بعد قليل"; emptyList() }
+                    else -> { lastError = "تعذر جلب المعالم (رمز $code)"; emptyList() }
+                }
+            } catch (e: java.net.UnknownHostException) { lastError = "لا يوجد اتصال بالإنترنت"; emptyList() }
+            catch (e: java.net.SocketTimeoutException) { lastError = "انتهت مهلة جلب المعالم"; emptyList() }
+            catch (e: kotlinx.coroutines.CancellationException) { throw e }
+            catch (e: Exception) { lastError = "تعذر جلب المعالم"; emptyList() }
+            finally { c?.disconnect() }
+        }
+    }
+}
+```
+> بيانات OSM في بعض المناطق ناقصة؛ لذلك الشاشة تسمح بالبحث بالاسم **أو بإضافة معلم يدوياً بالنقر على الخريطة** (الحل الأساسي حين تضعف التغطية).
+
+## 4) تعديلات `map.html` (وضع اختيار النقطة)
+أ) عرّف المتغير والدالة (قبل `window.onload`):
+```javascript
+var pickModeEnabled = false;
+function setPickMode(on) {
+    pickModeEnabled = !!on;
+    try { if (map) map.getContainer().style.cursor = pickModeEnabled ? 'crosshair' : ''; } catch (e) {}
+}
+window.setPickMode = setPickMode;
+```
+ب) استبدل معالج `map.on('click', ...)` الموجود في `initMap` بـ:
+```javascript
+map.on('click', function (e) {
+    if (pickModeEnabled) {
+        if (window.AndroidBridge && window.AndroidBridge.onMapPicked) window.AndroidBridge.onMapPicked(e.latlng.lat, e.latlng.lng);
+        return;
+    }
+    if (window.AndroidBridge && window.AndroidBridge.onMapClicked) window.AndroidBridge.onMapClicked();
+});
+```
+ج) (تحسين) الانتقال السينمائي للبحث: في `showSearchPinBase64` استبدل `map.setView([p.lat, p.lng], 16)` بـ `map.flyTo([p.lat, p.lng], 17, { duration: 1.2 })` (مفصّل في المستند 53).
+
+## 5) تعديلات `RealLeafletMapView.kt` (كلها اختيارية بقيم افتراضية، لا يتأثر أي استدعاء حالي)
+```kotlin
+// المعاملات الجديدة في نهاية التوقيع:
+pickMode: Boolean = false,
+onMapPicked: ((lat: Double, lng: Double) -> Unit)? = null,
+...
+// بجانب rememberUpdatedState الأخرى:
+val onMapPickedState by rememberUpdatedState(onMapPicked)
+// داخل addJavascriptInterface(object { ... }):
+@JavascriptInterface fun onMapPicked(lat: Double, lng: Double) { mainHandler.post { onMapPickedState?.invoke(lat, lng) } }
+// بجانب LaunchedEffects:
+LaunchedEffect(isMapReady, pickMode) {
+    if (isMapReady) webViewRef?.evaluateJavascript("if (window.setPickMode) { window.setPickMode($pickMode); }", null)
+}
+```
+## 6) ملف جديد: `LandmarkAddressScreen.kt`
+معالج 3 خطوات: **(1) المعلم** (بحث/معالم قريبة/نقر على الخريطة) ← **(2) النقطة** (نقر على الخريطة، الإزاحة تظهر مباشرة) ← **(3) التأكيد** (وصف نصي إلزامي + «هل هذا موقع منزلك؟»).
+```kotlin
+package com.example.ui.screens.map
+
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.example.utils.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+
+@Composable
+fun LandmarkAddressScreen(
+    centerLat: Double,
+    centerLng: Double,
+    hasRealLocation: Boolean,
+    selectedCity: String = "الكل",
+    onSaved: (LandmarkAddress) -> Unit,
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val store = remember { LandmarkAddressStore(context.applicationContext) }
+    val snackbar = remember { SnackbarHostState() }
+
+    var step by remember { mutableIntStateOf(0) }                  // 0 معلم، 1 نقطة، 2 تأكيد
+    var landmarkName by remember { mutableStateOf("") }
+    var landmark by remember { mutableStateOf<Pair<Double, Double>?>(null) }
+    var point by remember { mutableStateOf<Pair<Double, Double>?>(null) }
+    var description by remember { mutableStateOf("") }
+    var label by remember { mutableStateOf("منزلي") }
+    var confirmed by remember { mutableStateOf(false) }
+    var query by remember { mutableStateOf("") }
+    var results by remember { mutableStateOf<List<RealValhallaNavigator.SearchAddressResult>>(emptyList()) }
+    var nearby by remember { mutableStateOf<List<LandmarkCandidate>>(emptyList()) }
+    var busy by remember { mutableStateOf(false) }
+    var message by remember { mutableStateOf<String?>(null) }
+    var tapForLandmark by remember { mutableStateOf<Pair<Double, Double>?>(null) }
+    var focus by remember { mutableStateOf<Triple<String, Double, Double>?>(null) }
+    var manualName by remember { mutableStateOf("") }
+
+    BackHandler { if (step > 0) { step -= 1; confirmed = false } else onClose() }
+
+    fun chooseLandmark(name: String, lat: Double, lng: Double) {
+        landmarkName = name; landmark = lat to lng; point = null
+        focus = Triple(name, lat, lng); results = emptyList(); nearby = emptyList(); message = null; query = ""
+        step = 1
+    }
+
+    // بحث بالاسم (Nominatim الموجود) مع debounce
+    LaunchedEffect(query) {
+        val q = query.trim()
+        if (step != 0 || q.length < 3) { results = emptyList(); return@LaunchedEffect }
+        delay(600)
+        busy = true
+        results = RealValhallaNavigator.searchAddressAndPlaces(
+            q, emptyList(), emptyList(),
+            if (hasRealLocation) centerLat else 0.0, if (hasRealLocation) centerLng else 0.0
+        )
+        message = if (results.isEmpty()) (RealValhallaNavigator.lastSearchError ?: "لا توجد نتائج") else null
+        busy = false
+    }
+
+    val onPicked: (Double, Double) -> Unit = { lat, lng ->
+        when (step) {
+            0 -> tapForLandmark = lat to lng            // معلم يدوي: نطلب اسمه
+            1 -> point = lat to lng
+        }
+    }
+
+    val draft: LandmarkAddress? = remember(landmark, point, landmarkName, description, label) {
+        val l = landmark; val p = point
+        if (l != null && p != null) LandmarkAddress(
+            label = label.ifBlank { "منزلي" }, landmarkName = landmarkName,
+            landmarkLat = l.first, landmarkLng = l.second, pointLat = p.first, pointLng = p.second,
+            description = description.trim()
+        ) else null
+    }
+    val markers = remember(landmark, point, landmarkName) {
+        listOfNotNull(
+            landmark?.let { Triple("المعلم: $landmarkName", it.first, it.second) },
+            point?.let { Triple("موقعي", it.first, it.second) }
+        )
+    }
+
+    Box(modifier.fillMaxSize().background(Color(0xFF0B0F19))) {
+        RealLeafletMapView(
+            userCoords = if (hasRealLocation) Pair(centerLat, centerLng) else Pair(0.0, 0.0),
+            nearbyProviders = emptyList(), nearbyStores = emptyList(), nearbyProperties = emptyList(),
+            dynamicOffsets = emptyMap(),
+            currentMapMode = MapMode.OSM,
+            selectedCity = selectedCity,
+            selectedEntity = null,
+            onProviderSelected = {}, onStoreSelected = {}, onPropertySelected = {}, onDeselect = {},
+            waypointMarkers = markers,
+            focusPoint = focus,
+            pickMode = step <= 1,
+            onMapPicked = onPicked,
+            modifier = Modifier.fillMaxSize()
+        )
+
+        // الشريط العلوي
+        Column(Modifier.align(Alignment.TopCenter).fillMaxWidth().statusBarsPadding().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Surface(shape = RoundedCornerShape(14.dp), color = Color(0xFF0F172A).copy(alpha = 0.95f), modifier = Modifier.fillMaxWidth()) {
+                Row(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("عنواني بالمعلم — الخطوة ${step + 1} من 3", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                    IconButton(onClick = onClose, modifier = Modifier.size(36.dp)) { Icon(Icons.Default.Close, contentDescription = "إغلاق", tint = Color(0xFF94A3B8)) }
+                }
+            }
+            if (step == 0) {
+                OutlinedTextField(
+                    value = query, onValueChange = { query = it }, singleLine = true,
+                    placeholder = { Text("ابحث عن معلم معروف: مسجد، مدرسة، سوق…", color = Color(0xFF94A3B8), fontSize = 12.sp) },
+                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White,
+                        focusedContainerColor = Color(0xFF0F172A), unfocusedContainerColor = Color(0xFF0F172A),
+                        focusedBorderColor = Color(0xFF00E5FF), unfocusedBorderColor = Color(0xFF334155)),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                if (busy) LinearProgressIndicator(Modifier.fillMaxWidth(), color = Color(0xFF00E5FF))
+                message?.let { Text(it, color = Color(0xFFF59E0B), fontSize = 12.sp, modifier = Modifier.background(Color(0xCC0F172A), RoundedCornerShape(8.dp)).padding(8.dp)) }
+                if (results.isNotEmpty() || nearby.isNotEmpty()) {
+                    Surface(shape = RoundedCornerShape(14.dp), color = Color(0xFF0F172A).copy(alpha = 0.97f), modifier = Modifier.fillMaxWidth().heightIn(max = 260.dp)) {
+                        LazyColumn {
+                            items(results) { r ->
+                                Text("📍 ${r.shortName}", color = Color.White, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.fillMaxWidth().clickable { chooseLandmark(r.shortName, r.latitude, r.longitude) }.padding(12.dp))
+                                HorizontalDivider(color = Color.White.copy(alpha = 0.06f))
+                            }
+                            items(nearby) { n ->
+                                Text("${n.kind}: ${n.name} (${LandmarkAddress.roundMeters(n.distanceM)})", color = Color.White, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.fillMaxWidth().clickable { chooseLandmark(n.name, n.lat, n.lng) }.padding(12.dp))
+                                HorizontalDivider(color = Color.White.copy(alpha = 0.06f))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // اللوحة السفلية
+        Surface(
+            shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+            color = Color(0xFF0F172A).copy(alpha = 0.97f),
+            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().navigationBarsPadding()
+        ) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                when (step) {
+                    0 -> {
+                        Text("اختر معلماً قريباً من منزلك يعرفه الناس. اضغط على موقعه في الخريطة إن لم تجده في القائمة.", color = Color(0xFFCBD5E1), fontSize = 13.sp)
+                        OutlinedButton(
+                            onClick = {
+                                scope.launch {
+                                    busy = true
+                                    nearby = LandmarkFinder.nearby(centerLat, centerLng)
+                                    message = if (nearby.isEmpty()) (LandmarkFinder.lastError ?: "لا معالم مسجلة قريباً؛ اضغط على الخريطة لإضافة معلم") else null
+                                    busy = false
+                                }
+                            },
+                            enabled = LandmarkAddress.isValid(centerLat, centerLng),
+                            modifier = Modifier.fillMaxWidth()
+                        ) { Text("🕌 معالم قريبة مني") }
+                        if (!LandmarkAddress.isValid(centerLat, centerLng)) Text("لإظهار المعالم القريبة فعّل GPS، أو ابحث بالاسم.", color = Color(0xFF94A3B8), fontSize = 11.sp)
+                    }
+                    1 -> {
+                        Text("المعلم: $landmarkName", color = Color(0xFF00E5FF), fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        Text("اضغط على الخريطة في مكان منزلك بالضبط. يمكنك الضغط مجدداً لتصحيحه.", color = Color(0xFFCBD5E1), fontSize = 13.sp)
+                        draft?.let { Text(it.copy(description = "").describe(), color = Color(0xFF10B981), fontSize = 13.sp, fontWeight = FontWeight.Bold) }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedButton(onClick = { step = 0; point = null }, modifier = Modifier.weight(1f)) { Text("تغيير المعلم") }
+                            Button(onClick = { step = 2 }, enabled = point != null, modifier = Modifier.weight(1f)) { Text("التالي") }
+                        }
+                    }
+                    else -> {
+                        OutlinedTextField(value = label, onValueChange = { label = it }, singleLine = true, label = { Text("اسم العنوان") }, modifier = Modifier.fillMaxWidth())
+                        OutlinedTextField(
+                            value = description, onValueChange = { description = it }, label = { Text("وصف إلزامي (البوابة الحمراء، الدور الثاني…)") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        val err = draft?.validate()
+                        draft?.let {
+                            Text(it.describe(), color = Color(0xFF10B981), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                            if (it.distanceMeters > 500) Text("المسافة عن المعلم كبيرة (${LandmarkAddress.roundMeters(it.distanceMeters)})؛ يفضّل معلم أقرب.", color = Color(0xFFF59E0B), fontSize = 11.sp)
+                        }
+                        if (err != null && description.isNotBlank()) Text(err, color = Color(0xFFF59E0B), fontSize = 11.sp)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(checked = confirmed, onCheckedChange = { confirmed = it })
+                            Text("نعم، هذا هو موقع منزلي", color = Color.White, fontSize = 13.sp)
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedButton(onClick = { step = 1; confirmed = false }, modifier = Modifier.weight(1f)) { Text("رجوع") }
+                            Button(
+                                onClick = {
+                                    val d = draft ?: return@Button
+                                    scope.launch {
+                                        val ok = withContext(Dispatchers.IO) { store.save(d) }
+                                        if (ok) { onSaved(d); onClose() } else snackbar.showSnackbar("تعذر حفظ العنوان على هذا الجهاز")
+                                    }
+                                },
+                                enabled = draft != null && err == null && confirmed,
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                                modifier = Modifier.weight(1f)
+                            ) { Text("حفظ العنوان", fontWeight = FontWeight.Bold) }
+                        }
+                    }
+                }
+            }
+        }
+        SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 220.dp))
+    }
+
+    // تسمية معلم أضافه المستخدم بالنقر على الخريطة
+    tapForLandmark?.let { (lat, lng) ->
+        AlertDialog(
+            onDismissRequest = { tapForLandmark = null; manualName = "" },
+            title = { Text("اسم هذا المعلم") },
+            text = { OutlinedTextField(value = manualName, onValueChange = { manualName = it }, singleLine = true, placeholder = { Text("مثال: مسجد النور") }) },
+            confirmButton = {
+                TextButton(enabled = manualName.trim().length >= 2, onClick = {
+                    chooseLandmark(manualName.trim(), lat, lng); tapForLandmark = null; manualName = ""
+                }) { Text("اعتماد") }
+            },
+            dismissButton = { TextButton(onClick = { tapForLandmark = null; manualName = "" }) { Text("إلغاء") } }
+        )
+    }
+}
+
+/** قائمة «عناويني»: عرض، ذهاب (المعلم أولاً ثم النقطة)، حذف. */
+@Composable
+fun SavedLandmarkAddressesDialog(
+    addresses: List<LandmarkAddress>,
+    onNavigate: (LandmarkAddress) -> Unit,
+    onDelete: (LandmarkAddress) -> Unit,
+    onAddNew: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("عناويني بالمعلم") },
+        text = {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                items(addresses) { a ->
+                    Column(Modifier.fillMaxWidth().background(Color(0x14FFFFFF), RoundedCornerShape(12.dp)).padding(10.dp)) {
+                        Text(a.label, fontWeight = FontWeight.Bold)
+                        Text(a.describe(), fontSize = 12.sp)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            TextButton(onClick = { onNavigate(a) }) { Text("اذهب") }
+                            TextButton(onClick = { onDelete(a) }) { Text("حذف", color = Color(0xFFEF4444)) }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onAddNew) { Text("إضافة عنوان") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("إغلاق") } }
+    )
+}
+
+/** بطاقة للسائق/الفني: تقرأ حقل landmarkAddress من الحجز وتعرضه مع زر الذهاب. */
+@Composable
+fun LandmarkAddressCard(address: LandmarkAddress, onNavigate: (LandmarkAddress) -> Unit, modifier: Modifier = Modifier) {
+    Surface(shape = RoundedCornerShape(14.dp), color = Color(0xFF0F172A), modifier = modifier.fillMaxWidth()) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("📍 عنوان العميل بالمعلم", color = Color(0xFF00E5FF), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            Text(address.describe(), color = Color.White, fontSize = 14.sp)
+            Button(onClick = { onNavigate(address) }, modifier = Modifier.fillMaxWidth()) { Text("اذهب: المعلم أولاً ثم الموقع") }
+        }
+    }
+}
+```
+> أسماء معاملات `RealLeafletMapView` المستعملة هي نفسها التي استعملتها `NavigationScreen` (راجع الاستدعاء هناك). إن كان لأي معامل قيمة افتراضية غير موجودة عندك أضِفها بنفس نمط `NavigationScreen`.
+> إن لم يكن `SearchAddressResult` يملك الحقول `shortName/latitude/longitude` بهذه الأسماء فعدّلها (استعملتها في حوار إضافة المحطة).
+
+## 7) `MapScreenState.kt`: الملاحة عبر المعلم
+```kotlin
+/** يبدأ الملاحة إلى نقطة العنوان مروراً بالمعلم أولاً (المعلم معروف ودقيق على الخريطة). */
+fun startNavigationViaLandmark(addr: LandmarkAddress): Boolean {
+    val home = NavWaypoint(name = addr.label, latitude = addr.pointLat, longitude = addr.pointLng)
+    selectedWaypoints.clear()
+    if (addr.distanceMeters > 60.0) {
+        selectedWaypoints.add(NavWaypoint(name = addr.landmarkName, latitude = addr.landmarkLat, longitude = addr.landmarkLng))
+    }
+    return startNavigation(home)
+}
+```
+(import `com.example.utils.LandmarkAddress`.) تنطق الملاحة «لقد وصلت إلى المحطة: مسجد النور»، ثم تكمل للنقطة.
+
+## 8) `MapScreenContent.kt`: الزر والنوافذ ولافتة GPS الضعيف
+أ) حالات (بعد `hasRealLocation`):
+```kotlin
+val addressStore = remember { LandmarkAddressStore(context.applicationContext) }
+var savedAddresses by remember { mutableStateOf<List<LandmarkAddress>>(emptyList()) }
+var showSavedAddresses by remember { mutableStateOf(false) }
+var showLandmarkAddress by remember { mutableStateOf(false) }
+LaunchedEffect(showLandmarkAddress, showSavedAddresses) {
+    savedAddresses = withContext(Dispatchers.IO) { addressStore.getAll() }
+}
+val accuracyForBanner by viewModel.userLocationAccuracyM.collectAsState()
+val gpsWeak = hasRealLocation && accuracyForBanner > 50f && accuracyForBanner < Float.MAX_VALUE
+```
+ب) شاشة المعالج (قبل كتلة `if (state.isNavigating)` وبنفس نمط الإرجاع المبكر):
+```kotlin
+if (showLandmarkAddress) {
+    LandmarkAddressScreen(
+        centerLat = safeUserLat, centerLng = safeUserLng, hasRealLocation = hasRealLocation,
+        selectedCity = state.selectedCity,
+        onSaved = { coroutineScope.launch { snackbarHostState.showSnackbar("تم حفظ عنوانك: ${it.describe()}") } },
+        onClose = { showLandmarkAddress = false }
+    )
+    return
+}
+```
+ج) داخل الـ Box الرئيسي (قرب زر الفزعة؛ اضبط الموضع بصرياً):
+```kotlin
+// لافتة GPS الضعيف
+if (gpsWeak) {
+    Surface(color = Color(0xCC7C2D12), shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 150.dp, start = 16.dp, end = 16.dp)) {
+        Row(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("إشارة GPS ضعيفة (±${accuracyForBanner.toInt()} م). لعنوان دقيق استخدم «عنواني بالمعلم».", color = Color.White, fontSize = 12.sp, modifier = Modifier.weight(1f))
+            TextButton(onClick = { showLandmarkAddress = true }) { Text("فتح", color = Color(0xFF00E5FF)) }
+        }
+    }
+}
+// زر «عنواني»
+SmallFloatingActionButton(
+    onClick = { if (savedAddresses.isEmpty()) showLandmarkAddress = true else showSavedAddresses = true },
+    containerColor = Color(0xFF0F172A),
+    modifier = Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = 190.dp)
+) { Text("🏠") }
+```
+د) نافذة «عناويني»:
+```kotlin
+if (showSavedAddresses) {
+    SavedLandmarkAddressesDialog(
+        addresses = savedAddresses,
+        onNavigate = { a ->
+            showSavedAddresses = false
+            if (!hasRealLocation) {
+                viewModel.startLocationUpdates()
+                coroutineScope.launch { snackbarHostState.showSnackbar("فعّل GPS وانتظر تحديد موقعك") }
+            } else state.startNavigationViaLandmark(a)
+        },
+        onDelete = { a -> coroutineScope.launch { withContext(Dispatchers.IO) { addressStore.delete(a.id) }; savedAddresses = withContext(Dispatchers.IO) { addressStore.getAll() } } },
+        onAddNew = { showSavedAddresses = false; showLandmarkAddress = true },
+        onDismiss = { showSavedAddresses = false }
+    )
+}
+```
+imports: `kotlinx.coroutines.Dispatchers`, `kotlinx.coroutines.withContext`, `com.example.utils.LandmarkAddress`, `com.example.utils.LandmarkAddressStore`.
+
+## 9) ربط العنوان بالحجز (للسائق/الفني)
+في الحوار الذي ينشئ الحجز (`com.example.ui.dialogs.BookingDialog` أو الدالة التي تكتب مستند الحجز):
+1. أضف قائمة اختيار «عنواني المحفوظ» (من `LandmarkAddressStore.getAll()`).
+2. عند الاختيار أضف إلى بيانات الحجز: `"landmarkAddress" to address.toMap()` وضمّن `address.describe()` في نص الملاحظات.
+3. في شاشة الفني/السائق: `LandmarkAddress.fromMap(booking["landmarkAddress"] as? Map<String, Any?> ?: emptyMap())?.let { LandmarkAddressCard(it, onNavigate = { a -> /* state.startNavigationViaLandmark(a) */ }) }`.
+> لا أرى ملف الحجز عندك؛ AI Studio يفتح الملف الفعلي ويطبّق هذه الإضافة دون تغيير الحقول القائمة.
+> **قواعد Firestore:** الحقل `landmarkAddress` يقرؤه صاحب الحجز والفني المسند فقط.
+
+## 10) الخصوصية والأمان
+- العنوان يُخزَّن مشفّراً ومحلياً؛ لا يُرسل إلا عند إرفاقه بحجز (اذكر ذلك في سياسة الخصوصية).
+- Overpass وNominatim يستقبلان إحداثيات المركز/نص البحث فقط (أشر لهما في سياسة الخصوصية).
+- التحقق: الوصف إلزامي (≥ 3 أحرف)، والمسافة عن المعلم ≤ 1.5 كم، وتأكيد صريح «هذا هو موقع منزلي» (طبقة حماية من خطأ التحديد).
+
+## 11) اختبارات وحدة (JVM)
+```kotlin
+package com.example.utils
+
+import org.junit.Assert.*
+import org.junit.Test
+
+class LandmarkAddressTest {
+    private fun addr(dLat: Double = 0.0, dLng: Double = 0.0, desc: String = "البوابة الحمراء") = LandmarkAddress(
+        label = "منزلي", landmarkName = "مسجد النور", landmarkLat = 15.3694, landmarkLng = 44.1910,
+        pointLat = 15.3694 + dLat, pointLng = 44.1910 + dLng, description = desc
+    )
+    @Test fun northOffsetDescribed() =
+        assertEquals("على بعد 80 م شمال مسجد النور، البوابة الحمراء", addr(dLat = 0.0007).describe())
+    @Test fun eastDirection() = assertTrue(addr(dLng = 0.0003).describe().contains("شرق"))
+    @Test fun southWestDirection() = assertTrue(addr(dLat = -0.0005, dLng = -0.0005).describe().contains("جنوب غرب"))
+    @Test fun veryCloseIsAtLandmark() = assertTrue(addr(dLat = 0.00005).describe().startsWith("عند مسجد النور"))
+    @Test fun descriptionRequired() = assertNotNull(addr(desc = "ab").validate())
+    @Test fun tooFarRejected() = assertNotNull(addr(dLat = 0.02).validate())      // ≈ 2.2 كم
+    @Test fun validPasses() = assertNull(addr(dLat = 0.0007).validate())
+    @Test fun roundTripMap() {
+        val a = addr(dLat = 0.0007)
+        val b = LandmarkAddress.fromMap(a.toMap())!!
+        assertEquals(a.describe(), b.describe())
+    }
+}
+```
+## 12) اختبار على الهاتف
+1. أطفئ GPS: افتح «🏠» ← ابحث «مسجد» أو اضغط على موقع مسجد معروف وسمّه ← اضغط موقع منزلك ← اكتب وصفاً ← أكّد ← يظهر الوصف الصحيح بالاتجاه والمسافة.
+2. أغلق التطبيق وافتحه: «عناويني» تعرض العنوان (مخزّن مشفّراً).
+3. «اذهب» مع GPS يعمل: ملاحة بمحطتين (المعلم ثم النقطة) والنطق الصحيح.
+4. حجز بعنوان محفوظ: يصل للفني نص العنوان ونقطتاه.
+5. وضع الطيران: البحث والمعالم القريبة تفشل برسالة واضحة، والنقر اليدوي على الخريطة يعمل (إن كانت البلاطات مخزّنة).

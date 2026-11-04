@@ -1,0 +1,90 @@
+# 53 – فحص ملفات الخرائط الأخيرة + إضافة الوظائف الناقصة (مجاناً وبلا مفاتيح)
+
+## أ) نتيجة فحص الملفات الثمانية
+`ArVpsCameraOverlay_76a2f5`, `AlephVisualAssistantDialog_5089c1`, `CityAliases_0243af`, `MapJsonBuilder_9e9543`, `OfflineTileInterceptor_d5b284`, `OfflineMapManager_d8dc88`, `MapDistanceCalculator_b2b7cf`, `MapScreen_86b0ca` — **كلها مطابقة لما طُلب** ولا أخطاء جديدة:
+- AR: `cameraMode`، إعادة المحاولة، فتح الإعدادات، CameraX (لا `android.hardware.Camera`).
+- Aleph: بلا «ممتاز» ولا «OAM»، النتائج قابلة للنقر، و`hasUserLocation`.
+- `CityAliases` بلا كلمات عامة، و`MapJsonBuilder` بالمطابقة بالرموز و`MAX_PER_TYPE` وتقييم «جديد»، والمعترض (نطاق OSM الاختياري ولمس LRU وبلا تخزين لـ Esri)، والكاش 300MB، والمسافات.
+- `MapScreen_86b0ca` لا يشير لملفات MVI: **ملفات MVI الأربعة ميتة تماماً ويمكن حذفها بأمان** (`MapScreenViewModel/Events/UiState/Layout`).
+**المتبقي من المستند 52 ما زال قائماً** (دورة حياة الموقع، الإفصاح، Gradle، حذف `MapAssetMemoryCache` و`MapBookingDialog`، `AppErrorLogManager`).
+
+## ب) مقارنة الوظائف المطلوبة بما في التطبيق
+| الوظيفة في وثيقتك | الحالة | الإجراء |
+|---|---|---|
+| شريط علوي: رجوع، بحث، مدن، فلتر تصنيفات | ✅ موجودة | — |
+| البحث + «انتقال سينمائي» لموقع النتيجة | ⚠️ ينتقل بلا حركة | **أضفها (ج-1)** |
+| موقعي، الملاحة، تكبير/تصغير، رادار/خريطة، طبقات، حرارية | ✅ موجودة | — |
+| ثلاثي الأبعاد (إمالة 32° ومجسمات) | ❌ أُزيل (كان وهمياً) | **وضع اختياري حقيقي: المستند 55** |
+| Vela 3D | ❌ | يُغطّى بالمستند 55 |
+| صور جوية (Aerial) | ✅ باسم «أقمار صناعية» (Esri) | — |
+| AR، الملاحة المتقدمة، المساعد (Aleph) | ✅ بصيغتها الصادقة (موقع + بوصلة / ملخص من البيانات) | — |
+| طبقة «هجين معرّب» (صور + أسماء الشوارع) | ❌ | **أضفها (ج-2)** كمفتاح اختياري |
+| `google_streets` و`google_hybrid` | ❌ **لن تُضاف** | انظر (د) |
+| `osm_ar` (OSM «معرّب») | ✅ OSM موجودة | تسميتها الصادقة «OpenStreetMap» (د) |
+| طبقة «الملاحة» (للطرق السريعة) | ✅ تُستعمل OSM تلقائياً داخل الملاحة | لا طبقة منفصلة |
+| «العنوان بالمعلم» (حل تشويش GPS) | ❌ | **المستند 54** |
+
+## ج) الإضافات (مجانية، بلا مفتاح، معزولة)
+### ج-1) انتقال سينمائي للبحث
+في `map.html` داخل `showSearchPinBase64` استبدل `map.setView([p.lat, p.lng], 16)` (أو 17 إن كان مضبوطاً) بـ:
+```javascript
+map.flyTo([p.lat, p.lng], 17, { duration: 1.2, easeLinearity: 0.25 });
+```
+(`flyTo` مدمجة في Leaflet، بلا مكتبات.) وللتوافق مع الأجهزة الضعيفة: `duration: 0.8`.
+
+### ج-2) «أسماء الشوارع فوق الصور» (طبقة هجينة اختيارية)
+تُرسم فوق الأقمار الصناعية طبقة أسماء/حدود من خدمة Esri المرجعية. **ليست مضمونة بالعربية** (تعتمد على مصدر Esri) فلا نسمّيها «معرّبة». وهي من الخدمة نفسها التي تأتي منها صور الأقمار؛ **راجع شروط استخدام Esri قبل النشر** (كما ذكرت للصور). تُعطَّل افتراضياً.
+`map.html` (قبل `window.onload`):
+```javascript
+var labelsOverlay = null;
+function setHybridLabels(on) {
+    if (!map) return;
+    if (on) {
+        if (!labelsOverlay) {
+            labelsOverlay = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
+                maxZoom: 24, maxNativeZoom: 19, zIndex: 5,
+                attribution: 'أسماء © <a href="https://www.esri.com">Esri</a>'
+            });
+        }
+        if (!map.hasLayer(labelsOverlay)) labelsOverlay.addTo(map);
+    } else if (labelsOverlay && map.hasLayer(labelsOverlay)) {
+        map.removeLayer(labelsOverlay);
+    }
+}
+window.setHybridLabels = setHybridLabels;
+```
+`RealLeafletMapView.kt` (معامل اختياري):
+```kotlin
+hybridLabels: Boolean = false,
+...
+LaunchedEffect(isMapReady, hybridLabels, currentMapMode) {
+    if (!isMapReady) return@LaunchedEffect
+    val on = hybridLabels && (currentMapMode == MapMode.SATELLITE || currentMapMode == MapMode.VELA_3D)
+    webViewRef?.evaluateJavascript("if (window.setHybridLabels) { window.setHybridLabels($on); }", null)
+}
+```
+`MapScreenContent.kt`:
+```kotlin
+var hybridLabels by remember { mutableStateOf(false) }
+// في استدعاء RealLeafletMapView(...):  hybridLabels = hybridLabels,
+// داخل الـ Box الرئيسي (قرب شريط الفلاتر؛ اضبط الموضع بصرياً):
+if (state.currentMapMode == MapMode.SATELLITE || state.currentMapMode == MapMode.VELA_3D) {
+    FilterChip(
+        selected = hybridLabels, onClick = { hybridLabels = !hybridLabels },
+        label = { Text("أسماء الشوارع", fontSize = 12.sp) },
+        modifier = Modifier.align(Alignment.TopStart).statusBarsPadding().padding(top = 120.dp, start = 16.dp)
+    )
+}
+```
+> لا تغيّر `MapMode` (إضافة قيمة جديدة قد تكسر تعابير `when` الشاملة في ملفات أخرى).
+
+### ج-3) أسماء الطبقات الصادقة في `MapLayersDialog`
+«خريطة OpenStreetMap القياسية (الأسماء كما في قاعدة OSM)»، «شوارع HOT»، «تضاريس OpenTopoMap»، «أقمار صناعية (Esri)». (بلا «معرّب» ولا «Google».)
+
+## د) لماذا لا تُضاف طبقات Google
+عناوين بلاطات Google (`mt0/mt1.google.com...`) لا تُتاح بلا مفتاح ولا حساب فوترة في Google Maps Platform؛ استعمالها المباشر في تطبيق مخالف لشروط Google ويمكن حجبه في أي لحظة (فتفشل الخريطة عند كل المستخدمين)، وهو مناقض لشرطك «مجاني وبلا مفاتيح». البديل المجاني القانوني الذي أوصي به: OSM + HOT + OpenTopoMap + Esri للصور (مع مراجعة شروطها)، ولاحقاً بلاطات OSM الخاصة بك (MBTiles) لتعمل أوفلاين بلا اعتماد على أحد.
+
+## هـ) اختبار
+1. ابحث عن فني: تنتقل الخريطة إليه بحركة سلسة بدل القفز.
+2. في وضع الأقمار الصناعية فعّل «أسماء الشوارع»: تظهر الأسماء فوق الصور؛ وفي OSM يختفي المفتاح.
+3. لا تأثير على الملاحة ولا الرادار (الإضافات معزولة).

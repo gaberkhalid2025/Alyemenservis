@@ -82,7 +82,7 @@ android {
   }
 
   lint {
-    checkReleaseBuilds = false
+    checkReleaseBuilds = true
     abortOnError = false
   }
 
@@ -96,6 +96,9 @@ android {
     }
     debug {
       isMinifyEnabled = false
+      ndk {
+        abiFilters.add("x86_64")
+      }
       signingConfig = signingConfigs.getByName("debugConfig")
     }
   }

@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ar" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<link rel="stylesheet" href="maplibre-gl.css">
+<style>
+  html, body, #map { margin:0; height:100%; width:100%; background:#0B0F19; }
+  .pin { font-size:18px; line-height:1; background:#fff; border:2px solid #2563EB; border-radius:50%; width:30px; height:30px;
+         display:flex; align-items:center; justify-content:center; box-shadow:0 2px 6px rgba(0,0,0,.45); }
+  .pin.approx { opacity:.6; border-style:dashed; }
+  .me { width:18px; height:18px; background:#10B981; border:3px solid #fff; border-radius:50%; box-shadow:0 0 0 6px rgba(16,185,129,.30); }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<script src="maplibre-gl.js"></script>
+<script>
+(function () {
+  var STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty';   // قابل للاستبدال (ثابت واحد)
+  var map = null, markers = [], meMarker = null, styleReady = false;
+
+  function unavailable(msg) { try { if (window.AndroidBridge && window.AndroidBridge.onUnavailable) window.AndroidBridge.onUnavailable(String(msg)); } catch (e) {} }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+
+  // كشف الدعم قبل أي شيء
+  var probe = document.createElement('canvas');
+  if (!window.maplibregl) { unavailable('مكتبة الخريطة ثلاثية الأبعاد غير موجودة'); return; }
+  if (!probe.getContext('webgl2')) { unavailable('جهازك لا يدعم الرسم ثلاثي الأبعاد (WebGL2)'); return; }
+
+  window.init3D = function (lat, lng) {
+    try {
+      map = new maplibregl.Map({
+        container: 'map', style: STYLE_URL,
+        center: [lng, lat], zoom: 16, pitch: 60, bearing: -17,
+        attributionControl: { compact: true }          // الإسناد يبقى ظاهراً (مطلوب)
+      });
+      map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right');
+      map.on('load', function () {
+        styleReady = true;
+        if (window.AndroidBridge && window.AndroidBridge.onMapReady) window.AndroidBridge.onMapReady();
+      });
+      map.on('error', function (e) { if (!styleReady) unavailable('تعذر تحميل نمط الخريطة (تحتاج إنترنت)'); });
+      setTimeout(function () { if (!styleReady) unavailable('انتهت مهلة تحميل الخريطة (تحتاج إنترنت)'); }, 15000);
+    } catch (e) { unavailable('تعذر تشغيل الخريطة: ' + e); }
+  };
+
+  window.setMarkersBase64 = function (b64) {
+    if (!map) return;
+    try {
+      markers.forEach(function (m) { m.remove(); }); markers = [];
+      var list = JSON.parse(decodeURIComponent(escape(window.atob(b64))));
+      list.forEach(function (m) {
+        if (typeof m.lat !== 'number' || typeof m.lng !== 'number' || (m.lat === 0 && m.lng === 0)) return;
+        var el = document.createElement('div');
+        el.className = 'pin' + (m.isApprox === true ? ' approx' : '');
+        el.textContent = m.emoji || '📍';
+        el.title = esc(m.name);
+        var type = String(m.type || '').toUpperCase(), id = String(m.id);
+        el.addEventListener('click', function (ev) {
+          ev.stopPropagation();
+          if (window.AndroidBridge && window.AndroidBridge.onMarkerClicked) window.AndroidBridge.onMarkerClicked(id, type);
+        });
+        markers.push(new maplibregl.Marker({ element: el }).setLngLat([m.lng, m.lat]).addTo(map));
+      });
+    } catch (e) { console.error('markers3d', e); }
+  };
+
+  window.setUser = function (lat, lng, follow) {
+    if (!map || !isFinite(lat) || !isFinite(lng) || (lat === 0 && lng === 0)) return;
+    if (!meMarker) { var el = document.createElement('div'); el.className = 'me'; meMarker = new maplibregl.Marker({ element: el }).setLngLat([lng, lat]).addTo(map); }
+    else meMarker.setLngLat([lng, lat]);
+    if (follow) map.easeTo({ center: [lng, lat], duration: 600 });
+  };
+
+  window.setRouteBase64 = function (b64) {
+    if (!map || !styleReady) return;
+    try {
+      var pts = JSON.parse(window.atob(b64));                         // [[lat,lng],...]
+      var coords = pts.map(function (p) { return [p[1], p[0]]; });
+      var data = { type: 'Feature', geometry: { type: 'LineString', coordinates: coords } };
+      if (map.getSource('route')) { map.getSource('route').setData(data); return; }
+      map.addSource('route', { type: 'geojson', data: data });
+      map.addLayer({ id: 'route-casing', type: 'line', source: 'route', paint: { 'line-color': '#0B1120', 'line-width': 10 }, layout: { 'line-cap': 'round', 'line-join': 'round' } });
+      map.addLayer({ id: 'route-line', type: 'line', source: 'route', paint: { 'line-color': '#00E5FF', 'line-width': 5 }, layout: { 'line-cap': 'round', 'line-join': 'round' } });
+    } catch (e) { console.error('route3d', e); }
+  };
+
+  window.setPitch = function (deg) { if (map) map.easeTo({ pitch: Math.max(0, Math.min(75, deg)), duration: 500 }); };
+})();
+</script>
+</body>
+</html>

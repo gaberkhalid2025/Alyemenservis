@@ -31,7 +31,9 @@ import androidx.compose.ui.window.DialogProperties
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 
 data class ErrorLogItem(
     val id: String = UUID.randomUUID().toString(),
@@ -47,66 +49,52 @@ object AppErrorLogManager {
     val logs: StateFlow<List<ErrorLogItem>> = _logs.asStateFlow()
 
     private const val MAX_LOGS = 150
+    private val lastReported = ConcurrentHashMap<String, Long>()
 
-    fun logFirestoreError(tag: String, message: String, throwable: Throwable? = null) {
+    private val PHONE = Regex("\\+?\\d[\\d\\s-]{7,}\\d")
+    private val COORD = Regex("-?\\d{1,3}\\.\\d{4,}\\s*,\\s*-?\\d{1,3}\\.\\d{4,}")
+    private fun redact(s: String) = s.replace(PHONE, "[رقم]").replace(COORD, "[موقع]")
+
+    private fun shouldReport(key: String): Boolean {
+        val now = System.currentTimeMillis()
+        val last = lastReported[key]
+        return if (last == null || now - last > 60_000L) {
+            lastReported[key] = now
+            true
+        } else false
+    }
+
+    private fun report(defaultTag: String, type: String, tag: String, message: String, throwable: Throwable?) {
         val details = throwable?.stackTraceToString() ?: throwable?.localizedMessage ?: ""
         addLog(
             ErrorLogItem(
-                tag = if (tag.isBlank()) "Firestore" else tag,
+                tag = tag.ifBlank { defaultTag },
                 message = message,
                 details = details,
-                type = "FIRESTORE"
+                type = type
             )
         )
-        try {
-            MyApplication.instance?.recordExceptionSafely(
-                throwable ?: Exception("$tag: $message")
-            )
-        } catch (e: Exception) { /* تجاهل */ }
+        if (shouldReport("$tag:$message")) {
+            try {
+                MyApplication.instance?.recordExceptionSafely(
+                    throwable ?: Exception("$tag: $message")
+                )
+            } catch (_: Exception) { /* تجاهل */ }
+        }
     }
 
-    fun logApiError(tag: String, message: String, throwable: Throwable? = null) {
-        val details = throwable?.stackTraceToString() ?: throwable?.localizedMessage ?: ""
-        addLog(
-            ErrorLogItem(
-                tag = if (tag.isBlank()) "API" else tag,
-                message = message,
-                details = details,
-                type = "API"
-            )
-        )
-        try {
-            MyApplication.instance?.recordExceptionSafely(
-                throwable ?: Exception("$tag: $message")
-            )
-        } catch (e: Exception) { /* تجاهل */ }
-    }
+    fun logFirestoreError(tag: String, message: String, throwable: Throwable? = null) =
+        report("Firestore", "FIRESTORE", tag, message, throwable)
 
-    fun logGenericError(tag: String, message: String, throwable: Throwable? = null) {
-        val details = throwable?.stackTraceToString() ?: throwable?.localizedMessage ?: ""
-        addLog(
-            ErrorLogItem(
-                tag = if (tag.isBlank()) "General" else tag,
-                message = message,
-                details = details,
-                type = "GENERAL"
-            )
-        )
-        try {
-            MyApplication.instance?.recordExceptionSafely(
-                throwable ?: Exception("$tag: $message")
-            )
-        } catch (e: Exception) { /* تجاهل */ }
-    }
+    fun logApiError(tag: String, message: String, throwable: Throwable? = null) =
+        report("API", "API", tag, message, throwable)
+
+    fun logGenericError(tag: String, message: String, throwable: Throwable? = null) =
+        report("General", "GENERAL", tag, message, throwable)
 
     private fun addLog(item: ErrorLogItem) {
-        val current = _logs.value.toMutableList()
-        current.add(0, item)
-        if (current.size > MAX_LOGS) {
-            _logs.value = current.take(MAX_LOGS)
-        } else {
-            _logs.value = current
-        }
+        val safe = item.copy(message = redact(item.message), details = redact(item.details))
+        _logs.update { (listOf(safe) + it).take(MAX_LOGS) }
     }
 
     fun clearLogs() {

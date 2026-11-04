@@ -221,6 +221,30 @@
             });
         }
 
+        var pickModeEnabled = false;
+        function setPickMode(on) {
+            pickModeEnabled = !!on;
+            try { if (map) map.getContainer().style.cursor = pickModeEnabled ? 'crosshair' : ''; } catch (e) {}
+        }
+        window.setPickMode = setPickMode;
+
+        var labelsOverlay = null;
+        function setHybridLabels(on) {
+            if (!map) return;
+            if (on) {
+                if (!labelsOverlay) {
+                    labelsOverlay = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
+                        maxZoom: 24, maxNativeZoom: 19, zIndex: 5,
+                        attribution: 'أسماء © <a href="https://www.esri.com">Esri</a>'
+                    });
+                }
+                if (!map.hasLayer(labelsOverlay)) labelsOverlay.addTo(map);
+            } else if (labelsOverlay && map.hasLayer(labelsOverlay)) {
+                map.removeLayer(labelsOverlay);
+            }
+        }
+        window.setHybridLabels = setHybridLabels;
+
         function initMap(lat, lng, mode) {
             userLat = lat || 15.3694;
             userLng = lng || 44.1910;
@@ -246,7 +270,13 @@
                 map.on('dragstart', function () {
                     if (window.AndroidBridge && window.AndroidBridge.onUserPanned) window.AndroidBridge.onUserPanned();
                 });
-                map.on('click', function () {
+                map.on('click', function (e) {
+                    if (pickModeEnabled) {
+                        if (window.AndroidBridge && window.AndroidBridge.onMapPicked) {
+                            window.AndroidBridge.onMapPicked(e.latlng.lat, e.latlng.lng);
+                        }
+                        return;
+                    }
                     if (window.AndroidBridge && window.AndroidBridge.onMapClicked) window.AndroidBridge.onMapClicked();
                 });
 
@@ -487,7 +517,7 @@
                     '<div class="custom-pin-label">' + esc(p.name) + '</div></div>';
                 var icon = L.divIcon({ className: 'custom-leaflet-marker', html: html, iconSize: [145, 65], iconAnchor: [72, 38] });
                 searchPin = L.marker([p.lat, p.lng], { icon: icon }).addTo(map);
-                map.setView([p.lat, p.lng], 16);
+                map.flyTo([p.lat, p.lng], 17, { duration: 1.2, easeLinearity: 0.25 });
             } catch (e) {
                 console.error('showSearchPin error', e);
             }

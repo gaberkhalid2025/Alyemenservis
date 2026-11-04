@@ -49,6 +49,15 @@ fun BookingDialog(
     var bookingPinCodeInput by remember { mutableStateOf("") }
     var bookingCustomIdInput by remember { mutableStateOf("") }
 
+    val landmarkStore = remember { com.example.utils.LandmarkAddressStore(context.applicationContext) }
+    var savedLandmarkAddresses by remember { mutableStateOf<List<com.example.utils.LandmarkAddress>>(emptyList()) }
+    var selectedLandmark by remember { mutableStateOf<com.example.utils.LandmarkAddress?>(null) }
+    LaunchedEffect(Unit) {
+        savedLandmarkAddresses = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            landmarkStore.getAll()
+        }
+    }
+
     var showBookingConfirmDialog by remember { mutableStateOf(false) }
     var bookingFormSubmittedOnce by remember { mutableStateOf(false) }
     var bookingFormMissingFields by remember { mutableStateOf<List<String>>(emptyList()) }
@@ -186,6 +195,26 @@ fun BookingDialog(
                     isError = bookingFormSubmittedOnce && customerAreaInput.trim().isEmpty(),
                     colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
                 )
+
+                if (savedLandmarkAddresses.isNotEmpty()) {
+                    Text("📍 أو اختر من عناويني المحفوظة بالمعلم:", color = Color(0xFF00E5FF), fontSize = 10.5.sp)
+                    androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        items(savedLandmarkAddresses.size) { idx ->
+                            val addr = savedLandmarkAddresses[idx]
+                            SuggestionChip(
+                                onClick = {
+                                    customerAreaInput = addr.describe()
+                                    selectedLandmark = addr
+                                },
+                                label = { Text("🏠 ${addr.label} (${addr.landmarkName})", fontSize = 10.sp) },
+                                colors = SuggestionChipDefaults.suggestionChipColors(
+                                    containerColor = if (selectedLandmark?.id == addr.id) Color(0xFF065F46) else Color(0xFF0F172A),
+                                    labelColor = Color.White
+                                )
+                            )
+                        }
+                    }
+                }
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),

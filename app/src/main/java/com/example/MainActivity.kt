@@ -12,9 +12,9 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.viewModels
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -52,6 +52,7 @@ import com.example.ui.screens.about.*
 import com.example.utils.*
 import com.example.ui.viewmodels.*
 
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
@@ -72,6 +73,22 @@ class MainActivity : ComponentActivity() {
                 voiceResultCallback?.invoke(matches[0])
             }
         }
+    }
+
+    private val viewModel: MainViewModel by viewModels()
+
+    private fun hasLocationPermission() =
+        PermissionManager.hasPermission(this, PermissionManager.PERMISSION_FINE_LOCATION) ||
+        PermissionManager.hasPermission(this, PermissionManager.PERMISSION_COARSE_LOCATION)
+
+    override fun onStart() {
+        super.onStart()
+        if (hasLocationPermission()) viewModel.startLocationUpdates()
+    }
+
+    override fun onStop() {
+        viewModel.stopLocationUpdates()
+        super.onStop()
     }
 
     override fun onNewIntent(intent: Intent) {

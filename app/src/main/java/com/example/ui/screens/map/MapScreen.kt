@@ -17,9 +17,10 @@ import com.example.utils.resolveThemePalette
  * - MapScreenContent (Primary presentation layout)
  * - MapScreenState (State container)
  * - MapScreenFilters (City & category filter logic)
- * - MapScreenUiState & MapScreenEvents (MVI architecture)
  * - RadarRenderer (Canvas radar with dual pulses & sweep animation)
  * - RealLeafletMapView (OSM Tiles + Clustering + Offline Cache)
+ * - LandmarkAddressScreen (Visual Landmark Addresses for GPS jamming resilience)
+ * - Map3DView (MapLibre GL 3D vector map)
  */
 @Composable
 fun MapScreen(

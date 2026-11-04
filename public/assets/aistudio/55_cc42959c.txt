@@ -1,0 +1,267 @@
+# 55 – وضع 3D حقيقي (اختياري): MapLibre + OpenFreeMap — مجاني وبلا مفاتيح
+**ما هو:** خريطة متجهة (Vector) مع إمالة وتدوير ومباني بارزة (حيث تتوفر بيانات OSM) داخل `WebView` منفصل، تُفتح فوق الخريطة الحالية من زر «3D».
+**لماذا هذه الطريقة:** Leaflet لا يدعم الإمالة ولا المباني. المكتبة **MapLibre GL JS** مفتوحة المصدر، ومصدر البلاطات **OpenFreeMap** مجاني: بحسب موقعه لا حدود على الطلبات، ولا تسجيل ولا مفاتيح API، والاستخدام التجاري مسموح، والإسناد مطلوب (ويضيفه MapLibre تلقائياً). **تنبيه صادق:** شروط الخدمة العامة تصفها بأنها «كما هي» وقابلة للتغيير أو التوقف؛ لذلك رابط النمط في ثابت واحد قابل للاستبدال (ولاحقاً يمكنك استضافة نمطك).
+**القيود التي يجب أن تعرفها:**
+- يعمل **بالإنترنت فقط** (لا أوفلاين).
+- يحتاج WebView يدعم WebGL2؛ على أجهزة أندرويد 7 القديمة بلا تحديث للـ WebView قد لا يعمل: الكود يكتشف ذلك ويخفي الزر برسالة، فلا يتأثر التطبيق.
+- المباني تظهر حيث يملك OSM بيانات مبانٍ؛ التغطية في اليمن جزئية.
+- **عزل كامل:** إن لم تضف ملفات المكتبة فالزر لا يظهر ولا يتغير شيء في التطبيق.
+
+## 1) تحميل المكتبة مرة واحدة (بلا حساب ولا مفتاح)
+ضع الملفين في `app/src/main/assets/` (ثبّت إصداراً محدداً وتحقق من بصمته؛ أحدث إصدار ظهر لي في البحث كان 5.24.0، تحقق من آخر إصدار مستقر):
+```bash
+cd app/src/main/assets
+curl -L https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js  -o maplibre-gl.js
+curl -L https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css -o maplibre-gl.css
+sha256sum maplibre-gl.js maplibre-gl.css      # احتفظ بالبصمة في ملف README داخل المستودع
+```
+(الترخيص BSD-3؛ احتفظ بملف الترخيص في المستودع.)
+
+## 2) ملف جديد: `app/src/main/assets/map3d.html`
+```html
+<!DOCTYPE html>
+<html lang="ar" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<link rel="stylesheet" href="maplibre-gl.css">
+<style>
+  html, body, #map { margin:0; height:100%; width:100%; background:#0B0F19; }
+  .pin { font-size:18px; line-height:1; background:#fff; border:2px solid #2563EB; border-radius:50%; width:30px; height:30px;
+         display:flex; align-items:center; justify-content:center; box-shadow:0 2px 6px rgba(0,0,0,.45); }
+  .pin.approx { opacity:.6; border-style:dashed; }
+  .me { width:18px; height:18px; background:#10B981; border:3px solid #fff; border-radius:50%; box-shadow:0 0 0 6px rgba(16,185,129,.30); }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<script src="maplibre-gl.js"></script>
+<script>
+(function () {
+  var STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty';   // قابل للاستبدال (ثابت واحد)
+  var map = null, markers = [], meMarker = null, styleReady = false;
+
+  function unavailable(msg) { try { if (window.AndroidBridge && window.AndroidBridge.onUnavailable) window.AndroidBridge.onUnavailable(String(msg)); } catch (e) {} }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+
+  // كشف الدعم قبل أي شيء
+  var probe = document.createElement('canvas');
+  if (!window.maplibregl) { unavailable('مكتبة الخريطة ثلاثية الأبعاد غير موجودة'); return; }
+  if (!probe.getContext('webgl2')) { unavailable('جهازك لا يدعم الرسم ثلاثي الأبعاد (WebGL2)'); return; }
+
+  window.init3D = function (lat, lng) {
+    try {
+      map = new maplibregl.Map({
+        container: 'map', style: STYLE_URL,
+        center: [lng, lat], zoom: 16, pitch: 60, bearing: -17,
+        attributionControl: { compact: true }          // الإسناد يبقى ظاهراً (مطلوب)
+      });
+      map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right');
+      map.on('load', function () {
+        styleReady = true;
+        if (window.AndroidBridge && window.AndroidBridge.onMapReady) window.AndroidBridge.onMapReady();
+      });
+      map.on('error', function (e) { if (!styleReady) unavailable('تعذر تحميل نمط الخريطة (تحتاج إنترنت)'); });
+      setTimeout(function () { if (!styleReady) unavailable('انتهت مهلة تحميل الخريطة (تحتاج إنترنت)'); }, 15000);
+    } catch (e) { unavailable('تعذر تشغيل الخريطة: ' + e); }
+  };
+
+  window.setMarkersBase64 = function (b64) {
+    if (!map) return;
+    try {
+      markers.forEach(function (m) { m.remove(); }); markers = [];
+      var list = JSON.parse(decodeURIComponent(escape(window.atob(b64))));
+      list.forEach(function (m) {
+        if (typeof m.lat !== 'number' || typeof m.lng !== 'number' || (m.lat === 0 && m.lng === 0)) return;
+        var el = document.createElement('div');
+        el.className = 'pin' + (m.isApprox === true ? ' approx' : '');
+        el.textContent = m.emoji || '📍';
+        el.title = esc(m.name);
+        var type = String(m.type || '').toUpperCase(), id = String(m.id);
+        el.addEventListener('click', function (ev) {
+          ev.stopPropagation();
+          if (window.AndroidBridge && window.AndroidBridge.onMarkerClicked) window.AndroidBridge.onMarkerClicked(id, type);
+        });
+        markers.push(new maplibregl.Marker({ element: el }).setLngLat([m.lng, m.lat]).addTo(map));
+      });
+    } catch (e) { console.error('markers3d', e); }
+  };
+
+  window.setUser = function (lat, lng, follow) {
+    if (!map || !isFinite(lat) || !isFinite(lng) || (lat === 0 && lng === 0)) return;
+    if (!meMarker) { var el = document.createElement('div'); el.className = 'me'; meMarker = new maplibregl.Marker({ element: el }).setLngLat([lng, lat]).addTo(map); }
+    else meMarker.setLngLat([lng, lat]);
+    if (follow) map.easeTo({ center: [lng, lat], duration: 600 });
+  };
+
+  window.setRouteBase64 = function (b64) {
+    if (!map || !styleReady) return;
+    try {
+      var pts = JSON.parse(window.atob(b64));                         // [[lat,lng],...]
+      var coords = pts.map(function (p) { return [p[1], p[0]]; });
+      var data = { type: 'Feature', geometry: { type: 'LineString', coordinates: coords } };
+      if (map.getSource('route')) { map.getSource('route').setData(data); return; }
+      map.addSource('route', { type: 'geojson', data: data });
+      map.addLayer({ id: 'route-casing', type: 'line', source: 'route', paint: { 'line-color': '#0B1120', 'line-width': 10 }, layout: { 'line-cap': 'round', 'line-join': 'round' } });
+      map.addLayer({ id: 'route-line', type: 'line', source: 'route', paint: { 'line-color': '#00E5FF', 'line-width': 5 }, layout: { 'line-cap': 'round', 'line-join': 'round' } });
+    } catch (e) { console.error('route3d', e); }
+  };
+
+  window.setPitch = function (deg) { if (map) map.easeTo({ pitch: Math.max(0, Math.min(75, deg)), duration: 500 }); };
+})();
+</script>
+</body>
+</html>
+```
+## 3) ملف جديد: `Map3DView.kt` (`ui/screens/map`)
+```kotlin
+package com.example.ui.screens.map
+
+import android.annotation.SuppressLint
+import android.content.Context
+import android.os.Handler
+import android.os.Looper
+import android.util.Base64
+import android.webkit.JavascriptInterface
+import android.webkit.WebSettings
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.viewinterop.AndroidView
+
+object Map3D {
+    /** الزر لا يظهر إلا إن وُجدت ملفات المكتبة في assets. */
+    fun isAvailable(context: Context): Boolean = try {
+        val names = context.assets.list("")?.toSet().orEmpty()
+        "map3d.html" in names && "maplibre-gl.js" in names && "maplibre-gl.css" in names
+    } catch (e: Exception) { false }
+}
+
+@SuppressLint("SetJavaScriptEnabled")
+@Composable
+fun Map3DView(
+    centerLat: Double,
+    centerLng: Double,
+    userCoords: Pair<Double, Double>?,
+    markersJson: String,
+    routeCoordinates: List<Pair<Double, Double>> = emptyList(),
+    onMarkerClicked: (id: String, type: String) -> Unit,
+    onUnavailable: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val mainHandler = remember { Handler(Looper.getMainLooper()) }
+    val markerCb by rememberUpdatedState(onMarkerClicked)
+    val unavailableCb by rememberUpdatedState(onUnavailable)
+    var webView by remember { mutableStateOf<WebView?>(null) }
+    var ready by remember { mutableStateOf(false) }
+
+    AndroidView(
+        modifier = modifier,
+        factory = { ctx ->
+            WebView(ctx).apply {
+                settings.apply {
+                    javaScriptEnabled = true
+                    domStorageEnabled = true
+                    cacheMode = WebSettings.LOAD_DEFAULT
+                    allowFileAccess = false              // أصول assets لا تتأثر بهذا الإعداد
+                    allowContentAccess = false
+                    userAgentString = "AlYemenServicesApp/1.0 (Android; OpenStreetMap)"
+                }
+                addJavascriptInterface(object {
+                    @JavascriptInterface fun onMapReady() { mainHandler.post { ready = true } }
+                    @JavascriptInterface fun onMarkerClicked(id: String, type: String) { mainHandler.post { markerCb(id, type) } }
+                    @JavascriptInterface fun onUnavailable(reason: String) { mainHandler.post { unavailableCb(reason) } }
+                }, "AndroidBridge")
+                webViewClient = object : WebViewClient() {
+                    override fun onPageFinished(view: WebView?, url: String?) {
+                        view?.evaluateJavascript("if (window.init3D) { window.init3D($centerLat, $centerLng); }", null)
+                    }
+                }
+                loadUrl("file:///android_asset/map3d.html")
+                webView = this
+            }
+        },
+        onRelease = { w -> w.stopLoading(); w.removeJavascriptInterface("AndroidBridge"); w.destroy() }
+    )
+
+    LaunchedEffect(ready, markersJson) {
+        if (!ready || markersJson.isBlank()) return@LaunchedEffect
+        val b64 = Base64.encodeToString(markersJson.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
+        webView?.evaluateJavascript("if (window.setMarkersBase64) { window.setMarkersBase64('$b64'); }", null)
+    }
+    LaunchedEffect(ready, userCoords) {
+        val u = userCoords ?: return@LaunchedEffect
+        if (ready && (u.first != 0.0 || u.second != 0.0)) webView?.evaluateJavascript("if (window.setUser) { window.setUser(${u.first}, ${u.second}, false); }", null)
+    }
+    LaunchedEffect(ready, routeCoordinates) {
+        if (!ready || routeCoordinates.size < 2) return@LaunchedEffect
+        val arr = org.json.JSONArray()
+        val step = maxOf(1, routeCoordinates.size / 2000)
+        var i = 0
+        while (i < routeCoordinates.size) { arr.put(org.json.JSONArray().put(routeCoordinates[i].first).put(routeCoordinates[i].second)); i += step }
+        val b64 = Base64.encodeToString(arr.toString().toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
+        webView?.evaluateJavascript("if (window.setRouteBase64) { window.setRouteBase64('$b64'); }", null)
+    }
+}
+```
+## 4) الربط في `MapScreenContent.kt` (بلا تعديل أي ملف آخر)
+```kotlin
+val is3DAvailable = remember { Map3D.isAvailable(context) }
+var show3D by remember { mutableStateOf(false) }
+var map3dMessage by remember { mutableStateOf<String?>(null) }
+```
+زر (قرب أزرار الخريطة، يظهر فقط إن توفرت الملفات):
+```kotlin
+if (is3DAvailable && !state.isNavigating) {
+    SmallFloatingActionButton(
+        onClick = { map3dMessage = null; show3D = true },
+        containerColor = Color(0xFF0F172A),
+        modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(top = 200.dp, end = 16.dp)
+    ) { Text("3D", color = Color(0xFF00E5FF), fontWeight = FontWeight.Bold) }
+}
+```
+وفوق كل شيء (بعد بقية العناصر داخل الـ Box):
+```kotlin
+if (show3D) {
+    Box(Modifier.fillMaxSize().zIndex(10f).background(Color(0xFF0B0F19))) {
+        Map3DView(
+            centerLat = safeUserLat, centerLng = safeUserLng,
+            userCoords = if (hasRealLocation) Pair(safeUserLat, safeUserLng) else null,
+            markersJson = com.example.ui.screens.map.utils.MapJsonBuilder.buildMarkersJson(
+                nearbyProviders = filteredProviders.take(MapJsonBuilder.MAX_PER_TYPE),
+                nearbyStores = filteredStores.take(MapJsonBuilder.MAX_PER_TYPE),
+                nearbyProperties = emptyList(),
+                dynamicOffsets = emptyMap(),
+                safeUserLat = safeUserLat, safeUserLng = safeUserLng
+            ),
+            onMarkerClicked = { id, type ->
+                when (type) {
+                    "PROVIDER" -> filteredProviders.find { it.id == id }?.let { state.selectedEntity = it; show3D = false }
+                    "STORE", "RESTAURANT", "MEDICAL" -> filteredStores.find { it.id == id }?.let { state.selectedEntity = it; show3D = false }
+                }
+            },
+            onUnavailable = { reason -> map3dMessage = reason; show3D = false },
+            modifier = Modifier.fillMaxSize()
+        )
+        IconButton(onClick = { show3D = false }, modifier = Modifier.align(Alignment.TopStart).statusBarsPadding().padding(8.dp)) {
+            Icon(Icons.Default.Close, contentDescription = "إغلاق", tint = Color.White)
+        }
+    }
+    BackHandler { show3D = false }
+}
+LaunchedEffect(map3dMessage) { map3dMessage?.let { snackbarHostState.showSnackbar(it); map3dMessage = null } }
+```
+> عدّل أسماء معاملات `buildMarkersJson` لتطابق استدعاءه في `RealLeafletMapView` عندك بالضبط (انسخها منه). `zIndex` من `androidx.compose.ui.zIndex`. `BackHandler` من `androidx.activity.compose`.
+
+## 5) إسناد وخصوصية وإعدادات
+- لا تُخفِ إسناد MapLibre/OpenFreeMap/OSM (مفعّل كاش «compact» مع زر ⓘ).
+- يُرسل هذا الوضع طلبات البلاطات إلى `tiles.openfreemap.org` (عنوان IP وإحداثيات البلاطة المعروضة)؛ اذكره في سياسة الخصوصية.
+- لا حاجة لتغيير `network_security_config` (HTTPS)، ولا لصلاحيات جديدة.
+- إن أردت عدم الاعتماد على خدمة عامة لاحقاً: استضف النمط والبلاطات بنفسك (OpenFreeMap مفتوح المصدر)، وغيّر `STYLE_URL` فقط.
+
+## 6) اختبار
+1. بلا ملفات المكتبة: زر 3D لا يظهر (تحقق أن بقية التطبيق لم يتغير).
+2. بعد إضافتها ومع إنترنت: زر 3D ← خريطة مائلة بمباني (حيث تتوفر) والدبابيس؛ اضغط دبوساً ← تُفتح بطاقته.
+3. أطفئ الإنترنت: رسالة «تحتاج إنترنت» وتُغلق الطبقة.
+4. جهاز قديم (أندرويد 7 بلا تحديث WebView): رسالة «لا يدعم الرسم ثلاثي الأبعاد» ولا انهيار.

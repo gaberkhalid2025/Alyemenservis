@@ -1,6 +1,5 @@
 # ===== Firebase =====
 -keep class com.google.firebase.** { *; }
--keep class com.google.android.gms.** { *; }
 -dontwarn com.google.firebase.**
 -dontwarn com.google.android.gms.**
 -dontwarn com.google.android.gms.internal.**
@@ -51,7 +50,6 @@
 -dontwarn kotlinx.coroutines.**
 
 # ===== Compose =====
--keep class androidx.compose.** { *; }
 -dontwarn androidx.compose.**
 
 # ===== Enum =====
@@ -114,5 +112,12 @@
 -keep class com.example.utils.QueueSyncWorker { <init>(android.content.Context, androidx.work.WorkerParameters); }
 -keep class com.example.utils.QueueWorkerEntryPoint { *; }
 -keep class com.example.ui.MainViewModel$QueueEntryPoint { *; }
+
+# ===== Strip verbose and debug logs in release =====
+-assumenosideeffects class android.util.Log {
+    public static int v(...);
+    public static int d(...);
+    public static int i(...);
+}
 
 

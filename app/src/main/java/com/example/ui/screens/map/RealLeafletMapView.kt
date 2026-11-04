@@ -75,6 +75,9 @@ fun RealLeafletMapView(
     followUser: Boolean = false,
     onUserPanned: (() -> Unit)? = null,
     focusPoint: Triple<String, Double, Double>? = null,
+    pickMode: Boolean = false,
+    onMapPicked: ((lat: Double, lng: Double) -> Unit)? = null,
+    hybridLabels: Boolean = false,
     themeColors: VisualThemePalette = resolveThemePalette(AdminSettingsEntity()),
     modifier: Modifier = Modifier
 ) {
@@ -94,6 +97,7 @@ fun RealLeafletMapView(
     val onDeselectState by rememberUpdatedState(onDeselect)
     val onUserPannedState by rememberUpdatedState(onUserPanned)
     val onTilesStatusState by rememberUpdatedState(onTilesStatus)
+    val onMapPickedState by rememberUpdatedState(onMapPicked)
 
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner, webViewRef) {
@@ -253,6 +257,19 @@ fun RealLeafletMapView(
         }
     }
 
+    LaunchedEffect(isMapReady, pickMode) {
+        if (isMapReady && webViewRef != null) {
+            webViewRef?.evaluateJavascript("if (window.setPickMode) { window.setPickMode($pickMode); }", null)
+        }
+    }
+
+    LaunchedEffect(isMapReady, hybridLabels, currentMapMode) {
+        if (isMapReady && webViewRef != null) {
+            val on = hybridLabels && (currentMapMode == MapMode.SATELLITE || currentMapMode == MapMode.VELA_3D)
+            webViewRef?.evaluateJavascript("if (window.setHybridLabels) { window.setHybridLabels($on); }", null)
+        }
+    }
+
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -328,6 +345,11 @@ fun RealLeafletMapView(
                             @JavascriptInterface
                             fun onTilesFailing(failing: Boolean) {
                                 mainHandler.post { onTilesStatusState?.invoke(failing) }
+                            }
+
+                            @JavascriptInterface
+                            fun onMapPicked(lat: Double, lng: Double) {
+                                mainHandler.post { onMapPickedState?.invoke(lat, lng) }
                             }
 
                             @JavascriptInterface
@@ -445,12 +467,4 @@ fun RealLeafletMapView(
             )
         }
     }
-}
-
-@Deprecated("غير مستخدم")
-object MapAssetMemoryCache {
-    fun isCached(): Boolean = true
-    fun invalidate() {}
-    fun getOrLoadSync(context: Context): String = ""
-    suspend fun getOrLoadAsync(context: Context): String = ""
 }

@@ -81,7 +81,7 @@ private val sBorderPaint = android.graphics.Paint().apply {
  * - Wide Zoom range (0.25f - 8.0f) for city-wide overview down to fine street level
  * - Elegant halos, full unclipped labels with crisp drop-shadows
  * - Pulsating neon user GPS marker
- * - Zero black screen fallback with try-catch safety
+ * - Fallback interactive map renderer with try-catch safety
  */
 @Composable
 fun OfflineInteractiveMap(

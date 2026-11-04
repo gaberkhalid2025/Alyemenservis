@@ -56,8 +56,15 @@ import com.example.utils.SosDispatcher
 import com.example.utils.ValhallaTileDownloader
 import com.example.utils.VisualThemePalette
 import com.example.utils.resolveThemePalette
+import com.example.utils.LandmarkAddress
+import com.example.utils.LandmarkAddressStore
+import com.example.utils.PermissionManager
+import androidx.activity.compose.BackHandler
+import androidx.compose.ui.zIndex
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * 🗺️ MapScreenContent
@@ -207,6 +214,24 @@ fun MapScreenContent(
         isSearching = false
     }
 
+    var showLocationDisclosure by remember { mutableStateOf(false) }
+
+    val addressStore = remember { LandmarkAddressStore(context.applicationContext) }
+    var savedAddresses by remember { mutableStateOf<List<LandmarkAddress>>(emptyList()) }
+    var showSavedAddresses by remember { mutableStateOf(false) }
+    var showLandmarkAddress by remember { mutableStateOf(false) }
+    LaunchedEffect(showLandmarkAddress, showSavedAddresses) {
+        savedAddresses = withContext(Dispatchers.IO) { addressStore.getAll() }
+    }
+    val accuracyForBanner by viewModel.userLocationAccuracyM.collectAsState()
+    val gpsWeak = hasRealLocation && accuracyForBanner > 50f && accuracyForBanner < Float.MAX_VALUE
+
+    var hybridLabels by remember { mutableStateOf(false) }
+
+    val is3DAvailable = remember { Map3D.isAvailable(context) }
+    var show3D by remember { mutableStateOf(false) }
+    var map3dMessage by remember { mutableStateOf<String?>(null) }
+
     // Location Permission launcher
     val locationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
@@ -221,6 +246,27 @@ fun MapScreenContent(
         }
     }
 
+    if (showLocationDisclosure) {
+        AlertDialog(
+            onDismissRequest = { showLocationDisclosure = false },
+            title = { Text("لماذا نطلب موقعك؟", fontWeight = FontWeight.Bold) },
+            text = { Text(PermissionManager.getRationaleForPermission(PermissionManager.PERMISSION_FINE_LOCATION)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showLocationDisclosure = false
+                        locationPermissionLauncher.launch(
+                            arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
+                        )
+                    }
+                ) { Text("متابعة", fontWeight = FontWeight.Bold) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLocationDisclosure = false }) { Text("ليس الآن") }
+            }
+        )
+    }
+
     LaunchedEffect(Unit) {
         try {
             OfflineMapManager.purgeCacheIfNeeded(context)
@@ -230,9 +276,7 @@ fun MapScreenContent(
         if (hasFine || hasCoarse) {
             viewModel.startLocationUpdates()
         } else {
-            locationPermissionLauncher.launch(
-                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
-            )
+            showLocationDisclosure = true
         }
     }
 
@@ -283,6 +327,23 @@ fun MapScreenContent(
         ),
         label = "ar_alpha"
     )
+
+    // 🏠 معالج «عنواني بالمعلم» (حفظ وتعديل العناوين بالمعالم بدون الاعتماد على GPS)
+    if (showLandmarkAddress) {
+        LandmarkAddressScreen(
+            centerLat = safeUserLat,
+            centerLng = safeUserLng,
+            hasRealLocation = hasRealLocation,
+            selectedCity = state.selectedCity,
+            onSaved = { addr ->
+                coroutineScope.launch {
+                    snackbarHostState.showSnackbar("تم حفظ عنوانك: ${addr.describe()}")
+                }
+            },
+            onClose = { showLandmarkAddress = false }
+        )
+        return
+    }
 
     // Fullscreen Turn-by-Turn Navigation Screen
     if (state.isNavigating) {
@@ -396,6 +457,7 @@ fun MapScreenContent(
                     onSwitchToRadar = { state.isRadarMode = true },
                     onTilesStatus = { areTilesFailing = it },
                     reloadTilesKey = state.reloadTilesTrigger,
+                    hybridLabels = hybridLabels,
                     focusPoint = searchedPlace?.let { Triple(it.shortName, it.latitude, it.longitude) },
                     modifier = Modifier.fillMaxSize()
                 )
@@ -438,6 +500,123 @@ fun MapScreenContent(
                             }
                         }
                     }
+                }
+
+                // 🛰️ لافتة GPS الضعيف (تشويش أو ضعف الإشارة)
+                if (gpsWeak) {
+                    Surface(
+                        color = Color(0xCC7C2D12),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .statusBarsPadding()
+                            .padding(top = 150.dp, start = 16.dp, end = 16.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                "إشارة GPS ضعيفة (±${accuracyForBanner.toInt()} م). لعنوان دقيق استخدم «عنواني بالمعلم».",
+                                color = Color.White,
+                                fontSize = 12.sp,
+                                modifier = Modifier.weight(1f)
+                            )
+                            TextButton(onClick = { showLandmarkAddress = true }) {
+                                Text("فتح", color = Color(0xFF00E5FF), fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+
+                // 🏷️ مفتاح أسماء الشوارع فوق صور الأقمار الصناعية (طبقة هجينة)
+                if (state.currentMapMode == MapMode.SATELLITE || state.currentMapMode == MapMode.VELA_3D) {
+                    FilterChip(
+                        selected = hybridLabels,
+                        onClick = { hybridLabels = !hybridLabels },
+                        label = { Text("أسماء الشوارع", fontSize = 11.sp, color = if (hybridLabels) Color(0xFF00E5FF) else Color.White) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            containerColor = Color(0xCC0F172A),
+                            selectedContainerColor = Color(0xFF1E293B)
+                        ),
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .statusBarsPadding()
+                            .padding(top = 100.dp, start = 16.dp)
+                    )
+                }
+
+                // 🧊 زر 3D الحقيقي (MapLibre + OpenFreeMap)
+                if (is3DAvailable && !state.isNavigating) {
+                    SmallFloatingActionButton(
+                        onClick = {
+                            map3dMessage = null
+                            show3D = true
+                        },
+                        containerColor = Color(0xFF0F172A),
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .statusBarsPadding()
+                            .padding(top = 150.dp, end = 16.dp)
+                    ) {
+                        Text("3D", color = Color(0xFF00E5FF), fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    }
+                }
+
+                // 🏠 زر «عنواني بالمعلم» (حل تشويش GPS)
+                SmallFloatingActionButton(
+                    onClick = {
+                        if (savedAddresses.isEmpty()) showLandmarkAddress = true
+                        else showSavedAddresses = true
+                    },
+                    containerColor = Color(0xFF0F172A),
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 16.dp, bottom = 190.dp)
+                ) {
+                    Text("🏠", fontSize = 16.sp)
+                }
+
+                // 🗺️ عرض الخريطة ثلاثية الأبعاد (3D View Overlay)
+                if (show3D) {
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .zIndex(10f)
+                            .background(Color(0xFF0B0F19))
+                    ) {
+                        Map3DView(
+                            centerLat = safeUserLat,
+                            centerLng = safeUserLng,
+                            userCoords = if (hasRealLocation) Pair(safeUserLat, safeUserLng) else null,
+                            markersJson = com.example.ui.screens.map.utils.MapJsonBuilder.buildMarkersJson(
+                                nearbyProviders = filteredProviders.take(com.example.ui.screens.map.utils.MapJsonBuilder.MAX_PER_TYPE),
+                                nearbyStores = filteredStores.take(com.example.ui.screens.map.utils.MapJsonBuilder.MAX_PER_TYPE),
+                                nearbyProperties = emptyList(),
+                                dynamicOffsets = emptyMap(),
+                                safeUserLat = safeUserLat,
+                                safeUserLng = safeUserLng
+                            ),
+                            onMarkerClicked = { id, type ->
+                                when (type) {
+                                    "PROVIDER" -> filteredProviders.find { it.id == id }?.let { state.selectedEntity = it; show3D = false }
+                                    "STORE", "RESTAURANT", "MEDICAL" -> filteredStores.find { it.id == id }?.let { state.selectedEntity = it; show3D = false }
+                                }
+                            },
+                            onUnavailable = { reason -> map3dMessage = reason; show3D = false },
+                            modifier = Modifier.fillMaxSize()
+                        )
+                        IconButton(
+                            onClick = { show3D = false },
+                            modifier = Modifier
+                                .align(Alignment.TopStart)
+                                .statusBarsPadding()
+                                .padding(8.dp)
+                        ) {
+                            Icon(Icons.Default.Close, contentDescription = "إغلاق", tint = Color.White)
+                        }
+                    }
+                    BackHandler { show3D = false }
                 }
             }
 
@@ -1254,5 +1433,38 @@ fun MapScreenContent(
             themeColors = themeColors,
             onDismiss = { state.bookingProviderTarget = null }
         )
+    }
+
+    if (showSavedAddresses) {
+        SavedLandmarkAddressesDialog(
+            addresses = savedAddresses,
+            onNavigate = { a ->
+                showSavedAddresses = false
+                if (!hasRealLocation) {
+                    viewModel.startLocationUpdates()
+                    coroutineScope.launch { snackbarHostState.showSnackbar("فعّل GPS وانتظر تحديد موقعك") }
+                } else {
+                    state.startNavigationViaLandmark(a)
+                }
+            },
+            onDelete = { a ->
+                coroutineScope.launch {
+                    withContext(Dispatchers.IO) { addressStore.delete(a.id) }
+                    savedAddresses = withContext(Dispatchers.IO) { addressStore.getAll() }
+                }
+            },
+            onAddNew = {
+                showSavedAddresses = false
+                showLandmarkAddress = true
+            },
+            onDismiss = { showSavedAddresses = false }
+        )
+    }
+
+    LaunchedEffect(map3dMessage) {
+        map3dMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            map3dMessage = null
+        }
     }
 }

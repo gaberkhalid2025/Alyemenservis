@@ -29,7 +29,7 @@ import com.example.ui.screens.entities.*
 import com.example.ui.screens.home.FavoritesScreenLayout
 import com.example.ui.screens.home.ServicesBrowserLayout
 import com.example.ui.screens.home.UnifiedGlobalSearchScreen
-import com.example.ui.screens.map.MapScreenLayout
+import com.example.ui.screens.map.MapScreen
 import com.example.ui.screens.notifications.UserNotificationsDialogView
 import com.example.ui.screens.owner.OwnerDashboardScreen
 import com.example.ui.screens.register.RegisterScreen
@@ -305,7 +305,7 @@ fun AppNavigator(
                 AppScreens.BOOKINGS_VIEW -> BookingsScreenLayout(viewModel = viewModel, themeColors = themeColors)
                 AppScreens.INSTANT_REQUESTS_VIEW -> InstantRequestsScreen(viewModel = viewModel, themeColors = themeColors)
                 AppScreens.ORDERS_VIEW -> OrdersScreenLayout(viewModel = viewModel, themeColors = themeColors, onRequestQuickService = { viewModel.navigateToScreen(AppScreens.QUICK_SERVICE_REQUEST) })
-                AppScreens.MAP_VIEW -> MapScreenLayout(
+                AppScreens.MAP_VIEW -> MapScreen(
                     viewModel = viewModel,
                     onBackClick = { viewModel.goBack() },
                     onOpenProviderDetails = { provider ->

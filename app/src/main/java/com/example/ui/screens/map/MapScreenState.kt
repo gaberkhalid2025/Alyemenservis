@@ -84,6 +84,16 @@ class MapScreenState(
         return true
     }
 
+    /** يبدأ الملاحة إلى نقطة العنوان مروراً بالمعلم أولاً (المعلم معروف ودقيق على الخريطة). */
+    fun startNavigationViaLandmark(addr: com.example.utils.LandmarkAddress): Boolean {
+        val home = NavWaypoint(name = addr.label, latitude = addr.pointLat, longitude = addr.pointLng)
+        selectedWaypoints.clear()
+        if (addr.distanceMeters > 60.0) {
+            selectedWaypoints.add(NavWaypoint(name = addr.landmarkName, latitude = addr.landmarkLat, longitude = addr.landmarkLng))
+        }
+        return startNavigation(home)
+    }
+
     fun stopNavigation() {
         isNavigating = false
         navWaypoints = emptyList()
