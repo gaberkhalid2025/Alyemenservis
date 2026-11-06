@@ -195,6 +195,7 @@ object RealValhallaNavigator {
             val cause = (t as? java.lang.reflect.InvocationTargetException)?.targetException ?: t
             NativeValhallaStatus.lastError = "${cause.javaClass.simpleName}: ${cause.message}"
             Log.e(TAG, "Native Valhalla failed: ${NativeValhallaStatus.lastError}", cause)
+            AppErrorLogManager.logApiError("Valhalla", "فشل المحرك الأصلي: ${cause.javaClass.simpleName}", cause)
             null
         }
     }

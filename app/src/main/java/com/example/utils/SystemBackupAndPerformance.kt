@@ -55,6 +55,12 @@ object SystemBackupManager {
             val backupFile = File(backupDir, "ys_backup_${System.currentTimeMillis()}.json")
             backupFile.writeText(backupDataJson)
 
+            // تقليم النسخ المحلية للاحتفاظ بآخر 5 نسخ فقط منعاً لتراكم البيانات
+            backupDir.listFiles()?.filter { it.extension == "json" }
+                ?.sortedByDescending { it.lastModified() }
+                ?.drop(5)
+                ?.forEach { it.delete() }
+
             Pair(true, backupFile.absolutePath)
         } catch (e: Exception) {
             Pair(false, e.localizedMessage ?: "فشل إنشاء النسخة الاحتياطية")
@@ -107,7 +113,7 @@ fun RuntimePermissionRationaleDialog(
                     lineHeight = 16.sp
                 )
                 Text(
-                    text = "🔒 نضمن لك الحفاظ الكامل على خصوصية بياناتك وعدم مشاركتها مع أي أطراف خارجية.",
+                    text = "نستخدم هذا الإذن لتقديم الميزة المطلوبة فقط. راجع سياسة الخصوصية لمعرفة الجهات التي تُرسَل لها بيانات محددة (كخدمات الخرائط والبحث والتحليلات).",
                     fontSize = 10.sp,
                     color = Color(0xFF10B981)
                 )

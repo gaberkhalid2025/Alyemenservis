@@ -68,6 +68,10 @@ data class LandmarkAddress(
         "text" to describe(), "createdAt" to createdAt
     )
 
+    /** نص للمشاركة عبر واتساب أو الرسائل مع رابطين للخرائط بدون حاجة لحساب جوجل */
+    fun shareText(): String =
+        "$label: ${describe()}\nالمعلم: ${SosDispatcher.mapLink(landmarkLat, landmarkLng)}\nالموقع: ${SosDispatcher.mapLink(pointLat, pointLng)}"
+
     companion object {
         const val METERS_PER_DEG = 111_195.0
         const val MAX_OFFSET_METERS = 1500.0

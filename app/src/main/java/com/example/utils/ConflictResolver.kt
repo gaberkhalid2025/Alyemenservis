@@ -67,7 +67,7 @@ class ConflictResolver(@Suppress("UNUSED_PARAMETER") context: Context? = null) {
 
         val localUpdated = (localData["updatedAt"] as? Number)?.toLong() ?: 0L
         val cloudUpdated = (cloudData["updatedAt"] as? Number)?.toLong() ?: 0L
-        val isConflict = hasDifference && (localVer != cloudVer || (localUpdated != 0L && cloudUpdated != 0L && localUpdated != cloudUpdated))
+        val isConflict = hasDifference && (localVer != cloudVer || localUpdated != cloudUpdated || (localData.isNotEmpty() && cloudData.isNotEmpty()))
 
         if (isConflict) {
             val conflict = Conflict(

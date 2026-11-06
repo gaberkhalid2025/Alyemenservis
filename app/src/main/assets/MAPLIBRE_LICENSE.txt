@@ -1,0 +1,7 @@
+MapLibre GL JS v5.24.0
+License: BSD 3-Clause License
+https://github.com/maplibre/maplibre-gl-js/blob/main/LICENSE.txt
+
+Official sha256 checksums for verified assets:
+45a9b07a9189ce56054c620a947ccf41e291e58c95e9b61533b740aaa65ee5cb  maplibre-gl.js (1.1 MB)
+ab1e70d59ec40465bae7e7030da2f3ccf28133fd502e62bd598eefbadfd7a732  maplibre-gl.css (69 KB)

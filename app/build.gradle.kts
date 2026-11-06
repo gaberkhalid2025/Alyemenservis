@@ -34,8 +34,6 @@ android {
     }
     val agoraId = agoraProps.getProperty("AGORA_APP_ID") ?: System.getenv("AGORA_APP_ID") ?: ""
     buildConfigField("String", "AGORA_APP_ID", "\"$agoraId\"")
-    val geminiKey = System.getenv("GEMINI_API_KEY") ?: ""
-    buildConfigField("String", "GEMINI_API_KEY", "\"$geminiKey\"")
   }
 
   signingConfigs {
@@ -175,7 +173,7 @@ dependencies {
   implementation("com.google.firebase:firebase-analytics")
   implementation(libs.kotlinx.coroutines.android)
   implementation(libs.kotlinx.coroutines.core)
-  implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
+  implementation(libs.kotlinx.coroutines.play.services)
   implementation(libs.logging.interceptor)
   implementation(libs.moshi.kotlin)
   implementation(libs.okhttp)

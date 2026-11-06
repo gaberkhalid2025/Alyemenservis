@@ -293,7 +293,7 @@ class AssistantViewModel : ViewModel() {
         }.take(5)
 
         try {
-            val apiKey = BuildConfig.GEMINI_API_KEY
+            val apiKey = ""
             if (apiKey.isNotEmpty()) {
                 val mediaType = "application/json; charset=utf-8".toMediaType()
                 val ragList = if (matched.isNotEmpty()) matched else providersList.filter { it.isVip }.take(10)

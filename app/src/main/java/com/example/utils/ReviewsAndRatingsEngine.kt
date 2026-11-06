@@ -167,46 +167,35 @@ object ReviewsAndRatingsEngine {
             return
         }
 
-        val docRef = db.collection("ratings").document(reviewId)
-        docRef.get().addOnSuccessListener { snapshot ->
-            if (!snapshot.exists()) {
-                onError("التقييم غير موجود")
-                return@addOnSuccessListener
-            }
-
-            val helpfulList = (snapshot.get("helpfulUserIds") as? List<*>)?.filterIsInstance<String>()?.toMutableList() ?: mutableListOf()
-            val unhelpfulList = (snapshot.get("unhelpfulUserIds") as? List<*>)?.filterIsInstance<String>()?.toMutableList() ?: mutableListOf()
-
+        val ref = db.collection("ratings").document(reviewId)
+        db.runTransaction { tx ->
+            val snap = tx.get(ref)
+            if (!snap.exists()) throw IllegalStateException("التقييم غير موجود")
+            if (snap.getString("userId") == userId) throw IllegalStateException("لا يمكنك التصويت على تقييمك")
+            val helpful = (snap.get("helpfulUserIds") as? List<*>)?.filterIsInstance<String>()?.toMutableList() ?: mutableListOf()
+            val unhelpful = (snap.get("unhelpfulUserIds") as? List<*>)?.filterIsInstance<String>()?.toMutableList() ?: mutableListOf()
             if (isHelpful) {
-                if (helpfulList.contains(userId)) {
-                    helpfulList.remove(userId) // Toggle off
-                } else {
-                    helpfulList.add(userId)
-                    unhelpfulList.remove(userId)
+                if (!helpful.remove(userId)) {
+                    helpful.add(userId)
+                    unhelpful.remove(userId)
                 }
             } else {
-                if (unhelpfulList.contains(userId)) {
-                    unhelpfulList.remove(userId) // Toggle off
-                } else {
-                    unhelpfulList.add(userId)
-                    helpfulList.remove(userId)
+                if (!unhelpful.remove(userId)) {
+                    unhelpful.add(userId)
+                    helpful.remove(userId)
                 }
             }
-
-            val updates = mapOf(
-                "helpfulCount" to helpfulList.size,
-                "unhelpfulCount" to unhelpfulList.size,
-                "helpfulUserIds" to helpfulList,
-                "unhelpfulUserIds" to unhelpfulList
-            )
-
-            docRef.update(updates).addOnSuccessListener {
-                onSuccess(helpfulList.size, unhelpfulList.size)
-            }.addOnFailureListener {
-                onError(it.localizedMessage ?: "فشل تحديث التصويت")
-            }
+            tx.update(ref, mapOf(
+                "helpfulUserIds" to helpful,
+                "unhelpfulUserIds" to unhelpful,
+                "helpfulCount" to helpful.size,
+                "unhelpfulCount" to unhelpful.size
+            ))
+            helpful.size to unhelpful.size
+        }.addOnSuccessListener { (h, u) ->
+            onSuccess(h, u)
         }.addOnFailureListener {
-            onError(it.localizedMessage ?: "فشل جلب التقييم")
+            onError(it.localizedMessage ?: "فشل تحديث التصويت")
         }
     }
 

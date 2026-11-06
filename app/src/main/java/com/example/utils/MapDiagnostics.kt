@@ -4,10 +4,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.speech.tts.TextToSpeech
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -125,6 +122,7 @@ fun MapDiagnosticsDialog(hasRealLocation: Boolean, accuracyM: Float?, onDismiss:
     val context = LocalContext.current
     var items by remember { mutableStateOf<List<DiagnosticItem>?>(null) }
     LaunchedEffect(Unit) { items = MapDiagnostics.run(context, hasRealLocation, accuracyM) }
+    val recentLogs = remember { AppErrorLogManager.logs.value.take(5) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -143,13 +141,28 @@ fun MapDiagnosticsDialog(hasRealLocation: Boolean, accuracyM: Float?, onDismiss:
                         }
                     }
                 }
+                if (recentLogs.isNotEmpty()) {
+                    Spacer(Modifier.height(8.dp))
+                    Text("سجل الأخطاء الأخير:", color = Color(0xFFF59E0B), fontSize = 12.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                    recentLogs.forEach { log ->
+                        Text("• [${log.tag}] ${log.message}", color = Color(0xFFE2E8F0), fontSize = 10.sp)
+                    }
+                }
             }
         },
         confirmButton = {
             TextButton(onClick = {
-                val text = items?.let { MapDiagnostics.toText(it) } ?: return@TextButton
+                val reportText = buildString {
+                    items?.let { append(MapDiagnostics.toText(it)) }
+                    if (recentLogs.isNotEmpty()) {
+                        append("\n\n--- Recent Error Logs ---\n")
+                        recentLogs.forEach { log ->
+                            append("[${log.tag}] ${log.message}\n")
+                        }
+                    }
+                }
                 (context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager)
-                    .setPrimaryClip(ClipData.newPlainText("map-diagnostics", text))
+                    .setPrimaryClip(ClipData.newPlainText("map-diagnostics", reportText))
             }) { Text("نسخ التقرير", color = Color(0xFF10B981)) }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("إغلاق", color = Color(0xFF94A3B8)) } }

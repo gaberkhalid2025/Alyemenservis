@@ -176,11 +176,7 @@ fun MapScreenContent(
         wasSosPending = sosPending
     }
 
-    DisposableEffect(Unit) {
-        onDispose {
-            viewModel.stopLocationUpdates()
-        }
-    }
+
 
     // [إصلاح 18] البحث الصوتي باستخدام محرك النظام
     val speechLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { res ->

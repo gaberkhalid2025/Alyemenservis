@@ -755,7 +755,7 @@ fun OfflineInteractiveMap(
                 }
 
             } catch (e: Exception) {
-                // Guaranteed safety: Never display a blank or crash screen
+                // Fallback rendering in case of canvas draw exception
                 drawRect(Color(0xFF0F172A))
                 drawCircle(Color(0xFF00E5FF).copy(alpha = 0.3f), 40f, Offset(size.width / 2, size.height / 2))
             }

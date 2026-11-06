@@ -177,6 +177,7 @@ object OnlineOsrmNavigator {
             throw e
         } catch (e: Throwable) {
             Log.e(TAG, "OSRM calculateRoute exception: ${e.message}", e)
+            AppErrorLogManager.logApiError("OSRM", "فشل استعلام OSRM: ${e.javaClass.simpleName}", e)
             return@withContext NavRouteResult(
                 totalDistanceMeters = 0.0,
                 totalDurationSeconds = 0.0,

@@ -173,10 +173,10 @@ fun LandmarkAddressScreen(
                                     busy = false
                                 }
                             },
-                            enabled = LandmarkAddress.isValid(centerLat, centerLng),
+                            enabled = hasRealLocation && LandmarkAddress.isValid(centerLat, centerLng),
                             modifier = Modifier.fillMaxWidth()
                         ) { Text("🕌 معالم قريبة مني") }
-                        if (!LandmarkAddress.isValid(centerLat, centerLng)) Text("لإظهار المعالم القريبة فعّل GPS، أو ابحث بالاسم.", color = Color(0xFF94A3B8), fontSize = 11.sp)
+                        if (!hasRealLocation) Text("لإظهار المعالم القريبة منك فعّل GPS، أو ابحث بالاسم، أو اضغط على الخريطة.", color = Color(0xFF94A3B8), fontSize = 11.sp)
                     }
                     1 -> {
                         Text("المعلم: $landmarkName", color = Color(0xFF00E5FF), fontSize = 13.sp, fontWeight = FontWeight.Bold)
@@ -250,6 +250,7 @@ fun SavedLandmarkAddressesDialog(
     onAddNew: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    val context = LocalContext.current
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("عناويني بالمعلم") },
@@ -261,6 +262,9 @@ fun SavedLandmarkAddressesDialog(
                         Text(a.describe(), fontSize = 12.sp)
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             TextButton(onClick = { onNavigate(a) }) { Text("اذهب") }
+                            TextButton(onClick = {
+                                com.example.utils.SosDispatcher.safeStart(context, com.example.utils.SosDispatcher.shareIntent(a.shareText()))
+                            }) { Text("مشاركة") }
                             TextButton(onClick = { onDelete(a) }) { Text("حذف", color = Color(0xFFEF4444)) }
                         }
                     }
