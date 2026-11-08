@@ -25,7 +25,8 @@ data class SyncError(
  * 📊 SyncStatusTracker
  * تتبع وإدارة حالة المزامنة وعرض الإحصائيات والأخطاء والتقدم في واجهة المستخدم.
  */
-class SyncStatusTracker(private val context: Context) {
+class SyncStatusTracker(context: Context) {
+    private val appContext = context.applicationContext
 
     private val _syncStatus = MutableStateFlow(SyncStatus.NOT_SYNCED)
     val syncStatus: StateFlow<SyncStatus> = _syncStatus.asStateFlow()

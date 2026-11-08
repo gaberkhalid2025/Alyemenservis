@@ -1020,8 +1020,9 @@ fun StoreListItemCard(
                 if (settingsState.showCallButton) {
                     Button(
                         onClick = {
-                            val u = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${store.phone}"))
-                            context.startActivity(u)
+                            if (store.phone.isNotBlank()) {
+                                com.example.utils.SosDispatcher.safeStart(context, com.example.utils.SosDispatcher.dialIntent(store.phone))
+                            }
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
                         modifier = Modifier.weight(1f).height(32.dp),
@@ -1068,9 +1069,8 @@ fun StoreListItemCard(
                         onClick = {
                             if (viewModel != null) {
                                 viewModel.startVoiceCall(store.name, "مركز تجاري / متجر")
-                            } else {
-                                val u = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${store.phone}"))
-                                context.startActivity(u)
+                            } else if (store.phone.isNotBlank()) {
+                                com.example.utils.SosDispatcher.safeStart(context, com.example.utils.SosDispatcher.dialIntent(store.phone))
                             }
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB)),
@@ -1627,8 +1627,9 @@ fun PropertyListItemCard(
                     if (settingsState.showCallButton) {
                         Button(
                             onClick = {
-                                val u = android.content.Intent(android.content.Intent.ACTION_DIAL, android.net.Uri.parse("tel:${prop.phone}"))
-                                context.startActivity(u)
+                                if (prop.phone.isNotBlank()) {
+                                    com.example.utils.SosDispatcher.safeStart(context, com.example.utils.SosDispatcher.dialIntent(prop.phone))
+                                }
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
                             modifier = Modifier.weight(1f).height(30.dp),
@@ -1642,9 +1643,8 @@ fun PropertyListItemCard(
                             onClick = {
                                 if (viewModel != null) {
                                     viewModel.startVoiceCall(prop.title, "صاحب العقار HD")
-                                } else {
-                                    val u = android.content.Intent(android.content.Intent.ACTION_DIAL, android.net.Uri.parse("tel:${prop.phone}"))
-                                    context.startActivity(u)
+                                } else if (prop.phone.isNotBlank()) {
+                                    com.example.utils.SosDispatcher.safeStart(context, com.example.utils.SosDispatcher.dialIntent(prop.phone))
                                 }
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB)),
@@ -1947,8 +1947,9 @@ fun StoreDetailsDialog(
                     ) {
                         Button(
                             onClick = {
-                                val u = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${store.phone}"))
-                                context.startActivity(u)
+                                if (store.phone.isNotBlank()) {
+                                    com.example.utils.SosDispatcher.safeStart(context, com.example.utils.SosDispatcher.dialIntent(store.phone))
+                                }
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF16A34A)),
                             shape = RoundedCornerShape(10.dp),
@@ -2987,8 +2988,9 @@ fun PropertyDetailsDialog(
                     ) {
                         Button(
                             onClick = {
-                                val u = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${property.phone}"))
-                                context.startActivity(u)
+                                if (property.phone.isNotBlank()) {
+                                    com.example.utils.SosDispatcher.safeStart(context, com.example.utils.SosDispatcher.dialIntent(property.phone))
+                                }
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF16A34A)),
                             modifier = Modifier.weight(1f)

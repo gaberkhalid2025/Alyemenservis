@@ -1,0 +1,97 @@
+# 56 – المتبقي النهائي بعد فحص كل الدفعات (الإعدادات، المنطق، الخرائط، العنوان بالمعلم، 3D)
+> قراءة وبحث نصي؛ لم أبنِ المشروع ولم أشغّل التطبيق.
+
+## 1) ما تأكدت من اكتماله ✅
+- **الإعدادات:** `targetSdk = 36`، `minSdk = 24`، بلا `cleartext` ولا صلاحية موقع خلفية، `appcheck-debug` للتجربة فقط، فحص lint للإصدار، `x86_64` للمحاكي، `assumenosideeffects` في Proguard.
+- **الموقع:** `MainActivity` يملك `onStart/onStop` وحُذف مصدر الموقع الثالث، وإفصاح الموقع مضاف، `CrashReporter.install` في `MyApplication`.
+- **الملاحة والمنطق:** الطابور (الفزعة لا تسقط، العمل المُعجَّل، `getForegroundInfo`)، التشفير (`EncryptedSharedPreferences`)، موافقة التحليلات، البوصلة بـ`cameraMode`، التنزيل الآمن، البحث الضبابي، `fromParts` في SOS، تقرير الانهيار برأس وذيل.
+- **الخرائط:** `MapAssetMemoryCache` حُذف، `pickMode/hybridLabels/onTilesStatus` في `RealLeafletMapView`، لافتة GPS الضعيف، مفتاح الأسماء، زر 3D مع `Map3D.isAvailable`، `MapControls` بأزرار 48dp، `CityAliases` بلا كلمات عامة، `MapJsonBuilder` بالرموز، التقييم الافتراضي 0، `MapScreenState` (استعادة `VELA_3D` وملاحة المعلم).
+- **ميزة العنوان بالمعلم:** النموذج والتخزين والباحث والمعالج وقائمة «عناويني» مطبّقة ومرتبطة في `MapScreenContent`.
+
+## 2) المتبقي بالأولوية
+
+### أ) عالية
+**1. إيقاف GPS عند مغادرة الخريطة ما زال في `MapScreenContent` (سطر ≈ 179).** النشاط صار مالك التشغيل والإيقاف، وهذا الـ `DisposableEffect` يوقف التحديثات كلما غادرت شاشة الخريطة فتتجمد المسافات في بقية الشاشات. **احذفه:**
+```kotlin
+DisposableEffect(Unit) { onDispose { viewModel.stopLocationUpdates() } }   // ← احذف هذه الكتلة كاملة
+```
+**2. زر «معالم قريبة مني» يعمل بلا GPS فيبحث حول مركز المدينة (خطأ في ميزة العنوان).** `MapScreenContent` يمرّر `centerLat = safeUserLat` (مركز المدينة عند غياب الموقع) فيصبح `LandmarkAddress.isValid(...)` صحيحاً دائماً.
+في `LandmarkAddressScreen.kt` (سطور ≈ 176 و179):
+```kotlin
+enabled = hasRealLocation && LandmarkAddress.isValid(centerLat, centerLng),
+...
+if (!hasRealLocation) Text("لإظهار المعالم القريبة منك فعّل GPS، أو ابحث بالاسم، أو اضغط على الخريطة.", color = Color(0xFF94A3B8), fontSize = 11.sp)
+```
+
+### ب) متوسطة
+**3. ثغرة سباق في التصويت على التقييمات (`ReviewsAndRatingsEngine.voteReviewHelpful`).** قراءة ثم كتابة بلا معاملة: تصويتان متزامنان يضيع أحدهما، والعدّادات تُكتب من العميل.
+```kotlin
+fun voteReviewHelpful(reviewId: String, userId: String, isHelpful: Boolean,
+                      onSuccess: (Int, Int) -> Unit, onError: (String) -> Unit) {
+    if (userId.isBlank()) { onError("يجب تسجيل الدخول للتصويت على التقييم"); return }
+    val ref = db.collection("ratings").document(reviewId)
+    db.runTransaction { tx ->
+        val snap = tx.get(ref)
+        if (!snap.exists()) throw IllegalStateException("التقييم غير موجود")
+        if (snap.getString("userId") == userId) throw IllegalStateException("لا يمكنك التصويت على تقييمك")
+        val helpful = (snap.get("helpfulUserIds") as? List<*>)?.filterIsInstance<String>()?.toMutableList() ?: mutableListOf()
+        val unhelpful = (snap.get("unhelpfulUserIds") as? List<*>)?.filterIsInstance<String>()?.toMutableList() ?: mutableListOf()
+        if (isHelpful) { if (!helpful.remove(userId)) { helpful.add(userId); unhelpful.remove(userId) } }
+        else { if (!unhelpful.remove(userId)) { unhelpful.add(userId); helpful.remove(userId) } }
+        tx.update(ref, mapOf("helpfulUserIds" to helpful, "unhelpfulUserIds" to unhelpful,
+            "helpfulCount" to helpful.size, "unhelpfulCount" to unhelpful.size))
+        helpful.size to unhelpful.size
+    }.addOnSuccessListener { (h, u) -> onSuccess(h, u) }
+     .addOnFailureListener { onError(it.localizedMessage ?: "فشل تحديث التصويت") }
+}
+```
+وفي **قواعد Firestore** منع العميل من تعديل `helpfulCount/unhelpfulCount` مباشرة خارج هذا النمط (أو انقل الحساب إلى Cloud Function).
+**4. عبارة خصوصية غير صحيحة في `SystemBackupAndPerformance.RuntimePermissionRationaleDialog`:** «نضمن … عدم مشاركتها مع أي أطراف خارجية». التطبيق يرسل نصوص البحث والإحداثيات إلى Nominatim وOSRM وOverpass وFirebase وAnalytics. هذه عبارة مضلِّلة قد تخالف سياسات المتجر. استبدلها بـ:
+```kotlin
+text = "نستخدم هذا الإذن لتقديم الميزة المطلوبة فقط. راجع سياسة الخصوصية لمعرفة الجهات التي تُرسَل لها بيانات محددة (كخدمات الخرائط والبحث والتحليلات)."
+```
+ووحّد نص الإذن مع `PermissionManager.getRationaleForPermission` بدل نصّين مختلفين.
+**5. النسخ الاحتياطية المحلية (`SystemBackupManager.createLocalBackup`):** تُكتب في `filesDir/backups` **بلا حد** (تتراكم) وبلا تشفير، وهي تُحذف مع إزالة التطبيق فلا تُعدّ نسخة احتياطية حقيقية. أضف تقليماً لآخر 5:
+```kotlin
+backupDir.listFiles()?.filter { it.extension == "json" }?.sortedByDescending { it.lastModified() }?.drop(5)?.forEach { it.delete() }
+```
+وسمِّها «نسخة محلية» في الواجهة، ولا تضع فيها بيانات حساسة.
+**6. أخطاء الخرائط لا تصل إلى سجل الأخطاء ولا التشخيص:** `RealValhallaNavigator` و`OnlineOsrmNavigator` و`MapDiagnostics` لا يستعملون `AppErrorLogManager`. في كل `catch`/فشل:
+```kotlin
+AppErrorLogManager.logApiError("Valhalla", "فشل المحرك الأصلي: ${t.javaClass.simpleName}", t)   // وفي OSRM: "OSRM"
+```
+وفي `MapDiagnosticsDialog` اعرض آخر 5 سجلات (`AppErrorLogManager.logs.value.take(5)`).
+**7. Gradle:**
+- `GEMINI_API_KEY` ما زال في `BuildConfig` (موضعان): احذف `buildConfigField` وأي استعمال (يُستخرج من الـ APK).
+- `kotlinx-coroutines-play-services:1.7.3` مثبّت يدوياً بينما بقية coroutines `1.10.2`: أضف في `libs.versions.toml`: `kotlinxCoroutinesPlayServices = "1.10.2"` وبند المكتبة، واستعمله.
+- `composeBom = "2024.09.00"` قديم؛ حدّثه لأحدث BOM مستقر وجرّب (لا يؤثر على الميزات لكن يجلب إصلاحات أداء وتوافق مع 36).
+- `isMinifyEnabled = false` في النوعين: فعّله للإصدار فقط بعد المرور على خطة المستند 46-د.
+**8. Proguard:** ما زالت قواعد `-keep` الشاملة على `com.google.android.gms.**` و`com.google.firebase.**` و`androidx.compose` (تبطل التصغير ولا لزوم لها). احذفها واستعمل الملف المصغَّر في المستند 46 عند تفعيل R8.
+
+### ج) منخفضة
+**9.** `OfflineInteractiveMap`: ما زال تعليق «Guaranteed to NEVER show a black screen».
+**10.** لافتة «تعذر جلب البلاطات» بلا إجراء: `RealLeafletMapView` يملك مشغّلاً لـ`reloadBaseLayer` لكن لا زر في `MapScreenContent`. أضف زر «إعادة المحاولة» يزيد عدّاداً `tilesRetryTick` تمرّره للدالة (معامل `retryTick: Int = 0`) فتنادي `window.reloadBaseLayer()` عند تغيّره.
+**11.** `NavConfig.YEMEN_CITIES` ما زالت مكررة مع `OfflineMapManager` و`CityAliases` (لا خطر وظيفي).
+**12.** `ConflictResolver`: لا يكشف التعارض عند تساوي رقم الإصدار واختلاف البيانات.
+**13.** `FullSyncManager` (المزامنة الدورية الوهمية) لم أره في هذه الدفعات؛ تأكد من تطبيق المستند 44-2.
+**14.** ملفات MVI الأربعة لم تعد في ما أرسلته؛ إن حذفتها فاضمن نجاح البناء (`MapScreen.kt` يجب ألا يستوردها).
+
+## 3) تحسينات إضافية على ميزة العنوان (مجانية)
+**أ) مشاركة العنوان** نصياً مع رابطين لـOSM (للسائق عبر واتساب وغيره، بلا خادم):
+```kotlin
+// LandmarkAddress.kt
+fun shareText(): String =
+    "$label: ${describe()}\nالمعلم: ${SosDispatcher.mapLink(landmarkLat, landmarkLng)}\nالموقع: ${SosDispatcher.mapLink(pointLat, pointLng)}"
+```
+وفي `SavedLandmarkAddressesDialog` زر: `TextButton(onClick = { SosDispatcher.safeStart(context, SosDispatcher.shareIntent(a.shareText())) }) { Text("مشاركة") }` (مرّر `context` أو نفّذه في المستدعي).
+**ب) ربط الحجز (لم أره بعد):** `LandmarkAddressCard` معرّفة لكنها غير مستعملة في الملفات المرفوعة. أرسل لي ملف الحجز (`BookingDialog` والدالة التي تكتب مستند الحجز) وشاشة الفني لأكتب لك التعديل الدقيق.
+**ج) تحقق من ملفات 3D:** افحص أن `maplibre-gl.js` ملف جافاسكربت حقيقي (وليس صفحة خطأ HTML) وأن حجمه بمئات الكيلوبايت، واحفظ بصمة `sha256sum` في المستودع مع ملف الترخيص.
+
+## 4) خارج الكود (قرارات وتحققات)
+- App Check: إن كان الإنفاذ مفعّلاً في Firebase وستوزع APK خارج Google Play فقد تفشل طلبات النسخة (راجع المستند 51-ب).
+- صفحات 16KB لمكتبات native (Valhalla) والتحقق من ABI 32-بت (`unzip -l valhalla-mobile-*.aar | grep jni`).
+- خريطة أوفلاين كاملة (MBTiles خاص)، 3D بلا إنترنت، ذكاء اصطناعي حقيقي في Aleph، رؤية حاسوبية في AR: مشاريع منفصلة.
+- التوقيع وبناء GitHub (المستند 49) في المرحلة الأخيرة.
+
+## 5) ترتيب التنفيذ
+1 ← 2 (دقائق) ثم 3 ← 6 ← 7 (ساعات)، ثم 8–14 عند الإنتهاء. بعدها: `./gradlew testDebugUnitTest` ثم قائمة القبول على الهاتف (المستند 45/48).

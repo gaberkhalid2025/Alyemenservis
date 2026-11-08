@@ -79,8 +79,9 @@ object HolidayManager {
                 }
             }
 
-            // 3. فحص يوم الجمعة (Friday)
-            if (cal.get(Calendar.DAY_OF_WEEK) == Calendar.FRIDAY) {
+            // 3. فحص يوم الجمعة (Friday) إلا إذا كان مزود الخدمة متاحاً للعمل يوم الجمعة
+            val worksFriday = providerId != null && providersWorkingFriday.contains(providerId)
+            if (cal.get(Calendar.DAY_OF_WEEK) == Calendar.FRIDAY && !worksFriday) {
                 return Pair(true, "يوم الجمعة (عطلة أسبوعية) 🕌")
             }
 
@@ -88,6 +89,12 @@ object HolidayManager {
         } catch (e: Exception) {
             return Pair(false, null)
         }
+    }
+
+    private val providersWorkingFriday = java.util.concurrent.CopyOnWriteArraySet<String>()
+
+    fun setProviderWorksFriday(providerId: String, works: Boolean) {
+        if (works) providersWorkingFriday.add(providerId) else providersWorkingFriday.remove(providerId)
     }
 
     /**

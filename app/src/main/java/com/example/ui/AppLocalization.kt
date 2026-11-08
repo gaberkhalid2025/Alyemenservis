@@ -229,6 +229,22 @@ object LocaleManager {
         val sp = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         sp.edit().putString(KEY_LANG, cleanCode).apply()
 
+        try {
+            val locale = java.util.Locale(cleanCode)
+            java.util.Locale.setDefault(locale)
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                val localeManager = context.getSystemService(android.app.LocaleManager::class.java)
+                localeManager?.applicationLocales = android.os.LocaleList(locale)
+            }
+            val res = context.resources
+            val config = res.configuration
+            config.setLocale(locale)
+            @Suppress("DEPRECATION")
+            res.updateConfiguration(config, res.displayMetrics)
+        } catch (e: Throwable) {
+            android.util.Log.e("AppLocalization", "Failed to apply system app locale: ${e.message}", e)
+        }
+
         // Sync with Firestore for remote backup / settings
         try {
             val db = FirebaseFirestore.getInstance()
@@ -238,7 +254,7 @@ object LocaleManager {
                 db.collection("registered_users").document(decId).update("preferredLanguage", cleanCode)
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            android.util.Log.e("AppLocalization", "Failed to sync language to Firestore: ${e.message}", e)
         }
     }
 
@@ -261,7 +277,7 @@ object LocaleManager {
             db.collection("settings").document("app_translations")
                 .addSnapshotListener { snapshot, error ->
                     if (error != null) {
-                        error.printStackTrace()
+                        android.util.Log.e("AppLocalization", "Snapshot error in app_translations: ${error.message}", error)
                         return@addSnapshotListener
                     }
                     if (snapshot != null && snapshot.exists()) {
@@ -276,7 +292,7 @@ object LocaleManager {
                     }
                 }
         } catch (e: Exception) {
-            e.printStackTrace()
+            android.util.Log.e("AppLocalization", "Failed to listen to translations: ${e.message}", e)
         }
     }
 

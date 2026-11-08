@@ -1,0 +1,74 @@
+# 57 – المتبقي في الدفعتين الأخيرتين (24 ملفاً) في مستند واحد
+**الدفعة أ (19):** `MyApplication_3e7518`, `MainActivity_9567fc`, `MainViewModel_790ef2`, `NetworkUtils_cfba62`, `SessionManagerAndUxEnhancer_1b116f`, `CrashReporter_4dc283`, `CompassSensor_12c530`, `ArabicNormalizer_a08afa`, `CrossFuzzySearchEngine_e390e3`, `AnalyticsAndReportingEngine_cba28f`, `AnalyticsEventsHelper_aaf27e`, `MapScreen_f51c6e`, `PushNotificationHandler_6cf354`, `ReportExporter_666aea`, `AppLocalization_b055d2`, `StoresRealEstateComponents`, `AppNavigator_0c005e`, `AppScreens_67bcac`, `ScreenRoutes_856845`.
+**الدفعة ب (5):** `ValhallaTileDownloader_1d6907`, `SyncStatusTracker_26011e`, `SystemBackupAndPerformance_1`, `HolidayManager`, `LandmarkAddressStore_1`.
+> قراءة وبحث نصي؛ لم أبنِ المشروع ولم أشغّل التطبيق. `StoresRealEstateComponents` (5799 سطراً) و`AppNavigator` اطّلعت على أنماط الخطر فيهما فقط، لا على كل أسطرهما.
+
+## 1) ما تأكدت من اكتماله ✅
+مسار الموقع الواحد (`onStart/onStop`، الإفصاح، لا مصدر ثالث)، حظر المصدر العام أثناء الملاحة وساعة صلاحية الموقع، `CrashReporter` مركّب، جدولة الطابور عند الإقلاع، تشفير التوكن و`clearForLogout`، `hasInternetTransport`، البوصلة بـ`cameraMode`، البحث الضبابي بالتطبيع، حذف المراجع إلى ملفات MVI، المنزِّل الآمن (`releaseEngine` وSHA-256 والاستيراد والتبديل الذري ومساحة التخزين)، حذف عبارة الخصوصية الخاطئة وتقليم النسخ المحلية، و`LandmarkAddressStore` (مشفّر ويفشل بأمان).
+**توافق أندرويد 7:** لا يوجد أي استخدام لـ`java.time` في أي ملف مرفوع (`HolidayManager` يعتمد على `Calendar`)، فلا حاجة لـ desugaring مع `minSdk = 24`.
+
+## 2) المتبقي (بالأولوية)
+
+### أ) متوسطة
+**1. التحليلات بلا موافقة ما زالت غائبة (`AnalyticsAndReportingEngine`).**
+```kotlin
+object AnalyticsConsent {
+    private const val FILE = "privacy"; private const val KEY = "analytics_consent"
+    fun isEnabled(ctx: Context) = ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).getBoolean(KEY, true)
+    fun set(ctx: Context, enabled: Boolean) {
+        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit().putBoolean(KEY, enabled).apply()
+        com.google.firebase.analytics.FirebaseAnalytics.getInstance(ctx).setAnalyticsCollectionEnabled(enabled)
+        com.google.firebase.crashlytics.FirebaseCrashlytics.getInstance().setCrashlyticsCollectionEnabled(enabled)
+    }
+}
+// أول logUserBehaviorEvent:  if (!AnalyticsConsent.isEnabled(context)) return
+```
+وأضف مفتاح «مشاركة بيانات الاستخدام المجهولة» في الإعدادات، وطابِق نموذج «أمان البيانات» في Play.
+**2. رقم الهاتف في 7 مواضع بلا تنظيف (`StoresRealEstateComponents`، أسطر ≈ 1023 و1072 و1630 و1646 و1950 و2990).** `Uri.parse("tel:${store.phone}")` يتعطل مع المسافات والرموز (`#`/`*`)، ولا يتحقق من الفراغ. استعمل المساعد الموجود:
+```kotlin
+// بدل: val u = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${store.phone}")); context.startActivity(u)
+if (store.phone.isNotBlank()) {
+    SosDispatcher.safeStart(context, SosDispatcher.dialIntent(store.phone))
+}
+```
+وفي موضعي `printStackTrace` (≈ 2672 و3183) استبدلها بـ`Log.e(TAG, "...", e)`.
+**3. تصدير CSV (`ReportExporter`): ثغرتان وعيب ترميز.**
+- الحقل `tx.note` (نص حر) يُكتب بين علامتي اقتباس دون تهريب `"`، فيتكسر الصف. وأي قيمة تبدأ بـ`= + - @` تُنفَّذ كصيغة عند فتح الملف في Excel (حقن صيغ).
+- لا توجد علامة ترتيب البايت (BOM): يظهر العربي رموزاً مشوّهة في Excel.
+```kotlin
+private fun csvField(v: Any?): String {
+    var s = v?.toString().orEmpty().replace("\"", "\"\"")
+    if (s.isNotEmpty() && s[0] in charArrayOf('=', '+', '-', '@', '\t', '\r')) s = "'$s"
+    return "\"$s\""
+}
+// أول الكتابة:  writer.write("\uFEFF")
+// واستبدل كل listOf("\"${tx.id}\"", ...) بـ:
+val line = listOf(csvField(tx.id), csvField(typeAr), csvField(tx.amount), csvField(tx.currency),
+                  csvField(statusAr), csvField(tx.note), csvField(dateFormatted)).joinToString(",")
+```
+وطبّق `csvField` على سطر العناوين أيضاً. واحفظ الملف في `cacheDir/exports` واحذف ما يزيد عمره عن يوم عند كل تصدير (بيانات مالية لا تبقى على الجهاز).
+**4. `PushNotificationHandler`.**
+- لا فحص لتمكين الإشعارات (أندرويد 13+ بلا إذن يتجاهلها بصمت): أضف `if (!NotificationManagerCompat.from(ctx).areNotificationsEnabled()) { saveNotification(notification); return }` فيبقى الإشعار داخل التطبيق.
+- حقول `notification.data` كلها تُنسخ إلى `Intent` وقد تطغى على المفتاحين المحجوزين: 
+```kotlin
+private val RESERVED = setOf("target_screen", "notification_id")
+for ((k, v) in notification.data) if (k !in RESERVED) putExtra(k, v)
+```
+- تأكد أن `AppNavigator`/`MainActivity` يتحقق من `target_screen` بقائمة مسموحة (من `ScreenRoutes`) وبصلاحية المستخدم (لا شاشة مشرف بمجرد إشعار): `private val ALLOWED = setOf(/* مسارات من ScreenRoutes */); fun safeTarget(raw: String?) = raw?.takeIf { it in ALLOWED }`. **لم أرَ هذه الدالة**، فتحقق منها.
+- الأيقونة `android.R.drawable.ic_dialog_info` (أيقونة نظام): استبدلها بأيقونة تطبيقك الأحادية اللون.
+- شرط `SDK_INT >= M` زائد مع `minSdk 24`: اجعل `FLAG_IMMUTABLE` دائماً.
+
+### ب) منخفضة
+**5. `AppLocalization`:** ثلاث `printStackTrace` → `Log.e`. وإن لم تكن اللغة تُطبَّق على موارد النظام (حوارات الأذونات، اتجاه الواجهة) فأضف عند `setLanguage`: `AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(cleanCode))` (يعمل من أندرويد 7 مع AppCompat حديث)، وتأكد أن اتجاه Compose يتبع اللغة (`LocalLayoutDirection`).
+**6. `HolidayManager` (تحقق من قاعدة العمل):**
+- التواريخ تُقارن بصيغة `MM-dd`؛ الأعياد الهجرية (الفطر، الأضحى، المولد) تتغير سنوياً، فإن كانت مخزنة بصيغة شهر-يوم فستكون خاطئة كل سنة. خزّنها بتاريخ كامل `YYYY-MM-DD` من Firestore، واحتفظ بـ`MM-dd` للأعياد الوطنية الثابتة فقط.
+- يوم الجمعة يُعتبر عطلة (سطر ≈ 83) لكل المزودين؟ كثير من الفنيين يعملون الجمعة: اجعله قابلاً للتجاوز لكل مزود (`providerWorksFriday`).
+**7. `SyncStatusTracker`:** يحمل `Context` في الحقل؛ استعمل `context.applicationContext` لتفادي تسريب `Activity`.
+**8. `StoresRealEstateComponents`: 5799 سطراً في ملف واحد.** يبطئ البناء والتحليل ويصعّب الصيانة. قسّمه (بلا تغيير سلوك) إلى: `StoreCard.kt`، `StoreDetails.kt`، `PropertyCard.kt`، `PropertyDetails.kt`، `StoresFilters.kt`، `StoresScreen.kt`. اجعل النقل تدريجياً وابنِ بعد كل نقل.
+**9. `AppNavigator`:** لم أجد فيه `popUpTo`/`launchSingleTop`/`BackHandler`/روابط عميقة، أي أن التنقل مخصّص. تحقق من: (أ) استعادة الشاشة بعد قتل العملية، (ب) سلوك زر الرجوع في كل مستوى، (ج) أن الإشعارات والروابط العميقة تمر عبر القائمة المسموحة أعلاه.
+
+## 3) ما لا يغطيه الكود
+قرارات المنتج الخارجة عن الإصلاح (خريطة أوفلاين كاملة، ذكاء اصطناعي حقيقي، إشعار الفنيين عند الفزعة عبر Cloud Function)، وتحقق App Check قبل التوزيع من GitHub، وصفحات 16KB لمكتبات native، والتوقيع (المستند 49).
+
+## 4) الترتيب
+2 (الهاتف) ← 3 (CSV) ← 4 (الإشعارات) ← 1 (الموافقة) ← 5–9. ثم ابنِ وشغّل `./gradlew testDebugUnitTest` وقائمة القبول على الهاتف.

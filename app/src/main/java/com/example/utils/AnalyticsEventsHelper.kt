@@ -5,10 +5,29 @@ import android.os.Bundle
 import com.example.MyApplication
 import com.google.firebase.analytics.FirebaseAnalytics
 
+object AnalyticsConsent {
+    private const val FILE = "privacy"
+    private const val KEY = "analytics_consent"
+
+    fun isEnabled(ctx: Context): Boolean =
+        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).getBoolean(KEY, true)
+
+    fun set(ctx: Context, enabled: Boolean) {
+        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit().putBoolean(KEY, enabled).apply()
+        try {
+            FirebaseAnalytics.getInstance(ctx).setAnalyticsCollectionEnabled(enabled)
+            com.google.firebase.crashlytics.FirebaseCrashlytics.getInstance().setCrashlyticsCollectionEnabled(enabled)
+        } catch (_: Throwable) {}
+    }
+}
+
 object AnalyticsEventsHelper {
 
     fun logEvent(context: Context?, eventName: String, params: Bundle = Bundle()) {
         try {
+            val ctx = context ?: MyApplication.instance
+            if (ctx != null && !AnalyticsConsent.isEnabled(ctx)) return
+
             if (context != null) {
                 FirebaseAnalytics.getInstance(context).logEvent(eventName, params)
             } else {

@@ -17,35 +17,53 @@ import java.util.Locale
  */
 object ReportExporter {
 
+    private fun csvField(v: Any?): String {
+        var s = v?.toString().orEmpty().replace("\"", "\"\"")
+        if (s.isNotEmpty() && s[0] in charArrayOf('=', '+', '-', '@', '\t', '\r')) {
+            s = "'$s"
+        }
+        return "\"$s\""
+    }
+
+    private fun cleanOldExports(exportDir: File) {
+        try {
+            val oneDayAgo = System.currentTimeMillis() - 24 * 60 * 60 * 1000L
+            exportDir.listFiles()?.filter { it.isFile && it.lastModified() < oneDayAgo }?.forEach { it.delete() }
+        } catch (_: Exception) {}
+    }
+
     fun exportUrgentRequestsToCsv(context: Context, requests: List<InstantRequestEntity>): Result<File> {
         return try {
             val exportDir = File(context.cacheDir, "exports")
             if (!exportDir.exists()) exportDir.mkdirs()
+            cleanOldExports(exportDir)
 
-            // ✨ م2-ج3: استخدام DateFormatter
             val timeStamp = DateFormatter.formatCustom(System.currentTimeMillis(), "yyyyMMdd_HHmmss")
             val file = File(exportDir, "Urgent_Requests_$timeStamp.csv")
 
             file.bufferedWriter(Charsets.UTF_8).use { writer ->
                 writer.write("\uFEFF") // UTF-8 BOM
-                writer.write("رمز الطلب,الخدمة,المدينة,الحي,الحالة,العميل,الهاتف,الوقت المتبقي (دقيقة),التاريخ\n")
+                writer.write(listOf(
+                    csvField("رمز الطلب"), csvField("الخدمة"), csvField("المدينة"),
+                    csvField("الحي"), csvField("الحالة"), csvField("العميل"),
+                    csvField("الهاتف"), csvField("الوقت المتبقي (دقيقة)"), csvField("التاريخ")
+                ).joinToString(",") + "\n")
 
                 val now = System.currentTimeMillis()
                 requests.forEach { req ->
                     val remainingMinutes = (((req.expiresAt - now) / 1000) / 60).coerceAtLeast(0)
-                    // ✨ م2-ج3: استخدام DateFormatter
                     val dateFormatted = DateFormatter.formatDateTime(req.createdAt)
 
                     val line = listOf(
-                        "\"${req.requestCode}\"",
-                        "\"${req.serviceTitle}\"",
-                        "\"${req.userCity}\"",
-                        "\"${req.userNeighborhood}\"",
-                        "\"${req.status}\"",
-                        "\"${req.userName}\"",
-                        "\"${req.userPhone}\"",
-                        "\"$remainingMinutes\"",
-                        "\"$dateFormatted\""
+                        csvField(req.requestCode),
+                        csvField(req.serviceTitle),
+                        csvField(req.userCity),
+                        csvField(req.userNeighborhood),
+                        csvField(req.status),
+                        csvField(req.userName),
+                        csvField(req.userPhone),
+                        csvField(remainingMinutes),
+                        csvField(dateFormatted)
                     ).joinToString(",")
                     writer.write(line + "\n")
                 }
@@ -67,19 +85,19 @@ object ReportExporter {
         return try {
             val exportDir = File(context.cacheDir, "exports")
             if (!exportDir.exists()) exportDir.mkdirs()
+            cleanOldExports(exportDir)
 
-            // ✨ م2-ج3: استخدام DateFormatter
             val timeStamp = DateFormatter.formatCustom(System.currentTimeMillis(), "yyyyMMdd_HHmmss")
             val file = File(exportDir, "Financial_Report_${accountName}_$timeStamp.csv")
 
             file.bufferedWriter(Charsets.UTF_8).use { writer ->
                 writer.write("\uFEFF") // UTF-8 BOM
-                writer.write("تقرير المبيعات والنمو المالي للحساب: $accountName\n")
-                writer.write("إجمالي الإيرادات: $totalIncome $currency\n\n")
-                writer.write("البند / الخدمة,المبلغ ($currency)\n")
+                writer.write(csvField("تقرير المبيعات والنمو المالي للحساب: $accountName") + "\n")
+                writer.write(csvField("إجمالي الإيرادات: $totalIncome $currency") + "\n\n")
+                writer.write(listOf(csvField("البند / الخدمة"), csvField("المبلغ ($currency)")).joinToString(",") + "\n")
 
                 items.forEach { (item, amount) ->
-                    writer.write("\"$item\",\"$amount\"\n")
+                    writer.write(listOf(csvField(item), csvField(amount)).joinToString(",") + "\n")
                 }
             }
 
@@ -97,14 +115,19 @@ object ReportExporter {
         return try {
             val exportDir = File(context.cacheDir, "exports")
             if (!exportDir.exists()) exportDir.mkdirs()
+            cleanOldExports(exportDir)
 
             val timeStamp = DateFormatter.formatCustom(System.currentTimeMillis(), "yyyyMMdd_HHmmss")
             val file = File(exportDir, "Transactions_${accountName}_$timeStamp.csv")
 
             file.bufferedWriter(Charsets.UTF_8).use { writer ->
                 writer.write("\uFEFF") // UTF-8 BOM
-                writer.write("سجل العمليات المالية للحساب: $accountName\n")
-                writer.write("رمز العملية,النوع,المبلغ,العملة,الحالة,الملاحظات,التاريخ\n")
+                writer.write(csvField("سجل العمليات المالية للحساب: $accountName") + "\n")
+                writer.write(listOf(
+                    csvField("رمز العملية"), csvField("النوع"), csvField("المبلغ"),
+                    csvField("العملة"), csvField("الحالة"), csvField("الملاحظات"),
+                    csvField("التاريخ")
+                ).joinToString(",") + "\n")
 
                 transactions.forEach { tx ->
                     val dateFormatted = DateFormatter.formatDateTime(tx.timestamp)
@@ -124,13 +147,13 @@ object ReportExporter {
                         else -> tx.status
                     }
                     val line = listOf(
-                        "\"${tx.id}\"",
-                        "\"$typeAr\"",
-                        "\"${tx.amount}\"",
-                        "\"${tx.currency}\"",
-                        "\"$statusAr\"",
-                        "\"${tx.note}\"",
-                        "\"$dateFormatted\""
+                        csvField(tx.id),
+                        csvField(typeAr),
+                        csvField(tx.amount),
+                        csvField(tx.currency),
+                        csvField(statusAr),
+                        csvField(tx.note),
+                        csvField(dateFormatted)
                     ).joinToString(",")
                     writer.write(line + "\n")
                 }

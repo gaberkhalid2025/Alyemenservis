@@ -85,27 +85,31 @@ class PushNotificationHandler(private val context: Context) {
         }
     }
 
+    private val RESERVED_KEYS = setOf("target_screen", "notification_id")
+
     fun displayNotification(ctx: Context, notification: PushNotificationItem) {
         try {
+            if (!androidx.core.app.NotificationManagerCompat.from(ctx).areNotificationsEnabled()) {
+                saveNotification(notification)
+                return
+            }
+
             val intent = Intent(ctx, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
                 putExtra("target_screen", notification.targetScreen)
                 putExtra("notification_id", notification.id)
                 for ((k, v) in notification.data) {
-                    putExtra(k, v)
+                    if (k !in RESERVED_KEYS) {
+                        putExtra(k, v)
+                    }
                 }
             }
 
-            val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            } else {
-                PendingIntent.FLAG_UPDATE_CURRENT
-            }
-
+            val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             val pendingIntent = PendingIntent.getActivity(ctx, notification.id.hashCode(), intent, flags)
 
             val builder = NotificationCompat.Builder(ctx, CHANNEL_ID)
-                .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .setSmallIcon(com.example.R.drawable.ic_notification)
                 .setContentTitle(notification.title)
                 .setContentText(notification.message)
                 .setStyle(NotificationCompat.BigTextStyle().bigText(notification.message))

@@ -34,4 +34,20 @@ object ScreenRoutes {
         ) || showGuestRegisterDialogForAction != null || 
           showAssistantDialog || showRequestServiceModal
     }
+
+    val ALLOWED_EXTERNAL_TARGETS = setOf(
+        AppScreens.HOME, AppScreens.INSTANT_REQUESTS_VIEW, AppScreens.ORDERS_VIEW,
+        AppScreens.NOTIFICATIONS_VIEW, AppScreens.MAP_VIEW, AppScreens.CHAT_LIST,
+        AppScreens.STATUS_VIEW, AppScreens.JOIN_REQUEST_STATUS,
+        AppScreens.SMART_ASSISTANT, AppScreens.QUICK_SERVICE_REQUEST
+    )
+
+    fun safeTarget(raw: String?, isAdminOrOwner: Boolean): String? {
+        if (raw.isNullOrBlank() || raw == "MAIN" || raw == "HOME") return null
+        if (raw in ALLOWED_EXTERNAL_TARGETS) return raw
+        if ((raw == AppScreens.ADMIN_PANEL || raw == AppScreens.OWNER_PANEL || raw == "PASSWORD_RECOVERY_PANEL") && isAdminOrOwner) {
+            return raw
+        }
+        return null
+    }
 }

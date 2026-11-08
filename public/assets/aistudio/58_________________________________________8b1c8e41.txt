@@ -1,0 +1,92 @@
+# 58 – المتبقي النهائي + خطة الوصول إلى نظام خرائط احترافي
+> فحصت بالقراءة والبحث النصي ولم أبنِ المشروع. وأقولها بصراحة: **لا أستطيع أن أعدك بنظام «بلا أخطاء» ولا بمنافسة Google أو Alibaba**؛ تفوقهما قائم على بيانات حركة مرور وأماكن ضخمة وفرق ميدانية. ما يمكن بلوغه فعلاً: **نظام موثوق ومُختبَر وصادق، متميز في مجال محدد** (ملاحة أوفلاين لليمن، عناوين بالمعالم، خدمات محلية). والقسم 3 يحدد كيف.
+
+## 1) ما تأكدت من اكتماله ✅
+ملفات هذه الدفعة والتي قبلها مطابقة لما طُلب: `MapAssetMemoryCache` حُذف، إعادة محاولة البلاطات تعمل (`reloadTilesKey`)، نصوص الطبقات صادقة (أُزيل «تسميات عربية» و«Vela 3D»)، أزرار 48dp، الرادار بأرقام الحلقات، AR بـ`cameraMode` وإعادة المحاولة، Aleph بلا «ممتاز»، `OfflineInteractiveMap` بلا التعليق الدعائي ومع `isApprox` و`hasUserLocation`، `CityAliases` بلا كلمات عامة، `GEMINI_API_KEY` حُذف من Gradle، `1.7.3` أُزيل لصالح الكتالوج، `stopLocationUpdates` أُزيل من `MapScreenContent`، «معالم قريبة» مقيّد بـ`hasRealLocation`، وزر «مشاركة» للعنوان بالمعلم.
+**أصول 3D:** `maplibre-gl.js` (5.24.0، ≈ 1.1MB، ليس صفحة خطأ) و`maplibre-gl.css`، وبصمات SHA-256 في `MAPLIBRE_LICENSE.txt` **تطابق** الملفين المرفوعين. تحقق مرة واحدة من البصمة الرسمية: `curl -L https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js | sha256sum` ويجب أن تساوي `45a9b07a…ee5cb`. و`leaflet 1.9.4` سليم.
+
+## 2) المتبقي (بالأولوية)
+
+### أ) عالية
+**1. `MapTestRunner` ما زال موجوداً في نسختين (`MapTestRunner.kt` و`MapTestRunner_1.kt`) وما زال وهمياً، و`DeepSystemDiagnosticOrchestrator` يستدعيه.**
+`radarStressTestPassed = true` ثابت، 16 نتيجة `SUCCESS` ثابتة، 11 `delay(...)` تحاكي العمل، وعبارة «100%». يعني تقارير التشخيص (التي يقرؤها المشرف) تُظهر نجاحاً لا أساس له.
+- في `DeepSystemDiagnosticOrchestrator` استبدل استدعاء `MapTestRunner` بفحص حقيقي من `MapDiagnostics`:
+```kotlin
+val items = MapDiagnostics.run(context, hasRealLocation = viewModel.isUserLocationReal.value,
+                               accuracyM = viewModel.userLocationAccuracyM.value.takeIf { it < Float.MAX_VALUE })
+val failed = items.count { it.status == DiagStatus.FAIL }
+val step = DiagnosticStep(name = "نظام الخرائط", passed = failed == 0, details = MapDiagnostics.toText(items),
+                          durationMs = measuredMs)          // قِس الزمن بـ SystemClock.elapsedRealtime حول الاستدعاء
+```
+(طابق اسم `DiagnosticStep` وحقوله مع ملفك.)
+- ثم **احذف الملفين** `MapTestRunner.kt` و`MapTestRunner_1.kt` (وجود نسختين بنفس الاسم في الحزمة نفسها يسبب خطأ `Redeclaration` عند البناء).
+- افحص التكرار في كل المشروع (النسخ ذات اللواحق قد تكون من التنزيل فقط، لكن تأكد):
+```bash
+grep -rhn "^\(object\|class\|data class\|interface\|fun\|enum class\) *\([A-Za-z0-9_]*\)" app/src --include=*.kt | sed -E 's/^[0-9]+://' | awk '{print $2=="class"||$2=="object"?$3:$2}' | sort | uniq -d
+```
+أي اسم يُطبع هو إعلان مكرر.
+
+### ب) متوسطة
+**2. Proguard** (عند تفعيل R8): ما زالت `-keep class dagger.hilt.** { *; }` و`-keep class javax.inject.** { *; }` و`-keepclassmembers class kotlinx.coroutines.** { *; }` (أسطر 43 و44 و48). تبطل التصغير ولا لزوم لها (المكتبات تحمل قواعدها). احذفها عند تفعيل R8. و`isMinifyEnabled = false` في النوعين: فعّل الإصدار فقط بعد المرور على اختبار المستند 46-د.
+**3. أرقام الترقية المهمة قبل النشر:** `Compose BOM 2024.09.00` (قديم: حدّثه لأحدث مستقر واختبر)، وتأكد من محاذاة 16KB لمكتبات native قبل أي رفع إلى Play (المستند 46).
+**4. الملفات المرفوعة بلواحق (`_1`, `_xxxxxx`):** تأكد أن المشروع نفسه يحوي نسخة واحدة من كل ملف بالاسم الأصلي.
+
+## 3) ما يجعل النظام «احترافياً» فعلاً (مجاني، بالأولوية)
+
+### 1) اختبار الملاحة بلا سيارة: إعادة تشغيل مسار GPX (يقلل الأخطاء الميدانية)
+أكبر مصدر لأخطاء الملاحة يظهر على الطريق. سجّل مساراً حقيقياً (أي تطبيق GPX مجاني) وأعد تشغيله داخل التطبيق في نسخة debug فقط.
+```kotlin
+// app/src/debug/java/com/example/utils/GpxReplay.kt   (مجلد debug فقط، لا يدخل نسخة المستخدمين)
+object GpxReplay {
+    fun parse(context: Context, assetName: String): List<Pair<Double, Double>> {
+        val xml = context.assets.open(assetName).bufferedReader().use { it.readText() }
+        val re = Regex("""<trkpt[^>]*lat="([-0-9.]+)"[^>]*lon="([-0-9.]+)"""")
+        return re.findAll(xml).mapNotNull { m ->
+            val la = m.groupValues[1].toDoubleOrNull(); val lo = m.groupValues[2].toDoubleOrNull()
+            if (la != null && lo != null) la to lo else null
+        }.toList()
+    }
+    fun play(scope: CoroutineScope, pts: List<Pair<Double, Double>>, speedMps: Double = 12.0,
+             onPoint: (lat: Double, lng: Double, accuracyM: Float) -> Unit): Job = scope.launch {
+        for (i in pts.indices) {
+            onPoint(pts[i].first, pts[i].second, 8f)
+            if (i < pts.lastIndex) {
+                val d = HaversinePrecisionNavigator.calculateDistance(pts[i].first, pts[i].second, pts[i + 1].first, pts[i + 1].second)
+                delay(((d / speedMps) * 1000).toLong().coerceIn(200L, 5000L))
+            }
+        }
+    }
+}
+```
+وفي `MainViewModel` (مع حارس DEBUG):
+```kotlin
+@Volatile var debugReplayActive = false
+fun debugInjectLocation(lat: Double, lng: Double, accuracyM: Float) {
+    if (!BuildConfig.DEBUG) return
+    updateUserLocation(lat, lng); _userLocationAccuracyM.value = accuracyM; markFix()
+}
+// وفي onLocationResult للمستمعين الاثنين أول سطر:  if (debugReplayActive) return
+```
+زر في قائمة المطور (debug) يشغّل الإعادة. اختبر: خروج عن المسار، محطتين متقاربتين، ضياع الإشارة، سرعات مختلفة، وتسجيل التعليمات المنطوقة.
+
+### 2) قياس جودة الملاحة من الميدان (بلا بيانات شخصية)
+أحداث تحليلات (تحترم `AnalyticsConsent`، **بلا إحداثيات**): `nav_route_source` (valhalla / osrm / approximate)، `nav_route_time_ms`، `nav_reroute_count`، `nav_false_offroute_suspect` (إعادة حساب خلال 30 ث من سابقتها)، `nav_gps_weak_seconds`، `nav_arrival_by_route` مقابل `nav_arrival_by_distance`، `tiles_failing_shown`، `landmark_address_saved`. مؤشراتك: نسبة «تقريبي» < 5%، إعادات الحساب لكل رحلة < 1، خروج كاذب < 2%.
+
+### 3) تحسينات ملاحة مجانية (Valhalla)
+- **مسارات بديلة:** طلب `alternates` في استعلام Valhalla (لمسار من نقطتين) وعرض خيارين للمستخدم. تحقق من توثيق الإصدار المدمج قبل التنفيذ.
+- **خيارات طرق مناسبة لليمن:** `use_highways` و`top_speed` وتجنب الطرق غير المعبّدة إن دعمها `costing` في الإصدار الموجود: خيار «تجنّب الطرق الوعرة».
+- **حد السرعة والمسارات:** اعرضهما فقط حين يوفرهما Valhalla (`speed_limit` في المناورات)، وإلا لا تُعرض.
+- **أوقات الوصول:** وفّر تعديلاً لمعامل السرعة لكل مدينة من بياناتك الميدانية (ليس مختلقاً: يُحسب من رحلات فعلية).
+
+### 4) ما يتفوق به تطبيق محلي على الكبار
+1. **حزمة أوفلاين كاملة:** توجيه Valhalla (موجود) + بلاطات عرض MBTiles مولّدة من OSM لليمن بـ Planetiler (بيانات Geofabrik) + قاعدة أماكن FTS (المستند 14 في الحزمة الأولى).
+2. **العناوين بالمعلم** (مطبّق): ميزة لا يقدمها Google لليمن؛ وسّعها بمشاركة واتساب (مطبّق)، وإدخال تلقائي في الحجز (المستند 54-9).
+3. **خدمات وفنيون على الخريطة** (موجود) مع موقع الفني الحي الاختياري وتقدير الوصول.
+4. **تحسين بيانات OSM لليمن:** أضف زر «بلّغ عن خطأ في الطريق/المكان»، وساهم بالتصحيحات في OSM (تفيد كل المستخدمين وحزمتك).
+5. **صدق الأرقام والخصوصية** كميزة تسويقية: لا ادعاءات، موافقة واضحة، تشفير محلي.
+
+### 5) بوابات الجودة قبل أي إصدار
+`./gradlew testDebugUnitTest lintDebug assembleRelease` في GitHub Actions (المستند 49) + قائمة القبول الميدانية (المستند 48) + تجربة مغلقة 50 مستخدماً + مراقبة Crashlytics (هدف: ≥ 99.5% جلسات بلا انهيار).
+
+## 4) ترتيب العمل
+1 (حذف MapTestRunner وربط المشخّص) ← 2 و3 و4 ← أدوات الاختبار 3-1 و3-2 ← بناء وتجربة ميدانية 3 أسابيع ← 3-3 و3-4 حسب نتائج الميدان.

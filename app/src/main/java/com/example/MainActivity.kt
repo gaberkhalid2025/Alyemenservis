@@ -430,14 +430,11 @@ class MainActivity : ComponentActivity() {
                                 viewModel.selectedRequestId = openUrgentCode
                                 viewModel.navigateToScreen(AppScreens.URGENT_REQUEST_DETAILS)
                             }
-                            navigateTo == "PASSWORD_RECOVERY_PANEL" || navigateTo == "ADMIN_PANEL" || targetScreen == "ADMIN_PANEL" -> {
-                                viewModel.navigateToScreen(AppScreens.ADMIN_PANEL)
-                            }
-                            !targetScreen.isNullOrBlank() && targetScreen != "MAIN" && targetScreen != "HOME" -> {
-                                viewModel.navigateToScreen(targetScreen)
-                            }
-                            !navigateTo.isNullOrBlank() && navigateTo != "MAIN" && navigateTo != "HOME" -> {
-                                viewModel.navigateToScreen(navigateTo)
+                            else -> {
+                                val isAdmin = viewModel.adminRole.value != "GUEST"
+                                ScreenRoutes.safeTarget(targetScreen ?: navigateTo, isAdmin)?.let { safe ->
+                                    viewModel.navigateToScreen(safe)
+                                }
                             }
                         }
                     } catch (e: Exception) {
