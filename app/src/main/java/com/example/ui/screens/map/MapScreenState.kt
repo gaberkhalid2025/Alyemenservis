@@ -26,6 +26,23 @@ class MapScreenState(
     var isOfflineCacheActive by mutableStateOf(true)
     var showStreetAlertDialog by mutableStateOf(false)
     var currentMapMode by mutableStateOf(initialMapMode)
+    var previousMapMode by mutableStateOf(initialMapMode)
+    var nightMode by mutableStateOf(false)
+    var gibsEnabled by mutableStateOf(false)
+    var gibsProduct by mutableStateOf("truecolor")
+    var zoomInTick by mutableIntStateOf(0)
+    var zoomOutTick by mutableIntStateOf(0)
+
+    fun toggleMapMode(target: MapMode) {
+        if (currentMapMode == target) {
+            val back = if (previousMapMode != target) previousMapMode else MapMode.SATELLITE
+            currentMapMode = back
+        } else {
+            previousMapMode = currentMapMode
+            currentMapMode = target
+        }
+    }
+
     var isAlephAssistantOpen by mutableStateOf(false)
     var showLayerDialog by mutableStateOf(false)
     var selectedCategory by mutableStateOf(selectedCategory)
@@ -123,28 +140,36 @@ class MapScreenState(
 
         val Saver: Saver<MapScreenState, *> = listSaver(
             save = {
-                listOf(
-                    it.isRadarMode, it.isHeatmapActive, it.selectedCategory, it.selectedCity, it.searchQuery,
-                    it.maxRangeKm, it.currentMapMode.name, it.isNavigating, encode(it.navWaypoints)
-                )
+                try {
+                    listOf(
+                        it.isRadarMode, it.isHeatmapActive, it.selectedCategory, it.selectedCity, it.searchQuery,
+                        it.maxRangeKm, it.currentMapMode.name, it.isNavigating, encode(it.navWaypoints)
+                    )
+                } catch (_: Throwable) {
+                    emptyList()
+                }
             },
-            restore = {
-                val rawMode = try { MapMode.valueOf(it.getOrNull(6) as? String ?: "SATELLITE") } catch (e: Exception) { MapMode.SATELLITE }
-                val mode = if (rawMode == MapMode.VELA_3D) MapMode.SATELLITE else rawMode
-                MapScreenState(
-                    isRadarMode = it[0] as Boolean,
-                    isHeatmapActive = it[1] as Boolean,
-                    selectedCategory = it[2] as String,
-                    selectedCity = it[3] as String,
-                    searchQuery = it[4] as String,
-                    maxRangeKm = (it[5] as Number).toFloat(),
-                    initialMapMode = mode
-                ).also { st ->
-                    val wps = decode(it.getOrNull(8) as? String ?: "")
-                    if ((it.getOrNull(7) as? Boolean) == true && wps.isNotEmpty()) {
-                        st.navWaypoints = wps
-                        st.isNavigating = true
+            restore = { list ->
+                try {
+                    val rawMode = try { MapMode.valueOf(list.getOrNull(6) as? String ?: "SATELLITE") } catch (_: Throwable) { MapMode.SATELLITE }
+                    val mode = if (rawMode == MapMode.VELA_3D) MapMode.SATELLITE else rawMode
+                    MapScreenState(
+                        isRadarMode = (list.getOrNull(0) as? Boolean) ?: false,
+                        isHeatmapActive = (list.getOrNull(1) as? Boolean) ?: false,
+                        selectedCategory = (list.getOrNull(2) as? String) ?: "ALL",
+                        selectedCity = (list.getOrNull(3) as? String) ?: "الكل",
+                        searchQuery = (list.getOrNull(4) as? String) ?: "",
+                        maxRangeKm = (list.getOrNull(5) as? Number)?.toFloat() ?: 25.0f,
+                        initialMapMode = mode
+                    ).also { st ->
+                        val wps = decode(list.getOrNull(8) as? String ?: "")
+                        if ((list.getOrNull(7) as? Boolean) == true && wps.isNotEmpty()) {
+                            st.navWaypoints = wps
+                            st.isNavigating = true
+                        }
                     }
+                } catch (_: Throwable) {
+                    MapScreenState()
                 }
             }
         )

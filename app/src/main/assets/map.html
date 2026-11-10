@@ -177,12 +177,55 @@
     <script>
         var map;
         var currentBaseLayer;
+        var currentProviderKey = 'satellite';
+        var nightEnabled = false;
         var markerClusterGroup;
         var userMarker = null;
         var userAccuracyCircle = null;
         var userLat = 15.3694;
         var userLng = 44.1910;
         var activeMode = 'SATELLITE';
+
+        function ensurePane(name, zIndex) {
+            if (!map) return null;
+            var pane = map.getPane(name);
+            if (!pane) {
+                pane = map.createPane(name);
+                pane.style.zIndex = zIndex;
+                pane.style.pointerEvents = 'none';
+            }
+            return pane;
+        }
+
+        function applyNight() {
+            if (!currentBaseLayer) return;
+            try {
+                var el = currentBaseLayer.getContainer();
+                if (!el) return;
+                if (!nightEnabled) {
+                    el.style.filter = '';
+                    el.style.webkitFilter = '';
+                    return;
+                }
+                if (currentProviderKey === 'satellite') {
+                    var satFilter = 'brightness(0.80) contrast(1.05)';
+                    el.style.filter = satFilter;
+                    el.style.webkitFilter = satFilter;
+                } else {
+                    var vectorFilter = 'invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.95) saturate(0.85)';
+                    el.style.filter = vectorFilter;
+                    el.style.webkitFilter = vectorFilter;
+                }
+            } catch (e) {
+                console.error('applyNight error', e);
+            }
+        }
+
+        function setNightMode(on) {
+            nightEnabled = !!on;
+            applyNight();
+        }
+        window.setNightMode = setNightMode;
 
         var ATTR_OSM = '© <a href="https://www.openstreetmap.org/copyright">مساهمو OpenStreetMap</a>';
         var providers = {
@@ -233,8 +276,10 @@
             if (!map) return;
             if (on) {
                 if (!labelsOverlay) {
+                    ensurePane('labelsPane', 250);
                     labelsOverlay = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
-                        maxZoom: 24, maxNativeZoom: 19, zIndex: 5,
+                        maxZoom: 24, maxNativeZoom: 19,
+                        pane: 'labelsPane',
                         attribution: 'أسماء © <a href="https://www.esri.com">Esri</a>'
                     });
                 }
@@ -244,6 +289,95 @@
             }
         }
         window.setHybridLabels = setHybridLabels;
+
+        var GIBS_PRODUCTS = {
+            'truecolor': {
+                layer: 'MODIS_Terra_CorrectedReflectance_TrueColor',
+                format: 'jpg',
+                maxZoom: 9
+            },
+            'landtemp': {
+                layer: 'MODIS_Terra_Land_Surface_Temp_Day',
+                format: 'png',
+                maxZoom: 7
+            }
+        };
+
+        function gibsDate(daysAgo) {
+            var d = new Date();
+            d.setUTCDate(d.getUTCDate() - (daysAgo || 1));
+            var y = d.getUTCFullYear();
+            var m = String(d.getUTCMonth() + 1).padStart(2, '0');
+            var day = String(d.getUTCDate()).padStart(2, '0');
+            return y + '-' + m + '-' + day;
+        }
+
+        function gibsUrl(prodKey, daysAgo) {
+            var p = GIBS_PRODUCTS[prodKey] || GIBS_PRODUCTS['truecolor'];
+            var dateStr = gibsDate(daysAgo);
+            return 'https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/' +
+                p.layer + '/default/' + dateStr +
+                '/GoogleMapsCompatible_Level9/{z}/{y}/{x}.' + p.format;
+        }
+
+        var gibsOverlay = null;
+        var gibsRetryCount = 0;
+        function notifyGibs(ok) {
+            if (window.AndroidBridge && window.AndroidBridge.onGibsStatus) {
+                window.AndroidBridge.onGibsStatus(!!ok);
+            }
+        }
+
+        function setGibs(on, prodKey) {
+            if (!map) return;
+            prodKey = prodKey || 'truecolor';
+            if (gibsOverlay && map.hasLayer(gibsOverlay)) {
+                map.removeLayer(gibsOverlay);
+                gibsOverlay = null;
+            }
+            if (!on) {
+                notifyGibs(false);
+                return;
+            }
+
+            ensurePane('gibsPane', 260);
+            var prod = GIBS_PRODUCTS[prodKey] || GIBS_PRODUCTS['truecolor'];
+            gibsRetryCount = 0;
+
+            function tryLoadWithOffset(offset) {
+                if (offset > 3) {
+                    notifyGibs(false);
+                    return;
+                }
+                var url = gibsUrl(prodKey, offset);
+                var layer = L.tileLayer(url, {
+                    maxZoom: prod.maxZoom,
+                    maxNativeZoom: prod.maxZoom,
+                    opacity: 0.75,
+                    pane: 'gibsPane',
+                    attribution: 'بيانات الأقمار © <a href="https://earthdata.nasa.gov/gibs">NASA EOSDIS GIBS</a>'
+                });
+
+                var okCount = 0, errCount = 0;
+                layer.on('tileload', function() {
+                    okCount++;
+                    if (okCount === 1) notifyGibs(true);
+                });
+                layer.on('tileerror', function() {
+                    errCount++;
+                    if (okCount === 0 && errCount >= 4) {
+                        try { map.removeLayer(layer); } catch (e) {}
+                        tryLoadWithOffset(offset + 1);
+                    }
+                });
+
+                gibsOverlay = layer;
+                gibsOverlay.addTo(map);
+            }
+
+            tryLoadWithOffset(1);
+        }
+        window.setGibs = setGibs;
 
         function initMap(lat, lng, mode) {
             userLat = lat || 15.3694;
@@ -326,6 +460,8 @@
                 currentBaseLayer = providers[providerKey];
                 currentBaseLayer.addTo(map);
                 watchLayer(currentBaseLayer);
+                currentProviderKey = providerKey;
+                applyNight();
             }
 
             var iconEl = document.getElementById('modeIcon');
@@ -526,6 +662,13 @@
         function clearSearchPin() {
             if (map && searchPin) { map.removeLayer(searchPin); searchPin = null; }
         }
+
+        function setNavZoom(z) {
+            if (!map || typeof z !== 'number') return;
+            var target = Math.max(3, Math.min(20, Math.round(z)));
+            if (map.getZoom() !== target) map.setZoom(target, { animate: true });
+        }
+        window.setNavZoom = setNavZoom;
 
         // Auto initialize on load if not called by Android view
         window.onload = function() {

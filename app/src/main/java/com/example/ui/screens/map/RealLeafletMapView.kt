@@ -78,6 +78,14 @@ fun RealLeafletMapView(
     pickMode: Boolean = false,
     onMapPicked: ((lat: Double, lng: Double) -> Unit)? = null,
     hybridLabels: Boolean = false,
+    nightMode: Boolean = false,
+    gibsEnabled: Boolean = false,
+    gibsProduct: String = "truecolor",
+    onGibsStatus: ((Boolean) -> Unit)? = null,
+    zoomInTick: Int = 0,
+    zoomOutTick: Int = 0,
+    useZoomTicks: Boolean = false,
+    navZoom: Int? = null,
     themeColors: VisualThemePalette = resolveThemePalette(AdminSettingsEntity()),
     modifier: Modifier = Modifier
 ) {
@@ -98,6 +106,7 @@ fun RealLeafletMapView(
     val onUserPannedState by rememberUpdatedState(onUserPanned)
     val onTilesStatusState by rememberUpdatedState(onTilesStatus)
     val onMapPickedState by rememberUpdatedState(onMapPicked)
+    val onGibsStatusState by rememberUpdatedState(onGibsStatus)
 
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner, webViewRef) {
@@ -188,6 +197,7 @@ fun RealLeafletMapView(
     // التحكم في التكبير والتصغير التفاعلي
     var lastZoomScale by remember { mutableFloatStateOf(zoomScale) }
     LaunchedEffect(zoomScale) {
+        if (useZoomTicks) return@LaunchedEffect
         if (isMapReady && webViewRef != null) {
             if (zoomScale > lastZoomScale) {
                 webViewRef?.evaluateJavascript("if (window.zoomIn) { window.zoomIn(); }", null)
@@ -195,6 +205,25 @@ fun RealLeafletMapView(
                 webViewRef?.evaluateJavascript("if (window.zoomOut) { window.zoomOut(); }", null)
             }
             lastZoomScale = zoomScale
+        }
+    }
+
+    LaunchedEffect(zoomInTick) {
+        if (isMapReady && webViewRef != null && zoomInTick > 0) {
+            webViewRef?.evaluateJavascript("if (window.zoomIn) { window.zoomIn(); }", null)
+        }
+    }
+
+    LaunchedEffect(zoomOutTick) {
+        if (isMapReady && webViewRef != null && zoomOutTick > 0) {
+            webViewRef?.evaluateJavascript("if (window.zoomOut) { window.zoomOut(); }", null)
+        }
+    }
+
+    LaunchedEffect(isMapReady, navZoom, followUser) {
+        val z = navZoom
+        if (isMapReady && z != null && followUser) {
+            webViewRef?.evaluateJavascript("if (window.setNavZoom) { window.setNavZoom($z); }", null)
         }
     }
 
@@ -227,11 +256,13 @@ fun RealLeafletMapView(
                 arr.put(JSONArray().put(routeCoordinates[i].first).put(routeCoordinates[i].second))
                 i += step
             }
-            val last = routeCoordinates.last()
+            val last = routeCoordinates.lastOrNull() ?: return@withContext ""
             arr.put(JSONArray().put(last.first).put(last.second))
             Base64.encodeToString(arr.toString().toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
         }
-        webViewRef?.evaluateJavascript("if (window.setRouteBase64) { window.setRouteBase64('$b64', ${!followUser}); }", null)
+        if (b64.isNotBlank()) {
+            webViewRef?.evaluateJavascript("if (window.setRouteBase64) { window.setRouteBase64('$b64', ${!followUser}); }", null)
+        }
     }
 
     // محطات المسار المرقمة
@@ -267,6 +298,19 @@ fun RealLeafletMapView(
         if (isMapReady && webViewRef != null) {
             val on = hybridLabels && (currentMapMode == MapMode.SATELLITE || currentMapMode == MapMode.VELA_3D)
             webViewRef?.evaluateJavascript("if (window.setHybridLabels) { window.setHybridLabels($on); }", null)
+        }
+    }
+
+    LaunchedEffect(isMapReady, nightMode) {
+        if (isMapReady && webViewRef != null) {
+            webViewRef?.evaluateJavascript("if (window.setNightMode) { window.setNightMode($nightMode); }", null)
+        }
+    }
+
+    LaunchedEffect(isMapReady, gibsEnabled, gibsProduct) {
+        if (isMapReady && webViewRef != null) {
+            val key = gibsProduct.replace("'", "").replace("\"", "")
+            webViewRef?.evaluateJavascript("if (window.setGibs) { window.setGibs($gibsEnabled, '$key'); }", null)
         }
     }
 
@@ -348,6 +392,11 @@ fun RealLeafletMapView(
                             }
 
                             @JavascriptInterface
+                            fun onGibsStatus(ok: Boolean) {
+                                mainHandler.post { onGibsStatusState?.invoke(ok) }
+                            }
+
+                            @JavascriptInterface
                             fun onMapPicked(lat: Double, lng: Double) {
                                 mainHandler.post { onMapPickedState?.invoke(lat, lng) }
                             }
@@ -364,7 +413,7 @@ fun RealLeafletMapView(
                         }, "AndroidBridge")
 
                         webViewClient = object : WebViewClient() {
-                            private val ALLOWED_HOSTS = setOf("www.openstreetmap.org", "www.hotosm.org", "opentopomap.org", "www.esri.com")
+                            private val ALLOWED_HOSTS = setOf("www.openstreetmap.org", "www.hotosm.org", "opentopomap.org", "www.esri.com", "earthdata.nasa.gov")
 
                             override fun shouldInterceptRequest(
                                 view: WebView?,

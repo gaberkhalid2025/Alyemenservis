@@ -422,13 +422,18 @@ object RealValhallaNavigator {
         val nq = normalizeArabic(clean)
         val hasUser = !(userLat == 0.0 && userLng == 0.0)
 
-        // 1) محلي أولاً (فقط ما له إحداثيات صالحة)
+        // 1) محلي أولاً (فقط ما له إحداثيات صالحة) مع دعم مرادفات اللهجة اليمنية
         val local = mutableListOf<SearchAddressResult>()
+        val expansions = DialectSynonyms.expand(clean)
+        fun hit(text: String): Boolean {
+            val t = normalizeArabic(text)
+            return expansions.any { t.contains(it) }
+        }
         nearbyProviders.filter { it.latitude != 0.0 && it.longitude != 0.0 &&
-            (normalizeArabic(it.name).contains(nq) || normalizeArabic(it.area).contains(nq)) }
+            (hit(it.name) || hit(it.area) || hit(it.profession)) }
             .take(6).forEach { p -> local.add(SearchAddressResult("${p.name} - ${p.area}", p.name, p.latitude, p.longitude, "provider", "👷")) }
         nearbyStores.filter { it.latitude != 0.0 && it.longitude != 0.0 &&
-            (normalizeArabic(it.name).contains(nq) || normalizeArabic(it.cityId).contains(nq)) }
+            (hit(it.name) || hit(it.cityId) || hit(it.categoryId)) }
             .take(6).forEach { s -> local.add(SearchAddressResult("${s.name} - ${s.cityId}", s.name, s.latitude, s.longitude, "store", "🏪")) }
 
         // 2) Nominatim: حد 1 طلب/ثانية + كاش + رسالة خطأ واضحة

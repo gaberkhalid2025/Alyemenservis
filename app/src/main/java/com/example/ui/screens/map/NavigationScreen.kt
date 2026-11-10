@@ -373,6 +373,12 @@ fun NavigationScreen(
         DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(System.currentTimeMillis() + (remainingSeconds * 1000).toLong()))
     }
 
+    val smartZoom: Int? = when {
+        isApproximate || upcoming == null || !hasRealLocation -> null
+        distToManeuver < NavConfig.SMART_ZOOM_NEAR_METERS -> NavConfig.SMART_ZOOM_NEAR_LEVEL
+        else -> NavConfig.SMART_ZOOM_CRUISE_LEVEL
+    }
+
     Box(modifier = modifier.fillMaxSize().background(Color(0xFF0B1120))) {
 
         // ───────── الخريطة ─────────
@@ -398,6 +404,7 @@ fun NavigationScreen(
             waypointMarkers = waypoints.mapIndexed { i, w -> Triple("${i + 1}. ${w.name}", w.latitude, w.longitude) },
             followUser = followUser,
             onUserPanned = { followUser = false },
+            navZoom = smartZoom,
             modifier = Modifier.fillMaxSize()
         )
 

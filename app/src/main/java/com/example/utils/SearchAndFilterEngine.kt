@@ -37,9 +37,9 @@ object SearchAndFilterEngine {
         var query: Query = db.collection(collectionName)
 
         if (searchQuery.isNotBlank()) {
-            val token = ArabicNormalizer.normalize(searchQuery).split(" ").firstOrNull { it.length >= 2 }
-            if (token != null) {
-                query = query.whereArrayContains("keywords", token)
+            val tokens = DialectSynonyms.expand(searchQuery).flatMap { it.split(" ") }.filter { it.length >= 2 }.distinct().take(10)
+            if (tokens.isNotEmpty()) {
+                query = query.whereArrayContainsAny("keywords", tokens)
             }
         }
 

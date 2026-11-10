@@ -86,6 +86,12 @@ object LevenshteinMatcher {
     }
 
     fun isFuzzyMatch(query: String, target: String, maxDistance: Int = 3): Boolean = score(query, target) != null
+
+    /** تقييم مطابقات اللهجة الموسعة واختيار أفضل درجة */
+    fun scoreDialect(query: String, target: String): Int? =
+        DialectSynonyms.expand(query).mapNotNull { score(it, target) }.minOrNull()
+
+    fun isFuzzyMatchDialect(query: String, target: String): Boolean = scoreDialect(query, target) != null
 }
 
 data class SearchTechnicianItem(
@@ -137,8 +143,8 @@ fun CrossFuzzySearchScreen(
     val filteredTechnicians = remember(query, allTechnicians) {
         if (query.isBlank()) allTechnicians else {
             allTechnicians.filter {
-                LevenshteinMatcher.isFuzzyMatch(query, it.name) ||
-                        LevenshteinMatcher.isFuzzyMatch(query, it.profession)
+                LevenshteinMatcher.isFuzzyMatchDialect(query, it.name) ||
+                        LevenshteinMatcher.isFuzzyMatchDialect(query, it.profession)
             }
         }
     }
@@ -146,9 +152,9 @@ fun CrossFuzzySearchScreen(
     val filteredStores = remember(query, allStores) {
         if (query.isBlank()) allStores else {
             allStores.filter {
-                LevenshteinMatcher.isFuzzyMatch(query, it.name) ||
-                        LevenshteinMatcher.isFuzzyMatch(query, it.category) ||
-                        LevenshteinMatcher.isFuzzyMatch(query, it.address)
+                LevenshteinMatcher.isFuzzyMatchDialect(query, it.name) ||
+                        LevenshteinMatcher.isFuzzyMatchDialect(query, it.category) ||
+                        LevenshteinMatcher.isFuzzyMatchDialect(query, it.address)
             }
         }
     }
@@ -156,9 +162,9 @@ fun CrossFuzzySearchScreen(
     val filteredArticles = remember(query, allArticles) {
         if (query.isBlank()) allArticles else {
             allArticles.filter {
-                LevenshteinMatcher.isFuzzyMatch(query, it.title) ||
-                        LevenshteinMatcher.isFuzzyMatch(query, it.summary) ||
-                        LevenshteinMatcher.isFuzzyMatch(query, it.category)
+                LevenshteinMatcher.isFuzzyMatchDialect(query, it.title) ||
+                        LevenshteinMatcher.isFuzzyMatchDialect(query, it.summary) ||
+                        LevenshteinMatcher.isFuzzyMatchDialect(query, it.category)
             }
         }
     }

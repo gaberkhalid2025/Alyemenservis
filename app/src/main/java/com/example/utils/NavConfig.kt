@@ -19,6 +19,11 @@ object NavConfig {
     const val OFF_ROUTE_THRESHOLD_METERS = 45.0 // المسافة التي يعتبر عندها المستخدم خارج المسار
     const val ARRIVAL_THRESHOLD_METERS = 25.0    // المسافة لاعتبار الوصول للمحطة
     const val MIN_SPEED_FOR_DIRECTION_KMH = 5.0   // الحد الأدنى للسرعة لتحديد الاتجاه
+
+    // Smart Navigation Zoom
+    const val SMART_ZOOM_NEAR_METERS = 200.0
+    const val SMART_ZOOM_NEAR_LEVEL = 18
+    const val SMART_ZOOM_CRUISE_LEVEL = 15
     
     // Default Yemen Location (Sana'a)
     const val DEFAULT_YEMEN_LAT = 15.3694

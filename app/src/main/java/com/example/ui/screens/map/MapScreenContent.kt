@@ -110,6 +110,13 @@ fun MapScreenContent(
     val keyboardController = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
     var areTilesFailing by remember { mutableStateOf(false) }
 
+    val isSysDark = androidx.compose.foundation.isSystemInDarkTheme()
+    LaunchedEffect(Unit) {
+        if (!state.nightMode && isSysDark) {
+            state.nightMode = true
+        }
+    }
+
     var isDrivingMode by remember { mutableStateOf(true) }
     var isHudMode by remember { mutableStateOf(false) }
     var isHudMirrored by remember { mutableStateOf(false) }
@@ -117,6 +124,7 @@ fun MapScreenContent(
     var companionFilter by remember { mutableStateOf<String?>(null) }
     var showSosDialog by remember { mutableStateOf(false) }
     var showDownloadDialog by remember { mutableStateOf(false) }
+    var showGnss by remember { mutableStateOf(false) }
 
     androidx.activity.compose.BackHandler(enabled = true) {
         if (isHudMode) {
@@ -452,8 +460,21 @@ fun MapScreenContent(
                     onDeselect = { state.selectedEntity = null },
                     onSwitchToRadar = { state.isRadarMode = true },
                     onTilesStatus = { areTilesFailing = it },
-                    reloadTilesKey = state.reloadTilesTrigger,
                     hybridLabels = hybridLabels,
+                    nightMode = state.nightMode,
+                    gibsEnabled = state.gibsEnabled,
+                    gibsProduct = state.gibsProduct,
+                    onGibsStatus = { ok ->
+                        coroutineScope.launch {
+                            snackbarHostState.showSnackbar(
+                                if (ok) "🛰️ تم تحميل صور ناسا الفضائية لليوم بنجاح"
+                                else "تعذر تحميل بيانات ناسا لليوم (جاري المحاولة بالتاريخ السابق)"
+                            )
+                        }
+                    },
+                    zoomInTick = state.zoomInTick,
+                    zoomOutTick = state.zoomOutTick,
+                    useZoomTicks = true,
                     focusPoint = searchedPlace?.let { Triple(it.shortName, it.latitude, it.longitude) },
                     modifier = Modifier.fillMaxSize()
                 )
@@ -830,10 +851,10 @@ fun MapScreenContent(
                 isHeatmapActive = state.isHeatmapActive,
                 onToggleHeatmap = { state.isHeatmapActive = !state.isHeatmapActive },
                 onZoomIn = {
-                    state.zoomScale = (state.zoomScale * 1.30f).coerceIn(0.25f, 8.0f)
+                    state.zoomInTick++
                 },
                 onZoomOut = {
-                    state.zoomScale = (state.zoomScale / 1.30f).coerceIn(0.25f, 8.0f)
+                    state.zoomOutTick++
                 },
                 onRecenterLocation = {
                     state.panOffset = Offset.Zero
@@ -869,10 +890,10 @@ fun MapScreenContent(
                 isGpsActive = viewModel.isGpsTrackingActive.collectAsState().value,
                 themeColors = themeColors,
                 currentMapMode = state.currentMapMode,
-                onSelectMapMode = { mode, tilt ->
-                    state.currentMapMode = mode
+                onSelectMapMode = { mode, _ ->
+                    state.toggleMapMode(mode)
                     state.isRadarMode = false
-                    val label = when (mode) {
+                    val label = when (state.currentMapMode) {
                         MapMode.SATELLITE, MapMode.VELA_3D -> "أقمار صناعية"
                         MapMode.HOT -> "شوارع (HOT)"
                         MapMode.TOPO -> "تضاريس"
@@ -880,6 +901,31 @@ fun MapScreenContent(
                     }
                     coroutineScope.launch {
                         snackbarHostState.showSnackbar("النمط: $label")
+                    }
+                },
+                isNightMode = state.nightMode,
+                onToggleNight = {
+                    state.nightMode = !state.nightMode
+                    coroutineScope.launch {
+                        snackbarHostState.showSnackbar(if (state.nightMode) "🌙 تم تفعيل الوضع الليلي للخريطة" else "☀️ تم تفعيل الوضع النهاري للخريطة")
+                    }
+                },
+                isGibsActive = state.gibsEnabled,
+                onToggleGibs = {
+                    state.gibsEnabled = !state.gibsEnabled
+                    coroutineScope.launch {
+                        snackbarHostState.showSnackbar(
+                            if (state.gibsEnabled) "🛰️ تم تفعيل طبقة ناسا اليومية (${if (state.gibsProduct == "landtemp") "حرارة السطح" else "الألوان الحقيقية"})"
+                            else "تم إيقاف طبقة ناسا"
+                        )
+                    }
+                },
+                onGibsLongPress = {
+                    state.gibsProduct = if (state.gibsProduct == "truecolor") "landtemp" else "truecolor"
+                    state.gibsEnabled = true
+                    val prodName = if (state.gibsProduct == "landtemp") "حرارة السطح النهاري" else "الألوان الحقيقية (TrueColor)"
+                    coroutineScope.launch {
+                        snackbarHostState.showSnackbar("🛰️ تم التبديل إلى منتج ناسا: $prodName")
                     }
                 },
                 isDrivingMode = isDrivingMode,
@@ -901,6 +947,7 @@ fun MapScreenContent(
                         snackbarHostState.showSnackbar("اتجاه الجهاز: ${deg.toInt()}° ($dir)")
                     }
                 },
+                onShowGnss = { showGnss = true },
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
                     .padding(end = 16.dp)
@@ -1082,6 +1129,14 @@ fun MapScreenContent(
                 )
             }
 
+            if (showGnss) {
+                GnssPanelDialog(
+                    accuracyM = accuracyM.takeIf { it < Float.MAX_VALUE },
+                    onOpenLandmarkAddress = { showLandmarkAddress = true },
+                    onDismiss = { showGnss = false }
+                )
+            }
+
             // 📍 8.5. Multi-Stop Waypoints Management Bar (Appears when stops are added)
             if (state.selectedWaypoints.isNotEmpty()) {
                 Surface(
@@ -1106,8 +1161,29 @@ fun MapScreenContent(
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold
                             )
-                            TextButton(onClick = { state.clearWaypoints() }) {
-                                Text("مسح الكل", color = Color(0xFFEF4444), fontSize = 11.sp)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (state.selectedWaypoints.size >= 3 && hasRealLocation) {
+                                    TextButton(onClick = {
+                                        val origin = safeUserLat to safeUserLng
+                                        val before = com.example.utils.WaypointOptimizer.pathLength(origin, state.selectedWaypoints.toList())
+                                        val opt = com.example.utils.WaypointOptimizer.optimize(origin, state.selectedWaypoints.toList())
+                                        val after = com.example.utils.WaypointOptimizer.pathLength(origin, opt)
+                                        if (after + 1.0 < before) {
+                                            state.selectedWaypoints.clear()
+                                            state.selectedWaypoints.addAll(opt)
+                                            coroutineScope.launch {
+                                                snackbarHostState.showSnackbar("تم الترتيب: توفير ≈ ${com.example.ui.screens.map.utils.MapDistanceCalculator.formatDistance(before - after)} (بالخط المستقيم)")
+                                            }
+                                        } else {
+                                            coroutineScope.launch { snackbarHostState.showSnackbar("ترتيبك الحالي هو الأقرب") }
+                                        }
+                                    }) {
+                                        Text("ترتيب أذكى", color = Color(0xFF00E5FF), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                                TextButton(onClick = { state.clearWaypoints() }) {
+                                    Text("مسح الكل", color = Color(0xFFEF4444), fontSize = 11.sp)
+                                }
                             }
                         }
                         
