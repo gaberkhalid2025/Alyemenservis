@@ -125,6 +125,7 @@ fun MapScreenContent(
     var showSosDialog by remember { mutableStateOf(false) }
     var showDownloadDialog by remember { mutableStateOf(false) }
     var showGnss by remember { mutableStateOf(false) }
+    var showZones by remember { mutableStateOf(false) }
 
     androidx.activity.compose.BackHandler(enabled = true) {
         if (isHudMode) {
@@ -476,6 +477,7 @@ fun MapScreenContent(
                     zoomOutTick = state.zoomOutTick,
                     useZoomTicks = true,
                     focusPoint = searchedPlace?.let { Triple(it.shortName, it.latitude, it.longitude) },
+                    zones = if (showZones) com.example.utils.ReliabilityZones.build(filteredProviders, filteredStores) else emptyList(),
                     modifier = Modifier.fillMaxSize()
                 )
 
@@ -948,6 +950,13 @@ fun MapScreenContent(
                     }
                 },
                 onShowGnss = { showGnss = true },
+                isZonesActive = showZones,
+                onToggleZones = {
+                    showZones = !showZones
+                    coroutineScope.launch {
+                        snackbarHostState.showSnackbar(if (showZones) "🟢 تم تفعيل طبقة توفر وموثوقية الخدمات" else "تم إخفاء طبقة توفر الخدمات")
+                    }
+                },
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
                     .padding(end = 16.dp)

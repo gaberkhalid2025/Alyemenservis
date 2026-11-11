@@ -91,10 +91,21 @@ class MainActivity : ComponentActivity() {
         super.onStop()
     }
 
+    private fun handleTrackingIntent(intent: Intent?) {
+        val data = intent?.data ?: return
+        if (data.scheme == "alyemen" && data.host == "track") {
+            val token = data.pathSegments.firstOrNull().orEmpty()
+            if (com.example.utils.TrackingShareManager.TOKEN_REGEX.matches(token)) {
+                viewModel.pendingTrackingToken.value = token
+            }
+        }
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
         pendingNavigationIntent.value = intent
+        handleTrackingIntent(intent)
     }
 
     fun startVoiceInput(onResult: (String) -> Unit) {
@@ -213,6 +224,7 @@ class MainActivity : ComponentActivity() {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         pendingNavigationIntent.value = intent
+        handleTrackingIntent(intent)
         
         // 🔐 تهيئة Vault إذا لزم الأمر
         initializeAdminVaultIfNeeded()
@@ -550,7 +562,17 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                         } else {
-                            AppNavigator(viewModel = viewModel, themeColors = colors, permissionLauncher = permissionLauncher, locationPermissions = locationPermissions)
+                            Box(modifier = Modifier.fillMaxSize()) {
+                                AppNavigator(viewModel = viewModel, themeColors = colors, permissionLauncher = permissionLauncher, locationPermissions = locationPermissions)
+
+                                val trackingToken by viewModel.pendingTrackingToken.collectAsState()
+                                trackingToken?.let { token ->
+                                    TrackingViewerScreen(
+                                        token = token,
+                                        onClose = { viewModel.pendingTrackingToken.value = null }
+                                    )
+                                }
+                            }
                         }
                     }
                 }

@@ -20,6 +20,10 @@ object NavConfig {
     const val ARRIVAL_THRESHOLD_METERS = 25.0    // المسافة لاعتبار الوصول للمحطة
     const val MIN_SPEED_FOR_DIRECTION_KMH = 5.0   // الحد الأدنى للسرعة لتحديد الاتجاه
 
+    // Dead Reckoning (الملاحة عند انقطاع GPS)
+    const val DEAD_RECKONING_MAX_SECONDS = 10
+    const val DEAD_RECKONING_MIN_SPEED_MPS = 1.5
+
     // Smart Navigation Zoom
     const val SMART_ZOOM_NEAR_METERS = 200.0
     const val SMART_ZOOM_NEAR_LEVEL = 18

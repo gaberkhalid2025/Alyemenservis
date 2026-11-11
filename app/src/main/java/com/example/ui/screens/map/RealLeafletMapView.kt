@@ -36,6 +36,8 @@ import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 
+data class MapZone(val lat: Double, val lng: Double, val radiusM: Int, val colorHex: String)
+
 /**
  * 🗺️ RealLeafletMapView (Vela 3D + OpenAerialMap Satellite Engine)
  * - تحميل خريطة الأقمار الاصطناعية الافتراضية عالية الدقة بدون أي مفتاح API
@@ -86,6 +88,7 @@ fun RealLeafletMapView(
     zoomOutTick: Int = 0,
     useZoomTicks: Boolean = false,
     navZoom: Int? = null,
+    zones: List<MapZone> = emptyList(),
     themeColors: VisualThemePalette = resolveThemePalette(AdminSettingsEntity()),
     modifier: Modifier = Modifier
 ) {
@@ -225,6 +228,18 @@ fun RealLeafletMapView(
         if (isMapReady && z != null && followUser) {
             webViewRef?.evaluateJavascript("if (window.setNavZoom) { window.setNavZoom($z); }", null)
         }
+    }
+
+    LaunchedEffect(isMapReady, zones) {
+        if (!isMapReady) return@LaunchedEffect
+        val b64 = withContext(Dispatchers.Default) {
+            val arr = JSONArray()
+            zones.take(400).forEach {
+                arr.put(JSONObject().put("lat", it.lat).put("lng", it.lng).put("radiusM", it.radiusM).put("color", it.colorHex))
+            }
+            Base64.encodeToString(arr.toString().toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
+        }
+        webViewRef?.evaluateJavascript("if (window.setZonesBase64) { window.setZonesBase64('$b64'); }", null)
     }
 
     // إعادة التمركز إلى موقع المستخدم

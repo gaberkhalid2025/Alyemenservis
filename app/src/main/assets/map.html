@@ -670,6 +670,26 @@
         }
         window.setNavZoom = setNavZoom;
 
+        var zonesLayer = null;
+        function setZonesBase64(b64) {
+            try {
+                if (!map) return;
+                ensurePane('zonesPane', 255);
+                if (zonesLayer) { map.removeLayer(zonesLayer); zonesLayer = null; }
+                if (!b64) return;
+                var list = JSON.parse(decodeURIComponent(escape(window.atob(b64))));     // [{lat,lng,radiusM,color}]
+                zonesLayer = L.layerGroup();
+                list.forEach(function (z) {
+                    if (typeof z.lat !== 'number' || typeof z.lng !== 'number') return;
+                    var color = /^#[0-9A-Fa-f]{6}$/.test(z.color || '') ? z.color : '#F59E0B';
+                    L.circle([z.lat, z.lng], { pane: 'zonesPane', radius: Math.max(50, Math.min(z.radiusM || 300, 3000)),
+                        color: color, weight: 1, fillColor: color, fillOpacity: 0.22, interactive: false }).addTo(zonesLayer);
+                });
+                zonesLayer.addTo(map);
+            } catch (e) { console.error('zones', e); }
+        }
+        window.setZonesBase64 = setZonesBase64;
+
         // Auto initialize on load if not called by Android view
         window.onload = function() {
             if (!map) {

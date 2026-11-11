@@ -4,6 +4,8 @@ import android.speech.tts.TextToSpeech
 import android.util.Log
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -78,6 +80,9 @@ fun NavigationScreen(
     initialWaypoints: List<NavWaypoint> = emptyList(),
     hasRealLocation: Boolean = true,
     isDrivingMode: Boolean = true,
+    bookingId: String? = null,
+    chatBridge: com.example.utils.BookingChatBridge? = null,
+    onArrivedAtWaypoint: ((Int) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -196,6 +201,48 @@ fun NavigationScreen(
     val announced = remember { mutableSetOf<String>() }
     var routeFailures by remember { mutableIntStateOf(0) }
 
+    val voicePrefs = remember { context.getSharedPreferences("voice_prefs", android.content.Context.MODE_PRIVATE) }
+    var dialectVoice by remember { mutableStateOf(voicePrefs.getBoolean("dialect", false)) }
+
+    var drActive by remember { mutableStateOf(false) }
+    var lastAlong by remember { mutableDoubleStateOf(0.0) }
+    var lastSpeedMps by remember { mutableDoubleStateOf(0.0) }
+
+    // تذكّر آخر وضع موثوق للـ Dead Reckoning
+    LaunchedEffect(trackerState, hasRealLocation) {
+        val ts = trackerState
+        if (hasRealLocation && ts != null) {
+            lastAlong = ts.alongMeters
+            lastSpeedMps = currentSpeedKmh / 3.6
+        }
+    }
+
+    // تقدير محدود عند ضياع الإشارة (Dead Reckoning ≤ 10 ثوانٍ)
+    LaunchedEffect(hasRealLocation, tracker) {
+        drActive = false
+        if (hasRealLocation) return@LaunchedEffect
+        val t = tracker ?: return@LaunchedEffect
+        val v = lastSpeedMps.coerceIn(0.0, 25.0)
+        if (v < com.example.utils.NavConfig.DEAD_RECKONING_MIN_SPEED_MPS || routeResult == null || routeResult?.error != null) return@LaunchedEffect
+        val startAlong = lastAlong
+        val begin = android.os.SystemClock.elapsedRealtime()
+        drActive = true
+        while (true) {
+            kotlinx.coroutines.delay(1000L)
+            val dt = (android.os.SystemClock.elapsedRealtime() - begin) / 1000.0
+            if (dt > com.example.utils.NavConfig.DEAD_RECKONING_MAX_SECONDS) break
+            val alongM = (startAlong + v * dt).coerceAtMost(t.totalMeters)
+            trackerState = TrackerResult(
+                alongMeters = alongM,
+                remainingMeters = (t.totalMeters - alongM).coerceAtLeast(0.0),
+                offRouteMeters = 0.0,
+                segmentIndex = trackerState?.segmentIndex ?: 0,
+                progress = (alongM / t.totalMeters).toFloat().coerceIn(0f, 1f)
+            )
+        }
+        drActive = false
+    }
+
     // ───────── حساب المسار (من الموقع الحالي عبر المحطات المتبقية) ─────────
     val needsFirstRoute = hasRealLocation && routeResult == null
     LaunchedEffect(routeVersion, waypoints.size, isTilesDownloaded, needsFirstRoute, isDrivingMode) {
@@ -268,6 +315,7 @@ fun NavigationScreen(
                 currentWaypointIndex += 1
                 routeVersion += 1
             }
+            onArrivedAtWaypoint?.invoke(currentWaypointIndex)
         }
     }
 
@@ -332,8 +380,8 @@ fun NavigationScreen(
         HaversinePrecisionNavigator.calculateDistance(userLat, userLng, target.latitude, target.longitude) else 0.0
 
     // ───────── النطق حسب المسافة والسرعة ─────────
-    LaunchedEffect(currentStepIndex, along, routeVersion) {
-        if (isApproximate || upcoming == null || !hasRealLocation) return@LaunchedEffect
+    LaunchedEffect(currentStepIndex, along, routeVersion, drActive) {
+        if (isApproximate || upcoming == null || !(hasRealLocation || drActive)) return@LaunchedEffect
         val v = max(currentSpeedKmh / 3.6, 5.0)
         val far = max(250.0, v * 20)
         val mid = max(100.0, v * 8)
@@ -349,8 +397,14 @@ fun NavigationScreen(
             val isDest = upcoming.maneuverType == ManeuverType.DESTINATION
             when {
                 isDest && level == "N" -> { /* الوصول ينطقه كاشف الوصول عند handleArrival */ }
-                level == "N" -> speak(upcoming.instruction, false)
-                else -> speak(ArabicInstructionFormatter.upcomingText(upcoming.instruction, upcoming.maneuverType, distToManeuver), false)
+                else -> {
+                    val text = if (dialectVoice) {
+                        if (level == "N") com.example.utils.YemeniPhrases.maneuver(upcoming.maneuverType, upcoming.streetName)
+                        else com.example.utils.YemeniPhrases.upcoming(upcoming.maneuverType, upcoming.streetName, distToManeuver)
+                    } else if (level == "N") upcoming.instruction
+                    else ArabicInstructionFormatter.upcomingText(upcoming.instruction, upcoming.maneuverType, distToManeuver)
+                    speak(text, false)
+                }
             }
         }
     }
@@ -363,6 +417,7 @@ fun NavigationScreen(
     }
     val nativeError = if (isTilesDownloaded && result != null && !result.isOffline) NativeValhallaStatus.lastError else null
     val instructionText = when {
+        drActive -> "إشارة GPS ضعيفة — تقدير مؤقت للموقع"
         !hasRealLocation -> if (result != null) "إشارة GPS ضعيفة — سنواصل التوجيه عند عودتها" else "لم يتم تحديد موقعك بعد — فعّل GPS"
         result == null -> "جارٍ حساب المسار..."
         isApproximate -> "تقريبي: ${MapDistanceCalculator.formatDistance(distToTarget)} مباشرة إلى ${target?.name ?: ""} (بدون تعليمات منعطفات)"
@@ -508,8 +563,36 @@ fun NavigationScreen(
                             color = Color(0xFFCBD5E1), fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
                         )
                     }
-                    IconButton(onClick = { voiceEnabled = !voiceEnabled }, modifier = Modifier.size(34.dp)) {
-                        Icon(if (voiceEnabled) Icons.Default.VolumeUp else Icons.Default.VolumeOff, contentDescription = "الصوت", tint = Color(0xFF94A3B8))
+                    @OptIn(ExperimentalFoundationApi::class)
+                    Box(
+                        modifier = Modifier
+                            .size(34.dp)
+                            .clip(CircleShape)
+                            .combinedClickable(
+                                onClick = { voiceEnabled = !voiceEnabled },
+                                onLongClick = {
+                                    dialectVoice = !dialectVoice
+                                    voicePrefs.edit().putBoolean("dialect", dialectVoice).apply()
+                                    scope.launch {
+                                        snackbarHostState.showSnackbar(if (dialectVoice) "الصوت: لهجة يمنية 🇾🇪" else "الصوت: عربية فصحى")
+                                    }
+                                }
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            if (voiceEnabled) (if (dialectVoice) Icons.Default.RecordVoiceOver else Icons.Default.VolumeUp) else Icons.Default.VolumeOff,
+                            contentDescription = "الصوت (اضغط مطولاً لتبديل اللهجة)",
+                            tint = if (dialectVoice && voiceEnabled) Color(0xFF00E5FF) else Color(0xFF94A3B8)
+                        )
+                    }
+                    if (bookingId != null && chatBridge != null) {
+                        IconButton(
+                            onClick = { chatBridge.open(com.example.utils.BookingChat.channelIdFor(bookingId)) },
+                            modifier = Modifier.size(34.dp)
+                        ) {
+                            Icon(Icons.Default.Chat, contentDescription = "دردشة الحجز", tint = Color(0xFF38BDF8))
+                        }
                     }
                     IconButton(onClick = onFinishNavigation, modifier = Modifier.size(34.dp).testTag("exit_navigation_btn")) {
                         Icon(Icons.Default.Close, contentDescription = "إنهاء", tint = Color(0xFF94A3B8))
@@ -527,12 +610,41 @@ fun NavigationScreen(
             ) { Icon(Icons.Default.MyLocation, contentDescription = "موقعي", tint = Color(0xFF00E5FF)) }
         }
 
-        SnackbarHost(snackbarHostState, modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 210.dp))
+        SnackbarHost(snackbarHostState, modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 240.dp))
 
-        // ───────── اللوحة السفلية (ثلاث خلايا متساوية بلا تكرار) ─────────
+        // ───────── اللوحة السفلية مع الردود السريعة للحجز ─────────
         Column(
-            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().navigationBarsPadding().padding(horizontal = 14.dp, vertical = 12.dp)
+            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().navigationBarsPadding().padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            if (bookingId != null && chatBridge != null) {
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    items(com.example.utils.BookingChat.quickReplies) { msg ->
+                        AssistChip(
+                            onClick = {
+                                chatBridge.send(com.example.utils.BookingChat.channelIdFor(bookingId), msg)
+                                scope.launch { snackbarHostState.showSnackbar("تم الإرسال: $msg") }
+                            },
+                            label = { Text(msg, fontSize = 11.sp, color = Color.White) },
+                            colors = AssistChipDefaults.assistChipColors(containerColor = Color(0xFF1E293B).copy(alpha = 0.9f))
+                        )
+                    }
+                    item {
+                        AssistChip(
+                            onClick = {
+                                val etaMsg = com.example.utils.BookingChat.etaMessage((remainingSeconds / 60).toInt(), null)
+                                chatBridge.send(com.example.utils.BookingChat.channelIdFor(bookingId), etaMsg)
+                                scope.launch { snackbarHostState.showSnackbar("تم إرسال وقت الوصول المتوقع") }
+                            },
+                            label = { Text("أرسل وقت وصولي", fontSize = 11.sp, color = Color(0xFF00E5FF)) },
+                            colors = AssistChipDefaults.assistChipColors(containerColor = Color(0xFF1E293B).copy(alpha = 0.9f))
+                        )
+                    }
+                }
+            }
             Surface(
                 shape = RoundedCornerShape(20.dp),
                 color = Color(0xFF0F172A).copy(alpha = 0.96f),

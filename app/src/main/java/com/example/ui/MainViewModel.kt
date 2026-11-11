@@ -82,6 +82,8 @@ class MainViewModel @Inject constructor(
     }
     internal val _screenBackStack = MutableStateFlow<List<String>>(listOf("USER_BROWSE"))
     val screenBackStack: StateFlow<List<String>> = _screenBackStack.asStateFlow()
+
+    val pendingTrackingToken = MutableStateFlow<String?>(null)
     // INTENTIONAL: Delegating properties for unified access across ViewModels.
     // Do not convert to StateFlow - would break existing collectAsState() calls.
     val _currentUserId get() = authViewModel._currentUserId

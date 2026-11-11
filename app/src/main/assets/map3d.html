@@ -87,6 +87,15 @@
   };
 
   window.setPitch = function (deg) { if (map) map.easeTo({ pitch: Math.max(0, Math.min(75, deg)), duration: 500 }); };
+
+  window.setNavigatingBuildings = function (on) {
+    if (!map || !styleReady) return;
+    try {
+      map.getStyle().layers.forEach(function (l) {
+        if (l.type === 'fill-extrusion') map.setPaintProperty(l.id, 'fill-extrusion-opacity', on ? 0.25 : 0.85);
+      });
+    } catch (e) { console.error('buildings', e); }
+  };
 })();
 </script>
 </body>

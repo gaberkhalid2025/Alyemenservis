@@ -29,6 +29,7 @@ fun Map3DView(
     userCoords: Pair<Double, Double>?,
     markersJson: String,
     routeCoordinates: List<Pair<Double, Double>> = emptyList(),
+    navigating: Boolean = false,
     onMarkerClicked: (id: String, type: String) -> Unit,
     onUnavailable: (String) -> Unit,
     modifier: Modifier = Modifier
@@ -85,5 +86,8 @@ fun Map3DView(
         while (i < routeCoordinates.size) { arr.put(org.json.JSONArray().put(routeCoordinates[i].first).put(routeCoordinates[i].second)); i += step }
         val b64 = Base64.encodeToString(arr.toString().toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
         webView?.evaluateJavascript("if (window.setRouteBase64) { window.setRouteBase64('$b64'); }", null)
+    }
+    LaunchedEffect(ready, navigating) {
+        if (ready) webView?.evaluateJavascript("if (window.setNavigatingBuildings) { window.setNavigatingBuildings($navigating); }", null)
     }
 }

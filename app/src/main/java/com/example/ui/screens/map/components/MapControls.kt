@@ -69,7 +69,9 @@ fun MapControls(
     isGibsActive: Boolean = false,
     onToggleGibs: () -> Unit = {},
     onGibsLongPress: () -> Unit = {},
-    onShowGnss: (() -> Unit)? = null
+    onShowGnss: (() -> Unit)? = null,
+    isZonesActive: Boolean = false,
+    onToggleZones: (() -> Unit)? = null
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "gps_pulse")
     val gpsPulseAlpha by infiniteTransition.animateFloat(
@@ -278,6 +280,20 @@ fun MapControls(
                     onClick = showGnssAction,
                     testTag = "map_gnss_btn",
                     contentDescription = "حالة إشارة GPS والأقمار الصناعية"
+                )
+            }
+
+            // 13. 🟢 مناطق التوفر والموثوقية المحلية
+            onToggleZones?.let { toggleZonesAction ->
+                HorizontalDivider(modifier = Modifier.width(34.dp), color = Color.White.copy(alpha = 0.08f))
+                DockButton(
+                    icon = Icons.Default.PieChart,
+                    label = "توفر",
+                    active = isZonesActive,
+                    activeColor = Color(0xFF10B981),
+                    onClick = toggleZonesAction,
+                    testTag = "map_zones_btn",
+                    contentDescription = "مناطق توفر الخدمات المحلية"
                 )
             }
         }
