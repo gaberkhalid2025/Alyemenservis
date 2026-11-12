@@ -52,6 +52,7 @@ import com.example.ui.screens.map.components.*
 import com.example.ui.screens.map.utils.MapDistanceCalculator
 import com.example.ui.screens.map.utils.OfflineMapManager
 import com.example.utils.RealValhallaNavigator
+import com.example.utils.OfflineYemenGazetteer
 import com.example.utils.SosDispatcher
 import com.example.utils.ValhallaTileDownloader
 import com.example.utils.VisualThemePalette
@@ -111,10 +112,8 @@ fun MapScreenContent(
     var areTilesFailing by remember { mutableStateOf(false) }
 
     val isSysDark = androidx.compose.foundation.isSystemInDarkTheme()
-    LaunchedEffect(Unit) {
-        if (!state.nightMode && isSysDark) {
-            state.nightMode = true
-        }
+    LaunchedEffect(isSysDark) {
+        state.nightMode = isSysDark
     }
 
     var isDrivingMode by remember { mutableStateOf(true) }
@@ -127,6 +126,7 @@ fun MapScreenContent(
     var showGnss by remember { mutableStateOf(false) }
     var showZones by remember { mutableStateOf(false) }
     var showServicesSheet by remember { mutableStateOf(false) }
+    var showDestinationPicker by remember { mutableStateOf(false) }
 
     androidx.activity.compose.BackHandler(enabled = true) {
         if (isHudMode) {
@@ -173,6 +173,7 @@ fun MapScreenContent(
     var isSearching by remember { mutableStateOf(false) }
     var searchMessage by remember { mutableStateOf<String?>(null) }
     var searchPanelOpen by remember { mutableStateOf(false) }
+    var searchRetryNonce by remember { mutableIntStateOf(0) }
     var searchedPlace by remember { mutableStateOf<RealValhallaNavigator.SearchAddressResult?>(null) }
     var showDiagnostics by remember { mutableStateOf(false) }
     val accuracyM by viewModel.userLocationAccuracyM.collectAsState()
@@ -199,22 +200,25 @@ fun MapScreenContent(
         }
     }
 
-    LaunchedEffect(state.searchQuery) {
+    LaunchedEffect(state.searchQuery, searchRetryNonce) {
         val q = state.searchQuery.trim()
-        if (q.length < 3) {
+        if (q.length < 2) {
             searchResults = emptyList()
             searchMessage = null
             isSearching = false
             searchPanelOpen = false
             return@LaunchedEffect
         }
-        delay(600)
+        delay(300)
         isSearching = true
         searchPanelOpen = true
         searchResults = RealValhallaNavigator.searchAddressAndPlaces(
-            q, providers, stores,
-            if (hasRealLocation) safeUserLat else 0.0,
-            if (hasRealLocation) safeUserLng else 0.0
+            query = q,
+            nearbyProviders = providers,
+            nearbyStores = stores,
+            userLat = if (hasRealLocation) safeUserLat else 0.0,
+            userLng = if (hasRealLocation) safeUserLng else 0.0,
+            context = context
         )
         searchMessage = if (searchResults.isEmpty()) (RealValhallaNavigator.lastSearchError ?: "لا توجد نتائج لـ «$q»") else null
         isSearching = false
@@ -739,7 +743,10 @@ fun MapScreenContent(
                     },
                     onSearchExecute = { query ->
                         val q = query.trim()
-                        if (q.length >= 3) searchPanelOpen = true
+                        if (q.length >= 2) {
+                            searchPanelOpen = true
+                            searchRetryNonce++
+                        }
                         OfflineMapManager.findCity(q)?.let { city -> state.selectedCity = city.nameAr }
                         keyboardController?.hide()
                     }
@@ -811,14 +818,10 @@ fun MapScreenContent(
                                         textAlign = TextAlign.Center
                                     )
                                     Button(
-                                        onClick = { 
+                                        onClick = {
                                             val q = state.searchQuery.trim()
-                                            if (q.length >= 3) {
-                                                state.searchQuery = "" // Trigger refresh
-                                                coroutineScope.launch { 
-                                                    delay(100)
-                                                    state.searchQuery = q 
-                                                }
+                                            if (q.length >= 2) {
+                                                searchRetryNonce++
                                             }
                                         },
                                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E293B)),
@@ -905,13 +908,19 @@ fun MapScreenContent(
                 onOpenLayerDialog = { state.showLayerDialog = true },
                 isNavigationActive = state.isNavigating,
                 onToggleNavigation = {
+                    val searchedWp = searchedPlace?.let {
+                        NavWaypoint(name = it.shortName, latitude = it.latitude, longitude = it.longitude)
+                    }
                     when {
                         !hasRealLocation -> {
                             viewModel.startLocationUpdates()
                             coroutineScope.launch { snackbarHostState.showSnackbar("فعّل GPS وانتظر تحديد موقعك ثم أعد المحاولة") }
                         }
-                        !state.startNavigation(state.selectedEntity) -> {
-                            coroutineScope.launch { snackbarHostState.showSnackbar("اختر وجهة أولاً: اضغط على مكان في الخريطة أو ابحث عنه") }
+                        state.startNavigation(state.selectedEntity ?: searchedWp) -> {
+                            searchedPlace = null
+                        }
+                        else -> {
+                            showDestinationPicker = true
                         }
                     }
                 },
@@ -1300,7 +1309,14 @@ fun MapScreenContent(
                     ) {
                         Text(place.shortName, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
                         Text(place.displayName, color = Color(0xFF94A3B8), fontSize = 11.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                        Text("المسافة المباشرة: ${MapDistanceCalculator.formatDistance(dist)} (تقريبي)", color = Color(0xFF10B981), fontSize = 12.sp)
+                        Text(
+                            text = if (isTilesDownloaded)
+                                "المسافة المباشرة: ${MapDistanceCalculator.formatDistance(dist)} • توجيه أوفلاين جاهز ✓"
+                            else
+                                "المسافة المباشرة: ${MapDistanceCalculator.formatDistance(dist)} (تقريبي)",
+                            color = Color(0xFF10B981),
+                            fontSize = 12.sp
+                        )
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Button(
                                 onClick = {
@@ -1546,6 +1562,116 @@ fun MapScreenContent(
                 showLandmarkAddress = true
             },
             onDismiss = { showSavedAddresses = false }
+        )
+    }
+
+    if (showDestinationPicker) {
+        var pickerQuery by remember { mutableStateOf("") }
+        var pickerResults by remember { mutableStateOf<List<RealValhallaNavigator.SearchAddressResult>>(emptyList()) }
+        var pickerBusy by remember { mutableStateOf(false) }
+        val defaultSuggestions = remember(safeUserLat, safeUserLng, savedAddresses) {
+            val saved = savedAddresses.map {
+                RealValhallaNavigator.SearchAddressResult(
+                    displayName = "عنوان محفوظ • ${it.landmarkName}",
+                    shortName = it.label,
+                    latitude = it.pointLat,
+                    longitude = it.pointLng,
+                    type = "saved",
+                    icon = "🏠"
+                )
+            }
+            (saved + OfflineYemenGazetteer.suggestionsNear(safeUserLat, safeUserLng, limit = 12))
+                .distinctBy { "${it.shortName}_${it.latitude}" }
+        }
+
+        LaunchedEffect(pickerQuery) {
+            val q = pickerQuery.trim()
+            if (q.length < 2) {
+                pickerResults = emptyList()
+                pickerBusy = false
+                return@LaunchedEffect
+            }
+            delay(250)
+            pickerBusy = true
+            pickerResults = RealValhallaNavigator.searchAddressAndPlaces(
+                query = q,
+                nearbyProviders = providers,
+                nearbyStores = stores,
+                userLat = if (hasRealLocation) safeUserLat else 0.0,
+                userLng = if (hasRealLocation) safeUserLng else 0.0,
+                context = context
+            )
+            pickerBusy = false
+        }
+
+        val visibleList = if (pickerQuery.trim().length >= 2) pickerResults else defaultSuggestions
+
+        AlertDialog(
+            onDismissRequest = { showDestinationPicker = false },
+            containerColor = Color(0xFF0F172A),
+            titleContentColor = Color.White,
+            title = { Text("🧭 اختر وجهتك للملاحة", fontWeight = FontWeight.Bold, fontSize = 16.sp) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = pickerQuery,
+                        onValueChange = { pickerQuery = it },
+                        singleLine = true,
+                        placeholder = { Text("ابحث عن شارع، جولة، مدينة أو معلم (يعمل أوفلاين)…", fontSize = 12.sp, color = Color(0xFF94A3B8)) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedBorderColor = Color(0xFF00E5FF),
+                            unfocusedBorderColor = Color(0xFF334155)
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    if (pickerBusy) {
+                        LinearProgressIndicator(Modifier.fillMaxWidth(), color = Color(0xFF10B981))
+                    }
+                    if (visibleList.isEmpty() && pickerQuery.trim().length >= 2 && !pickerBusy) {
+                        Text(
+                            text = "لم يتم العثور على «${pickerQuery.trim()}» — جرب اسم الشارع أو المدينة",
+                            color = Color(0xFFF59E0B),
+                            fontSize = 12.sp
+                        )
+                    } else {
+                        LazyColumn(modifier = Modifier.heightIn(max = 280.dp)) {
+                            items(visibleList) { item ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            val wp = NavWaypoint(
+                                                name = item.shortName,
+                                                latitude = item.latitude,
+                                                longitude = item.longitude
+                                            )
+                                            showDestinationPicker = false
+                                            state.startNavigation(wp)
+                                        }
+                                        .padding(vertical = 8.dp, horizontal = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text(item.icon, fontSize = 16.sp)
+                                    Column(Modifier.weight(1f)) {
+                                        Text(item.shortName, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Text(item.displayName, color = Color(0xFF94A3B8), fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    }
+                                }
+                                HorizontalDivider(color = Color.White.copy(alpha = 0.06f))
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showDestinationPicker = false }) {
+                    Text("إغلاق", color = Color(0xFF94A3B8))
+                }
+            }
         )
     }
 

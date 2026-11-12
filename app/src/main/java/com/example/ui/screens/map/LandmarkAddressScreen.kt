@@ -64,15 +64,19 @@ fun LandmarkAddressScreen(
         step = 1
     }
 
-    // بحث بالاسم (Nominatim الموجود) مع debounce
+    // بحث بالاسم (محلي + كاش + Nominatim أونلاين) مع debounce
     LaunchedEffect(query) {
         val q = query.trim()
-        if (step != 0 || q.length < 3) { results = emptyList(); return@LaunchedEffect }
-        delay(600)
+        if (step != 0 || q.length < 2) { results = emptyList(); return@LaunchedEffect }
+        delay(350)
         busy = true
         results = RealValhallaNavigator.searchAddressAndPlaces(
-            q, emptyList(), emptyList(),
-            if (hasRealLocation) centerLat else 0.0, if (hasRealLocation) centerLng else 0.0
+            query = q,
+            nearbyProviders = emptyList(),
+            nearbyStores = emptyList(),
+            userLat = if (hasRealLocation) centerLat else 0.0,
+            userLng = if (hasRealLocation) centerLng else 0.0,
+            context = context
         )
         message = if (results.isEmpty()) (RealValhallaNavigator.lastSearchError ?: "لا توجد نتائج") else null
         busy = false

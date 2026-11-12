@@ -273,27 +273,35 @@ object ValhallaTileDownloader {
     fun createValhallaConfig(context: Context) {
         try {
             val dir = valhallaDir(context)
-            val tiles = File(dir, TILE_FILE_NAME)
+            val tiles = File(dir, TILE_FILE_NAME).takeIf { it.exists() && it.length() >= MIN_TILE_BYTES }
+                ?: dir.listFiles()?.firstOrNull { it.name.endsWith(".tar") && it.length() >= MIN_TILE_BYTES }
+                ?: File(dir, TILE_FILE_NAME)
             val configFile = File(dir, "valhalla.json")
-            configFile.writeText(
-                """
-                {
-                  "mjolnir": {
-                    "tile_dir": "${dir.absolutePath}",
-                    "tile_extract": "${tiles.absolutePath}"
-                  },
-                  "loki": {
-                    "actions": ["route", "locate", "sources_to_targets"]
-                  },
-                  "thor": {
-                    "source_to_target_algorithm": "select_optimal"
-                  },
-                  "routing": { "results_namespace": "valhalla" }
-                }
-                """.trimIndent()
+
+            val baseConfig = com.valhalla.valhalla.config.ValhallaConfigFactory.usingTileExtract(
+                tileExtractTar = tiles.absolutePath
             )
+            val valhallaFile = com.valhalla.valhalla.files.ValhallaFile(context, "valhalla.json", dir)
+            com.valhalla.valhalla.config.ValhallaConfigManager(context, valhallaFile).writeConfig(baseConfig)
+
+            // Ensure mjolnir.tile_dir and mjolnir.tile_extract both point to the local Android directory
+            if (configFile.exists()) {
+                val json = JSONObject(configFile.readText())
+                val mjolnir = json.optJSONObject("mjolnir") ?: JSONObject().also { json.put("mjolnir", it) }
+                mjolnir.put("tile_dir", dir.absolutePath)
+                mjolnir.put("tile_extract", tiles.absolutePath)
+                val loki = json.optJSONObject("loki") ?: JSONObject().also { json.put("loki", it) }
+                val serviceDefaults = loki.optJSONObject("service_defaults") ?: JSONObject().also { loki.put("service_defaults", it) }
+                if (serviceDefaults.optInt("radius", 0) < 50) {
+                    serviceDefaults.put("radius", 50)
+                }
+                if (serviceDefaults.optInt("street_side_max_distance", 0) < 1000) {
+                    serviceDefaults.put("street_side_max_distance", 2000)
+                }
+                configFile.writeText(json.toString(2))
+            }
         } catch (e: Exception) {
-            Log.e(TAG, "createValhallaConfig error: ${e.message}")
+            Log.e(TAG, "createValhallaConfig error: ${e.message}", e)
         }
     }
 }

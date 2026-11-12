@@ -3,7 +3,6 @@ package com.example.utils
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
-import android.speech.tts.TextToSpeech
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -25,14 +24,11 @@ import androidx.compose.ui.unit.sp
 import com.example.ui.screens.map.utils.OfflineMapManager
 import com.example.ui.screens.map.utils.OfflineTileInterceptor
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.Locale
-import kotlin.coroutines.resume
 
 enum class DiagStatus(val icon: String) { OK("✅"), FAIL("❌"), WARN("⚠️") }
 data class DiagnosticItem(val title: String, val status: DiagStatus, val detail: String)
@@ -78,12 +74,21 @@ object MapDiagnostics {
                 else -> DiagnosticItem("الموقع", DiagStatus.OK, "دقة ≈ ${accuracyM?.toInt() ?: "؟"} م")
             }
 
-            // 5) صوت عربي
-            val tts = arabicTtsAvailable(context)
-            out += when (tts) {
-                true -> DiagnosticItem("الصوت العربي", DiagStatus.OK, "متوفر")
-                false -> DiagnosticItem("الصوت العربي", DiagStatus.FAIL, "بيانات الصوت العربي غير مثبتة")
-                null -> DiagnosticItem("الصوت العربي", DiagStatus.WARN, "تعذر الفحص (مهلة)")
+            // 5) صوت عربي (يفحص المحرك الافتراضي ثم Google TTS وباقي المحركات المثبتة)
+            val (ttsOk, ttsEngine) = try {
+                ArabicNavigationVoiceEngine.probeArabicSupport(context)
+            } catch (_: Throwable) {
+                false to null
+            }
+            out += when {
+                ttsOk -> DiagnosticItem(
+                    "الصوت العربي",
+                    DiagStatus.OK,
+                    "متوفر (${if (ttsEngine?.contains("google") == true) "Google TTS" else ttsEngine ?: "النظام"})"
+                )
+                ArabicNavigationVoiceEngine.isPackageInstalled(context, ArabicNavigationVoiceEngine.GOOGLE_TTS_PACKAGE) ->
+                    DiagnosticItem("الصوت العربي", DiagStatus.WARN, "حزمة العربية غير منزّلة في Google TTS — تعمل نغمات التوجيه المدمجة بديلاً")
+                else -> DiagnosticItem("الصوت العربي", DiagStatus.WARN, "لا توجد حزمة نطق عربي — تعمل نغمات التوجيه المدمجة بديلاً")
             }
 
             // 6) عرض الخريطة أوفلاين
@@ -100,18 +105,6 @@ object MapDiagnostics {
             out
         }
 
-    private suspend fun arabicTtsAvailable(context: Context): Boolean? = withTimeoutOrNull(4000L) {
-        suspendCancellableCoroutine<Boolean> { cont ->
-            var engine: TextToSpeech? = null
-            engine = TextToSpeech(context) { status ->
-                val r = if (status == TextToSpeech.SUCCESS) (engine?.setLanguage(Locale("ar")) ?: TextToSpeech.ERROR) else TextToSpeech.ERROR
-                val ok = r != TextToSpeech.LANG_MISSING_DATA && r != TextToSpeech.LANG_NOT_SUPPORTED && r != TextToSpeech.ERROR
-                engine?.shutdown()
-                if (cont.isActive) cont.resume(ok)
-            }
-            cont.invokeOnCancellation { engine?.shutdown() }
-        }
-    }
 
     fun toText(items: List<DiagnosticItem>): String =
         items.joinToString("\n") { "${it.status.icon} ${it.title}: ${it.detail}" }

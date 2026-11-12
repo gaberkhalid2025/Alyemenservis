@@ -19,6 +19,8 @@ object VoiceManager : TextToSpeech.OnInitListener {
     var onHear: (((String) -> Unit) -> Unit)? = null
 
     private var tts: TextToSpeech? = null
+    private var appContext: Context? = null
+    private var triedGoogleFallback = false
     @Volatile
     private var isInitialized = false
     @Volatile
@@ -38,9 +40,11 @@ object VoiceManager : TextToSpeech.OnInitListener {
 
     @Synchronized
     fun init(context: Context) {
+        appContext = context.applicationContext
         if (tts == null && !isInitializing) {
             try {
                 isInitializing = true
+                triedGoogleFallback = false
                 tts = TextToSpeech(context.applicationContext, this)
             } catch (e: Exception) {
                 isInitializing = false
@@ -58,6 +62,23 @@ object VoiceManager : TextToSpeech.OnInitListener {
                 var result = tts?.setLanguage(yemeniLocale) ?: TextToSpeech.LANG_MISSING_DATA
                 if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
                     result = tts?.setLanguage(arabicLocale) ?: TextToSpeech.LANG_MISSING_DATA
+                }
+                if ((result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) &&
+                    !triedGoogleFallback && appContext != null &&
+                    com.example.utils.ArabicNavigationVoiceEngine.isPackageInstalled(
+                        appContext!!,
+                        com.example.utils.ArabicNavigationVoiceEngine.GOOGLE_TTS_PACKAGE
+                    )
+                ) {
+                    triedGoogleFallback = true
+                    isInitializing = true
+                    try { tts?.shutdown() } catch (_: Exception) {}
+                    tts = TextToSpeech(
+                        appContext!!,
+                        this,
+                        com.example.utils.ArabicNavigationVoiceEngine.GOOGLE_TTS_PACKAGE
+                    )
+                    return
                 }
                 if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
                     tts?.setLanguage(Locale.getDefault())

@@ -161,8 +161,18 @@ object RealValhallaNavigator {
     ): NavRouteResult? {
         return try {
             val valhallaDir = ValhallaTileDownloader.getValhallaDir(context)
+            val tilesFile = File(valhallaDir, NavConfig.VALHALLA_TILES_FILE)
             val configFile = File(valhallaDir, "valhalla.json")
-            if (!configFile.exists()) {
+            val needsRebuild = !configFile.exists() || runCatching {
+                val txt = configFile.readText()
+                !txt.contains("service_limits") ||
+                    !txt.contains("isochrone") ||
+                    (tilesFile.exists() && !txt.contains(tilesFile.absolutePath))
+            }.getOrDefault(true)
+            if (needsRebuild) {
+                try { cachedEngine?.close() } catch (_: Throwable) {}
+                cachedEngine = null
+                cachedConfigPath = null
                 ValhallaTileDownloader.createValhallaConfig(context)
             }
             if (!configFile.exists()) {
@@ -170,16 +180,23 @@ object RealValhallaNavigator {
                 return null
             }
 
-            val requestJson = formatValhallaRequest(origin, waypoints, driving)
+            val requestJson = formatValhallaRequest(origin, waypoints, driving, snapRadiusMeters = 50)
 
             // [إصلاح 20] استخدام نسخة محرك Valhalla واحدة محتفظ بها لتسريع الملاحة 10 أضعاف
             val responseJson = try {
                 engineFor(configFile.absolutePath).routeRaw(requestJson)
             } catch (t: Throwable) {
-                try { cachedEngine?.close() } catch (_: Throwable) {}
-                cachedEngine = null
-                cachedConfigPath = null
-                throw t
+                val msg = ((t as? java.lang.reflect.InvocationTargetException)?.targetException ?: t).message ?: ""
+                if (msg.contains("No suitable edges", ignoreCase = true) || msg.contains("171")) {
+                    // إعادة المحاولة بنطاق التقاط طريق أوسع للنقاط البعيدة عن الطريق المرسوم
+                    val wideRequest = formatValhallaRequest(origin, waypoints, driving, snapRadiusMeters = 800)
+                    engineFor(configFile.absolutePath).routeRaw(wideRequest)
+                } else {
+                    try { cachedEngine?.close() } catch (_: Throwable) {}
+                    cachedEngine = null
+                    cachedConfigPath = null
+                    throw t
+                }
             }
 
             if (!responseJson.isNullOrBlank()) {
@@ -200,13 +217,19 @@ object RealValhallaNavigator {
         }
     }
 
-    private fun formatValhallaRequest(origin: NavWaypoint, waypoints: List<NavWaypoint>, driving: Boolean): String {
+    private fun formatValhallaRequest(
+        origin: NavWaypoint,
+        waypoints: List<NavWaypoint>,
+        driving: Boolean,
+        snapRadiusMeters: Int = 50
+    ): String {
         val locations = (listOf(origin) + waypoints).map { wp ->
             org.json.JSONObject().apply {
                 put("lat", wp.latitude)
                 put("lon", wp.longitude)
                 put("type", "break")
                 put("name", wp.name)
+                put("radius", snapRadiusMeters)
             }
         }
         
@@ -407,54 +430,105 @@ object RealValhallaNavigator {
     }
 
     /**
-     * [إصلاح ملاحة نهائي] البحث الشامل عن الأماكن والشوارع والمتاجر
+     * [إصلاح ملاحة نهائي] البحث الشامل عن الأماكن والشوارع والمتاجر (أونلاين وأوفلاين)
      */
     suspend fun searchAddressAndPlaces(
         query: String,
         nearbyProviders: List<com.example.data.ProviderEntity> = emptyList(),
         nearbyStores: List<com.example.data.StoreEntity> = emptyList(),
         userLat: Double = 0.0,
-        userLng: Double = 0.0
+        userLng: Double = 0.0,
+        context: Context? = null
     ): List<SearchAddressResult> = withContext(Dispatchers.IO) {
         lastSearchError = null
         val clean = query.trim()
-        if (clean.length < 3) return@withContext emptyList()
+        if (clean.length < 2) return@withContext emptyList()
         val nq = normalizeArabic(clean)
         val hasUser = !(userLat == 0.0 && userLng == 0.0)
 
-        // 1) محلي أولاً (فقط ما له إحداثيات صالحة) مع دعم مرادفات اللهجة اليمنية
+        // 1) محلي أولاً: العناوين المحفوظة + الفنيون والمتاجر + القاموس الجغرافي اليمني + الكاش الدائم
         val local = mutableListOf<SearchAddressResult>()
-        val expansions = DialectSynonyms.expand(clean)
+        val expansions = DialectSynonyms.expand(clean).ifEmpty { listOf(nq) }
         fun hit(text: String): Boolean {
             val t = normalizeArabic(text)
             return expansions.any { t.contains(it) }
         }
-        nearbyProviders.filter { it.latitude != 0.0 && it.longitude != 0.0 &&
-            (hit(it.name) || hit(it.area) || hit(it.profession)) }
-            .take(6).forEach { p -> local.add(SearchAddressResult("${p.name} - ${p.area}", p.name, p.latitude, p.longitude, "provider", "👷")) }
-        nearbyStores.filter { it.latitude != 0.0 && it.longitude != 0.0 &&
-            (hit(it.name) || hit(it.cityId) || hit(it.categoryId)) }
-            .take(6).forEach { s -> local.add(SearchAddressResult("${s.name} - ${s.cityId}", s.name, s.latitude, s.longitude, "store", "🏪")) }
 
-        // 2) Nominatim: حد 1 طلب/ثانية + كاش + رسالة خطأ واضحة
-        val remote: List<SearchAddressResult> = searchMutex.withLock {
-            searchCache[nq]?.let { return@withLock it }
-            val wait = 1_100L - (System.currentTimeMillis() - lastNominatimAt)
-            if (wait > 0) delay(wait)
-            var r = fetchNominatim(clean, userLat, userLng, hasUser)
-            if (r != null && r.isEmpty() && clean.contains("اي")) { // هايل ↔ هائل
-                delay(1_100L)
-                r = fetchNominatim(clean.replace("اي", "ائ"), userLat, userLng, hasUser)
+        if (context != null) {
+            runCatching {
+                LandmarkAddressStore(context.applicationContext).getAll()
+                    .filter { hit(it.label) || hit(it.landmarkName) || hit(it.description) }
+                    .take(5)
+                    .forEach { addr ->
+                        local.add(
+                            SearchAddressResult(
+                                displayName = "${addr.label} — ${addr.describe()}",
+                                shortName = addr.label,
+                                latitude = addr.pointLat,
+                                longitude = addr.pointLng,
+                                type = "saved_landmark",
+                                icon = "🏠"
+                            )
+                        )
+                    }
             }
-            lastNominatimAt = System.currentTimeMillis()
-            if (r != null) searchCache[nq] = r
-            r ?: emptyList()
         }
 
-        val sortedRemote = if (hasUser) remote.sortedBy {
-            HaversinePrecisionNavigator.calculateDistance(userLat, userLng, it.latitude, it.longitude)
+        nearbyProviders.filter { it.latitude != 0.0 && it.longitude != 0.0 &&
+            (hit(it.name) || hit(it.area) || hit(it.profession) || hit(it.specialization)) }
+            .take(6).forEach { p -> local.add(SearchAddressResult("${p.name} - ${p.area}", p.name, p.latitude, p.longitude, "provider", "👷")) }
+        nearbyStores.filter { it.latitude != 0.0 && it.longitude != 0.0 &&
+            (hit(it.name) || hit(it.cityId) || hit(it.categoryId) || hit(it.description)) }
+            .take(6).forEach { s -> local.add(SearchAddressResult("${s.name} - ${s.cityId}", s.name, s.latitude, s.longitude, "store", "🏪")) }
+
+        // القاموس الجغرافي اليمني الشامل (مدن، شوارع، جولات، مستشفيات، جامعات، مطارات، إحداثيات)
+        local.addAll(OfflineYemenGazetteer.search(clean, userLat, userLng, limit = 10))
+
+        // كاش نتائج البحث السابقة المحفوظ على القرص
+        if (context != null) {
+            local.addAll(OfflineYemenGazetteer.searchCachedOnlineResults(context.applicationContext, clean))
+        }
+
+        // 2) Nominatim أونلاين (فقط إذا كان الاتصال متاحاً؛ بدون تعليق عند عدم وجود إنترنت)
+        val onlineAvailable = context == null || isNetworkAvailable(context)
+        val remote: List<SearchAddressResult> = if (onlineAvailable && clean.length >= 3) {
+            searchMutex.withLock {
+                searchCache[nq]?.let { return@withLock it }
+                val wait = 1_100L - (System.currentTimeMillis() - lastNominatimAt)
+                if (wait > 0) delay(wait)
+                var r = fetchNominatim(clean, userLat, userLng, hasUser)
+                if (r != null && r.isEmpty() && clean.contains("اي")) { // هايل ↔ هائل
+                    delay(1_100L)
+                    r = fetchNominatim(clean.replace("اي", "ائ"), userLat, userLng, hasUser)
+                }
+                lastNominatimAt = System.currentTimeMillis()
+                if (r != null && r.isNotEmpty()) {
+                    searchCache[nq] = r
+                    if (context != null) OfflineYemenGazetteer.cacheOnlineResults(context.applicationContext, r)
+                }
+                r ?: emptyList()
+            }
+        } else {
+            emptyList()
+        }
+
+        val sortedLocal = if (hasUser) {
+            local.sortedBy { HaversinePrecisionNavigator.calculateDistance(userLat, userLng, it.latitude, it.longitude) }
+        } else local
+        val sortedRemote = if (hasUser) {
+            remote.sortedBy { HaversinePrecisionNavigator.calculateDistance(userLat, userLng, it.latitude, it.longitude) }
         } else remote
-        (local + sortedRemote).distinctBy { String.format(Locale.US, "%.5f_%.5f", it.latitude, it.longitude) }
+
+        val combined = (sortedLocal + sortedRemote)
+            .distinctBy { String.format(Locale.US, "%.5f_%.5f", it.latitude, it.longitude) }
+
+        if (combined.isNotEmpty()) {
+            // لا نظهر رسالة خطأ انقطاع الإنترنت طالما وجدنا نتائج محلية دقيقة
+            lastSearchError = null
+        } else if (!onlineAvailable) {
+            lastSearchError = "لا توجد نتائج محلية مطابقة لـ «$clean» — جرب اسم الشارع الرئيسي أو المدينة أو اختر النقطة من الخريطة"
+        }
+        combined
     }
 
     /** null = فشل (يُسجَّل السبب في lastSearchError)، قائمة فارغة = لا نتائج. */

@@ -44,3 +44,21 @@ class ReliabilityZonesTest {
         assertEquals("#F59E0B", z.single().colorHex)
     }
 }
+
+class OfflineYemenGazetteerTest {
+    @Test
+    fun findsTwoLetterCity() {
+        val res = OfflineYemenGazetteer.search("إب")
+        org.junit.Assert.assertTrue(res.any { it.shortName == "إب" })
+    }
+
+    @Test
+    fun findsNormalizedStreetAndCoordinates() {
+        val street = OfflineYemenGazetteer.search("الزبيري")
+        org.junit.Assert.assertTrue(street.any { it.shortName.contains("الزبيري") })
+
+        val coords = OfflineYemenGazetteer.search("15.3694, 44.1910")
+        org.junit.Assert.assertEquals(1, coords.size)
+        org.junit.Assert.assertEquals(15.3694, coords.first().latitude, 0.0001)
+    }
+}

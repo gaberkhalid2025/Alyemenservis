@@ -1,6 +1,5 @@
 package com.example.ui.screens.map
 
-import android.speech.tts.TextToSpeech
 import android.util.Log
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
@@ -93,45 +92,48 @@ fun NavigationScreen(
     val latestLat by rememberUpdatedState(userLat)
     val latestLng by rememberUpdatedState(userLng)
 
-    // ───────── الصوت ─────────
-    var tts by remember { mutableStateOf<TextToSpeech?>(null) }
-    var ttsReady by remember { mutableStateOf(false) }
-    var ttsMissing by remember { mutableStateOf(false) }
+    // ───────── الصوت (محرك متعدد + نغمات أوفلاين احتياطية + إعداد ذكي) ─────────
     var voiceEnabled by remember { mutableStateOf(true) }
-    DisposableEffect(context) {
-        var instance: TextToSpeech? = null
-        instance = TextToSpeech(context) { status ->
-            if (status == TextToSpeech.SUCCESS) {
-                val r = instance?.setLanguage(Locale("ar"))
-                ttsMissing = r == TextToSpeech.LANG_MISSING_DATA || r == TextToSpeech.LANG_NOT_SUPPORTED
-                ttsReady = !ttsMissing
-            }
+    var voiceState by remember {
+        mutableStateOf(
+            ArabicNavigationVoiceEngine.VoiceEngineState(
+                googleTtsInstalled = ArabicNavigationVoiceEngine.isPackageInstalled(
+                    context,
+                    ArabicNavigationVoiceEngine.GOOGLE_TTS_PACKAGE
+                )
+            )
+        )
+    }
+    var showVoiceSetupDialog by remember { mutableStateOf(false) }
+    var voiceHintShown by remember { mutableStateOf(false) }
+
+    val voiceEngine = remember(context) {
+        ArabicNavigationVoiceEngine(context) { newState ->
+            voiceState = newState
         }
-        tts = instance
-        onDispose { instance?.stop(); instance?.shutdown() }
+    }
+    DisposableEffect(voiceEngine) {
+        voiceEngine.initialize()
+        onDispose { voiceEngine.shutdown() }
     }
 
-    LaunchedEffect(ttsMissing) {
-        if (ttsMissing) {
+    LaunchedEffect(voiceState.isInitializing, voiceState.usingAudioCueFallback) {
+        if (!voiceState.isInitializing && voiceState.usingAudioCueFallback && !voiceHintShown) {
+            voiceHintShown = true
             val res = snackbarHostState.showSnackbar(
-                message = "لا توجد حزمة نطق صوت عربي على جهازك",
-                actionLabel = "تثبيت",
+                message = "تعمل نغمات التوجيه المدمجة — لتفعيل النطق العربي اضغط إعداد",
+                actionLabel = "إعداد الصوت",
                 duration = SnackbarDuration.Long
             )
             if (res == SnackbarResult.ActionPerformed) {
-                try {
-                    context.startActivity(
-                        android.content.Intent(TextToSpeech.Engine.ACTION_INSTALL_TTS_DATA)
-                            .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                    )
-                } catch (_: Exception) {}
+                showVoiceSetupDialog = true
             }
         }
     }
 
-    val speak: (String, Boolean) -> Unit = { text, urgent ->
-        if (voiceEnabled && ttsReady) {
-            tts?.speak(text, if (urgent) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD, null, "nav_${System.nanoTime()}")
+    val speak: (String, ManeuverType?, Boolean) -> Unit = { text, maneuver, urgent ->
+        if (voiceEnabled) {
+            voiceEngine.speak(text, maneuver, urgent)
         }
     }
 
@@ -310,13 +312,13 @@ fun NavigationScreen(
         val next = waypoints.getOrNull(currentWaypointIndex + 1)
         if (arrived != null) {
             if (next == null) {
-                speak("لقد وصلت إلى ${arrived.name}. اكتملت الرحلة", false)
+                speak("لقد وصلت إلى ${arrived.name}. اكتملت الرحلة", ManeuverType.DESTINATION, false)
                 navigationFinished = true
             } else {
                 val legMeters = routeResult?.legs?.getOrNull(1)?.distanceMeters
                     ?: HaversinePrecisionNavigator.calculateDistance(arrived.latitude, arrived.longitude, next.latitude, next.longitude)
                 val km = String.format(Locale.US, "%.1f", legMeters / 1000.0)
-                speak("لقد وصلت إلى ${arrived.name}. الوجهة التالية هي ${next.name}، وتبعد $km كم", false)
+                speak("لقد وصلت إلى ${arrived.name}. الوجهة التالية هي ${next.name}، وتبعد $km كم", ManeuverType.DESTINATION, false)
                 currentWaypointIndex += 1
                 routeVersion += 1
             }
@@ -348,7 +350,7 @@ fun NavigationScreen(
         ) {
             lastRerouteAt = now
             offRoute.reset()
-            speak("جارٍ إعادة حساب المسار", true)
+            speak("جارٍ إعادة حساب المسار", ManeuverType.STRAIGHT, true)
             routeVersion += 1
         }
     }
@@ -408,7 +410,7 @@ fun NavigationScreen(
                         else com.example.utils.YemeniPhrases.upcoming(upcoming.maneuverType, upcoming.streetName, distToManeuver)
                     } else if (level == "N") upcoming.instruction
                     else ArabicInstructionFormatter.upcomingText(upcoming.instruction, upcoming.maneuverType, distToManeuver)
-                    speak(text, false)
+                    speak(text, upcoming.maneuverType, false)
                 }
             }
         }
@@ -594,19 +596,36 @@ fun NavigationScreen(
                                 Text(instructionText, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
                             }
                             
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                                 @OptIn(ExperimentalFoundationApi::class)
-                                IconButton(
-                                    onClick = { voiceEnabled = !voiceEnabled },
-                                    modifier = Modifier.size(34.dp)
+                                Box(
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .clip(CircleShape)
+                                        .combinedClickable(
+                                            onClick = { voiceEnabled = !voiceEnabled },
+                                            onLongClick = { showVoiceSetupDialog = true }
+                                        ),
+                                    contentAlignment = Alignment.Center
                                 ) {
                                     Icon(
                                         if (voiceEnabled) (if (dialectVoice) Icons.Default.RecordVoiceOver else Icons.Default.VolumeUp) else Icons.Default.VolumeOff,
-                                        contentDescription = "الصوت",
-                                        tint = if (dialectVoice && voiceEnabled) Color(0xFF00E5FF) else Color(0xFF94A3B8)
+                                        contentDescription = "الصوت (اضغط مطولاً لإعداد الصوت واللهجة)",
+                                        tint = when {
+                                            !voiceEnabled -> Color(0xFF94A3B8)
+                                            voiceState.usingAudioCueFallback -> Color(0xFFF59E0B)
+                                            dialectVoice -> Color(0xFF00E5FF)
+                                            else -> Color(0xFF10B981)
+                                        }
                                     )
                                 }
-                                IconButton(onClick = { isTopCardCollapsed = true }, modifier = Modifier.size(34.dp)) {
+                                IconButton(
+                                    onClick = { showVoiceSetupDialog = true },
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(Icons.Default.Tune, contentDescription = "إعدادات الصوت واللهجة", tint = Color(0xFFCBD5E1), modifier = Modifier.size(18.dp))
+                                }
+                                IconButton(onClick = { isTopCardCollapsed = true }, modifier = Modifier.size(36.dp)) {
                                     Icon(Icons.Default.KeyboardArrowUp, contentDescription = "طي", tint = Color(0xFF94A3B8))
                                 }
                             }
@@ -639,7 +658,7 @@ fun NavigationScreen(
                 verticalAlignment = Alignment.Bottom
             ) {
                 FloatingActionButton(
-                    onClick = onFinishNavigation,
+                    onClick = { showExitConfirm = true },
                     containerColor = Color(0xFFDC2626),
                     contentColor = Color.White,
                     modifier = Modifier.size(56.dp).testTag("end_navigation_fab")
@@ -766,18 +785,28 @@ fun NavigationScreen(
             )
         }
 
-        // ───────── حوار البحث وإضافة محطة (debounce + حالات واضحة) ─────────
+        // ───────── حوار البحث وإضافة محطة (أونلاين + أوفلاين + اقتراحات قريبة) ─────────
         if (showAddStopDialog) {
             var query by remember { mutableStateOf("") }
             var results by remember { mutableStateOf<List<RealValhallaNavigator.SearchAddressResult>>(emptyList()) }
             var searching by remember { mutableStateOf(false) }
             var message by remember { mutableStateOf<String?>(null) }
+            val offlineSuggestions = remember(userLat, userLng) {
+                OfflineYemenGazetteer.suggestionsNear(userLat, userLng, limit = 8)
+            }
             LaunchedEffect(query) {
                 val q = query.trim()
-                if (q.length < 3) { results = emptyList(); message = null; searching = false; return@LaunchedEffect }
-                delay(600)
+                if (q.length < 2) { results = emptyList(); message = null; searching = false; return@LaunchedEffect }
+                delay(400)
                 searching = true
-                results = RealValhallaNavigator.searchAddressAndPlaces(q, nearbyProviders, nearbyStores)
+                results = RealValhallaNavigator.searchAddressAndPlaces(
+                    query = q,
+                    nearbyProviders = nearbyProviders,
+                    nearbyStores = nearbyStores,
+                    userLat = userLat,
+                    userLng = userLng,
+                    context = context
+                )
                 message = if (results.isEmpty()) (RealValhallaNavigator.lastSearchError ?: "لا توجد نتائج لـ «$q»") else null
                 searching = false
             }
@@ -789,14 +818,18 @@ fun NavigationScreen(
                     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         OutlinedTextField(
                             value = query, onValueChange = { query = it }, singleLine = true,
-                            placeholder = { Text("ابحث عن شارع، محل، أو فني (3 أحرف على الأقل)", color = Color(0xFF94A3B8), fontSize = 12.sp) },
+                            placeholder = { Text("ابحث عن مدينة، شارع، جولة، أو فني (مثال: حدة، الزبيري)", color = Color(0xFF94A3B8), fontSize = 12.sp) },
                             colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = Color(0xFF00E5FF), unfocusedBorderColor = Color(0xFF334155)),
                             modifier = Modifier.fillMaxWidth()
                         )
                         if (searching) LinearProgressIndicator(Modifier.fillMaxWidth(), color = Color(0xFF00E5FF))
                         message?.let { Text(it, color = Color(0xFFF59E0B), fontSize = 12.sp) }
-                        LazyColumn(Modifier.fillMaxWidth().heightIn(max = 240.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            items(results) { res ->
+                        val listToShow = if (query.trim().length < 2) offlineSuggestions else results
+                        if (query.trim().length < 2 && listToShow.isNotEmpty()) {
+                            Text("وجهات سريعة قريبة (تعمل بدون إنترنت):", color = Color(0xFF10B981), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                        LazyColumn(Modifier.fillMaxWidth().heightIn(max = 260.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            items(listToShow) { res ->
                                 Surface(
                                     onClick = {
                                         waypoints.add(NavWaypoint(name = res.shortName, latitude = res.latitude, longitude = res.longitude))
@@ -819,6 +852,124 @@ fun NavigationScreen(
                 },
                 confirmButton = { TextButton(onClick = { showAddStopDialog = false }) { Text("إغلاق", color = Color(0xFF00E5FF)) } },
                 shape = RoundedCornerShape(18.dp)
+            )
+        }
+
+        // ───────── حوار إعداد الصوت العربي واللهجة اليمنية ─────────
+        if (showVoiceSetupDialog) {
+            AlertDialog(
+                onDismissRequest = { showVoiceSetupDialog = false },
+                containerColor = Color(0xFF0F172A),
+                shape = RoundedCornerShape(20.dp),
+                title = {
+                    Text(
+                        "إعداد الصوت العربي واللهجة اليمنية",
+                        color = Color.White,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (voiceState.isArabicReady) Color(0xFF064E3B) else Color(0xFF451A03),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = if (voiceState.isArabicReady) {
+                                    "✅ الصوت العربي جاهز (${voiceState.activeEngineLabel})"
+                                } else {
+                                    "🔔 تعمل الآن نغمات التوجيه الذكية (أوفلاين) لتنبيهك عند المنعطفات."
+                                },
+                                color = Color.White,
+                                fontSize = 12.sp,
+                                modifier = Modifier.padding(10.dp)
+                            )
+                        }
+
+                        // تبديل اللهجة (يمني / فصحى)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            FilterChip(
+                                selected = dialectVoice,
+                                onClick = {
+                                    dialectVoice = true
+                                    voicePrefs.edit().putBoolean("dialect", true).apply()
+                                },
+                                label = { Text("لهجة يمنية 🇾🇪", fontSize = 12.sp) },
+                                modifier = Modifier.weight(1f)
+                            )
+                            FilterChip(
+                                selected = !dialectVoice,
+                                onClick = {
+                                    dialectVoice = false
+                                    voicePrefs.edit().putBoolean("dialect", false).apply()
+                                },
+                                label = { Text("عربية فصحى", fontSize = 12.sp) },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+
+                        Text(
+                            text = "ملاحظة: في إعدادات النظام، اختر «العربية» فقط (لا توجد لغة باسم يمنية في أندرويد)، والتطبيق ينطقها تلقائياً باللهجة اليمنية عند تفعيلها أعلاه. على أجهزة سامسونج يُنصح باختيار محرك Google Speech Services.",
+                            color = Color(0xFFCBD5E1),
+                            fontSize = 11.sp
+                        )
+
+                        Button(
+                            onClick = {
+                                val sample = if (dialectVoice) "بعد ميتين متر، لف يمين" else "بعد مئتي متر، انعطف يميناً"
+                                voiceEngine.speak(sample, ManeuverType.RIGHT, true)
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0284C7)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("🔊 تجربة الصوت الآن", fontWeight = FontWeight.Bold)
+                        }
+
+                        if (!voiceState.isArabicReady) {
+                            if (voiceState.googleTtsInstalled) {
+                                OutlinedButton(
+                                    onClick = { ArabicNavigationVoiceEngine.openGoogleTtsVoiceDownload(context) },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text("تنزيل حزمة العربية عبر Google", color = Color(0xFF00E5FF))
+                                }
+                            } else {
+                                OutlinedButton(
+                                    onClick = { ArabicNavigationVoiceEngine.openGoogleTtsPlayStore(context) },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text("تثبيت محرك Google للنطق", color = Color(0xFF00E5FF))
+                                }
+                            }
+                            OutlinedButton(
+                                onClick = { ArabicNavigationVoiceEngine.openSystemTtsSettings(context) },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("فتح إعدادات النطق بالنظام", color = Color.White)
+                            }
+                        }
+
+                        TextButton(
+                            onClick = {
+                                voiceEngine.initialize()
+                                scope.launch { snackbarHostState.showSnackbar("جاري إعادة فحص محركات النطق...") }
+                            },
+                            modifier = Modifier.align(Alignment.CenterHorizontally)
+                        ) {
+                            Text("🔄 إعادة فحص المحركات بعد التثبيت", color = Color(0xFF10B981), fontSize = 12.sp)
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { showVoiceSetupDialog = false }) {
+                        Text("إغلاق", color = Color(0xFF00E5FF))
+                    }
+                }
             )
         }
 
