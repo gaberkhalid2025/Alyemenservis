@@ -72,8 +72,7 @@ fun MapControls(
     onShowGnss: (() -> Unit)? = null,
     isZonesActive: Boolean = false,
     onToggleZones: (() -> Unit)? = null,
-    isArActive: Boolean = false,
-    onToggleAr: (() -> Unit)? = null
+    onToggleArVela: () -> Unit = {}
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "gps_pulse")
     val gpsPulseAlpha by infiniteTransition.animateFloat(
@@ -109,6 +108,19 @@ fun MapControls(
                 onClick = onToggleNavigation,
                 testTag = "map_nav_toggle_btn",
                 contentDescription = "سهم اتجاه الملاحة"
+            )
+
+            HorizontalDivider(modifier = Modifier.width(34.dp), color = Color.White.copy(alpha = 0.08f))
+
+            // 1.5 📷 VELA AR (الواقع المعزز)
+            DockButton(
+                icon = Icons.Default.ViewInAr,
+                label = "VELA",
+                active = currentMapMode == MapMode.AR_VPS,
+                activeColor = Color(0xFF10B981),
+                onClick = onToggleArVela,
+                testTag = "map_ar_vela_btn",
+                contentDescription = "الواقع المعزز VELA AR"
             )
 
             HorizontalDivider(modifier = Modifier.width(34.dp), color = Color.White.copy(alpha = 0.08f))
@@ -152,19 +164,18 @@ fun MapControls(
 
             HorizontalDivider(modifier = Modifier.width(34.dp), color = Color.White.copy(alpha = 0.08f))
 
-            // 5. 📷 الواقع المعزز (VELA AR) - مدمج بأمان ونظام في شريط الأدوات دون تشتيت
-            onToggleAr?.let { toggleArAction ->
-                DockButton(
-                    icon = Icons.Default.ViewInAr,
-                    label = "AR",
-                    active = isArActive,
-                    activeColor = Color(0xFF10B981),
-                    onClick = toggleArAction,
-                    testTag = "mode_ar_vela_btn",
-                    contentDescription = "كاميرا الواقع المعزز (VELA AR)"
-                )
-                HorizontalDivider(modifier = Modifier.width(34.dp), color = Color.White.copy(alpha = 0.08f))
-            }
+            // 5. ☁️ الخريطة الحرارية
+            DockButton(
+                icon = if (isHeatmapActive) Icons.Default.CloudDone else Icons.Default.CloudQueue,
+                label = "حراري",
+                active = isHeatmapActive,
+                activeColor = Color(0xFF10B981),
+                onClick = onToggleHeatmap,
+                testTag = "map_heatmap_sync_btn",
+                contentDescription = "الخريطة الحرارية"
+            )
+
+            HorizontalDivider(modifier = Modifier.width(34.dp), color = Color.White.copy(alpha = 0.08f))
 
             // 6. Map Layers (طبقات الخريطة)
             DockButton(
@@ -225,7 +236,7 @@ fun MapControls(
 
             HorizontalDivider(modifier = Modifier.width(34.dp), color = Color.White.copy(alpha = 0.08f))
 
-            // 8. ➕ تكبير و ➖ تصغير
+            // 8. ➕ تكبير مباشر
             DockButton(
                 icon = Icons.Default.Add,
                 label = "تكبير",
@@ -235,6 +246,7 @@ fun MapControls(
                 contentDescription = "تكبير الخريطة"
             )
 
+            // 9. ➖ تصغير مباشر
             DockButton(
                 icon = Icons.Default.Remove,
                 label = "تصغير",
@@ -246,7 +258,7 @@ fun MapControls(
 
             HorizontalDivider(modifier = Modifier.width(34.dp), color = Color.White.copy(alpha = 0.08f))
 
-            // 9. 🌙 الوضع الليلي للخريطة
+            // 10. 🌙 الوضع الليلي للخريطة
             DockButton(
                 icon = if (isNightMode) Icons.Default.Bedtime else Icons.Default.WbSunny,
                 label = if (isNightMode) "ليلي" else "نهاري",
@@ -259,76 +271,43 @@ fun MapControls(
 
             HorizontalDivider(modifier = Modifier.width(34.dp), color = Color.White.copy(alpha = 0.08f))
 
-            // 10. ⚙️ قائمة الأدوات الإضافية المنسدلة (تخفيف التكدس وتنظيم الأدوات الثانوية)
-            var showMoreMenu by remember { mutableStateOf(false) }
-            Box(contentAlignment = Alignment.Center) {
+            // 🛠️ أدوات إضافية (قائمة منسدلة)
+            var showMoreTools by remember { mutableStateOf(false) }
+            Box {
                 DockButton(
                     icon = Icons.Default.Tune,
-                    label = "المزيد",
-                    active = showMoreMenu || isHeatmapActive || isGibsActive || isZonesActive,
-                    activeColor = Color(0xFF38BDF8),
-                    onClick = { showMoreMenu = !showMoreMenu },
-                    testTag = "map_more_menu_btn",
-                    contentDescription = "أدوات الخريطة الإضافية"
+                    label = "أدوات",
+                    active = isGibsActive || isZonesActive,
+                    activeColor = Color(0xFF00E5FF),
+                    onClick = { showMoreTools = true },
+                    contentDescription = "أدوات إضافية"
                 )
-
                 DropdownMenu(
-                    expanded = showMoreMenu,
-                    onDismissRequest = { showMoreMenu = false },
-                    modifier = Modifier
-                        .background(Color(0xFF0F172A))
-                        .border(1.dp, Color(0xFF334155), RoundedCornerShape(12.dp))
+                    expanded = showMoreTools,
+                    onDismissRequest = { showMoreTools = false },
+                    containerColor = Color(0xFF0F172A),
+                    modifier = Modifier.border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(12.dp))
                 ) {
+                    // 11. NASA GIBS
                     DropdownMenuItem(
-                        text = {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Icon(if (isHeatmapActive) Icons.Default.CloudDone else Icons.Default.CloudQueue, contentDescription = null, tint = if (isHeatmapActive) Color(0xFF10B981) else Color.White, modifier = Modifier.size(18.dp))
-                                Text("الخريطة الحرارية", color = Color.White, fontSize = 12.sp)
-                            }
-                        },
-                        onClick = {
-                            onToggleHeatmap()
-                            showMoreMenu = false
-                        }
+                        text = { Text("صور ناسا الفضائية", color = if (isGibsActive) Color(0xFF38BDF8) else Color.White) },
+                        leadingIcon = { Icon(Icons.Default.Explore, contentDescription = null, tint = if (isGibsActive) Color(0xFF38BDF8) else Color.White) },
+                        onClick = { onToggleGibs(); showMoreTools = false }
                     )
-                    DropdownMenuItem(
-                        text = {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Icon(Icons.Default.Explore, contentDescription = null, tint = if (isGibsActive) Color(0xFF38BDF8) else Color.White, modifier = Modifier.size(18.dp))
-                                Text("صور ناسا الفضائية اليومية", color = Color.White, fontSize = 12.sp)
-                            }
-                        },
-                        onClick = {
-                            onToggleGibs()
-                            showMoreMenu = false
-                        }
-                    )
-                    if (onShowGnss != null) {
+                    // 12. GNSS
+                    onShowGnss?.let { showGnssAction ->
                         DropdownMenuItem(
-                            text = {
-                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Icon(Icons.Default.SatelliteAlt, contentDescription = null, tint = Color(0xFF00E5FF), modifier = Modifier.size(18.dp))
-                                    Text("تشخيص إشارة GPS والأقمار", color = Color.White, fontSize = 12.sp)
-                                }
-                            },
-                            onClick = {
-                                onShowGnss()
-                                showMoreMenu = false
-                            }
+                            text = { Text("تشخيص إشارة GPS", color = Color.White) },
+                            leadingIcon = { Icon(Icons.Default.SatelliteAlt, contentDescription = null, tint = Color.White) },
+                            onClick = { showGnssAction(); showMoreTools = false }
                         )
                     }
-                    if (onToggleZones != null) {
+                    // 13. Zones
+                    onToggleZones?.let { toggleZonesAction ->
                         DropdownMenuItem(
-                            text = {
-                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Icon(Icons.Default.PieChart, contentDescription = null, tint = if (isZonesActive) Color(0xFF10B981) else Color.White, modifier = Modifier.size(18.dp))
-                                    Text("مناطق توفر الخدمات", color = Color.White, fontSize = 12.sp)
-                                }
-                            },
-                            onClick = {
-                                onToggleZones()
-                                showMoreMenu = false
-                            }
+                            text = { Text("مناطق توفر الخدمات", color = if (isZonesActive) Color(0xFF10B981) else Color.White) },
+                            leadingIcon = { Icon(Icons.Default.PieChart, contentDescription = null, tint = if (isZonesActive) Color(0xFF10B981) else Color.White) },
+                            onClick = { toggleZonesAction(); showMoreTools = false }
                         )
                     }
                 }

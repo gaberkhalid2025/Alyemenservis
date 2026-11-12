@@ -111,10 +111,8 @@ fun MapScreenContent(
     var areTilesFailing by remember { mutableStateOf(false) }
 
     val isSysDark = androidx.compose.foundation.isSystemInDarkTheme()
-    LaunchedEffect(isSysDark) {
-        val currentHour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
-        val isNightTime = currentHour >= 18 || currentHour < 6
-        if (isSysDark || isNightTime) {
+    LaunchedEffect(Unit) {
+        if (!state.nightMode && isSysDark) {
             state.nightMode = true
         }
     }
@@ -128,6 +126,7 @@ fun MapScreenContent(
     var showDownloadDialog by remember { mutableStateOf(false) }
     var showGnss by remember { mutableStateOf(false) }
     var showZones by remember { mutableStateOf(false) }
+    var showServicesSheet by remember { mutableStateOf(false) }
 
     androidx.activity.compose.BackHandler(enabled = true) {
         if (isHudMode) {
@@ -798,35 +797,36 @@ fun MapScreenContent(
                                     color = Color(0xFF10B981)
                                 )
                             }
-                            searchMessage?.let { msg ->
-                                Surface(
-                                    color = Color(0x33F59E0B),
-                                    shape = RoundedCornerShape(10.dp),
-                                    border = BorderStroke(1.dp, Color(0x66F59E0B)),
-                                    modifier = Modifier.fillMaxWidth().padding(10.dp)
+                            searchMessage?.let {
+                                Column(
+                                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    Icon(Icons.Default.ErrorOutline, contentDescription = null, tint = Color(0xFFF59E0B), modifier = Modifier.size(24.dp))
+                                    Text(
+                                        text = it,
+                                        color = Color(0xFFCBD5E1),
+                                        fontSize = 13.sp,
+                                        textAlign = TextAlign.Center
+                                    )
+                                    Button(
+                                        onClick = { 
+                                            val q = state.searchQuery.trim()
+                                            if (q.length >= 3) {
+                                                state.searchQuery = "" // Trigger refresh
+                                                coroutineScope.launch { 
+                                                    delay(100)
+                                                    state.searchQuery = q 
+                                                }
+                                            }
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E293B)),
+                                        shape = RoundedCornerShape(10.dp),
+                                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+                                        modifier = Modifier.height(36.dp)
                                     ) {
-                                        Text(
-                                            text = msg,
-                                            color = Color(0xFFFDE68A),
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.Medium,
-                                            modifier = Modifier.weight(1f)
-                                        )
-                                        TextButton(
-                                            onClick = {
-                                                val current = state.searchQuery
-                                                state.searchQuery = ""
-                                                state.searchQuery = current
-                                            },
-                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
-                                        ) {
-                                            Text("إعادة المحاولة", color = Color(0xFF00E5FF), fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
-                                        }
+                                        Text("إعادة المحاولة", fontSize = 12.sp, color = Color(0xFF00E5FF))
                                     }
                                 }
                             }
@@ -983,12 +983,11 @@ fun MapScreenContent(
                         snackbarHostState.showSnackbar(if (showZones) "🟢 تم تفعيل طبقة توفر وموثوقية الخدمات" else "تم إخفاء طبقة توفر الخدمات")
                     }
                 },
-                isArActive = state.currentMapMode == MapMode.AR_VPS,
-                onToggleAr = {
+                onToggleArVela = {
                     state.currentMapMode = if (state.currentMapMode == MapMode.AR_VPS) MapMode.SATELLITE else MapMode.AR_VPS
                     coroutineScope.launch {
                         snackbarHostState.showSnackbar(
-                            if (state.currentMapMode == MapMode.AR_VPS) "📷 تم تشغيل كاميرا الواقع المعزز (VELA AR) مع التوجيه ثلاثي الأبعاد"
+                            if (state.currentMapMode == MapMode.AR_VPS) "📷 تم تشغيل كاميرا الواقع المعزز (VELA AR)"
                             else "🗺️ تم العودة لخريطة الأقمار الصناعية"
                         )
                     }
@@ -997,6 +996,7 @@ fun MapScreenContent(
                     .align(Alignment.CenterEnd)
                     .padding(end = 16.dp)
             )
+
 
             // 🚨 6. Quiet Discreet SOS / الفزعة Button (Calm orange-red #EF4444)
             Surface(
@@ -1051,148 +1051,80 @@ fun MapScreenContent(
                 }
             }
 
-            // 🚗 7. Smart Companion Bar for Intercity Trips (زر عائم موحد يفتح Bottom Sheet لتوفير مساحة الخريطة)
+            // 🚗 7. Smart Companion Bar (Consolidated into single button)
             if (isDrivingMode && state.selectedEntity == null) {
-                Surface(
-                    onClick = { showCompanionBar = true },
-                    shape = RoundedCornerShape(22.dp),
-                    color = Color(0xFF0F172A).copy(alpha = 0.90f),
-                    border = BorderStroke(1.2.dp, if (companionFilter != null) Color(0xFF10B981) else Color(0xFF38BDF8)),
-                    shadowElevation = 8.dp,
+                Row(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .navigationBarsPadding()
-                        .padding(bottom = 20.dp)
+                        .padding(bottom = 24.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    // HUD toggle
+                    FloatingActionButton(
+                        onClick = { isHudMode = true },
+                        containerColor = Color(0xFF0F172A),
+                        contentColor = Color(0xFF38BDF8),
+                        modifier = Modifier.size(48.dp)
                     ) {
-                        Icon(
-                            imageVector = if (companionFilter != null) Icons.Default.FilterAlt else Icons.Default.AltRoute,
-                            contentDescription = "خدمات الطريق",
-                            tint = if (companionFilter != null) Color(0xFF10B981) else Color(0xFF38BDF8),
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Text(
-                            text = when (companionFilter) {
-                                "محطة" -> "⛽ محطات وقود"
-                                "استراحة" -> "☕ استراحات"
-                                "صيانة" -> "🔧 صيانة وبنشر"
-                                else -> "خدمات الطريق السريع"
-                            },
-                            color = Color.White,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        if (companionFilter != null) {
-                            IconButton(
-                                onClick = { companionFilter = null },
-                                modifier = Modifier.size(20.dp)
-                            ) {
-                                Icon(Icons.Default.Close, contentDescription = "إلغاء التصفية", tint = Color(0xFFEF4444), modifier = Modifier.size(14.dp))
-                            }
-                        }
+                        Icon(Icons.Default.Nightlife, contentDescription = "HUD ليلي", modifier = Modifier.size(24.dp))
                     }
+
+                    // Consolidated Services Button
+                    ExtendedFloatingActionButton(
+                        onClick = { showServicesSheet = true },
+                        containerColor = Color(0xFF0F172A),
+                        contentColor = Color.White,
+                        icon = { Icon(Icons.Default.LocalShipping, contentDescription = null, tint = Color(0xFF10B981)) },
+                        text = { Text("خدمات الطريق", fontWeight = FontWeight.Bold) },
+                        modifier = Modifier.height(48.dp)
+                    )
                 }
             }
 
-            // BottomSheet لخدمات الطريق السريع ووضع HUD
-            if (showCompanionBar) {
+            // Bottom Sheet for Services
+            if (showServicesSheet) {
                 ModalBottomSheet(
-                    onDismissRequest = { showCompanionBar = false },
+                    onDismissRequest = { showServicesSheet = false },
                     containerColor = Color(0xFF0F172A),
-                    scrimColor = Color.Black.copy(alpha = 0.5f)
+                    contentColor = Color.White,
+                    dragHandle = { BottomSheetDefaults.DragHandle(color = Color.White.copy(alpha = 0.3f)) }
                 ) {
                     Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 20.dp, vertical = 14.dp),
-                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 48.dp, start = 24.dp, end = 24.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                "خدمات الطريق والسفر 🚗",
-                                color = Color.White,
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            IconButton(onClick = { showCompanionBar = false }) {
-                                Icon(Icons.Default.Close, contentDescription = "إغلاق", tint = Color(0xFF94A3B8))
-                            }
-                        }
-
-                        // وضع HUD الليلي
-                        Surface(
-                            onClick = {
-                                isHudMode = true
-                                showCompanionBar = false
-                            },
-                            shape = RoundedCornerShape(14.dp),
-                            color = Color(0xFF1E293B),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(14.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                Icon(Icons.Default.Nightlife, contentDescription = null, tint = Color(0xFF38BDF8), modifier = Modifier.size(26.dp))
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text("شاشة العرض الأمامي (HUD) 🪞", color = Color.White, fontSize = 13.5.sp, fontWeight = FontWeight.Bold)
-                                    Text("انعكاس رقمي للسرعة والاتجاه على زجاج السيارة ليلاً", color = Color(0xFF94A3B8), fontSize = 11.sp)
-                                }
-                                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = Color(0xFF38BDF8), modifier = Modifier.size(18.dp))
-                            }
-                        }
-
-                        Text("تصفية أقرب محطات وخدمات على مسارك:", color = Color(0xFFCBD5E1), fontSize = 12.sp)
-
-                        val intercityItems = listOf(
-                            Triple("محطة", "⛽ محطات الوقود والديزل", "عرض أقرب محطات الوقود المتوفرة"),
-                            Triple("استراحة", "☕ الاستراحات والمطاعم", "أماكن التوقف المريحة على الطرق الطويلة"),
-                            Triple("صيانة", "🔧 بنشر وميكانيك وصيانة", "خدمات الميكانيك والطوارئ والإطارات")
+                        Text("خدمات الطريق السريع", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color(0xFF10B981))
+                        
+                        val items = listOf(
+                            Triple("وقود", "⛽ محطات وقود", "محطة"),
+                            Triple("استراحة", "☕ استراحات ومطاعم", "استراحة"),
+                            Triple("ميكانيك", "🔧 بنشر وصيانة", "صيانة")
                         )
 
-                        intercityItems.forEach { (queryKey, title, desc) ->
-                            val isSel = companionFilter == queryKey
+                        items.forEach { (key, label, filterQuery) ->
+                            val isActive = companionFilter == filterQuery
                             Surface(
                                 onClick = {
-                                    companionFilter = if (isSel) null else queryKey
-                                    showCompanionBar = false
-                                    coroutineScope.launch {
-                                        snackbarHostState.showSnackbar(
-                                            if (!isSel) "تم تفعيل تصفية: $title"
-                                            else "تم إلغاء التصفية"
-                                        )
-                                    }
+                                    companionFilter = if (isActive) null else filterQuery
+                                    showServicesSheet = false
                                 },
-                                shape = RoundedCornerShape(14.dp),
-                                color = if (isSel) Color(0xFF10B981).copy(alpha = 0.20f) else Color(0xFF1E293B),
-                                border = if (isSel) BorderStroke(1.5.dp, Color(0xFF10B981)) else null,
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (isActive) Color(0xFF10B981).copy(alpha = 0.15f) else Color.White.copy(alpha = 0.05f),
+                                border = if (isActive) BorderStroke(1.dp, Color(0xFF10B981)) else null,
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Row(
-                                    modifier = Modifier.padding(12.dp),
+                                    modifier = Modifier.padding(16.dp),
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                    horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(title, color = if (isSel) Color(0xFF10B981) else Color.White, fontSize = 13.5.sp, fontWeight = FontWeight.Bold)
-                                        Text(desc, color = Color(0xFF94A3B8), fontSize = 11.sp)
-                                    }
-                                    if (isSel) {
-                                        Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF10B981), modifier = Modifier.size(20.dp))
-                                    }
+                                    Text(label, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                                    if (isActive) Icon(Icons.Default.Check, contentDescription = null, tint = Color(0xFF10B981))
                                 }
                             }
                         }
-                        Spacer(modifier = Modifier.height(8.dp))
                     }
                 }
             }

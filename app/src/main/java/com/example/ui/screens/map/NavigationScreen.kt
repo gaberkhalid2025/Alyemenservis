@@ -2,9 +2,11 @@ package com.example.ui.screens.map
 
 import android.speech.tts.TextToSpeech
 import android.util.Log
+import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -186,8 +188,6 @@ fun NavigationScreen(
     var tracker by remember { mutableStateOf<RouteTracker?>(null) }
     var trackerState by remember { mutableStateOf<TrackerResult?>(null) }
     var isTilesDownloaded by remember { mutableStateOf(ValhallaTileDownloader.isTilesDownloaded(context)) }
-    var isTopGuidanceCollapsed by remember { mutableStateOf(false) }
-    var isBottomTripInfoCollapsed by remember { mutableStateOf(false) }
     var navigationFinished by remember { mutableStateOf(false) }
     var followUser by remember { mutableStateOf(true) }
     var mapMode by remember { mutableStateOf(MapMode.OSM) }
@@ -205,6 +205,9 @@ fun NavigationScreen(
 
     val voicePrefs = remember { context.getSharedPreferences("voice_prefs", android.content.Context.MODE_PRIVATE) }
     var dialectVoice by remember { mutableStateOf(voicePrefs.getBoolean("dialect", false)) }
+
+    var isTopCardCollapsed by remember { mutableStateOf(false) }
+    var isBottomCardCollapsed by remember { mutableStateOf(false) }
 
     var drActive by remember { mutableStateOf(false) }
     var lastAlong by remember { mutableDoubleStateOf(0.0) }
@@ -479,29 +482,21 @@ fun NavigationScreen(
             ) {
                 Column {
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 7.dp),
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Box(Modifier.size(9.dp).clip(CircleShape).background(if (isApproximate) Color(0xFFF59E0B) else Color(0xFF10B981)))
-                        Text(
-                            engineLabel,
-                            color = Color(0xFFF8FAFC),
-                            fontSize = 11.5.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f)
-                        )
-                        IconButton(onClick = { mapMode = if (mapMode == MapMode.OSM) MapMode.SATELLITE else MapMode.OSM }, modifier = Modifier.size(32.dp)) {
-                            Icon(Icons.Default.Layers, contentDescription = "الطبقة", tint = Color(0xFF38BDF8), modifier = Modifier.size(19.dp))
+                        Box(Modifier.size(8.dp).clip(CircleShape).background(if (isApproximate) Color(0xFFF59E0B) else Color(0xFF10B981)))
+                        Text(engineLabel, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                        IconButton(onClick = { mapMode = if (mapMode == MapMode.OSM) MapMode.SATELLITE else MapMode.OSM }, modifier = Modifier.size(30.dp)) {
+                            Icon(Icons.Default.Layers, contentDescription = "الطبقة", tint = Color(0xFF38BDF8), modifier = Modifier.size(18.dp))
                         }
-                        IconButton(onClick = { showAddStopDialog = true }, modifier = Modifier.size(32.dp)) {
-                            Icon(Icons.Default.Add, contentDescription = "إضافة محطة", tint = Color(0xFF34D399), modifier = Modifier.size(20.dp))
+                        IconButton(onClick = { showAddStopDialog = true }, modifier = Modifier.size(30.dp)) {
+                            Icon(Icons.Default.Add, contentDescription = "إضافة محطة", tint = Color(0xFF10B981), modifier = Modifier.size(20.dp))
                         }
                         if (!isTilesDownloaded) {
-                            IconButton(onClick = { showDownloadDialog = true }, modifier = Modifier.size(32.dp)) {
-                                Icon(Icons.Default.CloudDownload, contentDescription = "تحميل الخرائط", tint = Color(0xFF38BDF8), modifier = Modifier.size(20.dp))
+                            IconButton(onClick = { showDownloadDialog = true }, modifier = Modifier.size(30.dp)) {
+                                Icon(Icons.Default.CloudDownload, contentDescription = "تحميل الخرائط", tint = Color(0xFF0284C7), modifier = Modifier.size(20.dp))
                             }
                         }
                     }
@@ -546,131 +541,75 @@ fun NavigationScreen(
                 }
             }
 
-            // بطاقة التعليمات (قابلة للطي والتوسيع لنظام القيادة الآمن وتوفير مساحة الرؤية)
-            androidx.compose.animation.AnimatedVisibility(
-                visible = isTopGuidanceCollapsed,
-                enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.expandVertically(),
-                exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.shrinkVertically()
-            ) {
-                // الكبسولة الدائرية الأنيقة المطوية بلمسة واحدة
-                Surface(
-                    onClick = { isTopGuidanceCollapsed = false },
-                    shape = RoundedCornerShape(20.dp),
-                    color = Color(0xFF0F172A).copy(alpha = 0.94f),
-                    border = BorderStroke(1.2.dp, Color(0xFF00E5FF)),
-                    shadowElevation = 8.dp,
-                    modifier = Modifier.padding(top = 2.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+            // بطاقة التعليمات (قابلة للطي)
+            AnimatedContent(
+                targetState = isTopCardCollapsed,
+                transitionSpec = { fadeIn() + expandVertically() togetherWith fadeOut() + shrinkVertically() },
+                label = "top_card_anim"
+            ) { collapsed ->
+                if (collapsed) {
+                    // أيقونة دائرية أنيقة عند الطي
+                    Surface(
+                        onClick = { isTopCardCollapsed = false },
+                        shape = CircleShape,
+                        color = Color(0xFF0F172A).copy(alpha = 0.95f),
+                        border = BorderStroke(1.5.dp, Color(0xFF00E5FF)),
+                        shadowElevation = 8.dp,
+                        modifier = Modifier.size(56.dp).align(Alignment.CenterHorizontally)
                     ) {
-                        Surface(shape = CircleShape, color = Color(0xFF0284C7), modifier = Modifier.size(34.dp)) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(maneuverIcon(if (isApproximate) null else upcoming?.maneuverType), contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
-                            }
-                        }
-                        Column(modifier = Modifier.weight(1f)) {
-                            val distText = if (!isApproximate && upcoming != null) "بعد ${MapDistanceCalculator.formatDistance(distToManeuver)}: " else ""
-                            Text(
-                                text = distText + instructionText,
-                                color = Color.White,
-                                fontSize = 12.5.sp,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Text(
-                                text = "$currentSpeedKmh كم/س · انقر لتكبير التوجيهات",
-                                color = Color(0xFF38BDF8),
-                                fontSize = 10.5.sp,
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
-                        Icon(
-                            imageVector = Icons.Default.KeyboardArrowDown,
-                            contentDescription = "توسيع",
-                            tint = Color(0xFF00E5FF),
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
-                }
-            }
-
-            androidx.compose.animation.AnimatedVisibility(
-                visible = !isTopGuidanceCollapsed,
-                enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.expandVertically(),
-                exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.shrinkVertically()
-            ) {
-                Surface(
-                    shape = RoundedCornerShape(18.dp),
-                    color = Color(0xFF0F172A).copy(alpha = 0.96f),
-                    border = BorderStroke(1.2.dp, Color(0xFF00E5FF)),
-                    shadowElevation = 10.dp,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Surface(
-                            onClick = { isTopGuidanceCollapsed = true },
-                            shape = CircleShape,
-                            color = Color(0xFF0284C7),
-                            modifier = Modifier.size(44.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                if (isLoadingRoute && result == null) CircularProgressIndicator(Modifier.size(22.dp), color = Color.White, strokeWidth = 2.dp)
-                                else Icon(maneuverIcon(if (isApproximate) null else upcoming?.maneuverType), contentDescription = null, tint = Color.White, modifier = Modifier.size(26.dp))
-                            }
-                        }
-                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            val maneuverDistancePrompt = if (!isApproximate && upcoming != null) " · بعد ${MapDistanceCalculator.formatDistance(distToManeuver)}" else ""
-                            Text(
-                                text = (if (voiceEnabled) "🔊 صوت" else "🔇 صامت") + " · $currentSpeedKmh كم/س" + maneuverDistancePrompt,
-                                color = Color(0xFF38BDF8), fontSize = 11.5.sp, fontWeight = FontWeight.Bold
-                            )
-                            Text(instructionText, color = Color.White, fontSize = 13.5.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                            Text(
-                                "المحطة ${currentWaypointIndex + 1}/${waypoints.size} · ${target?.name ?: ""}",
-                                color = Color(0xFFE2E8F0), fontSize = 10.5.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                        @OptIn(ExperimentalFoundationApi::class)
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .combinedClickable(
-                                    onClick = { voiceEnabled = !voiceEnabled },
-                                    onLongClick = {
-                                        dialectVoice = !dialectVoice
-                                        voicePrefs.edit().putBoolean("dialect", dialectVoice).apply()
-                                        scope.launch {
-                                            snackbarHostState.showSnackbar(if (dialectVoice) "الصوت: لهجة يمنية 🇾🇪" else "الصوت: عربية فصحى")
-                                        }
-                                    }
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
+                        Box(contentAlignment = Alignment.Center) {
                             Icon(
-                                if (voiceEnabled) (if (dialectVoice) Icons.Default.RecordVoiceOver else Icons.Default.VolumeUp) else Icons.Default.VolumeOff,
-                                contentDescription = "الصوت (اضغط مطولاً لتبديل اللهجة)",
-                                tint = if (dialectVoice && voiceEnabled) Color(0xFF00E5FF) else Color(0xFFCBD5E1),
-                                modifier = Modifier.size(20.dp)
+                                maneuverIcon(if (isApproximate) null else upcoming?.maneuverType),
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(30.dp)
                             )
                         }
-                        if (bookingId != null && chatBridge != null) {
-                            IconButton(
-                                onClick = { chatBridge.open(com.example.utils.BookingChat.channelIdFor(bookingId)) },
-                                modifier = Modifier.size(36.dp)
-                            ) {
-                                Icon(Icons.Default.Chat, contentDescription = "دردشة الحجز", tint = Color(0xFF38BDF8), modifier = Modifier.size(20.dp))
-                            }
-                        }
-                        IconButton(
-                            onClick = { isTopGuidanceCollapsed = true },
-                            modifier = Modifier.size(36.dp)
+                    }
+                } else {
+                    Surface(
+                        shape = RoundedCornerShape(20.dp),
+                        color = Color(0xFF0F172A).copy(alpha = 0.95f),
+                        border = BorderStroke(1.5.dp, Color(0xFF00E5FF)),
+                        shadowElevation = 12.dp,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            Modifier.fillMaxWidth().padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            Icon(Icons.Default.KeyboardArrowUp, contentDescription = "طي التوجيهات", tint = Color(0xFF94A3B8), modifier = Modifier.size(22.dp))
+                            Surface(shape = CircleShape, color = Color(0xFF0284C7), modifier = Modifier.size(44.dp)) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    if (isLoadingRoute && result == null) CircularProgressIndicator(Modifier.size(22.dp), color = Color.White, strokeWidth = 2.dp)
+                                    else Icon(maneuverIcon(if (isApproximate) null else upcoming?.maneuverType), contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp))
+                                }
+                            }
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                                val maneuverDistancePrompt = if (!isApproximate && upcoming != null) " · بعد ${MapDistanceCalculator.formatDistance(distToManeuver)}" else ""
+                                Text(
+                                    text = (if (voiceEnabled) "🔊" else "🔇") + " · $currentSpeedKmh كم/س" + maneuverDistancePrompt,
+                                    color = Color(0xFF00E5FF), fontSize = 11.sp, fontWeight = FontWeight.ExtraBold
+                                )
+                                Text(instructionText, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                            }
+                            
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                @OptIn(ExperimentalFoundationApi::class)
+                                IconButton(
+                                    onClick = { voiceEnabled = !voiceEnabled },
+                                    modifier = Modifier.size(34.dp)
+                                ) {
+                                    Icon(
+                                        if (voiceEnabled) (if (dialectVoice) Icons.Default.RecordVoiceOver else Icons.Default.VolumeUp) else Icons.Default.VolumeOff,
+                                        contentDescription = "الصوت",
+                                        tint = if (dialectVoice && voiceEnabled) Color(0xFF00E5FF) else Color(0xFF94A3B8)
+                                    )
+                                }
+                                IconButton(onClick = { isTopCardCollapsed = true }, modifier = Modifier.size(34.dp)) {
+                                    Icon(Icons.Default.KeyboardArrowUp, contentDescription = "طي", tint = Color(0xFF94A3B8))
+                                }
+                            }
                         }
                     }
                 }
@@ -686,37 +625,38 @@ fun NavigationScreen(
             ) { Icon(Icons.Default.MyLocation, contentDescription = "موقعي", tint = Color(0xFF00E5FF)) }
         }
 
-        // زر إنهاء الملاحة المعزول والمستقل تماماً (أيقونة/زر أحمر واضح لتجنب الضغط العرضي أثناء القيادة)
-        Surface(
-            onClick = onFinishNavigation,
-            shape = CircleShape,
-            color = Color(0xFFDC2626),
-            border = BorderStroke(2.dp, Color.White.copy(alpha = 0.8f)),
-            shadowElevation = 10.dp,
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .navigationBarsPadding()
-                .padding(start = 14.dp, bottom = if (isBottomTripInfoCollapsed) 70.dp else 125.dp)
-                .size(46.dp)
-                .testTag("end_navigation_btn")
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    Icons.Default.Close,
-                    contentDescription = "إنهاء الملاحة",
-                    tint = Color.White,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-        }
+        SnackbarHost(snackbarHostState, modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 240.dp))
 
-        SnackbarHost(snackbarHostState, modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 200.dp))
-
-        // ───────── اللوحة السفلية لمعلومات الرحلة (رشيقة وقابلة للطي) ─────────
+        // ───────── اللوحة السفلية مع الردود السريعة للحجز ─────────
         Column(
-            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().navigationBarsPadding().padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().navigationBarsPadding().padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            // زر إنهاء الملاحة المنفصل (FAB أحمر) لسلامة السائق
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Bottom
+            ) {
+                FloatingActionButton(
+                    onClick = onFinishNavigation,
+                    containerColor = Color(0xFFDC2626),
+                    contentColor = Color.White,
+                    modifier = Modifier.size(56.dp).testTag("end_navigation_fab")
+                ) {
+                    Icon(Icons.Default.Stop, contentDescription = "إنهاء الملاحة", modifier = Modifier.size(28.dp))
+                }
+
+                if (bookingId != null && chatBridge != null) {
+                    IconButton(
+                        onClick = { chatBridge.open(com.example.utils.BookingChat.channelIdFor(bookingId)) },
+                        modifier = Modifier.background(Color(0xFF0F172A).copy(alpha = 0.9f), CircleShape).size(48.dp)
+                    ) {
+                        Icon(Icons.Default.Chat, contentDescription = "دردشة الحجز", tint = Color(0xFF38BDF8))
+                    }
+                }
+            }
+
             if (bookingId != null && chatBridge != null) {
                 LazyRow(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -746,75 +686,61 @@ fun NavigationScreen(
                 }
             }
 
-            // بطاقة معلومات الرحلة السفلية الرشيقة
-            Surface(
-                onClick = { isBottomTripInfoCollapsed = !isBottomTripInfoCollapsed },
-                shape = RoundedCornerShape(16.dp),
-                color = Color(0xFF0F172A).copy(alpha = 0.95f),
-                border = BorderStroke(1.dp, Color(0xFF334155)),
-                shadowElevation = 10.dp,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    // سطر ملخص أنيق ومضغوط
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+            AnimatedContent(
+                targetState = isBottomCardCollapsed,
+                transitionSpec = { fadeIn() + expandVertically() togetherWith fadeOut() + shrinkVertically() },
+                label = "bottom_card_anim"
+            ) { collapsed ->
+                if (collapsed) {
+                    Surface(
+                        onClick = { isBottomCardCollapsed = false },
+                        shape = RoundedCornerShape(16.dp),
+                        color = Color(0xFF0F172A).copy(alpha = 0.95f),
+                        border = BorderStroke(1.dp, Color(0xFF334155)),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Icon(Icons.Default.Schedule, contentDescription = null, tint = Color(0xFF10B981), modifier = Modifier.size(15.dp))
-                                Text(
-                                    text = if (result == null) "—" else (if (isApproximate) "~ " else "") + etaClock,
-                                    color = Color(0xFF10B981),
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Icon(Icons.Default.Timer, contentDescription = null, tint = Color.White, modifier = Modifier.size(15.dp))
-                                Text(
-                                    text = if (result == null) "—" else (if (isApproximate) "~ " else "") + MapDistanceCalculator.formatDuration(remainingSeconds),
-                                    color = Color.White,
-                                    fontSize = 12.5.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Icon(Icons.Default.Route, contentDescription = null, tint = Color(0xFF38BDF8), modifier = Modifier.size(15.dp))
-                                Text(
-                                    text = if (result == null) "—" else MapDistanceCalculator.formatDistance(remainingMeters),
-                                    color = Color(0xFFE2E8F0),
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
+                        Row(
+                            Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                "الوصول: $etaClock",
+                                color = Color(0xFF10B981),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                MapDistanceCalculator.formatDistance(remainingMeters),
+                                color = Color.White,
+                                fontSize = 13.sp
+                            )
+                            Icon(Icons.Default.KeyboardArrowDown, contentDescription = "توسيع", tint = Color(0xFF94A3B8))
                         }
-                        Icon(
-                            imageVector = if (isBottomTripInfoCollapsed) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                            contentDescription = if (isBottomTripInfoCollapsed) "توسيع" else "طي",
-                            tint = Color(0xFF94A3B8),
-                            modifier = Modifier.size(20.dp)
-                        )
                     }
-
-                    // شريط التقدم النحيف
-                    LinearProgressIndicator(
-                        progress = { progress },
-                        modifier = Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)),
-                        color = Color(0xFF00E5FF), trackColor = Color(0xFF334155)
-                    )
-
-                    // تفاصيل إضافية عند التوسيع
-                    if (!isBottomTripInfoCollapsed && isApproximate && result != null) {
-                        Text(
-                            "القيم تقريبية (خط مستقيم) — حمّل خرائط الأوفلاين لمسار حقيقي دقيق",
-                            color = Color(0xFFF59E0B),
-                            fontSize = 10.5.sp,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth().padding(top = 2.dp)
-                        )
+                } else {
+                    Surface(
+                        shape = RoundedCornerShape(20.dp),
+                        color = Color(0xFF0F172A).copy(alpha = 0.96f),
+                        border = BorderStroke(1.dp, Color(0xFF334155)),
+                        shadowElevation = 14.dp,
+                        modifier = Modifier.fillMaxWidth().clickable { isBottomCardCollapsed = true }
+                    ) {
+                        Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Row(Modifier.fillMaxWidth()) {
+                                InfoCell("وقت الوصول", if (result == null) "—" else (if (isApproximate) "~ " else "") + etaClock, Color(0xFF10B981), Modifier.weight(1f))
+                                InfoCell("المدة المتبقية", if (result == null) "—" else (if (isApproximate) "~ " else "") + MapDistanceCalculator.formatDuration(remainingSeconds), Color.White, Modifier.weight(1f))
+                                InfoCell("المسافة المتبقية", if (result == null) "—" else MapDistanceCalculator.formatDistance(remainingMeters), Color.White, Modifier.weight(1f))
+                            }
+                            if (isApproximate && result != null) {
+                                Text("القيم تقريبية (خط مستقيم)", color = Color(0xFFF59E0B), fontSize = 10.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                            }
+                            LinearProgressIndicator(
+                                progress = { progress },
+                                modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
+                                color = Color(0xFF00E5FF), trackColor = Color(0xFF334155)
+                            )
+                        }
                     }
                 }
             }
