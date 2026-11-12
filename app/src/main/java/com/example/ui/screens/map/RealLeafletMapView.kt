@@ -79,6 +79,9 @@ fun RealLeafletMapView(
     focusPoint: Triple<String, Double, Double>? = null,
     pickMode: Boolean = false,
     onMapPicked: ((lat: Double, lng: Double) -> Unit)? = null,
+    onMapLongPressed: ((lat: Double, lng: Double) -> Unit)? = null,
+    onMapCenterChanged: ((lat: Double, lng: Double) -> Unit)? = null,
+    ecoMode: Boolean = false,
     hybridLabels: Boolean = false,
     nightMode: Boolean = false,
     gibsEnabled: Boolean = false,
@@ -109,14 +112,22 @@ fun RealLeafletMapView(
     val onUserPannedState by rememberUpdatedState(onUserPanned)
     val onTilesStatusState by rememberUpdatedState(onTilesStatus)
     val onMapPickedState by rememberUpdatedState(onMapPicked)
+    val onMapLongPressedState by rememberUpdatedState(onMapLongPressed)
+    val onMapCenterChangedState by rememberUpdatedState(onMapCenterChanged)
     val onGibsStatusState by rememberUpdatedState(onGibsStatus)
 
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner, webViewRef) {
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
             when (event) {
-                androidx.lifecycle.Lifecycle.Event.ON_PAUSE -> webViewRef?.onPause()
-                androidx.lifecycle.Lifecycle.Event.ON_RESUME -> webViewRef?.onResume()
+                androidx.lifecycle.Lifecycle.Event.ON_PAUSE -> {
+                    webViewRef?.onPause()
+                    webViewRef?.pauseTimers()
+                }
+                androidx.lifecycle.Lifecycle.Event.ON_RESUME -> {
+                    webViewRef?.onResume()
+                    webViewRef?.resumeTimers()
+                }
                 else -> {}
             }
         }
@@ -309,6 +320,12 @@ fun RealLeafletMapView(
         }
     }
 
+    LaunchedEffect(isMapReady, ecoMode) {
+        if (isMapReady && webViewRef != null) {
+            webViewRef?.evaluateJavascript("if (window.setEcoMode) { window.setEcoMode($ecoMode); }", null)
+        }
+    }
+
     LaunchedEffect(isMapReady, hybridLabels, currentMapMode) {
         if (isMapReady && webViewRef != null) {
             val on = hybridLabels && (currentMapMode == MapMode.SATELLITE || currentMapMode == MapMode.VELA_3D)
@@ -414,6 +431,16 @@ fun RealLeafletMapView(
                             @JavascriptInterface
                             fun onMapPicked(lat: Double, lng: Double) {
                                 mainHandler.post { onMapPickedState?.invoke(lat, lng) }
+                            }
+
+                            @JavascriptInterface
+                            fun onMapLongPressed(lat: Double, lng: Double) {
+                                mainHandler.post { onMapLongPressedState?.invoke(lat, lng) }
+                            }
+
+                            @JavascriptInterface
+                            fun onMapCenterChanged(lat: Double, lng: Double) {
+                                mainHandler.post { onMapCenterChangedState?.invoke(lat, lng) }
                             }
 
                             @JavascriptInterface

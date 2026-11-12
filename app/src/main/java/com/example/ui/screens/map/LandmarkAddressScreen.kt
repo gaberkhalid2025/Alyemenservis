@@ -8,6 +8,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items as lazyItems
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -15,10 +17,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.ui.components.ManualCoordinateDialog
 import com.example.utils.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -31,6 +35,7 @@ fun LandmarkAddressScreen(
     centerLng: Double,
     hasRealLocation: Boolean,
     selectedCity: String = "الكل",
+    initialPoint: Pair<Double, Double>? = null,
     onSaved: (LandmarkAddress) -> Unit,
     onClose: () -> Unit,
     modifier: Modifier = Modifier
@@ -43,7 +48,7 @@ fun LandmarkAddressScreen(
     var step by remember { mutableIntStateOf(0) }                  // 0 معلم، 1 نقطة، 2 تأكيد
     var landmarkName by remember { mutableStateOf("") }
     var landmark by remember { mutableStateOf<Pair<Double, Double>?>(null) }
-    var point by remember { mutableStateOf<Pair<Double, Double>?>(null) }
+    var point by remember(initialPoint) { mutableStateOf(initialPoint) }
     var description by remember { mutableStateOf("") }
     var label by remember { mutableStateOf("منزلي") }
     var confirmed by remember { mutableStateOf(false) }
@@ -53,13 +58,19 @@ fun LandmarkAddressScreen(
     var busy by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
     var tapForLandmark by remember { mutableStateOf<Pair<Double, Double>?>(null) }
-    var focus by remember { mutableStateOf<Triple<String, Double, Double>?>(null) }
+    var focus by remember(initialPoint) {
+        mutableStateOf(initialPoint?.let { Triple("الموقع المختار", it.first, it.second) })
+    }
     var manualName by remember { mutableStateOf("") }
+    var manualKind by remember { mutableStateOf("معلم") }
+    var showStep0CoordDialog by remember { mutableStateOf(false) }
+    var showStep1CoordDialog by remember { mutableStateOf(false) }
 
     BackHandler { if (step > 0) { step -= 1; confirmed = false } else onClose() }
 
     fun chooseLandmark(name: String, lat: Double, lng: Double) {
-        landmarkName = name; landmark = lat to lng; point = null
+        landmarkName = name; landmark = lat to lng
+        if (initialPoint == null) point = null
         focus = Triple(name, lat, lng); results = emptyList(); nearby = emptyList(); message = null; query = ""
         step = 1
     }
@@ -116,6 +127,7 @@ fun LandmarkAddressScreen(
             waypointMarkers = markers,
             focusPoint = focus,
             pickMode = step <= 1,
+            ecoMode = MapPowerDataPrefs.isEcoMode(context),
             onMapPicked = onPicked,
             modifier = Modifier.fillMaxSize()
         )
@@ -125,13 +137,13 @@ fun LandmarkAddressScreen(
             Surface(shape = RoundedCornerShape(14.dp), color = Color(0xFF0F172A).copy(alpha = 0.95f), modifier = Modifier.fillMaxWidth()) {
                 Row(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text("عنواني بالمعلم — الخطوة ${step + 1} من 3", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                    IconButton(onClick = onClose, modifier = Modifier.size(36.dp)) { Icon(Icons.Default.Close, contentDescription = "إغلاق", tint = Color(0xFF94A3B8)) }
+                    IconButton(onClick = onClose, modifier = Modifier.size(48.dp)) { Icon(Icons.Default.Close, contentDescription = "إغلاق", tint = Color(0xFF94A3B8)) }
                 }
             }
             if (step == 0) {
                 OutlinedTextField(
                     value = query, onValueChange = { query = it }, singleLine = true,
-                    placeholder = { Text("ابحث عن معلم معروف: مسجد، مدرسة، سوق…", color = Color(0xFF94A3B8), fontSize = 12.sp) },
+                    placeholder = { Text("ابحث عن معلم قريب: مسجد، فندق، جولة، شارع، محطة…", color = Color(0xFF94A3B8), fontSize = 12.sp) },
                     colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White,
                         focusedContainerColor = Color(0xFF0F172A), unfocusedContainerColor = Color(0xFF0F172A),
                         focusedBorderColor = Color(0xFF00E5FF), unfocusedBorderColor = Color(0xFF334155)),
@@ -167,28 +179,52 @@ fun LandmarkAddressScreen(
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 when (step) {
                     0 -> {
-                        Text("اختر معلماً قريباً من منزلك يعرفه الناس. اضغط على موقعه في الخريطة إن لم تجده في القائمة.", color = Color(0xFFCBD5E1), fontSize = 13.sp)
-                        OutlinedButton(
-                            onClick = {
-                                scope.launch {
-                                    busy = true
-                                    nearby = LandmarkFinder.nearby(centerLat, centerLng)
-                                    message = if (nearby.isEmpty()) (LandmarkFinder.lastError ?: "لا معالم مسجلة قريباً؛ اضغط على الخريطة لإضافة معلم") else null
-                                    busy = false
-                                }
-                            },
-                            enabled = hasRealLocation && LandmarkAddress.isValid(centerLat, centerLng),
-                            modifier = Modifier.fillMaxWidth()
-                        ) { Text("🕌 معالم قريبة مني") }
-                        if (!hasRealLocation) Text("لإظهار المعالم القريبة منك فعّل GPS، أو ابحث بالاسم، أو اضغط على الخريطة.", color = Color(0xFF94A3B8), fontSize = 11.sp)
+                        val scanLat = initialPoint?.first ?: centerLat
+                        val scanLng = initialPoint?.second ?: centerLng
+                        val canScan = LandmarkAddress.isValid(scanLat, scanLng) && (initialPoint != null || hasRealLocation)
+                        Text("اختر معلماً قريباً (فندق، جولة، شارع، مسجد، محطة) أو اضغط على الخريطة لإضافته بنفسك.", color = Color(0xFFCBD5E1), fontSize = 12.5.sp)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                            OutlinedButton(
+                                onClick = {
+                                    scope.launch {
+                                        busy = true
+                                        nearby = LandmarkFinder.nearbyWithOfflineFallback(context, scanLat, scanLng)
+                                        message = if (nearby.isEmpty()) (LandmarkFinder.lastError ?: "لا معالم مسجلة قريباً؛ اضغط على الخريطة لإضافة معلم") else null
+                                        busy = false
+                                    }
+                                },
+                                enabled = canScan,
+                                modifier = Modifier.weight(1f).height(48.dp)
+                            ) { Text("🏛️ معالم/شوارع قريبة", fontSize = 12.sp) }
+                            OutlinedButton(
+                                onClick = { showStep0CoordDialog = true },
+                                modifier = Modifier.height(48.dp)
+                            ) { Text("🔢 إحداثيات", fontSize = 12.sp, color = Color(0xFF00E5FF)) }
+                        }
+                        if (!canScan) Text("لإظهار المعالم القريبة فعّل GPS، أو ابحث بالاسم، أو اضغط على الخريطة أو أدخل الإحداثيات.", color = Color(0xFF94A3B8), fontSize = 11.sp)
                     }
                     1 -> {
                         Text("المعلم: $landmarkName", color = Color(0xFF00E5FF), fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                        Text("اضغط على الخريطة في مكان منزلك بالضبط. يمكنك الضغط مجدداً لتصحيحه.", color = Color(0xFFCBD5E1), fontSize = 13.sp)
+                        Text("اضغط على الخريطة في مكان منزلك/موقعك بالضبط، أو استخدم GPS / الإحداثيات.", color = Color(0xFFCBD5E1), fontSize = 12.5.sp)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                            if (hasRealLocation && LandmarkAddress.isValid(centerLat, centerLng)) {
+                                OutlinedButton(
+                                    onClick = {
+                                        point = centerLat to centerLng
+                                        focus = Triple("موقعي الحالي", centerLat, centerLng)
+                                    },
+                                    modifier = Modifier.weight(1f).height(48.dp)
+                                ) { Text("📍 موقعي GPS", fontSize = 11.5.sp, color = Color(0xFF10B981)) }
+                            }
+                            OutlinedButton(
+                                onClick = { showStep1CoordDialog = true },
+                                modifier = Modifier.weight(1f).height(48.dp)
+                            ) { Text("🔢 إدخال إحداثيات", fontSize = 11.5.sp, color = Color(0xFF00E5FF)) }
+                        }
                         draft?.let { Text(it.copy(description = "").describe(), color = Color(0xFF10B981), fontSize = 13.sp, fontWeight = FontWeight.Bold) }
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            OutlinedButton(onClick = { step = 0; point = null }, modifier = Modifier.weight(1f)) { Text("تغيير المعلم") }
-                            Button(onClick = { step = 2 }, enabled = point != null, modifier = Modifier.weight(1f)) { Text("التالي") }
+                            OutlinedButton(onClick = { step = 0; if (initialPoint == null) point = null }, modifier = Modifier.weight(1f).height(48.dp)) { Text("تغيير المعلم") }
+                            Button(onClick = { step = 2 }, enabled = point != null, modifier = Modifier.weight(1f).height(48.dp)) { Text("التالي") }
                         }
                     }
                     else -> {
@@ -229,18 +265,95 @@ fun LandmarkAddressScreen(
         SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 220.dp))
     }
 
-    // تسمية معلم أضافه المستخدم بالنقر على الخريطة
+    // تسمية معلم أضافه المستخدم بالنقر على الخريطة وحفظه محلياً للاستخدام الأوفلاين
     tapForLandmark?.let { (lat, lng) ->
+        val kinds = remember { listOf("معلم", "فندق", "جولة", "شارع", "مسجد", "محطة وقود", "سوق", "مستشفى") }
         AlertDialog(
             onDismissRequest = { tapForLandmark = null; manualName = "" },
-            title = { Text("اسم هذا المعلم") },
-            text = { OutlinedTextField(value = manualName, onValueChange = { manualName = it }, singleLine = true, placeholder = { Text("مثال: مسجد النور") }) },
+            containerColor = Color(0xFF0F172A),
+            titleContentColor = Color.White,
+            title = { Text("➕ إضافة معلم جديد على الخريطة", fontWeight = FontWeight.Bold, fontSize = 15.sp) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        "سيُحفظ المعلم محلياً لتجده مستقبلاً في البحث وعناوين التوصيل (${OfflineYemenGazetteer.formatCoordinates(lat, lng)}).",
+                        color = Color(0xFFCBD5E1),
+                        fontSize = 11.5.sp
+                    )
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        lazyItems(kinds) { kind ->
+                            FilterChip(
+                                selected = manualKind == kind,
+                                onClick = { manualKind = kind },
+                                label = { Text(kind, fontSize = 11.sp) }
+                            )
+                        }
+                    }
+                    OutlinedTextField(
+                        value = manualName,
+                        onValueChange = { manualName = it },
+                        singleLine = true,
+                        label = { Text("اسم المعلم *") },
+                        placeholder = { Text("مثال: فندق السعيد، جولة آية، مسجد النور") },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedBorderColor = Color(0xFF00E5FF),
+                            unfocusedBorderColor = Color(0xFF334155)
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
             confirmButton = {
                 TextButton(enabled = manualName.trim().length >= 2, onClick = {
-                    chooseLandmark(manualName.trim(), lat, lng); tapForLandmark = null; manualName = ""
-                }) { Text("اعتماد") }
+                    val cleanName = manualName.trim()
+                    val selectedKind = manualKind
+                    scope.launch {
+                        withContext(Dispatchers.IO) {
+                            CustomLandmarkStore.add(context, cleanName, selectedKind, lat, lng)
+                        }
+                        chooseLandmark(cleanName, lat, lng)
+                        tapForLandmark = null
+                        manualName = ""
+                    }
+                }) { Text("حفظ واعتماد", color = Color(0xFF10B981), fontWeight = FontWeight.Bold) }
             },
-            dismissButton = { TextButton(onClick = { tapForLandmark = null; manualName = "" }) { Text("إلغاء") } }
+            dismissButton = { TextButton(onClick = { tapForLandmark = null; manualName = "" }) { Text("إلغاء", color = Color(0xFF94A3B8)) } }
+        )
+    }
+
+    if (showStep0CoordDialog) {
+        ManualCoordinateDialog(
+            initialLat = initialPoint?.first ?: centerLat,
+            initialLng = initialPoint?.second ?: centerLng,
+            gpsLat = centerLat,
+            gpsLng = centerLng,
+            hasGps = hasRealLocation,
+            title = "🔢 تحديد إحداثيات المعلم",
+            onDismiss = { showStep0CoordDialog = false },
+            onConfirm = { lat, lng, _ ->
+                showStep0CoordDialog = false
+                tapForLandmark = lat to lng
+                focus = Triple("معلم مقترح", lat, lng)
+            }
+        )
+    }
+
+    if (showStep1CoordDialog) {
+        ManualCoordinateDialog(
+            initialLat = point?.first ?: centerLat,
+            initialLng = point?.second ?: centerLng,
+            gpsLat = centerLat,
+            gpsLng = centerLng,
+            hasGps = hasRealLocation,
+            title = "🔢 إدخال إحداثيات موقعك",
+            onDismiss = { showStep1CoordDialog = false },
+            onConfirm = { lat, lng, _ ->
+                point = lat to lng
+                focus = Triple("موقعي", lat, lng)
+                showStep1CoordDialog = false
+            }
         )
     }
 }

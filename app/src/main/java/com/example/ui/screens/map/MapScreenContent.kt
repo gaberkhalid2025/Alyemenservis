@@ -59,7 +59,10 @@ import com.example.utils.VisualThemePalette
 import com.example.utils.resolveThemePalette
 import com.example.utils.LandmarkAddress
 import com.example.utils.LandmarkAddressStore
+import com.example.utils.MapPowerDataPrefs
 import com.example.utils.PermissionManager
+import com.example.ui.components.AddCustomLandmarkDialog
+import com.example.ui.components.ManualCoordinateDialog
 import androidx.activity.compose.BackHandler
 import androidx.compose.ui.zIndex
 import kotlinx.coroutines.Dispatchers
@@ -128,9 +131,23 @@ fun MapScreenContent(
     var showServicesSheet by remember { mutableStateOf(false) }
     var showDestinationPicker by remember { mutableStateOf(false) }
 
+    LaunchedEffect(Unit) { MapPowerDataPrefs.init(context) }
+    val isEcoMode by MapPowerDataPrefs.ecoMode.collectAsState()
+    val isManualLoc by viewModel.isManualLocationSet.collectAsState()
+    var isPinPickMode by remember { mutableStateOf(false) }
+    var centerCoords by remember { mutableStateOf<Pair<Double, Double>?>(null) }
+    var pinnedPoint by remember { mutableStateOf<Pair<Double, Double>?>(null) }
+    var pinnedLandmarkTarget by remember { mutableStateOf<Pair<Double, Double>?>(null) }
+    var showCoordinateDialog by remember { mutableStateOf(false) }
+    var showAddLandmarkForPin by remember { mutableStateOf<Pair<Double, Double>?>(null) }
+
     androidx.activity.compose.BackHandler(enabled = true) {
         if (isHudMode) {
             isHudMode = false
+        } else if (isPinPickMode) {
+            isPinPickMode = false
+        } else if (pinnedPoint != null) {
+            pinnedPoint = null
         } else if (state.isNavigating) {
             state.stopNavigation()
         } else if (state.selectedEntity != null) {
@@ -161,9 +178,9 @@ fun MapScreenContent(
     val safeUserLat = rawUserLat
     val safeUserLng = rawUserLng
 
-    // [إصلاح 18] بوصلة حقيقية باستخدام الحساسات
+    // [إصلاح 18] بوصلة حقيقية باستخدام الحساسات (تتوقف في وضع توفير الطاقة)
     val heading = com.example.utils.rememberHeadingDegrees(
-        enabled = !state.isNavigating,
+        enabled = !state.isNavigating && !isEcoMode,
         lat = safeUserLat,
         lng = safeUserLng
     )
@@ -301,6 +318,7 @@ fun MapScreenContent(
     DisposableEffect(Unit) {
         onDispose {
             state.clearOffsets()
+            viewModel.stopLocationUpdates()
         }
     }
 
@@ -345,12 +363,17 @@ fun MapScreenContent(
             centerLng = safeUserLng,
             hasRealLocation = hasRealLocation,
             selectedCity = state.selectedCity,
+            initialPoint = pinnedLandmarkTarget,
             onSaved = { addr ->
+                pinnedLandmarkTarget = null
                 coroutineScope.launch {
                     snackbarHostState.showSnackbar("تم حفظ عنوانك: ${addr.describe()}")
                 }
             },
-            onClose = { showLandmarkAddress = false }
+            onClose = {
+                pinnedLandmarkTarget = null
+                showLandmarkAddress = false
+            }
         )
         return
     }
@@ -481,7 +504,25 @@ fun MapScreenContent(
                     zoomInTick = state.zoomInTick,
                     zoomOutTick = state.zoomOutTick,
                     useZoomTicks = true,
-                    focusPoint = searchedPlace?.let { Triple(it.shortName, it.latitude, it.longitude) },
+                    focusPoint = searchedPlace?.let { Triple(it.shortName, it.latitude, it.longitude) }
+                        ?: pinnedPoint?.let { Triple("📌 نقطة محددة", it.first, it.second) },
+                    pickMode = isPinPickMode,
+                    ecoMode = isEcoMode,
+                    onMapPicked = { lat, lng ->
+                        isPinPickMode = false
+                        pinnedPoint = lat to lng
+                        state.selectedEntity = null
+                        searchedPlace = null
+                    },
+                    onMapLongPressed = { lat, lng ->
+                        isPinPickMode = false
+                        pinnedPoint = lat to lng
+                        state.selectedEntity = null
+                        searchedPlace = null
+                    },
+                    onMapCenterChanged = { lat, lng ->
+                        centerCoords = lat to lng
+                    },
                     zones = if (showZones) com.example.utils.ReliabilityZones.build(filteredProviders, filteredStores) else emptyList(),
                     modifier = Modifier.fillMaxSize()
                 )
@@ -553,21 +594,116 @@ fun MapScreenContent(
                     }
                 }
 
-                // 🏷️ مفتاح أسماء الشوارع فوق صور الأقمار الصناعية (طبقة هجينة)
-                if (state.currentMapMode == MapMode.SATELLITE || state.currentMapMode == MapMode.VELA_3D) {
-                    FilterChip(
-                        selected = hybridLabels,
-                        onClick = { hybridLabels = !hybridLabels },
-                        label = { Text("أسماء الشوارع", fontSize = 11.sp, color = if (hybridLabels) Color(0xFF00E5FF) else Color.White) },
-                        colors = FilterChipDefaults.filterChipColors(
-                            containerColor = Color(0xCC0F172A),
-                            selectedContainerColor = Color(0xFF1E293B)
-                        ),
+                // 🏷️ شريط الشارات السريعة (أسماء الشوارع + وضع التوفير + الموقع اليدوي)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .statusBarsPadding()
+                        .padding(top = 100.dp, start = 16.dp)
+                ) {
+                    if (state.currentMapMode == MapMode.SATELLITE || state.currentMapMode == MapMode.VELA_3D) {
+                        FilterChip(
+                            selected = hybridLabels,
+                            onClick = { hybridLabels = !hybridLabels },
+                            label = { Text("أسماء الشوارع", fontSize = 11.sp, color = if (hybridLabels) Color(0xFF00E5FF) else Color.White) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                containerColor = Color(0xCC0F172A),
+                                selectedContainerColor = Color(0xFF1E293B)
+                            )
+                        )
+                    }
+                    if (isEcoMode) {
+                        FilterChip(
+                            selected = true,
+                            onClick = {
+                                MapPowerDataPrefs.setEcoMode(context, false)
+                                viewModel.startLocationUpdates()
+                                coroutineScope.launch { snackbarHostState.showSnackbar("تم إيقاف وضع توفير البطارية والنت") }
+                            },
+                            label = { Text("🔋 توفير", fontSize = 11.sp, color = Color(0xFF10B981)) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = Color(0xCC064E3B)
+                            )
+                        )
+                    }
+                    if (isManualLoc) {
+                        FilterChip(
+                            selected = true,
+                            onClick = {
+                                viewModel.clearManualUserLocation()
+                                viewModel.startLocationUpdates()
+                                coroutineScope.launch { snackbarHostState.showSnackbar("تمت العودة لتحديد الموقع عبر GPS") }
+                            },
+                            label = { Text("📍 موقع يدوي ×", fontSize = 10.5.sp, color = Color(0xFF00E5FF)) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = Color(0xCC0F172A)
+                            )
+                        )
+                    }
+                }
+
+                // 🎯 وضع تحديد نقطة بدبوس المنتصف أو النقر
+                if (isPinPickMode) {
+                    Box(
+                        modifier = Modifier.align(Alignment.Center),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.LocationOn,
+                            contentDescription = "مؤشر تحديد النقطة",
+                            tint = Color(0xFFEF4444),
+                            modifier = Modifier.size(42.dp).offset(y = (-16).dp)
+                        )
+                        Box(
+                            modifier = Modifier
+                                .size(10.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFF00E5FF))
+                        )
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(18.dp),
+                        color = Color(0xFF0F172A).copy(alpha = 0.96f),
+                        border = BorderStroke(1.2.dp, Color(0xFF00E5FF)),
                         modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .statusBarsPadding()
-                            .padding(top = 100.dp, start = 16.dp)
-                    )
+                            .align(Alignment.BottomCenter)
+                            .navigationBarsPadding()
+                            .padding(horizontal = 14.dp, vertical = 90.dp)
+                            .fillMaxWidth()
+                    ) {
+                        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            val active = centerCoords ?: (safeUserLat to safeUserLng)
+                            Text("📌 تحديد نقطة يدوياً على الخريطة", color = Color(0xFF00E5FF), fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            Text(
+                                "حرّك الخريطة لوضع المؤشر على المكان المطلوب أو اضغط مباشرة فوقه (${OfflineYemenGazetteer.formatCoordinates(active.first, active.second)})",
+                                color = Color(0xFFCBD5E1),
+                                fontSize = 11.5.sp
+                            )
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                                Button(
+                                    onClick = {
+                                        pinnedPoint = active
+                                        isPinPickMode = false
+                                        state.selectedEntity = null
+                                        searchedPlace = null
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                                    modifier = Modifier.weight(1f).height(48.dp)
+                                ) {
+                                    Text("تثبيت هذه النقطة ✓", fontWeight = FontWeight.Bold)
+                                }
+                                OutlinedButton(
+                                    onClick = { isPinPickMode = false },
+                                    modifier = Modifier.height(48.dp)
+                                ) {
+                                    Text("إلغاء", color = Color(0xFF94A3B8))
+                                }
+                            }
+                        }
+                    }
                 }
 
                 // 🧊 زر 3D الحقيقي (MapLibre + OpenFreeMap)
@@ -1001,6 +1137,28 @@ fun MapScreenContent(
                         )
                     }
                 },
+                isPinPickMode = isPinPickMode,
+                onTogglePinPickMode = {
+                    isPinPickMode = !isPinPickMode
+                    if (isPinPickMode) {
+                        pinnedPoint = null
+                        state.selectedEntity = null
+                        searchedPlace = null
+                    }
+                },
+                isEcoMode = isEcoMode,
+                onToggleEcoMode = {
+                    val next = !isEcoMode
+                    MapPowerDataPrefs.setEcoMode(context, next)
+                    viewModel.startLocationUpdates()
+                    coroutineScope.launch {
+                        snackbarHostState.showSnackbar(
+                            if (next) "🔋 تم تفعيل وضع توفير البطارية والنت (كاش ذكي وتحديث GPS اقتصادي)"
+                            else "⚡ تم العودة للوضع القياسي للخرائط والموقع"
+                        )
+                    }
+                },
+                onOpenCoordinateEntry = { showCoordinateDialog = true },
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
                     .padding(end = 16.dp)
@@ -1349,6 +1507,125 @@ fun MapScreenContent(
                     }
                 }
             }
+
+            // 📌 بطاقة النقطة المحددة يدوياً (بالنقر المطول أو وضع الدبوس أو الإحداثيات)
+            pinnedPoint?.let { (pLat, pLng) ->
+                if (state.selectedEntity == null && searchedPlace == null) {
+                    val dist = MapDistanceCalculator.calculateDistanceMeters(safeUserLat, safeUserLng, pLat, pLng)
+                    var refSummary by remember(pLat, pLng) { mutableStateOf("") }
+                    LaunchedEffect(pLat, pLng) {
+                        refSummary = withContext(Dispatchers.IO) {
+                            OfflineYemenGazetteer.nearestReferenceSummary(context, pLat, pLng)
+                        }
+                    }
+                    Surface(
+                        shape = RoundedCornerShape(20.dp),
+                        color = Color(0xFF0B0F19).copy(alpha = 0.97f),
+                        border = BorderStroke(1.2.dp, Color(0xFF00E5FF).copy(alpha = 0.45f)),
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .navigationBarsPadding()
+                            .padding(12.dp)
+                            .fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                                Column(Modifier.weight(1f)) {
+                                    Text("📌 نقطة محددة يدوياً", color = Color.White, fontSize = 14.5.sp, fontWeight = FontWeight.Bold)
+                                    Text(
+                                        OfflineYemenGazetteer.formatCoordinates(pLat, pLng),
+                                        color = Color(0xFF00E5FF),
+                                        fontSize = 11.5.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                                IconButton(
+                                    onClick = { pinnedPoint = null },
+                                    modifier = Modifier.size(48.dp)
+                                ) {
+                                    Icon(Icons.Default.Close, contentDescription = "إغلاق النقطة", tint = Color(0xFF94A3B8))
+                                }
+                            }
+                            if (refSummary.isNotBlank()) {
+                                Text("أقرب مرجع: $refSummary", color = Color(0xFF10B981), fontSize = 11.5.sp)
+                            }
+                            if (hasRealLocation) {
+                                Text(
+                                    "المسافة من موقعك: ${MapDistanceCalculator.formatDistance(dist)}",
+                                    color = Color(0xFFCBD5E1),
+                                    fontSize = 11.5.sp
+                                )
+                            }
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                                Button(
+                                    onClick = {
+                                        val wp = NavWaypoint(name = "نقطة محددة", latitude = pLat, longitude = pLng)
+                                        if (!hasRealLocation) {
+                                            viewModel.startLocationUpdates()
+                                            coroutineScope.launch { snackbarHostState.showSnackbar("فعّل GPS أو حدد موقعك يدوياً من «اعتمد كموقعي» للبدء") }
+                                        } else if (state.startNavigation(wp)) {
+                                            pinnedPoint = null
+                                        }
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                                    modifier = Modifier.weight(1f).height(48.dp)
+                                ) {
+                                    Text("🧭 ابدأ الملاحة", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                }
+                                OutlinedButton(
+                                    onClick = {
+                                        state.addWaypoint(NavWaypoint(name = "نقطة (${OfflineYemenGazetteer.formatCoordinates(pLat, pLng)})", latitude = pLat, longitude = pLng))
+                                        coroutineScope.launch { snackbarHostState.showSnackbar("📍 تمت إضافة النقطة كمحطة") }
+                                    },
+                                    modifier = Modifier.weight(1f).height(48.dp)
+                                ) {
+                                    Text("➕ كمحطة", fontSize = 12.sp, color = Color.White)
+                                }
+                            }
+                            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                item {
+                                    AssistChip(
+                                        onClick = {
+                                            viewModel.setManualUserLocation(pLat, pLng)
+                                            pinnedPoint = null
+                                            coroutineScope.launch { snackbarHostState.showSnackbar("✓ تم اعتماد هذه النقطة كموقعك اليدوي للانطلاق والتوصيل") }
+                                        },
+                                        label = { Text("📍 اعتمد كموقعي", fontSize = 11.sp, color = Color(0xFF00E5FF)) }
+                                    )
+                                }
+                                item {
+                                    AssistChip(
+                                        onClick = { showAddLandmarkForPin = pLat to pLng },
+                                        label = { Text("➕ احفظ كمعلم", fontSize = 11.sp, color = Color(0xFFFBBF24)) }
+                                    )
+                                }
+                                item {
+                                    AssistChip(
+                                        onClick = {
+                                            pinnedLandmarkTarget = pLat to pLng
+                                            pinnedPoint = null
+                                            showLandmarkAddress = true
+                                        },
+                                        label = { Text("🏠 عنوان بالمعلم", fontSize = 11.sp, color = Color(0xFF10B981)) }
+                                    )
+                                }
+                                item {
+                                    AssistChip(
+                                        onClick = {
+                                            val shareText = "موقعي المحدد:\n$refSummary\n${OfflineYemenGazetteer.formatCoordinates(pLat, pLng)}\n${SosDispatcher.mapLink(pLat, pLng)}"
+                                            SosDispatcher.safeStart(context, SosDispatcher.shareIntent(shareText))
+                                        },
+                                        label = { Text("📤 مشاركة", fontSize = 11.sp, color = Color.White) }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -1617,7 +1894,7 @@ fun MapScreenContent(
                         value = pickerQuery,
                         onValueChange = { pickerQuery = it },
                         singleLine = true,
-                        placeholder = { Text("ابحث عن شارع، جولة، مدينة أو معلم (يعمل أوفلاين)…", fontSize = 12.sp, color = Color(0xFF94A3B8)) },
+                        placeholder = { Text("ابحث عن شارع، جولة، فندق، معلم أو الصق إحداثيات…", fontSize = 12.sp, color = Color(0xFF94A3B8)) },
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = Color.White,
                             unfocusedTextColor = Color.White,
@@ -1626,17 +1903,37 @@ fun MapScreenContent(
                         ),
                         modifier = Modifier.fillMaxWidth()
                     )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        OutlinedButton(
+                            onClick = {
+                                showDestinationPicker = false
+                                isPinPickMode = true
+                            },
+                            modifier = Modifier.weight(1f).height(48.dp)
+                        ) {
+                            Text("📍 دبوس الخريطة", fontSize = 11.sp, color = Color(0xFF10B981), maxLines = 1)
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                showDestinationPicker = false
+                                showCoordinateDialog = true
+                            },
+                            modifier = Modifier.weight(1f).height(48.dp)
+                        ) {
+                            Text("🔢 إحداثيات يدوياً", fontSize = 11.sp, color = Color(0xFF00E5FF), maxLines = 1)
+                        }
+                    }
                     if (pickerBusy) {
                         LinearProgressIndicator(Modifier.fillMaxWidth(), color = Color(0xFF10B981))
                     }
                     if (visibleList.isEmpty() && pickerQuery.trim().length >= 2 && !pickerBusy) {
                         Text(
-                            text = "لم يتم العثور على «${pickerQuery.trim()}» — جرب اسم الشارع أو المدينة",
+                            text = "لم يتم العثور على «${pickerQuery.trim()}» — حدد المكان بدبوس الخريطة أو بالإحداثيات أعلاه",
                             color = Color(0xFFF59E0B),
                             fontSize = 12.sp
                         )
                     } else {
-                        LazyColumn(modifier = Modifier.heightIn(max = 280.dp)) {
+                        LazyColumn(modifier = Modifier.heightIn(max = 260.dp)) {
                             items(visibleList) { item ->
                                 Row(
                                     modifier = Modifier
@@ -1670,6 +1967,56 @@ fun MapScreenContent(
             dismissButton = {
                 TextButton(onClick = { showDestinationPicker = false }) {
                     Text("إغلاق", color = Color(0xFF94A3B8))
+                }
+            }
+        )
+    }
+
+    if (showCoordinateDialog) {
+        ManualCoordinateDialog(
+            initialLat = pinnedPoint?.first ?: safeUserLat,
+            initialLng = pinnedPoint?.second ?: safeUserLng,
+            gpsLat = safeUserLat,
+            gpsLng = safeUserLng,
+            hasGps = hasRealLocation,
+            confirmLabel = "📌 عرض على الخريطة",
+            onDismiss = { showCoordinateDialog = false },
+            onConfirm = { lat, lng, _ ->
+                pinnedPoint = lat to lng
+                searchedPlace = null
+                state.selectedEntity = null
+                showCoordinateDialog = false
+            },
+            onNavigate = { lat, lng, _ ->
+                val wp = NavWaypoint(
+                    name = "إحداثيات (${OfflineYemenGazetteer.formatCoordinates(lat, lng)})",
+                    latitude = lat,
+                    longitude = lng
+                )
+                showCoordinateDialog = false
+                if (!hasRealLocation) {
+                    coroutineScope.launch { snackbarHostState.showSnackbar("حدد موقع انطلاقك أولاً عبر GPS أو «📍 كموقعي»") }
+                } else {
+                    state.startNavigation(wp)
+                }
+            },
+            onSetAsMyLocation = { lat, lng ->
+                viewModel.setManualUserLocation(lat, lng)
+                showCoordinateDialog = false
+                coroutineScope.launch { snackbarHostState.showSnackbar("✓ تم اعتماد الإحداثيات كموقع انطلاقك اليدوي") }
+            }
+        )
+    }
+
+    showAddLandmarkForPin?.let { (lat, lng) ->
+        AddCustomLandmarkDialog(
+            latitude = lat,
+            longitude = lng,
+            onDismiss = { showAddLandmarkForPin = null },
+            onAdded = { saved ->
+                showAddLandmarkForPin = null
+                coroutineScope.launch {
+                    snackbarHostState.showSnackbar("✓ تم حفظ المعلم «${saved.name}» وسيظهر في البحث أوفلاين")
                 }
             }
         )

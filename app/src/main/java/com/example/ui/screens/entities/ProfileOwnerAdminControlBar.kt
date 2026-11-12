@@ -10,7 +10,9 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -26,6 +28,10 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.data.*
 import com.example.ui.*
+import com.example.ui.components.InteractiveMapLocationPickerDialog
+import com.example.ui.components.ManualCoordinateDialog
+import com.example.utils.LandmarkAddress
+import com.example.utils.OfflineYemenGazetteer
 import com.example.utils.VisualThemePalette
 
 @Composable
@@ -481,19 +487,31 @@ fun ProfileOwnerAdminControlBar(
 
     // 2. DIALOG: Edit Profile Details
     if (showEditDetailsDialog) {
+        val userLat by viewModel.userLatitude.collectAsState()
+        val userLng by viewModel.userLongitude.collectAsState()
+        val isRealLoc by viewModel.isUserLocationReal.collectAsState()
+        val hasGps = isRealLoc && LandmarkAddress.isValid(userLat, userLng)
+
+        var editName by remember { mutableStateOf(provider?.name ?: store?.name ?: property?.title ?: "") }
+        var editPhone by remember { mutableStateOf(provider?.phone ?: store?.phone ?: property?.phone ?: "") }
+        var editArea by remember { mutableStateOf(provider?.area ?: store?.cityId ?: property?.cityId ?: "") }
+        var editDesc by remember { mutableStateOf(provider?.profession ?: store?.description ?: property?.description ?: "") }
+        var editLat by remember { mutableDoubleStateOf(provider?.latitude ?: store?.latitude ?: property?.latitude ?: 15.3694) }
+        var editLng by remember { mutableDoubleStateOf(provider?.longitude ?: store?.longitude ?: property?.longitude ?: 44.1910) }
+        var showEntityMapPicker by remember { mutableStateOf(false) }
+        var showEntityCoordDialog by remember { mutableStateOf(false) }
+
         Dialog(onDismissRequest = { showEditDetailsDialog = false }) {
             Card(
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = themeColors.surface),
                 modifier = Modifier.fillMaxWidth().padding(8.dp)
             ) {
-                var editName by remember { mutableStateOf(provider?.name ?: store?.name ?: property?.title ?: "") }
-                var editPhone by remember { mutableStateOf(provider?.phone ?: store?.phone ?: property?.phone ?: "") }
-                var editArea by remember { mutableStateOf(provider?.area ?: store?.cityId ?: property?.cityId ?: "") }
-                var editDesc by remember { mutableStateOf(provider?.profession ?: store?.description ?: property?.description ?: "") }
-
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("📝 تعديل البيانات الأساسية للنشاط", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                Column(
+                    modifier = Modifier.padding(16.dp).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text("📝 تعديل البيانات الأساسية وموقع الخريطة", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
 
                     OutlinedTextField(
                         value = editName,
@@ -516,11 +534,54 @@ fun ProfileOwnerAdminControlBar(
                     OutlinedTextField(
                         value = editArea,
                         onValueChange = { editArea = it },
-                        label = { Text("المدينة / المحافظة / الحي") },
-                        singleLine = true,
+                        label = { Text("المدينة / المحافظة / الحي أو أقرب معلم") },
+                        maxLines = 2,
                         modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
                     )
+
+                    Surface(
+                        color = Color(0xFF0F172A),
+                        shape = RoundedCornerShape(10.dp),
+                        border = BorderStroke(1.dp, Color(0xFF00E5FF).copy(alpha = 0.35f))
+                    ) {
+                        Column(Modifier.fillMaxWidth().padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(
+                                "📍 إحداثيات الموقع: ${OfflineYemenGazetteer.formatCoordinates(editLat, editLng)}",
+                                color = Color(0xFF00E5FF),
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+                                OutlinedButton(
+                                    onClick = { showEntityMapPicker = true },
+                                    contentPadding = PaddingValues(horizontal = 8.dp),
+                                    modifier = Modifier.weight(1f).height(48.dp)
+                                ) {
+                                    Text("🗺️ من الخريطة", fontSize = 10.5.sp, color = Color(0xFF10B981), maxLines = 1)
+                                }
+                                OutlinedButton(
+                                    onClick = { showEntityCoordDialog = true },
+                                    contentPadding = PaddingValues(horizontal = 8.dp),
+                                    modifier = Modifier.weight(1f).height(48.dp)
+                                ) {
+                                    Text("🔢 إحداثيات", fontSize = 10.5.sp, color = Color(0xFF00E5FF), maxLines = 1)
+                                }
+                                if (hasGps) {
+                                    OutlinedButton(
+                                        onClick = {
+                                            editLat = userLat
+                                            editLng = userLng
+                                        },
+                                        contentPadding = PaddingValues(horizontal = 8.dp),
+                                        modifier = Modifier.height(48.dp)
+                                    ) {
+                                        Text("📡 GPS", fontSize = 10.5.sp, color = Color(0xFFFBBF24), maxLines = 1)
+                                    }
+                                }
+                            }
+                        }
+                    }
 
                     OutlinedTextField(
                         value = editDesc,
@@ -535,32 +596,89 @@ fun ProfileOwnerAdminControlBar(
                         Button(
                             onClick = {
                                 if (provider != null) {
-                                    val updated = provider.copy(name = editName, phone = editPhone, area = editArea, profession = editDesc)
+                                    val updated = provider.copy(
+                                        name = editName,
+                                        phone = editPhone,
+                                        area = editArea,
+                                        profession = editDesc,
+                                        latitude = editLat,
+                                        longitude = editLng
+                                    )
                                     viewModel.updateProviderEntity(updated)
                                 } else if (store != null) {
-                                    val updated = store.copy(name = editName, phone = editPhone, cityId = editArea, description = editDesc)
+                                    val updated = store.copy(
+                                        name = editName,
+                                        phone = editPhone,
+                                        cityId = editArea,
+                                        description = editDesc,
+                                        latitude = editLat,
+                                        longitude = editLng
+                                    )
                                     viewModel.updateStoreEntity(updated)
                                 } else if (property != null) {
-                                    val updated = property.copy(title = editName, phone = editPhone, cityId = editArea, description = editDesc)
+                                    val updated = property.copy(
+                                        title = editName,
+                                        phone = editPhone,
+                                        cityId = editArea,
+                                        description = editDesc,
+                                        latitude = editLat,
+                                        longitude = editLng
+                                    )
                                     viewModel.updatePropertyEntity(updated)
                                 }
-                                Toast.makeText(context, "✅ تم حفظ التعديلات بنجاح!", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "✅ تم حفظ التعديلات والموقع بنجاح!", Toast.LENGTH_SHORT).show()
                                 showEditDetailsDialog = false
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = themeColors.primary),
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f).height(48.dp)
                         ) {
                             Text("حفظ التعديلات 💾", fontWeight = FontWeight.Bold)
                         }
                         OutlinedButton(
                             onClick = { showEditDetailsDialog = false },
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f).height(48.dp)
                         ) {
                             Text("إلغاء", color = Color.White)
                         }
                     }
                 }
             }
+        }
+
+        if (showEntityMapPicker) {
+            InteractiveMapLocationPickerDialog(
+                initialLat = editLat,
+                initialLng = editLng,
+                hasGps = hasGps,
+                gpsLat = userLat,
+                gpsLng = userLng,
+                title = "📍 حدد موقع النشاط / الفني على الخريطة",
+                onDismiss = { showEntityMapPicker = false },
+                onLocationPicked = { res ->
+                    editLat = res.latitude
+                    editLng = res.longitude
+                    if (editArea.isBlank()) editArea = res.formattedAddress
+                    showEntityMapPicker = false
+                }
+            )
+        }
+
+        if (showEntityCoordDialog) {
+            ManualCoordinateDialog(
+                initialLat = editLat,
+                initialLng = editLng,
+                gpsLat = userLat,
+                gpsLng = userLng,
+                hasGps = hasGps,
+                title = "🔢 تعديل إحداثيات النشاط",
+                onDismiss = { showEntityCoordDialog = false },
+                onConfirm = { lat, lng, summary ->
+                    editLat = lat
+                    editLng = lng
+                    if (editArea.isBlank() && summary.isNotBlank()) editArea = summary
+                    showEntityCoordDialog = false
+                }
+            )
         }
     }
 

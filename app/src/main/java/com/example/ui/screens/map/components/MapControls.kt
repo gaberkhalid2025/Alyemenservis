@@ -72,7 +72,12 @@ fun MapControls(
     onShowGnss: (() -> Unit)? = null,
     isZonesActive: Boolean = false,
     onToggleZones: (() -> Unit)? = null,
-    onToggleArVela: () -> Unit = {}
+    onToggleArVela: () -> Unit = {},
+    isPinPickMode: Boolean = false,
+    onTogglePinPickMode: () -> Unit = {},
+    isEcoMode: Boolean = false,
+    onToggleEcoMode: () -> Unit = {},
+    onOpenCoordinateEntry: () -> Unit = {}
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "gps_pulse")
     val gpsPulseAlpha by infiniteTransition.animateFloat(
@@ -277,9 +282,10 @@ fun MapControls(
                 DockButton(
                     icon = Icons.Default.Tune,
                     label = "أدوات",
-                    active = isGibsActive || isZonesActive,
+                    active = isGibsActive || isZonesActive || isPinPickMode || isEcoMode,
                     activeColor = Color(0xFF00E5FF),
                     onClick = { showMoreTools = true },
+                    testTag = "map_tools_btn",
                     contentDescription = "أدوات إضافية"
                 )
                 DropdownMenu(
@@ -288,6 +294,38 @@ fun MapControls(
                     containerColor = Color(0xFF0F172A),
                     modifier = Modifier.border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(12.dp))
                 ) {
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                if (isPinPickMode) "إلغاء تحديد النقطة بالدبوس" else "📍 تحديد نقطة على الخريطة",
+                                color = if (isPinPickMode) Color(0xFF00E5FF) else Color.White
+                            )
+                        },
+                        leadingIcon = { Icon(Icons.Default.PinDrop, contentDescription = null, tint = if (isPinPickMode) Color(0xFF00E5FF) else Color.White) },
+                        onClick = { onTogglePinPickMode(); showMoreTools = false }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("🔢 إدخال إحداثيات يدوياً", color = Color.White) },
+                        leadingIcon = { Icon(Icons.Default.EditLocationAlt, contentDescription = null, tint = Color(0xFF38BDF8)) },
+                        onClick = { onOpenCoordinateEntry(); showMoreTools = false }
+                    )
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                if (isEcoMode) "🔋 وضع توفير البطارية والنت (مفعّل ✓)" else "🔋 وضع توفير البطارية والنت",
+                                color = if (isEcoMode) Color(0xFF10B981) else Color.White
+                            )
+                        },
+                        leadingIcon = {
+                            Icon(
+                                Icons.Default.BatterySaver,
+                                contentDescription = null,
+                                tint = if (isEcoMode) Color(0xFF10B981) else Color(0xFFFBBF24)
+                            )
+                        },
+                        onClick = { onToggleEcoMode(); showMoreTools = false }
+                    )
+                    HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
                     // 11. NASA GIBS
                     DropdownMenuItem(
                         text = { Text("صور ناسا الفضائية", color = if (isGibsActive) Color(0xFF38BDF8) else Color.White) },

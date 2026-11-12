@@ -27,19 +27,67 @@ object LandmarkFinder {
 
         val la = String.format(Locale.US, "%.6f", lat)
         val lo = String.format(Locale.US, "%.6f", lng)
-        val q = "[out:json][timeout:15];nwr(around:$radiusM,$la,$lo)[\"amenity\"~\"^(place_of_worship|school|marketplace|hospital|pharmacy|bank)\$\"][\"name\"];out center 40;"
+        val q = "[out:json][timeout:15];(" +
+            "nwr(around:$radiusM,$la,$lo)[\"amenity\"~\"^(place_of_worship|school|marketplace|hospital|pharmacy|bank|fuel|restaurant|cafe)\$\"][\"name\"];" +
+            "nwr(around:$radiusM,$la,$lo)[\"tourism\"~\"^(hotel|guest_house|motel)\$\"][\"name\"];" +
+            "nwr(around:$radiusM,$la,$lo)[\"junction\"=\"roundabout\"][\"name\"];" +
+            "way(around:$radiusM,$la,$lo)[\"highway\"~\"^(primary|secondary|tertiary|residential|trunk)\$\"][\"name\"];" +
+            ");out center 45;"
 
         val result = postOverpass(q, lat, lng) { tags ->
-            when (tags.optString("amenity")) {
-                "place_of_worship" -> if (tags.optString("religion") == "muslim" || tags.optString("religion").isBlank()) "مسجد" else "دار عبادة"
-                "school" -> "مدرسة"; "marketplace" -> "سوق"; "hospital" -> "مستشفى"
-                "pharmacy" -> "صيدلية"; "bank" -> "بنك"; else -> "معلم"
+            when {
+                tags.optString("tourism") in listOf("hotel", "guest_house", "motel") -> "فندق"
+                tags.optString("junction") == "roundabout" -> "جولة"
+                tags.has("highway") && !tags.has("amenity") -> "شارع"
+                else -> when (tags.optString("amenity")) {
+                    "place_of_worship" -> if (tags.optString("religion") == "muslim" || tags.optString("religion").isBlank()) "مسجد" else "دار عبادة"
+                    "school" -> "مدرسة"
+                    "marketplace" -> "سوق"
+                    "hospital" -> "مستشفى"
+                    "pharmacy" -> "صيدلية"
+                    "bank" -> "بنك"
+                    "fuel" -> "محطة وقود"
+                    "restaurant", "cafe" -> "مطعم"
+                    else -> "معلم"
+                }
             }
         }
         if (result.isNotEmpty()) {
             cache[key] = System.currentTimeMillis() to result
         }
         result
+    }
+
+    /**
+     * يجلب أقرب المعالم (مساجد، فنادق، شوارع، جولات، محطات) أونلاين مع دمج تلقائي للمعالم المضافة محلياً
+     * وقاعدة البيانات الأوفلاين حتى لا يفشل أبداً عند انقطاع الإنترنت.
+     */
+    suspend fun nearbyWithOfflineFallback(
+        context: android.content.Context,
+        lat: Double,
+        lng: Double,
+        radiusM: Int = 1500
+    ): List<LandmarkCandidate> = withContext(Dispatchers.IO) {
+        if (!LandmarkAddress.isValid(lat, lng)) return@withContext emptyList()
+        val cm = context.getSystemService(android.content.Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager
+        val net = cm?.activeNetwork
+        val caps = cm?.getNetworkCapabilities(net)
+        val hasNet = caps?.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
+
+        val remote = if (hasNet) nearby(lat, lng, radiusM) else emptyList()
+        val custom = CustomLandmarkStore.nearby(context, lat, lng, maxDistanceM = 15_000.0)
+        val offlineGaz = OfflineYemenGazetteer.PLACES.mapNotNull { p ->
+            val d = HaversinePrecisionNavigator.calculateDistance(lat, lng, p.latitude, p.longitude)
+            if (d <= 20_000.0) LandmarkCandidate(p.name, p.latitude, p.longitude, p.category, d) else null
+        }
+
+        val combined = (custom + remote + offlineGaz)
+            .distinctBy { "${it.name}_${String.format(Locale.US, "%.4f", it.lat)}" }
+            .sortedBy { it.distanceM }
+            .take(30)
+
+        if (combined.isNotEmpty()) lastError = null
+        combined
     }
 
     suspend fun nearbyWalkingAid(lat: Double, lng: Double, radiusM: Int = 800): List<LandmarkCandidate> = withContext(Dispatchers.IO) {

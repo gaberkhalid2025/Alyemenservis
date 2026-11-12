@@ -194,14 +194,19 @@ class LocationService(
      * [إصلاح 17] تدفق مستمر لموقع GPS مع فلترة الدقة والمواقع الوهمية والقفزات
      */
     @SuppressLint("MissingPermission")
-    fun locationUpdates(intervalMs: Long = 1000L, maxAccuracyM: Float = 50f): kotlinx.coroutines.flow.Flow<LocationCoordinates> = kotlinx.coroutines.flow.callbackFlow {
+    fun locationUpdates(
+        intervalMs: Long = 1500L,
+        maxAccuracyM: Float = 50f,
+        minDistanceMeters: Float = 3f
+    ): kotlinx.coroutines.flow.Flow<LocationCoordinates> = kotlinx.coroutines.flow.callbackFlow {
         val permission = checkPermissionState()
         if (permission == LocationPermissionState.DENIED || permission == LocationPermissionState.GPS_DISABLED) {
             close()
             return@callbackFlow
         }
         val request = com.google.android.gms.location.LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, intervalMs)
-            .setMinUpdateIntervalMillis(intervalMs / 2)
+            .setMinUpdateIntervalMillis((intervalMs / 2).coerceAtLeast(800L))
+            .setMinUpdateDistanceMeters(minDistanceMeters)
             .setWaitForAccurateLocation(false)
             .build()
 

@@ -32,7 +32,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.data.*
+import com.example.ui.components.InteractiveMapLocationPickerDialog
+import com.example.ui.components.ManualCoordinateDialog
+import com.example.ui.components.buildFormattedLocationAddress
+import com.example.ui.screens.map.LandmarkAddressScreen
+import com.example.utils.LandmarkAddress
+import com.example.utils.LandmarkAddressStore
+import com.example.utils.OfflineYemenGazetteer
 import com.example.utils.VisualThemePalette
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @Composable
 fun StoreProductOrderDialog(
@@ -59,6 +68,20 @@ fun StoreProductOrderDialog(
     var quantity by remember { mutableStateOf(1) }
     var notes by remember { mutableStateOf("") }
     var isSubmitted by remember { mutableStateOf(false) }
+
+    val userLat by viewModel.userLatitude.collectAsState()
+    val userLng by viewModel.userLongitude.collectAsState()
+    val isRealLoc by viewModel.isUserLocationReal.collectAsState()
+    val hasGps = isRealLoc && LandmarkAddress.isValid(userLat, userLng)
+
+    val landmarkStore = remember { LandmarkAddressStore(context.applicationContext) }
+    var savedAddresses by remember { mutableStateOf<List<LandmarkAddress>>(emptyList()) }
+    var showMapPicker by remember { mutableStateOf(false) }
+    var showCoordDialog by remember { mutableStateOf(false) }
+    var showLandmarkWizard by remember { mutableStateOf(false) }
+    LaunchedEffect(showLandmarkWizard) {
+        savedAddresses = withContext(Dispatchers.IO) { landmarkStore.getAll() }
+    }
 
     val totalAmount = product.price * quantity
 
@@ -171,14 +194,55 @@ fun StoreProductOrderDialog(
                 OutlinedTextField(
                     value = customerArea,
                     onValueChange = { customerArea = it },
-                    label = { Text("المدينة / الحي أو العنوان", fontSize = 11.sp) },
+                    label = { Text("المدينة / الحي / موقع التوصيل الدقيق", fontSize = 11.sp) },
                     modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
+                    maxLines = 2,
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = Color.White,
                         unfocusedTextColor = Color.White
                     )
                 )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = { showMapPicker = true },
+                        contentPadding = PaddingValues(horizontal = 8.dp),
+                        modifier = Modifier.weight(1f).height(48.dp)
+                    ) {
+                        Text("📍 من الخريطة", fontSize = 10.5.sp, color = Color(0xFF10B981), maxLines = 1)
+                    }
+                    OutlinedButton(
+                        onClick = { showCoordDialog = true },
+                        contentPadding = PaddingValues(horizontal = 8.dp),
+                        modifier = Modifier.weight(1f).height(48.dp)
+                    ) {
+                        Text("🔢 إحداثيات", fontSize = 10.5.sp, color = Color(0xFF00E5FF), maxLines = 1)
+                    }
+                    OutlinedButton(
+                        onClick = { showLandmarkWizard = true },
+                        contentPadding = PaddingValues(horizontal = 8.dp),
+                        modifier = Modifier.height(48.dp)
+                    ) {
+                        Text("🏠 بالمعلم", fontSize = 10.5.sp, color = Color(0xFFFBBF24), maxLines = 1)
+                    }
+                }
+
+                if (savedAddresses.isNotEmpty()) {
+                    androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        items(savedAddresses.size) { idx ->
+                            val addr = savedAddresses[idx]
+                            SuggestionChip(
+                                onClick = {
+                                    customerArea = "${addr.describe()} (${OfflineYemenGazetteer.formatCoordinates(addr.pointLat, addr.pointLng)})"
+                                },
+                                label = { Text("🏠 ${addr.label}", fontSize = 10.sp) }
+                            )
+                        }
+                    }
+                }
 
                 OutlinedTextField(
                     value = notes,
@@ -286,7 +350,8 @@ fun StoreProductOrderDialog(
                                 totalAmount = totalAmount,
                                 paymentId = "DIRECT_CONTACT",
                                 paymentStatus = "COD_PENDING",
-                                status = "PENDING"
+                                status = "PENDING",
+                                notes = notes.trim()
                             )
                             viewModel.placeOrder(newOrder)
                             Toast.makeText(context, "✅ تم إرسال الطلب وإشعار التاجر بنجاح!", Toast.LENGTH_SHORT).show()
@@ -304,6 +369,56 @@ fun StoreProductOrderDialog(
                     Text("إرسال طلب الاستفسار والشراء", color = Color.Black, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
             }
+        }
+    }
+
+    if (showMapPicker) {
+        InteractiveMapLocationPickerDialog(
+            initialLat = if (hasGps) userLat else 15.3694,
+            initialLng = if (hasGps) userLng else 44.1910,
+            hasGps = hasGps,
+            gpsLat = userLat,
+            gpsLng = userLng,
+            title = "📍 حدد موقع التوصيل على الخريطة",
+            onDismiss = { showMapPicker = false },
+            onLocationPicked = { res ->
+                customerArea = res.formattedAddress
+                if (res.note.isNotBlank() && notes.isBlank()) notes = res.note
+                showMapPicker = false
+            }
+        )
+    }
+
+    if (showCoordDialog) {
+        ManualCoordinateDialog(
+            initialLat = if (hasGps) userLat else 15.3694,
+            initialLng = if (hasGps) userLng else 44.1910,
+            gpsLat = userLat,
+            gpsLng = userLng,
+            hasGps = hasGps,
+            title = "🔢 إحداثيات موقع التوصيل",
+            onDismiss = { showCoordDialog = false },
+            onConfirm = { lat, lng, summary ->
+                customerArea = buildFormattedLocationAddress(lat, lng, nearestSummary = summary)
+                showCoordDialog = false
+            }
+        )
+    }
+
+    if (showLandmarkWizard) {
+        Dialog(
+            onDismissRequest = { showLandmarkWizard = false },
+            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
+        ) {
+            LandmarkAddressScreen(
+                centerLat = if (hasGps) userLat else 15.3694,
+                centerLng = if (hasGps) userLng else 44.1910,
+                hasRealLocation = hasGps,
+                onSaved = { addr ->
+                    customerArea = "${addr.describe()} (${OfflineYemenGazetteer.formatCoordinates(addr.pointLat, addr.pointLng)})"
+                },
+                onClose = { showLandmarkWizard = false }
+            )
         }
     }
 }

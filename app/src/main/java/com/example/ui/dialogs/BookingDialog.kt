@@ -23,7 +23,13 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.data.ProviderEntity
 import com.example.ui.MainViewModel
+import com.example.ui.components.InteractiveMapLocationPickerDialog
+import com.example.ui.components.ManualCoordinateDialog
+import com.example.ui.components.buildFormattedLocationAddress
+import com.example.ui.screens.map.LandmarkAddressScreen
 import com.example.VoiceManager
+import com.example.utils.LandmarkAddress
+import com.example.utils.OfflineYemenGazetteer
 import com.example.utils.VisualThemePalette
 
 @Composable
@@ -52,7 +58,14 @@ fun BookingDialog(
     val landmarkStore = remember { com.example.utils.LandmarkAddressStore(context.applicationContext) }
     var savedLandmarkAddresses by remember { mutableStateOf<List<com.example.utils.LandmarkAddress>>(emptyList()) }
     var selectedLandmark by remember { mutableStateOf<com.example.utils.LandmarkAddress?>(null) }
-    LaunchedEffect(Unit) {
+    val userLat by viewModel.userLatitude.collectAsState()
+    val userLng by viewModel.userLongitude.collectAsState()
+    val isRealLoc by viewModel.isUserLocationReal.collectAsState()
+    val hasGps = isRealLoc && LandmarkAddress.isValid(userLat, userLng)
+    var showMapPicker by remember { mutableStateOf(false) }
+    var showCoordDialog by remember { mutableStateOf(false) }
+    var showLandmarkWizard by remember { mutableStateOf(false) }
+    LaunchedEffect(showLandmarkWizard) {
         savedLandmarkAddresses = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             landmarkStore.getAll()
         }
@@ -188,13 +201,37 @@ fun BookingDialog(
                 OutlinedTextField(
                     value = customerAreaInput,
                     onValueChange = { customerAreaInput = it },
-                    label = { Text("المنطقة والحي *", color = themeColors.textSecondary, fontSize = 11.sp) },
-                    placeholder = { Text("مثال: صنعاء - حدة", fontSize = 10.5.sp) },
-                    singleLine = true,
+                    label = { Text("المنطقة والحي أو موقعك الدقيق *", color = themeColors.textSecondary, fontSize = 11.sp) },
+                    placeholder = { Text("مثال: صنعاء - حدة أو حدد من الخريطة", fontSize = 10.5.sp) },
+                    maxLines = 2,
                     modifier = Modifier.fillMaxWidth(),
                     isError = bookingFormSubmittedOnce && customerAreaInput.trim().isEmpty(),
                     colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
                 )
+
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+                    OutlinedButton(
+                        onClick = { showMapPicker = true },
+                        contentPadding = PaddingValues(horizontal = 8.dp),
+                        modifier = Modifier.weight(1f).height(48.dp)
+                    ) {
+                        Text("📍 من الخريطة", fontSize = 10.5.sp, color = Color(0xFF10B981), maxLines = 1)
+                    }
+                    OutlinedButton(
+                        onClick = { showCoordDialog = true },
+                        contentPadding = PaddingValues(horizontal = 8.dp),
+                        modifier = Modifier.weight(1f).height(48.dp)
+                    ) {
+                        Text("🔢 إحداثيات", fontSize = 10.5.sp, color = Color(0xFF00E5FF), maxLines = 1)
+                    }
+                    OutlinedButton(
+                        onClick = { showLandmarkWizard = true },
+                        contentPadding = PaddingValues(horizontal = 8.dp),
+                        modifier = Modifier.height(48.dp)
+                    ) {
+                        Text("🏠 بالمعلم", fontSize = 10.5.sp, color = Color(0xFFFBBF24), maxLines = 1)
+                    }
+                }
 
                 if (savedLandmarkAddresses.isNotEmpty()) {
                     Text("📍 أو اختر من عناويني المحفوظة بالمعلم:", color = Color(0xFF00E5FF), fontSize = 10.5.sp)
@@ -203,7 +240,7 @@ fun BookingDialog(
                             val addr = savedLandmarkAddresses[idx]
                             SuggestionChip(
                                 onClick = {
-                                    customerAreaInput = addr.describe()
+                                    customerAreaInput = "${addr.describe()} (${OfflineYemenGazetteer.formatCoordinates(addr.pointLat, addr.pointLng)})"
                                     selectedLandmark = addr
                                 },
                                 label = { Text("🏠 ${addr.label} (${addr.landmarkName})", fontSize = 10.sp) },
@@ -383,5 +420,56 @@ fun BookingDialog(
                 }
             }
         )
+    }
+
+    if (showMapPicker) {
+        InteractiveMapLocationPickerDialog(
+            initialLat = if (hasGps) userLat else provider.latitude,
+            initialLng = if (hasGps) userLng else provider.longitude,
+            hasGps = hasGps,
+            gpsLat = userLat,
+            gpsLng = userLng,
+            title = "📍 حدد موقع حضور الفني على الخريطة",
+            onDismiss = { showMapPicker = false },
+            onLocationPicked = { res ->
+                customerAreaInput = res.formattedAddress
+                if (res.note.isNotBlank() && customerServiceInput.isBlank()) customerServiceInput = res.note
+                showMapPicker = false
+            }
+        )
+    }
+
+    if (showCoordDialog) {
+        ManualCoordinateDialog(
+            initialLat = if (hasGps) userLat else provider.latitude,
+            initialLng = if (hasGps) userLng else provider.longitude,
+            gpsLat = userLat,
+            gpsLng = userLng,
+            hasGps = hasGps,
+            title = "🔢 إحداثيات موقع الحجز",
+            onDismiss = { showCoordDialog = false },
+            onConfirm = { lat, lng, summary ->
+                customerAreaInput = buildFormattedLocationAddress(lat, lng, nearestSummary = summary)
+                showCoordDialog = false
+            }
+        )
+    }
+
+    if (showLandmarkWizard) {
+        Dialog(
+            onDismissRequest = { showLandmarkWizard = false },
+            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
+        ) {
+            LandmarkAddressScreen(
+                centerLat = if (hasGps) userLat else provider.latitude,
+                centerLng = if (hasGps) userLng else provider.longitude,
+                hasRealLocation = hasGps,
+                onSaved = { addr ->
+                    customerAreaInput = "${addr.describe()} (${OfflineYemenGazetteer.formatCoordinates(addr.pointLat, addr.pointLng)})"
+                    selectedLandmark = addr
+                },
+                onClose = { showLandmarkWizard = false }
+            )
+        }
     }
 }

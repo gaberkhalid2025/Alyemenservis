@@ -50,13 +50,21 @@ fun rememberHeadingDegrees(enabled: Boolean, lat: Double, lng: Double, cameraMod
                 } else rot
                 SensorManager.getOrientation(matrix, orient)
                 val az = (Math.toDegrees(orient[0].toDouble()).toFloat() + declination + 360f) % 360f
-                if (first) { smoothed = az; first = false } else {
+                if (first) {
+                    smoothed = az
+                    first = false
+                    heading = smoothed
+                } else {
                     var d = az - smoothed
                     if (d > 180f) d -= 360f
                     if (d < -180f) d += 360f
                     smoothed = (smoothed + 0.15f * d + 360f) % 360f
+                    val diff = kotlin.math.abs(smoothed - heading)
+                    val angularDiff = minOf(diff, 360f - diff)
+                    if (angularDiff >= 1.5f) {
+                        heading = smoothed
+                    }
                 }
-                heading = smoothed
             }
             override fun onAccuracyChanged(s: Sensor?, accuracy: Int) {}
         }

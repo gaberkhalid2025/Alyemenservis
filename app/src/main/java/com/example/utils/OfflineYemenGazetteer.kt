@@ -252,15 +252,107 @@ object OfflineYemenGazetteer {
         }
     }
 
-    private fun parseCoordinates(raw: String): Pair<Double, Double>? {
-        val parts = raw.replace("،", ",").split(",", " ").map { it.trim() }.filter { it.isNotEmpty() }
-        if (parts.size != 2) return null
-        val lat = parts[0].toDoubleOrNull() ?: return null
-        val lng = parts[1].toDoubleOrNull() ?: return null
-        if (lat in -90.0..90.0 && lng in -180.0..180.0 && !(lat == 0.0 && lng == 0.0)) {
-            return lat to lng
+    /**
+     * يحلّل الإحداثيات بأي صيغة شائعة:
+     * - 15.3694, 44.1910 (أو بأرقام عربية ١٥.٣٦٩٤، ٤٤.١٩١٠)
+     * - روابط خرائط جوجل أو واتساب: ?q=lat,lng أو @lat,lng أو ll=lat,lng
+     * - روابط geo:lat,lng أو OpenStreetMap #map=zoom/lat/lng
+     * - درجات ودقائق: 15°22'10"N 44°11'28"E
+     */
+    fun parseCoordinates(raw: String): Pair<Double, Double>? {
+        val normalized = normalizeDigits(raw).trim()
+        if (normalized.isBlank()) return null
+
+        // 1) روابط خرائط جوجل / واتساب / OSM / geo
+        val urlPatterns = listOf(
+            Regex("(?:q|ll|center)=([+-]?\\d+(?:\\.\\d+)?),\\s*([+-]?\\d+(?:\\.\\d+)?)"),
+            Regex("@([+-]?\\d+(?:\\.\\d+)?),([+-]?\\d+(?:\\.\\d+)?)"),
+            Regex("geo:([+-]?\\d+(?:\\.\\d+)?),([+-]?\\d+(?:\\.\\d+)?)"),
+            Regex("#map=\\d+/([+-]?\\d+(?:\\.\\d+)?)/([+-]?\\d+(?:\\.\\d+)?)")
+        )
+        for (p in urlPatterns) {
+            p.find(normalized)?.let { m ->
+                val lat = m.groupValues[1].toDoubleOrNull()
+                val lng = m.groupValues[2].toDoubleOrNull()
+                if (lat != null && lng != null && LandmarkAddress.isValid(lat, lng)) return lat to lng
+            }
         }
+
+        // 2) درجات ودقائق وثواني: 15°22'10.5"N 44°11'28"E
+        val dmsRegex = Regex("(\\d{1,3})°\\s*(\\d{1,2})['′]\\s*(\\d{1,2}(?:\\.\\d+)?)[\"″]?\\s*([NSns]).*?(\\d{1,3})°\\s*(\\d{1,2})['′]\\s*(\\d{1,2}(?:\\.\\d+)?)[\"″]?\\s*([EWew])")
+        dmsRegex.find(normalized)?.let { m ->
+            val latDeg = m.groupValues[1].toDouble() + m.groupValues[2].toDouble() / 60.0 + m.groupValues[3].toDouble() / 3600.0
+            val latSign = if (m.groupValues[4].equals("S", true)) -1.0 else 1.0
+            val lngDeg = m.groupValues[5].toDouble() + m.groupValues[6].toDouble() / 60.0 + m.groupValues[7].toDouble() / 3600.0
+            val lngSign = if (m.groupValues[8].equals("W", true)) -1.0 else 1.0
+            val lat = latDeg * latSign
+            val lng = lngDeg * lngSign
+            if (LandmarkAddress.isValid(lat, lng)) return lat to lng
+        }
+
+        // 3) إحداثيات عشرية مباشرة (lat, lng أو lat lng)
+        val cleaned = normalized
+            .replace("،", ",")
+            .replace("؛", ",")
+            .replace(";", ",")
+            .replace("|", ",")
+        val decimalPair = Regex("^\\s*([+-]?\\d+(?:\\.\\d+)?)\\s*[,\\s]+\\s*([+-]?\\d+(?:\\.\\d+)?)\\s*$")
+        decimalPair.matchEntire(cleaned)?.let { m ->
+            val lat = m.groupValues[1].toDoubleOrNull()
+            val lng = m.groupValues[2].toDoubleOrNull()
+            if (lat != null && lng != null && LandmarkAddress.isValid(lat, lng)) return lat to lng
+        }
+
+        // 4) استخراج زوج إحداثيات من أي نص مشاركة (مثل رسالة واتساب)
+        val embedded = Regex("([+-]?\\d{1,2}\\.\\d{3,})\\s*[,،\\s]+\\s*([+-]?\\d{1,3}\\.\\d{3,})")
+        embedded.find(normalized)?.let { m ->
+            val lat = m.groupValues[1].toDoubleOrNull()
+            val lng = m.groupValues[2].toDoubleOrNull()
+            if (lat != null && lng != null && LandmarkAddress.isValid(lat, lng)) return lat to lng
+        }
+
         return null
+    }
+
+    fun formatCoordinates(lat: Double, lng: Double): String =
+        String.format(Locale.US, "%.5f, %.5f", lat, lng)
+
+    fun nearestReferenceSummary(context: Context?, lat: Double, lng: Double): String {
+        if (!LandmarkAddress.isValid(lat, lng)) return ""
+        val custom = if (context != null) CustomLandmarkStore.nearby(context, lat, lng, 25_000.0) else emptyList()
+        val gaz = PLACES.map { p ->
+            LandmarkCandidate(
+                name = p.name,
+                lat = p.latitude,
+                lng = p.longitude,
+                kind = p.category,
+                distanceM = HaversinePrecisionNavigator.calculateDistance(lat, lng, p.latitude, p.longitude)
+            )
+        }
+        val nearest = (custom + gaz).minByOrNull { it.distanceM } ?: return formatCoordinates(lat, lng)
+        val helperAddr = LandmarkAddress(
+            label = "",
+            landmarkName = nearest.name,
+            landmarkLat = nearest.lat,
+            landmarkLng = nearest.lng,
+            pointLat = lat,
+            pointLng = lng,
+            description = ""
+        )
+        return helperAddr.describe()
+    }
+
+    private fun normalizeDigits(input: String): String {
+        val sb = StringBuilder(input.length)
+        for (ch in input) {
+            when (ch) {
+                in '٠'..'٩' -> sb.append(('0'.code + (ch.code - '٠'.code)).toChar())
+                in '۰'..'۹' -> sb.append(('0'.code + (ch.code - '۰'.code)).toChar())
+                '٫' -> sb.append('.')
+                else -> sb.append(ch)
+            }
+        }
+        return sb.toString()
     }
 
     fun cacheOnlineResults(context: Context, results: List<RealValhallaNavigator.SearchAddressResult>) {

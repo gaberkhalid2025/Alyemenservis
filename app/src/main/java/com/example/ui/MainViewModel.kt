@@ -253,7 +253,7 @@ class MainViewModel @Inject constructor(
             while (true) {
                 kotlinx.coroutines.delay(5_000L)
                 val limit = if (navTrackingJob?.isActive == true) 15_000L else 90_000L
-                if (_isUserLocationReal.value && System.currentTimeMillis() - _lastFixAtMs.value > limit) {
+                if (!_isManualLocationSet.value && _isUserLocationReal.value && System.currentTimeMillis() - _lastFixAtMs.value > limit) {
                     _isUserLocationReal.value = false
                     _userLocationAccuracyM.value = Float.MAX_VALUE
                 }
@@ -269,6 +269,8 @@ class MainViewModel @Inject constructor(
     val userLocationAccuracyM: StateFlow<Float> = _userLocationAccuracyM.asStateFlow()
     private val _isUserLocationReal = MutableStateFlow(false)
     val isUserLocationReal: StateFlow<Boolean> = _isUserLocationReal.asStateFlow()
+    private val _isManualLocationSet = MutableStateFlow(false)
+    val isManualLocationSet: StateFlow<Boolean> = _isManualLocationSet.asStateFlow()
     internal val _isGpsTrackingActive = MutableStateFlow(false)
     val isGpsTrackingActive: StateFlow<Boolean> = _isGpsTrackingActive.asStateFlow()
     private var locationCallback: com.google.android.gms.location.LocationCallback? = null
@@ -388,6 +390,20 @@ class MainViewModel @Inject constructor(
         _userLatitude.value = lat
         _userLongitude.value = lng
     }
+
+    fun setManualUserLocation(lat: Double, lng: Double) {
+        if (!LandmarkAddress.isValid(lat, lng)) return
+        _isManualLocationSet.value = true
+        _userLatitude.value = lat
+        _userLongitude.value = lng
+        _userLocationAccuracyM.value = 5f
+        markFix()
+    }
+
+    fun clearManualUserLocation() {
+        _isManualLocationSet.value = false
+    }
+
     fun startLocationUpdates() {
         val ctx = appContext ?: return
         try {
@@ -395,10 +411,11 @@ class MainViewModel @Inject constructor(
             val coarse = androidx.core.content.ContextCompat.checkSelfPermission(ctx, android.Manifest.permission.ACCESS_COARSE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED
             if (!fine && !coarse) return
 
+            val eco = MapPowerDataPrefs.isEcoMode(ctx)
             val fusedClient = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(ctx)
 
             fusedClient.lastLocation.addOnSuccessListener { loc ->
-                if (loc == null) return@addOnSuccessListener
+                if (loc == null || _isManualLocationSet.value) return@addOnSuccessListener
                 val isMock = if (android.os.Build.VERSION.SDK_INT >= 31) loc.isMock else @Suppress("DEPRECATION") loc.isFromMockProvider
                 val real = !isMock && isFresh(loc) && (!loc.hasAccuracy() || loc.accuracy <= 150f)
                 if (real) {                                   // الموقع القديم يُتجاهل تماماً ولا يغيّر الحالة
@@ -408,14 +425,23 @@ class MainViewModel @Inject constructor(
                 }
             }
 
-            val request = com.google.android.gms.location.LocationRequest.Builder(
-                com.google.android.gms.location.Priority.PRIORITY_HIGH_ACCURACY, 3000L
-            ).setMinUpdateIntervalMillis(1000L).build()
+            val intervalMs = if (eco) 12_000L else 6_000L
+            val minDistM = if (eco) 15f else 8f
+            val priority = if (eco) {
+                com.google.android.gms.location.Priority.PRIORITY_BALANCED_POWER_ACCURACY
+            } else {
+                com.google.android.gms.location.Priority.PRIORITY_HIGH_ACCURACY
+            }
+
+            val request = com.google.android.gms.location.LocationRequest.Builder(priority, intervalMs)
+                .setMinUpdateIntervalMillis(if (eco) 6_000L else 3_000L)
+                .setMinUpdateDistanceMeters(minDistM)
+                .build()
 
             if (locationCallback == null) {
                 locationCallback = object : com.google.android.gms.location.LocationCallback() {
                     override fun onLocationResult(result: com.google.android.gms.location.LocationResult) {
-                        if (navTrackingJob?.isActive == true) return // أثناء الملاحة المصدر الوحيد هو التدفق المفلتر
+                        if (navTrackingJob?.isActive == true || _isManualLocationSet.value) return
                         val loc = result.lastLocation ?: return
                         val isMock = if (android.os.Build.VERSION.SDK_INT >= 31) loc.isMock else @Suppress("DEPRECATION") loc.isFromMockProvider
                         val real = !isMock && isFresh(loc, 30_000L) && (!loc.hasAccuracy() || loc.accuracy <= 150f)
@@ -428,7 +454,7 @@ class MainViewModel @Inject constructor(
                 }
             }
             fusedClient.requestLocationUpdates(request, locationCallback!!, android.os.Looper.getMainLooper())
-                .addOnSuccessListener { _isGpsTrackingActive.value = true }          // لا نعلن النشاط قبل نجاح الطلب
+                .addOnSuccessListener { _isGpsTrackingActive.value = true }
                 .addOnFailureListener { _isGpsTrackingActive.value = false }
             startFreshnessWatchdog()
         } catch (e: Exception) {
@@ -449,9 +475,15 @@ class MainViewModel @Inject constructor(
     fun startNavigationTracking() {
         if (navTrackingJob?.isActive == true) return
         startFreshnessWatchdog()
+        val eco = appContext?.let { MapPowerDataPrefs.isEcoMode(it) } == true
         navTrackingJob = viewModelScope.launch {
             try {
-                locationService.locationUpdates(intervalMs = 1000L, maxAccuracyM = 50f).collect { c ->
+                locationService.locationUpdates(
+                    intervalMs = if (eco) 2_500L else 1_500L,
+                    maxAccuracyM = 50f,
+                    minDistanceMeters = if (eco) 5f else 3f
+                ).collect { c ->
+                    _isManualLocationSet.value = false
                     updateUserLocation(c.latitude, c.longitude)
                     _userLocationAccuracyM.value = c.accuracyMeters
                     markFix()

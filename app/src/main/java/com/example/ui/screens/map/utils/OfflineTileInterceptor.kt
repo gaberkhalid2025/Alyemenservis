@@ -17,47 +17,101 @@ object OfflineTileInterceptor {
     private const val MBTILES_PATH = "maps/yemen.mbtiles"      // داخل filesDir
     private const val USER_AGENT = "AlYemenServicesApp/1.0 (Android)"
     private const val MAX_TILE_BYTES = 2 * 1024 * 1024
+    private const val CACHE_TTL_MS = 30L * 24L * 3600L * 1000L // 30 يوماً لتوفير الباقة
+    private const val MAX_DISK_CACHE_BYTES = 120L * 1024L * 1024L
+
+    private data class CachedTile(val bytes: ByteArray, val mime: String)
+    private val memoryCache = object : android.util.LruCache<String, CachedTile>(10 * 1024 * 1024) {
+        override fun sizeOf(key: String, value: CachedTile): Int = value.bytes.size
+    }
+    @Volatile private var lastPruneAt = 0L
 
     private val OSM = Regex("^https://(?:[a-c]\\.)?tile\\.openstreetmap\\.org/(\\d+)/(\\d+)/(\\d+)\\.png$")
     private val HOT = Regex("^https://[a-c]\\.tile\\.openstreetmap\\.fr/hot/(\\d+)/(\\d+)/(\\d+)\\.png$")
     private val TOPO = Regex("^https://[a-c]\\.tile\\.opentopomap\\.org/(\\d+)/(\\d+)/(\\d+)\\.png$")
     private val SAT = Regex("^https://server\\.arcgisonline\\.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/(\\d+)/(\\d+)/(\\d+)$")
 
-    private data class Tile(val source: String, val z: Int, val x: Int, val y: Int)
+    private data class Tile(val source: String, val z: Int, val x: Int, val y: Int, val ext: String, val mime: String) {
+        val key: String get() = "$source/$z/$x/$y"
+    }
 
     private fun parse(url: String): Tile? {
-        OSM.matchEntire(url)?.let { return Tile("osm", it.groupValues[1].toInt(), it.groupValues[2].toInt(), it.groupValues[3].toInt()) }
-        HOT.matchEntire(url)?.let { return Tile("hot", it.groupValues[1].toInt(), it.groupValues[2].toInt(), it.groupValues[3].toInt()) }
-        TOPO.matchEntire(url)?.let { return Tile("topo", it.groupValues[1].toInt(), it.groupValues[2].toInt(), it.groupValues[3].toInt()) }
-        // Esri: {z}/{y}/{x}
-        SAT.matchEntire(url)?.let { return Tile("sat", it.groupValues[1].toInt(), it.groupValues[3].toInt(), it.groupValues[2].toInt()) }
+        OSM.matchEntire(url)?.let { return Tile("osm", it.groupValues[1].toInt(), it.groupValues[2].toInt(), it.groupValues[3].toInt(), "png", "image/png") }
+        HOT.matchEntire(url)?.let { return Tile("hot", it.groupValues[1].toInt(), it.groupValues[2].toInt(), it.groupValues[3].toInt(), "png", "image/png") }
+        TOPO.matchEntire(url)?.let { return Tile("topo", it.groupValues[1].toInt(), it.groupValues[2].toInt(), it.groupValues[3].toInt(), "png", "image/png") }
+        // Esri: {z}/{y}/{x} (غالباً JPEG)
+        SAT.matchEntire(url)?.let { return Tile("sat", it.groupValues[1].toInt(), it.groupValues[3].toInt(), it.groupValues[2].toInt(), "jpg", "image/jpeg") }
         return null
     }
 
-    /** يعيد استجابة البلاطة من المصدر المحلي، أو null ليتولى WebView الطلب بنفسه. */
+    /** يعيد استجابة البلاطة من الذاكرة أو الكاش المحلي أو الشبكة (مع تخزين دائم للصور الفضائية والخرائط لتوفير الباقة). */
     fun intercept(context: Context, url: String): WebResourceResponse? {
         val tile = parse(url) ?: return null
 
-        if (tile.source == "osm") readMbtile(context, tile)?.let { return png(it) }
-
-        val cache = cacheFile(context, tile)
-        if (cache.exists() && cache.length() > 0) {
-            if (System.currentTimeMillis() - cache.lastModified() > 3_600_000L) {
-                cache.setLastModified(System.currentTimeMillis())
-            }
-            return png(cache.readBytes())
+        memoryCache.get(tile.key)?.let { cached ->
+            return tileResponse(cached.bytes, cached.mime)
         }
 
-        if (tile.source == "sat") return null          // لا تخزين لصور Esri
-        val bytes = download(url) ?: return null
-        try { writeAtomically(cache, bytes) } catch (t: Throwable) { Log.w(TAG, "cache write failed: ${t.message}") }
-        return png(bytes)
+        if (tile.source == "osm") {
+            readMbtile(context, tile)?.let { bytes ->
+                memoryCache.put(tile.key, CachedTile(bytes, "image/png"))
+                return tileResponse(bytes, "image/png")
+            }
+        }
+
+        val cache = cacheFile(context, tile)
+        val eco = com.example.utils.MapPowerDataPrefs.isEcoMode(context)
+        if (cache.exists() && cache.length() > 0) {
+            val age = System.currentTimeMillis() - cache.lastModified()
+            if (eco || age <= CACHE_TTL_MS) {
+                val bytes = cache.readBytes()
+                memoryCache.put(tile.key, CachedTile(bytes, tile.mime))
+                return tileResponse(bytes, tile.mime)
+            }
+        }
+
+        val bytes = download(url) ?: run {
+            // إذا فشل الاتصال نعيد النسخة المخزنة حتى لو قديمة
+            if (cache.exists() && cache.length() > 0) {
+                val old = cache.readBytes()
+                memoryCache.put(tile.key, CachedTile(old, tile.mime))
+                return tileResponse(old, tile.mime)
+            }
+            return null
+        }
+
+        memoryCache.put(tile.key, CachedTile(bytes, tile.mime))
+        try {
+            writeAtomically(cache, bytes)
+            maybePruneDiskCache(context)
+        } catch (t: Throwable) {
+            Log.w(TAG, "cache write failed: ${t.message}")
+        }
+        return tileResponse(bytes, tile.mime)
     }
 
-    private fun png(bytes: ByteArray) = WebResourceResponse("image/png", null, ByteArrayInputStream(bytes))
+    private fun tileResponse(bytes: ByteArray, mime: String) =
+        WebResourceResponse(mime, null, ByteArrayInputStream(bytes))
 
     private fun cacheFile(context: Context, t: Tile) =
-        File(OfflineMapManager.getTileCacheDir(context), "${t.source}/${t.z}/${t.x}/${t.y}.png")
+        File(OfflineMapManager.getTileCacheDir(context), "${t.source}/${t.z}/${t.x}/${t.y}.${t.ext}")
+
+    private fun maybePruneDiskCache(context: Context) {
+        val now = System.currentTimeMillis()
+        if (now - lastPruneAt < 10 * 60_000L) return
+        lastPruneAt = now
+        try {
+            val dir = OfflineMapManager.getTileCacheDir(context)
+            val files = dir.walkTopDown().filter { it.isFile && !it.name.endsWith(".tmp") }.toList()
+            var total = files.sumOf { it.length() }
+            if (total <= MAX_DISK_CACHE_BYTES) return
+            for (f in files.sortedBy { it.lastModified() }) {
+                if (total <= MAX_DISK_CACHE_BYTES * 8 / 10) break
+                val len = f.length()
+                if (f.delete()) total -= len
+            }
+        } catch (_: Throwable) {}
+    }
 
     private fun writeAtomically(target: File, bytes: ByteArray) {
         target.parentFile?.mkdirs()
@@ -71,6 +125,7 @@ object OfflineTileInterceptor {
         return try {
             c = (URL(url).openConnection() as HttpURLConnection).apply {
                 connectTimeout = 4_000; readTimeout = 6_000
+                useCaches = true
                 setRequestProperty("User-Agent", USER_AGENT)
             }
             if (c.responseCode != 200) return null

@@ -484,8 +484,9 @@ object RealValhallaNavigator {
         // القاموس الجغرافي اليمني الشامل (مدن، شوارع، جولات، مستشفيات، جامعات، مطارات، إحداثيات)
         local.addAll(OfflineYemenGazetteer.search(clean, userLat, userLng, limit = 10))
 
-        // كاش نتائج البحث السابقة المحفوظ على القرص
+        // المعالم المخصصة المضافة يدوياً + كاش نتائج البحث السابقة المحفوظ على القرص
         if (context != null) {
+            local.addAll(CustomLandmarkStore.search(context.applicationContext, clean))
             local.addAll(OfflineYemenGazetteer.searchCachedOnlineResults(context.applicationContext, clean))
         }
 

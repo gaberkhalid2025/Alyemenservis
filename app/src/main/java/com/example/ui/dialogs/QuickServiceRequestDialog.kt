@@ -36,8 +36,19 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.example.ui.MainViewModel
+import com.example.ui.components.InteractiveMapLocationPickerDialog
+import com.example.ui.components.ManualCoordinateDialog
+import com.example.ui.components.buildFormattedLocationAddress
+import com.example.ui.screens.map.LandmarkAddressScreen
+import com.example.utils.LandmarkAddress
+import com.example.utils.LandmarkAddressStore
+import com.example.utils.OfflineYemenGazetteer
 import com.example.utils.VisualThemePalette
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * 🌟 3-Step Wizard for "اطلب خدمتك الآن" (Reverse Auction & Instant Requests)
@@ -57,6 +68,10 @@ fun QuickServiceRequestScreen(
     val currentUserName by viewModel.currentUserName.collectAsState()
     val currentUserId by viewModel.currentUserId.collectAsState()
     val settingsState by viewModel.settings.collectAsState()
+    val userLat by viewModel.userLatitude.collectAsState()
+    val userLng by viewModel.userLongitude.collectAsState()
+    val isRealLoc by viewModel.isUserLocationReal.collectAsState()
+    val hasGps = isRealLoc && LandmarkAddress.isValid(userLat, userLng)
 
     // Wizard Step State (1, 2, 3)
     var currentStep by remember { mutableIntStateOf(1) }
@@ -248,6 +263,9 @@ fun QuickServiceRequestScreen(
                             deliveryMethod = deliveryMethod,
                             onDeliveryMethodChange = { deliveryMethod = it },
                             selectedSection = selectedSection,
+                            gpsLat = userLat,
+                            gpsLng = userLng,
+                            hasGps = hasGps,
                             themeColors = themeColors
                         )
                     }
@@ -633,8 +651,20 @@ private fun Step2LocationAndDetails(
     deliveryMethod: String,
     onDeliveryMethodChange: (String) -> Unit,
     selectedSection: String,
+    gpsLat: Double,
+    gpsLng: Double,
+    hasGps: Boolean,
     themeColors: VisualThemePalette
 ) {
+    val context = LocalContext.current
+    val landmarkStore = remember { LandmarkAddressStore(context.applicationContext) }
+    var savedAddresses by remember { mutableStateOf<List<LandmarkAddress>>(emptyList()) }
+    var showMapPicker by remember { mutableStateOf(false) }
+    var showCoordDialog by remember { mutableStateOf(false) }
+    var showLandmarkWizard by remember { mutableStateOf(false) }
+    LaunchedEffect(showLandmarkWizard) {
+        savedAddresses = withContext(Dispatchers.IO) { landmarkStore.getAll() }
+    }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -682,10 +712,10 @@ private fun Step2LocationAndDetails(
         OutlinedTextField(
             value = neighborhood,
             onValueChange = onNeighborhoodChange,
-            label = { Text("الحي / الشارع / المعلم البارز (مثال: شارع حدة - جولة الرويشان)") },
-            placeholder = { Text("اكتب موقعك بالتحديد ليصل الفني أو الطلب سريعاً") },
+            label = { Text("الحي / الشارع / المعلم أو الموقع الدقيق") },
+            placeholder = { Text("اكتب موقعك أو حدده على الخريطة ليصل المندوب/الفني بالضبط") },
             modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
+            maxLines = 2,
             shape = RoundedCornerShape(10.dp),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedTextColor = Color.White,
@@ -696,6 +726,43 @@ private fun Step2LocationAndDetails(
                 unfocusedContainerColor = Color(0xFF1E293B)
             )
         )
+
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+            OutlinedButton(
+                onClick = { showMapPicker = true },
+                contentPadding = PaddingValues(horizontal = 8.dp),
+                modifier = Modifier.weight(1f).height(48.dp)
+            ) {
+                Text("📍 من الخريطة", fontSize = 11.sp, color = Color(0xFF10B981), maxLines = 1)
+            }
+            OutlinedButton(
+                onClick = { showCoordDialog = true },
+                contentPadding = PaddingValues(horizontal = 8.dp),
+                modifier = Modifier.weight(1f).height(48.dp)
+            ) {
+                Text("🔢 إحداثيات", fontSize = 11.sp, color = Color(0xFF00E5FF), maxLines = 1)
+            }
+            OutlinedButton(
+                onClick = { showLandmarkWizard = true },
+                contentPadding = PaddingValues(horizontal = 8.dp),
+                modifier = Modifier.height(48.dp)
+            ) {
+                Text("🏠 بالمعلم", fontSize = 11.sp, color = Color(0xFFFBBF24), maxLines = 1)
+            }
+        }
+
+        if (savedAddresses.isNotEmpty()) {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                items(savedAddresses) { addr ->
+                    SuggestionChip(
+                        onClick = {
+                            onNeighborhoodChange("${addr.describe()} (${OfflineYemenGazetteer.formatCoordinates(addr.pointLat, addr.pointLng)})")
+                        },
+                        label = { Text("🏠 ${addr.label} (${addr.landmarkName})", fontSize = 10.sp) }
+                    )
+                }
+            }
+        }
 
         HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
 
@@ -777,6 +844,57 @@ private fun Step2LocationAndDetails(
                     )
                 }
             }
+        }
+    }
+
+    if (showMapPicker) {
+        InteractiveMapLocationPickerDialog(
+            initialLat = if (hasGps) gpsLat else 15.3694,
+            initialLng = if (hasGps) gpsLng else 44.1910,
+            hasGps = hasGps,
+            gpsLat = gpsLat,
+            gpsLng = gpsLng,
+            title = "📍 حدد موقع التوصيل / الخدمة على الخريطة",
+            onDismiss = { showMapPicker = false },
+            onLocationPicked = { res ->
+                onNeighborhoodChange(res.formattedAddress)
+                if (res.note.isNotBlank() && orderDetails.isBlank()) onOrderDetailsChange(res.note)
+                showMapPicker = false
+            }
+        )
+    }
+
+    if (showCoordDialog) {
+        ManualCoordinateDialog(
+            initialLat = if (hasGps) gpsLat else 15.3694,
+            initialLng = if (hasGps) gpsLng else 44.1910,
+            gpsLat = gpsLat,
+            gpsLng = gpsLng,
+            hasGps = hasGps,
+            title = "🔢 إحداثيات موقع الطلب",
+            onDismiss = { showCoordDialog = false },
+            onConfirm = { lat, lng, summary ->
+                onNeighborhoodChange(buildFormattedLocationAddress(lat, lng, nearestSummary = summary))
+                showCoordDialog = false
+            }
+        )
+    }
+
+    if (showLandmarkWizard) {
+        Dialog(
+            onDismissRequest = { showLandmarkWizard = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
+        ) {
+            LandmarkAddressScreen(
+                centerLat = if (hasGps) gpsLat else 15.3694,
+                centerLng = if (hasGps) gpsLng else 44.1910,
+                hasRealLocation = hasGps,
+                selectedCity = selectedCity,
+                onSaved = { addr ->
+                    onNeighborhoodChange("${addr.describe()} (${OfflineYemenGazetteer.formatCoordinates(addr.pointLat, addr.pointLng)})")
+                },
+                onClose = { showLandmarkWizard = false }
+            )
         }
     }
 }

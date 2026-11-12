@@ -119,6 +119,10 @@
             0% { transform: scale(0.4); opacity: 0.95; }
             100% { transform: scale(1.9); opacity: 0; }
         }
+        body.eco-mode .user-pulse {
+            animation: none !important;
+            opacity: 0.25;
+        }
 
         .mode-indicator {
             position: absolute;
@@ -227,24 +231,44 @@
         }
         window.setNightMode = setNightMode;
 
+        var ecoModeEnabled = false;
         var ATTR_OSM = '© <a href="https://www.openstreetmap.org/copyright">مساهمو OpenStreetMap</a>';
         var providers = {
             'osm': L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                maxZoom: 24, maxNativeZoom: 19, attribution: ATTR_OSM
+                maxZoom: 24, maxNativeZoom: 19, updateWhenIdle: true, updateWhenZooming: false, keepBuffer: 1, attribution: ATTR_OSM
             }),
             'hot': L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
-                maxZoom: 24, maxNativeZoom: 19, subdomains: ['a', 'b', 'c'],
+                maxZoom: 24, maxNativeZoom: 19, subdomains: ['a', 'b', 'c'], updateWhenIdle: true, updateWhenZooming: false, keepBuffer: 1,
                 attribution: ATTR_OSM + ' — نمط <a href="https://www.hotosm.org/">HOT</a>'
             }),
             'topo': L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
-                maxZoom: 24, maxNativeZoom: 17, subdomains: ['a', 'b', 'c'],
+                maxZoom: 24, maxNativeZoom: 17, subdomains: ['a', 'b', 'c'], updateWhenIdle: true, updateWhenZooming: false, keepBuffer: 1,
                 attribution: ATTR_OSM + ' — SRTM | نمط © <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA)'
             }),
             'satellite': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-                maxZoom: 24, maxNativeZoom: 19,
+                maxZoom: 24, maxNativeZoom: 19, updateWhenIdle: true, updateWhenZooming: false, keepBuffer: 1,
                 attribution: 'صور © <a href="https://www.esri.com">Esri</a> — Maxar, Earthstar Geographics'
             })
         };
+
+        function setEcoMode(on) {
+            ecoModeEnabled = !!on;
+            try {
+                if (document.body) {
+                    if (ecoModeEnabled) document.body.classList.add('eco-mode');
+                    else document.body.classList.remove('eco-mode');
+                }
+                Object.keys(providers).forEach(function (k) {
+                    var layer = providers[k];
+                    if (layer && layer.options) {
+                        layer.options.keepBuffer = ecoModeEnabled ? 0 : 1;
+                        layer.options.updateWhenIdle = true;
+                        layer.options.updateWhenZooming = false;
+                    }
+                });
+            } catch (e) {}
+        }
+        window.setEcoMode = setEcoMode;
 
         var tileOk = 0, tileErr = 0, tilesFailingNotified = false;
         function notifyTiles(failing) {
@@ -403,6 +427,31 @@
 
                 map.on('dragstart', function () {
                     if (window.AndroidBridge && window.AndroidBridge.onUserPanned) window.AndroidBridge.onUserPanned();
+                });
+                var centerTimer = null;
+                map.on('move', function () {
+                    if (!window.AndroidBridge || !window.AndroidBridge.onMapCenterChanged) return;
+                    if (centerTimer) return;
+                    centerTimer = setTimeout(function () {
+                        centerTimer = null;
+                        try {
+                            var c = map.getCenter();
+                            window.AndroidBridge.onMapCenterChanged(c.lat, c.lng);
+                        } catch (err) {}
+                    }, 100);
+                });
+                map.on('moveend', function () {
+                    if (window.AndroidBridge && window.AndroidBridge.onMapCenterChanged) {
+                        var c = map.getCenter();
+                        window.AndroidBridge.onMapCenterChanged(c.lat, c.lng);
+                    }
+                });
+                map.on('contextmenu', function (e) {
+                    if (window.AndroidBridge && window.AndroidBridge.onMapLongPressed) {
+                        window.AndroidBridge.onMapLongPressed(e.latlng.lat, e.latlng.lng);
+                    } else if (pickModeEnabled && window.AndroidBridge && window.AndroidBridge.onMapPicked) {
+                        window.AndroidBridge.onMapPicked(e.latlng.lat, e.latlng.lng);
+                    }
                 });
                 map.on('click', function (e) {
                     if (pickModeEnabled) {
