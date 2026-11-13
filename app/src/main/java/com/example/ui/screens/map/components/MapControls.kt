@@ -79,6 +79,7 @@ fun MapControls(
     onToggleEcoMode: () -> Unit = {},
     onOpenCoordinateEntry: () -> Unit = {},
     hasMoreLayersActive: Boolean = false,
+    hasLayerOverlayActive: Boolean = false,
     onOpenMoreLayers: () -> Unit = {},
     onOpenGroupTracking: () -> Unit = {}
 ) {
@@ -189,7 +190,7 @@ fun MapControls(
             DockButton(
                 icon = Icons.Default.Layers,
                 label = "طبقات",
-                active = false,
+                active = hasLayerOverlayActive,
                 activeColor = Color(0xFFFBBF24),
                 inactiveColor = Color(0xFFFBBF24),
                 onClick = onOpenLayerDialog,
@@ -266,7 +267,21 @@ fun MapControls(
 
             HorizontalDivider(modifier = Modifier.width(34.dp), color = Color.White.copy(alpha = 0.08f))
 
-            // 10. 🌙 الوضع الليلي للخريطة
+            // 10. 🗂️ طبقات إضافية (نُقلت إلى الشريط الرئيسي تحت أيقونة التصغير)
+            DockButton(
+                icon = Icons.Default.AutoAwesomeMotion,
+                label = "إضافية",
+                active = hasMoreLayersActive,
+                activeColor = Color(0xFF00E5FF),
+                inactiveColor = Color(0xFF38BDF8),
+                onClick = onOpenMoreLayers,
+                testTag = "map_more_layers_btn",
+                contentDescription = "طبقات إضافية"
+            )
+
+            HorizontalDivider(modifier = Modifier.width(34.dp), color = Color.White.copy(alpha = 0.08f))
+
+            // 11. 🌙 الوضع الليلي للخريطة
             DockButton(
                 icon = if (isNightMode) Icons.Default.Bedtime else Icons.Default.WbSunny,
                 label = if (isNightMode) "ليلي" else "نهاري",
@@ -285,7 +300,7 @@ fun MapControls(
                 DockButton(
                     icon = Icons.Default.Tune,
                     label = "أدوات",
-                    active = isGibsActive || isZonesActive || isPinPickMode || isEcoMode || hasMoreLayersActive,
+                    active = isZonesActive || isPinPickMode || isEcoMode,
                     activeColor = Color(0xFF00E5FF),
                     onClick = { showMoreTools = true },
                     testTag = "map_tools_btn",
@@ -329,12 +344,6 @@ fun MapControls(
                         onClick = { onToggleEcoMode(); showMoreTools = false }
                     )
                     HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
-                    // 11. NASA GIBS
-                    DropdownMenuItem(
-                        text = { Text("صور ناسا الفضائية", color = if (isGibsActive) Color(0xFF38BDF8) else Color.White) },
-                        leadingIcon = { Icon(Icons.Default.Explore, contentDescription = null, tint = if (isGibsActive) Color(0xFF38BDF8) else Color.White) },
-                        onClick = { onToggleGibs(); showMoreTools = false }
-                    )
                     // 12. GNSS
                     onShowGnss?.let { showGnssAction ->
                         DropdownMenuItem(
@@ -352,24 +361,7 @@ fun MapControls(
                         )
                     }
                     HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
-                    // 14. طبقات إضافية (EOX / USGS / RainViewer / التغطية / الذروة / الوعورة)
-                    DropdownMenuItem(
-                        text = {
-                            Text(
-                                "🗂️ طبقات إضافية",
-                                color = if (hasMoreLayersActive) Color(0xFF00E5FF) else Color.White
-                            )
-                        },
-                        leadingIcon = {
-                            Icon(
-                                Icons.Default.Layers,
-                                contentDescription = null,
-                                tint = if (hasMoreLayersActive) Color(0xFF00E5FF) else Color(0xFFFBBF24)
-                            )
-                        },
-                        onClick = { onOpenMoreLayers(); showMoreTools = false }
-                    )
-                    // 15. تتبع المجموعة (تحديث يدوي ≤ 5 أعضاء)
+                    // 14. تتبع المجموعة (تحديث يدوي ≤ 5 أعضاء)
                     DropdownMenuItem(
                         text = { Text("👥 تتبع المجموعة", color = Color.White) },
                         leadingIcon = { Icon(Icons.Default.Group, contentDescription = null, tint = Color(0xFF10B981)) },

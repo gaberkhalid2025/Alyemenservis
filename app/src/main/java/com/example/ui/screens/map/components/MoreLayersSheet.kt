@@ -26,10 +26,6 @@ import com.example.utils.NavConfig
 fun MoreLayersSheet(
     nightMode: Boolean,
     onToggleNight: (Boolean) -> Unit,
-    gibsEnabled: Boolean,
-    onToggleGibs: (Boolean) -> Unit,
-    eoxEnabled: Boolean,
-    onToggleEox: (Boolean) -> Unit,
     quakesEnabled: Boolean,
     onToggleQuakes: (Boolean) -> Unit,
     rainEnabled: Boolean,
@@ -83,22 +79,6 @@ fun MoreLayersSheet(
                 checked = nightMode,
                 onCheckedChange = onToggleNight,
                 testTag = "layer_night_switch"
-            )
-            LayerToggleRow(
-                icon = Icons.Default.SatelliteAlt,
-                title = "صور ناسا الفضائية (NASA GIBS)",
-                subtitle = "صور أقمار صناعية يومية مجانية من NASA EOSDIS",
-                checked = gibsEnabled,
-                onCheckedChange = onToggleGibs,
-                testTag = "layer_gibs_switch"
-            )
-            LayerToggleRow(
-                icon = Icons.Default.Public,
-                title = "صور EOX Sentinel-2 (2016 بدون سحب)",
-                subtitle = "خريطة فضائية نظيفة CC-BY-4.0 بلا قيود أو مفاتيح",
-                checked = eoxEnabled,
-                onCheckedChange = onToggleEox,
-                testTag = "layer_eox_switch"
             )
             LayerToggleRow(
                 icon = Icons.Default.WarningAmber,

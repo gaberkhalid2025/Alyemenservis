@@ -206,7 +206,7 @@
                     el.style.webkitFilter = '';
                     return;
                 }
-                if (currentProviderKey === 'satellite') {
+                if (currentProviderKey === 'satellite' || currentProviderKey === 'satellite_clarity') {
                     var satFilter = 'brightness(0.80) contrast(1.05)';
                     el.style.filter = satFilter;
                     el.style.webkitFilter = satFilter;
@@ -240,9 +240,17 @@
                 maxZoom: 24, maxNativeZoom: 17, subdomains: ['a', 'b', 'c'], updateWhenIdle: true, updateWhenZooming: false, keepBuffer: 1,
                 attribution: ATTR_OSM + ' — SRTM | نمط © <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA)'
             }),
+            'vela': L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png', {
+                maxZoom: 24, maxNativeZoom: 19, subdomains: ['a', 'b', 'c', 'd'], updateWhenIdle: true, updateWhenZooming: false, keepBuffer: 1,
+                attribution: 'خرائط VELA — ' + ATTR_OSM + ' • © <a href="https://carto.com/attributions">CARTO</a>'
+            }),
             'satellite': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
                 maxZoom: 24, maxNativeZoom: 19, updateWhenIdle: true, updateWhenZooming: false, keepBuffer: 1,
                 attribution: 'صور © <a href="https://www.esri.com">Esri</a> — Maxar, Earthstar Geographics'
+            }),
+            'satellite_clarity': L.tileLayer('https://clarity.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                maxZoom: 24, maxNativeZoom: 19, updateWhenIdle: true, updateWhenZooming: false, keepBuffer: 1,
+                attribution: 'صور Clarity © <a href="https://www.esri.com">Esri</a> — High-Res Clarity'
             })
         };
 
@@ -311,6 +319,11 @@
 
         var GIBS_PRODUCTS = {
             'truecolor': {
+                layer: 'VIIRS_SNPP_CorrectedReflectance_TrueColor',
+                format: 'jpg',
+                maxZoom: 9
+            },
+            'modis': {
                 layer: 'MODIS_Terra_CorrectedReflectance_TrueColor',
                 format: 'jpg',
                 maxZoom: 9
@@ -324,7 +337,7 @@
 
         function gibsDate(daysAgo) {
             var d = new Date();
-            d.setUTCDate(d.getUTCDate() - (daysAgo || 1));
+            d.setUTCDate(d.getUTCDate() - (daysAgo || 0));
             var y = d.getUTCFullYear();
             var m = String(d.getUTCMonth() + 1).padStart(2, '0');
             var day = String(d.getUTCDate()).padStart(2, '0');
@@ -340,7 +353,8 @@
         }
 
         var gibsOverlay = null;
-        var gibsRetryCount = 0;
+        var gibsActive = false;
+        var eoxActive = false;
         function notifyGibs(ok) {
             if (window.AndroidBridge && window.AndroidBridge.onGibsStatus) {
                 window.AndroidBridge.onGibsStatus(!!ok);
@@ -350,41 +364,43 @@
         function setGibs(on, prodKey) {
             if (!map) return;
             prodKey = prodKey || 'truecolor';
+            gibsActive = !!on;
             if (gibsOverlay && map.hasLayer(gibsOverlay)) {
                 map.removeLayer(gibsOverlay);
                 gibsOverlay = null;
             }
             if (!on) {
-                notifyGibs(false);
+                refreshModeIndicator();
                 return;
             }
 
-            ensurePane('gibsPane', 260);
+            ensurePane('gibsPane', 245);
             var prod = GIBS_PRODUCTS[prodKey] || GIBS_PRODUCTS['truecolor'];
-            gibsRetryCount = 0;
+            refreshModeIndicator();
 
             function tryLoadWithOffset(offset) {
-                if (offset > 3) {
-                    notifyGibs(false);
+                if (!gibsActive || offset > 3) {
+                    if (offset > 3) notifyGibs(false);
                     return;
                 }
                 var url = gibsUrl(prodKey, offset);
                 var layer = L.tileLayer(url, {
-                    maxZoom: prod.maxZoom,
+                    maxZoom: 24,
                     maxNativeZoom: prod.maxZoom,
-                    opacity: 0.75,
+                    opacity: 0.85,
                     pane: 'gibsPane',
-                    attribution: 'بيانات الأقمار © <a href="https://earthdata.nasa.gov/gibs">NASA EOSDIS GIBS</a>'
+                    attribution: 'بث مباشر © <a href="https://earthdata.nasa.gov/gibs">NASA EOSDIS GIBS</a>'
                 });
 
-                var okCount = 0, errCount = 0;
+                var okCount = 0, errCount = 0, switched = false;
                 layer.on('tileload', function() {
                     okCount++;
                     if (okCount === 1) notifyGibs(true);
                 });
                 layer.on('tileerror', function() {
                     errCount++;
-                    if (okCount === 0 && errCount >= 4) {
+                    if (!switched && okCount === 0 && errCount >= 3) {
+                        switched = true;
                         try { map.removeLayer(layer); } catch (e) {}
                         tryLoadWithOffset(offset + 1);
                     }
@@ -394,7 +410,7 @@
                 gibsOverlay.addTo(map);
             }
 
-            tryLoadWithOffset(1);
+            tryLoadWithOffset(0);
         }
         window.setGibs = setGibs;
 
@@ -404,21 +420,23 @@
             }
         }
 
-        // EOX Sentinel-2 cloudless 2016 (CC BY 4.0 - Free, Zero API Key)
+        // EOX Sentinel-2 cloudless 2021 (CC BY 4.0 - Free, Zero API Key)
         var eoxOverlay = null;
         function setEox(on) {
             if (!map) return;
+            eoxActive = !!on;
             if (eoxOverlay && map.hasLayer(eoxOverlay)) {
                 map.removeLayer(eoxOverlay);
                 eoxOverlay = null;
             }
+            refreshModeIndicator();
             if (!on) return;
             ensurePane('eoxPane', 240);
             var okCount = 0, errCount = 0, failedNotified = false;
-            var layer = L.tileLayer('https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless_3857/default/GoogleMapsCompatible/{z}/{y}/{x}.jpg', {
+            var layer = L.tileLayer('https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2021_3857/default/GoogleMapsCompatible/{z}/{y}/{x}.jpg', {
                 maxZoom: 24,
                 maxNativeZoom: 13,
-                opacity: 0.88,
+                opacity: 0.92,
                 pane: 'eoxPane',
                 attribution: 'Sentinel-2 cloudless © <a href="https://s2maps.eu">EOX IT Services</a> (<a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>)'
             });
@@ -577,6 +595,25 @@
             }
         }
 
+        var currentBaseTitle = 'أقمار صناعية';
+        var currentBaseIcon = '🛰️';
+
+        function refreshModeIndicator() {
+            var iconEl = document.getElementById('modeIcon');
+            var titleEl = document.getElementById('modeTitle');
+            var icon = currentBaseIcon;
+            var title = currentBaseTitle;
+            if (gibsActive) {
+                icon = '📡';
+                title = 'بث ناسا المباشر (NASA GIBS)';
+            } else if (eoxActive) {
+                icon = '🌍';
+                title = 'أقمار EOX Sentinel-2 (بدون سحب)';
+            }
+            if (iconEl) iconEl.innerText = icon;
+            if (titleEl) titleEl.innerText = title;
+        }
+
         function setLayer(mode) {
             activeMode = mode || 'SATELLITE';
             if (currentBaseLayer && map) {
@@ -599,6 +636,14 @@
                 providerKey = 'topo';
                 title = 'التضاريس والارتفاعات (Topo)';
                 icon = '⛰️';
+            } else if (mode === 'VELA') {
+                providerKey = 'vela';
+                title = 'خرائط VELA المجانية';
+                icon = '✨';
+            } else if (mode === 'SATELLITE_CLARITY') {
+                providerKey = 'satellite_clarity';
+                title = 'أقمار فائقة الوضوح (Clarity)';
+                icon = '💎';
             } else if (mode === 'VELA_3D') {
                 providerKey = 'satellite';
                 title = 'أقمار صناعية';
@@ -617,10 +662,9 @@
                 applyNight();
             }
 
-            var iconEl = document.getElementById('modeIcon');
-            var titleEl = document.getElementById('modeTitle');
-            if (iconEl) iconEl.innerText = icon;
-            if (titleEl) titleEl.innerText = title;
+            currentBaseIcon = icon;
+            currentBaseTitle = title;
+            refreshModeIndicator();
         }
 
         function switchMapMode(mode) {

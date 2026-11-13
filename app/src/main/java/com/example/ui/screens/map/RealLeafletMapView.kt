@@ -183,10 +183,12 @@ fun RealLeafletMapView(
         if (isMapReady && webViewRef != null) {
             val modeKey = when (currentMapMode) {
                 MapMode.VELA_3D -> "VELA_3D"
+                MapMode.VELA -> "VELA"
                 MapMode.OSM -> "OSM"
                 MapMode.HOT -> "HOT"
                 MapMode.TOPO -> "TOPO"
                 MapMode.SATELLITE -> "SATELLITE"
+                MapMode.SATELLITE_CLARITY -> "SATELLITE_CLARITY"
                 else -> "SATELLITE"
             }
             val script = "if (window.switchMapMode) { window.switchMapMode('$modeKey'); }"
@@ -333,7 +335,7 @@ fun RealLeafletMapView(
 
     LaunchedEffect(isMapReady, hybridLabels, currentMapMode) {
         if (isMapReady && webViewRef != null) {
-            val on = hybridLabels && (currentMapMode == MapMode.SATELLITE || currentMapMode == MapMode.VELA_3D)
+            val on = hybridLabels && (currentMapMode == MapMode.SATELLITE || currentMapMode == MapMode.SATELLITE_CLARITY || currentMapMode == MapMode.VELA_3D)
             webViewRef?.evaluateJavascript("if (window.setHybridLabels) { window.setHybridLabels($on); }", null)
         }
     }
@@ -485,7 +487,7 @@ fun RealLeafletMapView(
 
                             @JavascriptInterface
                             fun getAvailableLayers(): String {
-                                return "[\"OSM\",\"HOT\",\"TOPO\",\"SATELLITE\",\"VELA_3D\"]"
+                                return "[\"OSM\",\"HOT\",\"TOPO\",\"VELA\",\"SATELLITE\",\"SATELLITE_CLARITY\",\"VELA_3D\"]"
                             }
                         }, "AndroidBridge")
 
@@ -495,6 +497,7 @@ fun RealLeafletMapView(
                                 "www.hotosm.org",
                                 "opentopomap.org",
                                 "www.esri.com",
+                                "carto.com",
                                 "earthdata.nasa.gov",
                                 "s2maps.eu",
                                 "creativecommons.org",

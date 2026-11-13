@@ -699,7 +699,7 @@ fun MapScreenContent(
                         .statusBarsPadding()
                         .padding(top = 100.dp, start = 16.dp)
                 ) {
-                    if (state.currentMapMode == MapMode.SATELLITE || state.currentMapMode == MapMode.VELA_3D) {
+                    if (state.currentMapMode == MapMode.SATELLITE || state.currentMapMode == MapMode.SATELLITE_CLARITY || state.currentMapMode == MapMode.VELA_3D) {
                         FilterChip(
                             selected = hybridLabels,
                             onClick = { hybridLabels = !hybridLabels },
@@ -1163,10 +1163,13 @@ fun MapScreenContent(
                     state.toggleMapMode(mode)
                     state.isRadarMode = false
                     val label = when (state.currentMapMode) {
-                        MapMode.SATELLITE, MapMode.VELA_3D -> "أقمار صناعية"
+                        MapMode.SATELLITE -> "أقمار صناعية (Esri)"
+                        MapMode.SATELLITE_CLARITY -> "أقمار فائقة الوضوح (Clarity)"
+                        MapMode.VELA -> "خرائط VELA المجانية"
+                        MapMode.VELA_3D -> "خرائط 3D التفاعلية"
                         MapMode.HOT -> "شوارع (HOT)"
-                        MapMode.TOPO -> "تضاريس"
-                        else -> "خريطة قياسية"
+                        MapMode.TOPO -> "تضاريس (Topo)"
+                        else -> "خريطة قياسية (OSM)"
                     }
                     coroutineScope.launch {
                         snackbarHostState.showSnackbar("النمط: $label")
@@ -1257,8 +1260,11 @@ fun MapScreenContent(
                     }
                 },
                 onOpenCoordinateEntry = { showCoordinateDialog = true },
-                hasMoreLayersActive = state.eoxEnabled || state.quakesEnabled || state.rainEnabled ||
-                    state.peakEnabled || state.coverageEnabled || state.hazardEnabled || state.gibsEnabled,
+                hasMoreLayersActive = state.quakesEnabled || state.rainEnabled ||
+                    state.peakEnabled || state.coverageEnabled || state.hazardEnabled ||
+                    state.reliabilityEnabled || state.nightMode,
+                hasLayerOverlayActive = state.gibsEnabled || state.eoxEnabled || show3D ||
+                    state.currentMapMode == MapMode.VELA || state.currentMapMode == MapMode.SATELLITE_CLARITY,
                 onOpenMoreLayers = { showMoreLayersSheet = true },
                 onOpenGroupTracking = { showGroupTracking = true },
                 modifier = Modifier
@@ -1398,16 +1404,73 @@ fun MapScreenContent(
                 }
             }
 
-            // 🗺️ 8. Layer Selection Dialog (نظام الطبقات الخمس)
+            // 🗺️ 8. Layer Selection Dialog (نظام الطبقات المجاني الشامل)
             if (state.showLayerDialog) {
                 MapLayersDialog(
                     currentMapMode = state.currentMapMode,
-                    onSelectLayer = { mode, tilt ->
+                    onSelectLayer = { mode, _ ->
+                        show3D = false
                         state.currentMapMode = mode
                         state.isRadarMode = false
                         state.showLayerDialog = false
+                        val modeLabel = when (mode) {
+                            MapMode.VELA -> "✨ تم تفعيل خرائط VELA المجانية"
+                            MapMode.SATELLITE -> "🛰️ تم تفعيل أقمار Esri القياسية"
+                            MapMode.SATELLITE_CLARITY -> "💎 تم تفعيل أقمار Esri Clarity عالية الوضوح"
+                            MapMode.OSM -> "🌐 تم تفعيل خريطة OSM القياسية"
+                            MapMode.HOT -> "🗺️ تم تفعيل خريطة شوارع HOT"
+                            MapMode.TOPO -> "⛰️ تم تفعيل خريطة التضاريس"
+                            else -> "تم تفعيل الطبقة بنجاح ✓"
+                        }
                         coroutineScope.launch {
-                            snackbarHostState.showSnackbar("تم تفعيل الطبقة بنجاح ✓")
+                            snackbarHostState.showSnackbar(modeLabel)
+                        }
+                    },
+                    is3DAvailable = is3DAvailable,
+                    is3DActive = show3D,
+                    onOpen3D = {
+                        state.showLayerDialog = false
+                        state.isRadarMode = false
+                        if (is3DAvailable) {
+                            map3dMessage = null
+                            show3D = true
+                        } else {
+                            coroutineScope.launch {
+                                snackbarHostState.showSnackbar("العرض ثلاثي الأبعاد غير مدعوم على هذا الجهاز")
+                            }
+                        }
+                    },
+                    gibsEnabled = state.gibsEnabled,
+                    gibsProduct = state.gibsProduct,
+                    onToggleGibs = { enabled ->
+                        state.gibsEnabled = enabled
+                        coroutineScope.launch {
+                            snackbarHostState.showSnackbar(
+                                if (enabled) "📡 تم تشغيل بث ناسا اليومي المباشر (NASA GIBS)"
+                                else "تم إيقاف بث ناسا المباشر"
+                            )
+                        }
+                    },
+                    onSelectGibsProduct = { productKey ->
+                        state.gibsProduct = productKey
+                        state.gibsEnabled = true
+                        val prodName = when (productKey) {
+                            "modis" -> "MODIS الألوان الحقيقية"
+                            "landtemp" -> "حرارة السطح النهاري"
+                            else -> "VIIRS البث المباشر (375م)"
+                        }
+                        coroutineScope.launch {
+                            snackbarHostState.showSnackbar("📡 تم التبديل إلى بث ناسا: $prodName")
+                        }
+                    },
+                    eoxEnabled = state.eoxEnabled,
+                    onToggleEox = { enabled ->
+                        state.eoxEnabled = enabled
+                        coroutineScope.launch {
+                            snackbarHostState.showSnackbar(
+                                if (enabled) "🌍 تم تفعيل صور EOX Sentinel-2 (بدون سحب)"
+                                else "تم إيقاف طبقة EOX Sentinel-2"
+                            )
                         }
                     },
                     onDismiss = { state.showLayerDialog = false }
@@ -1426,10 +1489,6 @@ fun MapScreenContent(
                 MoreLayersSheet(
                     nightMode = state.nightMode,
                     onToggleNight = { state.nightMode = it },
-                    gibsEnabled = state.gibsEnabled,
-                    onToggleGibs = { state.gibsEnabled = it },
-                    eoxEnabled = state.eoxEnabled,
-                    onToggleEox = { state.eoxEnabled = it },
                     quakesEnabled = state.quakesEnabled,
                     onToggleQuakes = { state.quakesEnabled = it },
                     rainEnabled = state.rainEnabled,

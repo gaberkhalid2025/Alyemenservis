@@ -42,4 +42,24 @@ class ToggleMapModeTest {
         state.zoomOutTick++
         assertEquals(1, state.zoomOutTick)
     }
+
+    @Test
+    fun testVelaAndClarityAndLiveOverlays() {
+        val state = MapScreenState(initialMapMode = MapMode.SATELLITE)
+
+        state.toggleMapMode(MapMode.VELA)
+        assertEquals(MapMode.VELA, state.currentMapMode)
+        assertEquals(MapMode.SATELLITE, state.previousMapMode)
+
+        state.toggleMapMode(MapMode.SATELLITE_CLARITY)
+        assertEquals(MapMode.SATELLITE_CLARITY, state.currentMapMode)
+        assertEquals(MapMode.VELA, state.previousMapMode)
+
+        state.gibsEnabled = true
+        state.gibsProduct = "modis"
+        state.eoxEnabled = true
+        assertEquals(true, state.gibsEnabled)
+        assertEquals("modis", state.gibsProduct)
+        assertEquals(true, state.eoxEnabled)
+    }
 }

@@ -9,7 +9,7 @@ import com.example.data.ProviderEntity
 import com.example.data.StoreEntity
 import com.example.utils.NavWaypoint
 
-enum class MapMode { OSM, HOT, TOPO, SATELLITE, VELA_3D, AR_VPS, ALEPH_ASSISTANT }
+enum class MapMode { OSM, HOT, TOPO, SATELLITE, SATELLITE_CLARITY, VELA, VELA_3D, AR_VPS, ALEPH_ASSISTANT }
 
 @Stable
 class MapScreenState(
