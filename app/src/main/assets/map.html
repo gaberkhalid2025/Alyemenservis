@@ -147,11 +147,6 @@
             display: none !important;
         }
         .leaflet-control-attribution {
-            background: rgba(15, 23, 42, 0.65) !important;
-            color: #64748B !important;
-            font-size: 7.5px !important;
-            padding: 1px 6px !important;
-        .leaflet-control-attribution {
             background: rgba(15, 23, 42, 0.85) !important;
             color: #CBD5E1 !important;
             font-size: 10px !important;
@@ -402,6 +397,115 @@
             tryLoadWithOffset(1);
         }
         window.setGibs = setGibs;
+
+        function notifyOverlay(name, failing, msg) {
+            if (window.AndroidBridge && window.AndroidBridge.onOverlayStatus) {
+                window.AndroidBridge.onOverlayStatus(String(name || ''), !!failing, String(msg || ''));
+            }
+        }
+
+        // EOX Sentinel-2 cloudless 2016 (CC BY 4.0 - Free, Zero API Key)
+        var eoxOverlay = null;
+        function setEox(on) {
+            if (!map) return;
+            if (eoxOverlay && map.hasLayer(eoxOverlay)) {
+                map.removeLayer(eoxOverlay);
+                eoxOverlay = null;
+            }
+            if (!on) return;
+            ensurePane('eoxPane', 240);
+            var okCount = 0, errCount = 0, failedNotified = false;
+            var layer = L.tileLayer('https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless_3857/default/GoogleMapsCompatible/{z}/{y}/{x}.jpg', {
+                maxZoom: 24,
+                maxNativeZoom: 13,
+                opacity: 0.88,
+                pane: 'eoxPane',
+                attribution: 'Sentinel-2 cloudless © <a href="https://s2maps.eu">EOX IT Services</a> (<a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>)'
+            });
+            layer.on('tileload', function() {
+                okCount++;
+                if (okCount === 1) notifyOverlay('eox', false, 'تم تحميل طبقة EOX Sentinel-2 بنجاح');
+            });
+            layer.on('tileerror', function() {
+                errCount++;
+                if (!failedNotified && okCount === 0 && errCount >= 6) {
+                    failedNotified = true;
+                    notifyOverlay('eox', true, 'تعذر تحميل بلاطات EOX حالياً');
+                }
+            });
+            eoxOverlay = layer;
+            eoxOverlay.addTo(map);
+        }
+        window.setEox = setEox;
+
+        // USGS Earthquakes Overlay (GeoJSON converted list)
+        var quakesLayer = null;
+        function setQuakesBase64(b64) {
+            try {
+                if (!map) return;
+                var qPane = ensurePane('quakesPane', 450);
+                if (qPane) qPane.style.pointerEvents = 'auto';
+                if (quakesLayer) {
+                    map.removeLayer(quakesLayer);
+                    quakesLayer = null;
+                }
+                if (!b64) return;
+                var jsonStr = decodeURIComponent(escape(window.atob(b64)));
+                var list = JSON.parse(jsonStr);
+                quakesLayer = L.layerGroup();
+                list.forEach(function(q) {
+                    if (typeof q.lat !== 'number' || typeof q.lng !== 'number') return;
+                    var mag = Number(q.mag) || 2.5;
+                    var radius = Math.max(5, Math.min(22, (mag - 1.5) * 4.2));
+                    var color = mag >= 5.0 ? '#EF4444' : (mag >= 4.0 ? '#F97316' : '#F59E0B');
+                    var c = L.circleMarker([q.lat, q.lng], {
+                        pane: 'quakesPane',
+                        radius: radius,
+                        color: '#FFFFFF',
+                        weight: 1.2,
+                        fillColor: color,
+                        fillOpacity: 0.78
+                    });
+                    c.bindPopup('<div style="direction:rtl;font-family:sans-serif;min-width:140px;"><b>🌋 زلزال بقوة ' + esc(mag.toFixed(1)) + '</b><br/>' + esc(q.place || '') + '</div>');
+                    c.addTo(quakesLayer);
+                });
+                quakesLayer.addTo(map);
+            } catch (e) {
+                console.error('setQuakesBase64 error', e);
+            }
+        }
+        window.setQuakesBase64 = setQuakesBase64;
+
+        // RainViewer Past Radar Overlay (empty URL disables)
+        var rainOverlay = null;
+        function setRainUrl(url) {
+            if (!map) return;
+            if (rainOverlay && map.hasLayer(rainOverlay)) {
+                map.removeLayer(rainOverlay);
+                rainOverlay = null;
+            }
+            if (!url || typeof url !== 'string' || url.indexOf('https://') !== 0) return;
+            ensurePane('rainPane', 270);
+            var okCount = 0, errCount = 0, failedNotified = false;
+            var layer = L.tileLayer(url, {
+                maxZoom: 24,
+                maxNativeZoom: 10,
+                opacity: 0.55,
+                pane: 'rainPane',
+                attribution: 'رادار الطقس © <a href="https://www.rainviewer.com">RainViewer</a>'
+            });
+            layer.on('tileload', function() { okCount++; });
+            layer.on('tileerror', function() {
+                errCount++;
+                if (!failedNotified && okCount === 0 && errCount >= 6) {
+                    failedNotified = true;
+                    notifyOverlay('rain', true, 'تعذر تحميل بلاطات الرادار الجوي');
+                }
+            });
+            rainOverlay = layer;
+            rainOverlay.addTo(map);
+        }
+        window.setRainUrl = setRainUrl;
 
         function initMap(lat, lng, mode) {
             userLat = lat || 15.3694;

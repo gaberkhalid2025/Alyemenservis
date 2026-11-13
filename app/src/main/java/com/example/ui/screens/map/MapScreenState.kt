@@ -30,6 +30,13 @@ class MapScreenState(
     var nightMode by mutableStateOf(false)
     var gibsEnabled by mutableStateOf(false)
     var gibsProduct by mutableStateOf("truecolor")
+    var eoxEnabled by mutableStateOf(false)
+    var quakesEnabled by mutableStateOf(false)
+    var rainEnabled by mutableStateOf(false)
+    var reliabilityEnabled by mutableStateOf(false)
+    var peakEnabled by mutableStateOf(false)
+    var coverageEnabled by mutableStateOf(false)
+    var hazardEnabled by mutableStateOf(false)
     var zoomInTick by mutableIntStateOf(0)
     var zoomOutTick by mutableIntStateOf(0)
 

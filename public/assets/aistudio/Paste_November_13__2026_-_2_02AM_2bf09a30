@@ -1,0 +1,577 @@
+# 63 – إضافة المميزات الناقصة من النص (مجانية 100% وبلا مفاتيح)
+> **حكم صادق على نصّك قبل التنفيذ** (تحققت من المصادر الرسمية):
+> - **Google Hybrid/Streets (`mt1.google.com`) لن أضيفها.** ليست «بنية مفتوحة»؛ هذه عناوين غير رسمية مخالفة لشروط Google (الرسمي يتطلب Maps Platform بمفتاح وفوترة)، ويمكن حجبها بلا إنذار فتتعطل الخريطة عند الجميع. بديلها المجاني القانوني موجود عندك: OSM وHOT وTOPO وEsri للصور.
+> - **RainViewer:** النص قديم. منذ 1 يناير 2026 الخدمة المجانية تقتصر على **رادار الماضي فقط، بحد أقصى تكبير 7، وبلا قمر صناعي IR ولا تنبؤ**، و«للاستخدام الشخصي والتعليمي ومجتمعات صغيرة» وغير موجهة لتطبيقات تجارية كبيرة، مع إسناد إلزامي. لذلك أضفته **معطّلاً افتراضياً** وبتحذير، ولا أنصح به لتطبيق تجاري دون مراسلتهم.
+> - **EOX Sentinel-2 cloudless:** نسخة **2016 فقط** بترخيص CC BY 4.0 (تجاري مسموح مع إسناد إلزامي). نسخ 2018 وما بعدها بترخيص غير تجاري (NC)؛ فلا تستعملها. أضفت 2016 فقط.
+> - **NASA GIBS وUSGS:** عامّة ومجانية بلا مفتاح (GIBS مطبّقة في المستند 59).
+> - **مجموعة/تتبع العائلة اللحظي:** مناقض لقرارنا بتجنب المستمعين اللحظيين؛ أضفت نسخة **بتحديث يدوي** (≤5 أشخاص، برمز لكل شخص).
+
+## 0) المقارنة مع نصّك
+| من النص | الحالة |
+|---|---|
+| موقعي، ملاحة، تكبير/تصغير، رادار، طبقات، 3D، AR، Aleph، GNSS، موثوقية، مسار متعدد المحطات، سلامة، معلم، طوارئ، ليلي، ناسا | ✅ موجودة (المستندات 59–62) |
+| Esri دقيقة | ✅ هي طبقة «أقمار» الحالية |
+| **EOX Sentinel-2 (2016)** | ➕ هنا (القسم 1) |
+| **زلازل USGS** | ➕ هنا (القسم 1) |
+| **رادار المطر RainViewer** | ➕ اختياري معطّل (القسم 1) |
+| **تغطية: مناطق انقطاع الشبكة** | ➕ هنا (القسم 3) تُتعلَّم من جهازك |
+| **تنبيهات صعوبة الطرق قبل دخولها** | ➕ هنا (القسم 4) |
+| **GPX** (تصدير المسار والرحلة) | ➕ هنا (القسم 5) |
+| **طباعة PDF** (ملخص المسار برسم تخطيطي) | ➕ هنا (القسم 6) |
+| **HUD عاكس للزجاج الأمامي** | ➕ هنا (القسم 7) |
+| **فلتر كالمان ثنائي المحور** | ➕ هنا (القسم 8) |
+| **مجموعة (تتبع بتحديث يدوي)** | ➕ هنا (القسم 9) |
+| تجميع العلامات (Clustering)، OSM احتياطي، Valhalla أوفلاين | ✅ موجودة |
+
+## 1) طبقات خارجية مجانية (EOX 2016 + الزلازل + المطر الاختياري)
+**ثوابت `NavConfig`:**
+```kotlin
+const val ENABLE_RAINVIEWER = false      // اتركه false ما لم تؤكد أن ترخيصهم يناسب استعمالك
+const val QUAKES_FEED_URL = "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_week.geojson"
+```
+### `map.html` (أضف قبل `function initMap`؛ تستعمل `ensurePane` و`esc` الموجودتين)
+```javascript
+function notifyOverlay(name, ok) { try { if (window.AndroidBridge && window.AndroidBridge.onOverlayStatus) window.AndroidBridge.onOverlayStatus(String(name), !!ok); } catch (e) {} }
+
+// --- EOX Sentinel-2 cloudless (نسخة 2016: CC BY 4.0، الإسناد إلزامي) ---
+var eoxLayer = null, eoxOk = 0, eoxErr = 0;
+function setEox(on) {
+    if (!map) return;
+    ensurePane('eoxPane', 205);                                        // فوق البلاطات الأساسية (200)، تحت الأسماء والدبابيس
+    if (eoxLayer && map.hasLayer(eoxLayer)) map.removeLayer(eoxLayer);
+    eoxLayer = null; eoxOk = 0; eoxErr = 0;
+    if (!on) return;
+    eoxLayer = L.tileLayer('https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless_3857/default/g/{z}/{y}/{x}.jpg', {
+        pane: 'eoxPane', maxNativeZoom: 13, maxZoom: 24, noWrap: true,
+        attribution: '<a href="https://s2maps.eu">Sentinel-2 cloudless</a> by <a href="https://eox.at">EOX IT Services GmbH</a> (Contains modified Copernicus Sentinel data 2016 &amp; 2017)'
+    });
+    eoxLayer.on('tileload', function () { eoxOk++; });
+    eoxLayer.on('tileerror', function () { eoxErr++; if (eoxOk === 0 && eoxErr === 8) notifyOverlay('eox', false); });
+    eoxLayer.addTo(map);
+}
+window.setEox = setEox;
+
+// --- زلازل USGS (البيانات تُجلب من Kotlin وتُمرَّر هنا) ---
+var quakesLayer = null;
+function setQuakesBase64(b64) {
+    try {
+        if (!map) return;
+        ensurePane('quakesPane', 450);
+        map.getPane('quakesPane').style.pointerEvents = 'auto';        // ليعمل لمس الدوائر
+        if (quakesLayer) { map.removeLayer(quakesLayer); quakesLayer = null; }
+        if (!b64) return;
+        var list = JSON.parse(decodeURIComponent(escape(window.atob(b64))));      // [{lat,lng,mag,place,time}]
+        quakesLayer = L.layerGroup();
+        list.forEach(function (q) {
+            if (typeof q.lat !== 'number' || typeof q.lng !== 'number' || typeof q.mag !== 'number') return;
+            var color = q.mag >= 5 ? '#EF4444' : (q.mag >= 4 ? '#F59E0B' : '#FACC15');
+            L.circleMarker([q.lat, q.lng], { pane: 'quakesPane', radius: Math.max(5, Math.min(26, q.mag * 4)),
+                color: color, weight: 2, fillColor: color, fillOpacity: 0.35 })
+                .bindTooltip(esc('M' + q.mag.toFixed(1) + ' — ' + (q.place || '') + ' — ' + new Date(q.time).toLocaleString('ar')), { direction: 'top' })
+                .addTo(quakesLayer);
+        });
+        quakesLayer.addTo(map);
+    } catch (e) { console.error('quakes', e); }
+}
+window.setQuakesBase64 = setQuakesBase64;
+
+// --- رادار المطر RainViewer (اختياري؛ القالب يأتي من Kotlin) ---
+var rainLayer = null;
+function setRainUrl(template) {
+    if (!map) return;
+    ensurePane('rainPane', 270);
+    if (rainLayer && map.hasLayer(rainLayer)) map.removeLayer(rainLayer);
+    rainLayer = null;
+    if (!template) return;
+    rainLayer = L.tileLayer(template, { pane: 'rainPane', opacity: 0.6, maxNativeZoom: 7, maxZoom: 24,
+        attribution: 'Weather data by <a href="https://www.rainviewer.com">RainViewer</a>' });
+    rainLayer.addTo(map);
+}
+window.setRainUrl = setRainUrl;
+```
+> عنوان EOX: معرّف الطبقة `s2cloudless_3857` هو نسخة 2016 حسب ما أعرفه من EOX؛ **تحقق منه** من `https://tiles.maps.eox.at/wmts/1.0.0/WMTSCapabilities.xml` وتأكد أن الطبقة المقصودة هي 2016 (CC BY) لا 2018+ (NC). إن اختلف المعرّف عدّل السطر فقط.
+### ملف جديد: `com/example/utils/OverlayFeeds.kt` (Kotlin يجلب الزلازل والمطر)
+```kotlin
+package com.example.utils
+
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
+import java.net.HttpURLConnection
+import java.net.URL
+
+data class Quake(val lat: Double, val lng: Double, val mag: Double, val place: String, val timeMs: Long)
+
+object OverlayFeeds {
+    private var quakesCache: Pair<Long, List<Quake>>? = null
+    private var rainCache: Pair<Long, String>? = null
+
+    private fun get(url: String): String? {
+        var c: HttpURLConnection? = null
+        return try {
+            c = (URL(url).openConnection() as HttpURLConnection).apply {
+                connectTimeout = 8_000; readTimeout = 12_000; setRequestProperty("User-Agent", "AlYemenServicesApp/1.0")
+            }
+            if (c.responseCode == 200) c.inputStream.bufferedReader().use { it.readText() } else null
+        } catch (e: Exception) { null } finally { c?.disconnect() }
+    }
+
+    /** زلازل المنطقة (الجزيرة العربية وما حولها) آخر أسبوع، M≥2.5. كاش 10 دقائق. */
+    suspend fun quakes(): List<Quake>? = withContext(Dispatchers.IO) {
+        quakesCache?.let { (t, v) -> if (System.currentTimeMillis() - t < 10 * 60_000L) return@withContext v }
+        val text = get(NavConfig.QUAKES_FEED_URL) ?: return@withContext null
+        try {
+            val feats = JSONObject(text).optJSONArray("features") ?: return@withContext emptyList()
+            val out = mutableListOf<Quake>()
+            for (i in 0 until feats.length()) {
+                val f = feats.getJSONObject(i)
+                val coords = f.optJSONObject("geometry")?.optJSONArray("coordinates") ?: continue
+                val lng = coords.optDouble(0); val lat = coords.optDouble(1)
+                if (lat !in 5.0..32.0 || lng !in 30.0..65.0) continue                  // نطاق المنطقة
+                val p = f.optJSONObject("properties") ?: continue
+                out.add(Quake(lat, lng, p.optDouble("mag", Double.NaN), p.optString("place"), p.optLong("time")))
+            }
+            val res = out.filter { !it.mag.isNaN() }.sortedByDescending { it.timeMs }.take(150)
+            quakesCache = System.currentTimeMillis() to res
+            res
+        } catch (e: Exception) { null }
+    }
+
+    /** قالب بلاطات رادار المطر الأحدث (ماضٍ فقط). كاش 5 دقائق. null عند الفشل. */
+    suspend fun rainTemplate(): String? = withContext(Dispatchers.IO) {
+        if (!NavConfig.ENABLE_RAINVIEWER) return@withContext null
+        rainCache?.let { (t, v) -> if (System.currentTimeMillis() - t < 5 * 60_000L) return@withContext v }
+        val text = get("https://api.rainviewer.com/public/weather-maps.json") ?: return@withContext null
+        try {
+            val j = JSONObject(text)
+            val host = j.optString("host")
+            val past = j.optJSONObject("radar")?.optJSONArray("past") ?: return@withContext null
+            if (past.length() == 0 || host.isBlank()) return@withContext null
+            val path = past.getJSONObject(past.length() - 1).optString("path")
+            val tpl = "$host$path/256/{z}/{x}/{y}/2/1_1.png"
+            rainCache = System.currentTimeMillis() to tpl
+            tpl
+        } catch (e: Exception) { null }
+    }
+}
+```
+### `RealLeafletMapView.kt`: معاملات وتأثيرات (كلها اختيارية)
+```kotlin
+eoxEnabled: Boolean = false,
+quakesEnabled: Boolean = false,
+rainEnabled: Boolean = false,
+onOverlayStatus: ((name: String, ok: Boolean) -> Unit)? = null,
+...
+val onOverlayStatusState by rememberUpdatedState(onOverlayStatus)
+// داخل addJavascriptInterface:
+@JavascriptInterface fun onOverlayStatus(name: String, ok: Boolean) { mainHandler.post { onOverlayStatusState?.invoke(name, ok) } }
+// تأثيرات:
+LaunchedEffect(isMapReady, eoxEnabled) { if (isMapReady) webViewRef?.evaluateJavascript("if (window.setEox) { window.setEox($eoxEnabled); }", null) }
+LaunchedEffect(isMapReady, quakesEnabled) {
+    if (!isMapReady) return@LaunchedEffect
+    if (!quakesEnabled) { webViewRef?.evaluateJavascript("if (window.setQuakesBase64) { window.setQuakesBase64(''); }", null); return@LaunchedEffect }
+    val list = OverlayFeeds.quakes()
+    if (list == null) { onOverlayStatusState?.invoke("quakes", false); return@LaunchedEffect }
+    val b64 = withContext(Dispatchers.Default) {
+        val arr = JSONArray()
+        list.forEach { arr.put(JSONObject().put("lat", it.lat).put("lng", it.lng).put("mag", it.mag).put("place", it.place).put("time", it.timeMs)) }
+        Base64.encodeToString(arr.toString().toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
+    }
+    webViewRef?.evaluateJavascript("if (window.setQuakesBase64) { window.setQuakesBase64('$b64'); }", null)
+}
+LaunchedEffect(isMapReady, rainEnabled) {
+    if (!isMapReady) return@LaunchedEffect
+    val tpl = if (rainEnabled) OverlayFeeds.rainTemplate() else null
+    if (rainEnabled && tpl == null) onOverlayStatusState?.invoke("rain", false)
+    val js = if (tpl != null) "window.setRainUrl('${tpl.replace("'", "")}')" else "window.setRainUrl(null)"
+    webViewRef?.evaluateJavascript("if (window.setRainUrl) { $js; }", null)
+}
+```
+### `MapScreenState.kt` (حقول بلا Saver)
+```kotlin
+var eoxEnabled by mutableStateOf(false)
+var quakesEnabled by mutableStateOf(false)
+var rainEnabled by mutableStateOf(false)
+var reliabilityEnabled by mutableStateOf(false)
+var peakEnabled by mutableStateOf(false)
+var coverageEnabled by mutableStateOf(false)
+var hazardEnabled by mutableStateOf(false)
+```
+### نافذة «طبقات إضافية» (بدل زحمة الشريط الجانبي): ملف جديد `MoreLayersSheet.kt`
+```kotlin
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun MoreLayersSheet(state: MapScreenState, onDismiss: () -> Unit) {
+    @Composable fun Row3(title: String, sub: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+        Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) { Text(title, color = Color.White, fontSize = 14.sp); Text(sub, color = Color(0xFF94A3B8), fontSize = 11.sp) }
+            Switch(checked = checked, onCheckedChange = onChange)
+        }
+    }
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Color(0xFF0F172A)) {
+        Column(Modifier.padding(16.dp).navigationBarsPadding().verticalScroll(rememberScrollState())) {
+            Text("طبقات إضافية", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            Row3("Sentinel-2 بلا سحب (EOX)", "صور أقمار أوروبية خالية من السحب (إنترنت)", state.eoxEnabled) { state.eoxEnabled = it }
+            Row3("الزلازل (USGS)", "هزات آخر أسبوع في المنطقة (إنترنت)", state.quakesEnabled) { state.quakesEnabled = it }
+            if (NavConfig.ENABLE_RAINVIEWER) Row3("رادار المطر (RainViewer)", "ماضٍ فقط • تقريبي • تكبير حتى 7", state.rainEnabled) { state.rainEnabled = it }
+            Row3("توفر الفنيين", "أخضر متاح • أصفر مشغول • أحمر بلا فنيين", state.reliabilityEnabled) { state.reliabilityEnabled = it }
+            Row3("ازدحام الحجوزات المتوقع", "من حجوزات آخر 8 أسابيع (تقديري)", state.peakEnabled) { state.peakEnabled = it }
+            Row3("مناطق انقطاع الشبكة", "تتعلمها من تنقلاتك على هذا الجهاز فقط", state.coverageEnabled) { state.coverageEnabled = it }
+            Row3("صعوبة الطرق", "من بيانات المزودين", state.hazardEnabled) { state.hazardEnabled = it }
+        }
+    }
+}
+```
+زر في `MapControls` («المزيد» `Icons.Default.Layers`/`MoreHoriz`) يفتحها. **دمج طبقات المناطق** في `MapScreenContent`:
+```kotlin
+val zones = remember(state.reliabilityEnabled, state.peakEnabled, state.coverageEnabled, state.hazardEnabled, providers, stores, peakZones, coverageZones) {
+    buildList {
+        if (state.coverageEnabled) addAll(coverageZones)
+        if (state.peakEnabled) addAll(PeakPredictor.toMapZones(peakZones))
+        if (state.reliabilityEnabled) addAll(ReliabilityZones.build(providers, stores))
+        if (state.hazardEnabled) addAll(roadDifficultyZones(providers))
+    }.take(400)
+}
+// RealLeafletMapView(..., zones = zones, eoxEnabled = state.eoxEnabled, quakesEnabled = state.quakesEnabled, rainEnabled = state.rainEnabled,
+//     onOverlayStatus = { name, ok -> if (!ok) { when (name) { "eox" -> state.eoxEnabled = false; "quakes" -> state.quakesEnabled = false; "rain" -> state.rainEnabled = false }
+//         coroutineScope.launch { snackbarHostState.showSnackbar("تعذر تحميل الطبقة (تحتاج إنترنت)") } } })
+```
+**اختبار:** فعّل كل مفتاح على حدة: تظهر الطبقة ولا تستبدل غيرها؛ أطفئ الإنترنت: تُطفأ الطبقة برسالة؛ الإسناد ظاهر في زاوية الخريطة.
+
+## 3) خريطة مناطق انقطاع الشبكة (تتعلمها من جهازك)
+**صدق:** لا تعرف مناطق الانقطاع العامة (لا بيانات مشغلين مجانية)؛ هي **ما لاحظه جهازك** أثناء تنقلاتك (محلياً، لا تُرسل). كلما استعملت التطبيق ازدادت دقتها.
+```kotlin
+package com.example.utils
+
+import android.content.Context
+import org.json.JSONArray
+import org.json.JSONObject
+import kotlin.math.floor
+
+object CoverageLog {
+    private const val FILE = "coverage_log"; private const val KEY = "cells"
+    private const val CELL = 0.005                 // ≈ 550 م
+    private const val MAX_CELLS = 2000
+    @Volatile private var lastSample = 0L
+    @Volatile private var lastLat = 0.0; @Volatile private var lastLng = 0.0
+
+    /** استدعها من مسار تحديث الموقع (MainViewModel) كل تحديث؛ تقيّد نفسها بـ20 ث و30 م. */
+    @Synchronized fun sample(ctx: Context, lat: Double, lng: Double, hasInternet: Boolean) {
+        val now = System.currentTimeMillis()
+        if (!LandmarkAddress.isValid(lat, lng) || now - lastSample < 20_000L) return
+        if (lastSample != 0L && HaversinePrecisionNavigator.calculateDistance(lat, lng, lastLat, lastLng) < 30.0) return
+        lastSample = now; lastLat = lat; lastLng = lng
+        val prefs = ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+        val root = try { JSONObject(prefs.getString(KEY, "{}")) } catch (e: Exception) { JSONObject() }
+        val k = "${floor(lat / CELL).toLong()}_${floor(lng / CELL).toLong()}"
+        val c = root.optJSONObject(k) ?: JSONObject().put("ok", 0).put("bad", 0)
+        c.put(if (hasInternet) "ok" else "bad", c.optInt(if (hasInternet) "ok" else "bad") + 1).put("t", now)
+        root.put(k, c)
+        if (root.length() > MAX_CELLS) {                                     // احذف الأقدم
+            val oldest = root.keys().asSequence().minByOrNull { root.getJSONObject(it).optLong("t") }
+            if (oldest != null) root.remove(oldest)
+        }
+        prefs.edit().putString(KEY, root.toString()).apply()
+    }
+
+    /** منطقة ميتة: لاحظنا انقطاعاً ≥ مرتين وأكثر من حالات الاتصال. */
+    fun deadZones(ctx: Context): List<MapZone> {
+        val root = try { JSONObject(ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).getString(KEY, "{}")) } catch (e: Exception) { return emptyList() }
+        val out = mutableListOf<MapZone>()
+        root.keys().forEach { k ->
+            val c = root.getJSONObject(k)
+            if (c.optInt("bad") >= 2 && c.optInt("bad") > c.optInt("ok")) {
+                val (a, b) = k.split("_").map { it.toLong() }
+                out.add(MapZone((a + 0.5) * CELL, (b + 0.5) * CELL, 350, "#A78BFA"))
+            }
+        }
+        return out
+    }
+    fun clear(ctx: Context) { ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit().clear().apply() }
+}
+```
+الاستدعاء داخل `MainViewModel.updateUserLocation`: `CoverageLog.sample(appContext, lat, lng, NetworkUtils.hasInternetTransport(appContext))` (داخل `try/catch`). و`coverageZones = remember(state.coverageEnabled) { if (state.coverageEnabled) CoverageLog.deadZones(context) else emptyList() }`. زر «مسح بيانات التغطية» في الإعدادات.
+**ملاحظة:** حالة «بلا إنترنت» تُلتقط حين يكون التطبيق مفتوحاً؛ تغطية الشبكات الخلوية نفسها (إشارة بلا بيانات) غير مقاسة.
+
+## 4) تنبيه صعوبة الطرق قبل دخولها أثناء الملاحة
+```kotlin
+object HazardAlerts {
+    /** يعيد أقرب منطقة خطر ضمن المسافة، أو null. */
+    fun nearest(lat: Double, lng: Double, zones: List<MapZone>, alertMeters: Double = 300.0): MapZone? =
+        zones.filter { HaversinePrecisionNavigator.calculateDistance(lat, lng, it.lat, it.lng) <= it.radiusM + alertMeters }
+             .minByOrNull { HaversinePrecisionNavigator.calculateDistance(lat, lng, it.lat, it.lng) }
+}
+```
+في `NavigationScreen` (معامل `hazardZones: List<MapZone> = emptyList()` يمرّره `MapScreenContent` = `roadDifficultyZones(providers)`):
+```kotlin
+val warned = remember { mutableSetOf<String>() }
+// داخل مؤثر التتبع بعد حساب الموقع (hasRealLocation):
+HazardAlerts.nearest(userLat, userLng, hazardZones)?.let { z ->
+    val key = "${"%.4f".format(z.lat)}_${"%.4f".format(z.lng)}"
+    if (warned.add(key)) speak("تنبيه: طريق وعر أو صعب خلال ${MapDistanceCalculator.formatDistanceSpoken(300.0)}", true)
+}
+```
+(تنبيه واحد لكل منطقة في الرحلة.)
+```kotlin
+class HazardAlertsTest { @org.junit.Test fun nearZone() {
+    val z = MapZone(15.0, 44.0, 250, "#EF4444")
+    org.junit.Assert.assertNotNull(HazardAlerts.nearest(15.0, 44.004, listOf(z)))     // ≈ 445 م < 250+300
+    org.junit.Assert.assertNull(HazardAlerts.nearest(15.0, 44.02, listOf(z)))
+} }
+```
+
+## 5) تصدير GPX (مسار الرحلة ومسار الخطة)
+```kotlin
+package com.example.utils
+
+import android.content.Context
+import androidx.core.content.FileProvider
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
+
+data class TrackPoint(val lat: Double, val lng: Double, val timeMs: Long)
+
+object GpxWriter {
+    private fun esc(s: String) = s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;")
+    private val iso = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply { timeZone = TimeZone.getTimeZone("UTC") }
+
+    fun track(name: String, pts: List<TrackPoint>): String = buildString {
+        append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
+        append("<gpx version=\"1.1\" creator=\"AlYemenServices\" xmlns=\"http://www.topografix.com/GPX/1/1\">\n")
+        append("<trk><name>${esc(name)}</name><trkseg>\n")
+        synchronized(iso) { pts.forEach { append("<trkpt lat=\"${"%.6f".format(Locale.US, it.lat)}\" lon=\"${"%.6f".format(Locale.US, it.lng)}\"><time>${iso.format(Date(it.timeMs))}</time></trkpt>\n") } }
+        append("</trkseg></trk></gpx>")
+    }
+
+    /** مسار مخطّط (بلا أوقات). */
+    fun route(name: String, coords: List<Pair<Double, Double>>): String = buildString {
+        append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
+        append("<gpx version=\"1.1\" creator=\"AlYemenServices\" xmlns=\"http://www.topografix.com/GPX/1/1\">\n<rte><name>${esc(name)}</name>\n")
+        coords.forEach { append("<rtept lat=\"${"%.6f".format(Locale.US, it.first)}\" lon=\"${"%.6f".format(Locale.US, it.second)}\"/>\n") }
+        append("</rte></gpx>")
+    }
+
+    /** يحفظ في cache/exports ويعيد Uri للمشاركة (يتطلب <cache-path name="exports" path="exports/"/> في file_paths.xml). */
+    fun saveAndUri(context: Context, fileName: String, xml: String): android.net.Uri? = try {
+        val dir = File(context.cacheDir, "exports").apply { mkdirs() }
+        dir.listFiles()?.filter { System.currentTimeMillis() - it.lastModified() > 86_400_000L }?.forEach { it.delete() }   // نظّف الأقدم من يوم
+        val f = File(dir, fileName.replace(Regex("[^A-Za-z0-9._-]"), "_"))
+        f.writeText(xml, Charsets.UTF_8)
+        FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", f)
+    } catch (e: Exception) { null }
+}
+
+/** مسجّل رحلة اختياري (خصوصية: يعمل فقط بتفعيل المستخدم). */
+class TripRecorder {
+    private val pts = ArrayList<TrackPoint>()
+    var enabled = false
+    fun add(lat: Double, lng: Double, now: Long = System.currentTimeMillis()) {
+        if (!enabled || !LandmarkAddress.isValid(lat, lng) || pts.size >= 20_000) return
+        val last = pts.lastOrNull()
+        if (last != null && now - last.timeMs < 2_000L &&
+            HaversinePrecisionNavigator.calculateDistance(last.lat, last.lng, lat, lng) < 5.0) return
+        pts.add(TrackPoint(lat, lng, now))
+    }
+    fun snapshot(): List<TrackPoint> = pts.toList()
+    fun clear() = pts.clear()
+}
+```
+المشاركة: `startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply { type = "application/gpx+xml"; putExtra(Intent.EXTRA_STREAM, uri); addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION) }, "تصدير GPX"))`. في `NavigationScreen`: زر «GPX» + مفتاح «تسجيل الرحلة»؛ `recorder.add(userLat, userLng)` داخل مؤثر التتبع. و`file_paths.xml`: أضف `<cache-path name="exports" path="exports/" />`.
+```kotlin
+class GpxWriterTest {
+    @org.junit.Test fun escapesAndStructure() {
+        val x = GpxWriter.route("a & b <c>", listOf(15.0 to 44.0, 15.1 to 44.1))
+        org.junit.Assert.assertTrue(x.contains("a &amp; b &lt;c&gt;")); org.junit.Assert.assertEquals(2, Regex("<rtept").findAll(x).count())
+    }
+}
+```
+
+## 6) طباعة/مشاركة ملخص المسار كـ PDF (رسم تخطيطي بلا إنترنت)
+يرسم عنواناً وملخصاً وقائمة التعليمات ورسماً تخطيطياً للمسار (إسقاط بسيط) بلا بلاطات؛ يُشارك أو يُطبع من عارض PDF.
+```kotlin
+package com.example.utils
+
+import android.content.Context
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.Path
+import android.graphics.pdf.PdfDocument
+import android.text.Layout
+import android.text.StaticLayout
+import android.text.TextPaint
+import androidx.core.content.FileProvider
+import java.io.File
+import java.io.FileOutputStream
+import kotlin.math.cos
+import kotlin.math.max
+import kotlin.math.min
+
+object RoutePdfBuilder {
+    private const val W = 595; private const val H = 842; private const val M = 36f
+
+    fun build(context: Context, title: String, summary: String, steps: List<String>, coords: List<Pair<Double, Double>>): android.net.Uri? = try {
+        val doc = PdfDocument()
+        var pageNo = 1
+        var page = doc.startPage(PdfDocument.PageInfo.Builder(W, H, pageNo).create())
+        var canvas = page.canvas
+        val titleP = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { textSize = 20f; color = Color.BLACK; isFakeBoldText = true }
+        val bodyP = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { textSize = 12f; color = Color.DKGRAY }
+        var y = M
+
+        fun drawRtl(text: String, p: TextPaint, top: Float): Float {
+            val layout = StaticLayout.Builder.obtain(text, 0, text.length, p, (W - 2 * M).toInt())
+                .setAlignment(Layout.Alignment.ALIGN_OPPOSITE)            // يمين في النص العربي
+                .setLineSpacing(0f, 1.15f).build()
+            canvas.save(); canvas.translate(M, top); layout.draw(canvas); canvas.restore()
+            return top + layout.height
+        }
+        y = drawRtl(title, titleP, y) + 8f
+        y = drawRtl(summary, bodyP, y) + 14f
+
+        // رسم تخطيطي للمسار
+        if (coords.size >= 2) {
+            val boxH = 220f; val box = android.graphics.RectF(M, y, W - M, y + boxH)
+            val frame = Paint().apply { style = Paint.Style.STROKE; color = Color.LTGRAY }
+            canvas.drawRect(box, frame)
+            val minLat = coords.minOf { it.first }; val maxLat = coords.maxOf { it.first }
+            val minLng = coords.minOf { it.second }; val maxLng = coords.maxOf { it.second }
+            val kx = cos(Math.toRadians((minLat + maxLat) / 2))
+            val w = max((maxLng - minLng) * kx, 1e-6); val h = max(maxLat - minLat, 1e-6)
+            val s = min((box.width() - 20f) / w, (box.height() - 20f) / h).toFloat()
+            fun px(lng: Double) = (box.left + 10f + ((lng - minLng) * kx * s)).toFloat()
+            fun py(lat: Double) = (box.bottom - 10f - ((lat - minLat) * s)).toFloat()
+            val path = Path().apply { coords.forEachIndexed { i, c -> if (i == 0) moveTo(px(c.second), py(c.first)) else lineTo(px(c.second), py(c.first)) } }
+            canvas.drawPath(path, Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 3f; color = Color.rgb(0, 140, 200) })
+            canvas.drawCircle(px(coords.first().second), py(coords.first().first), 6f, Paint().apply { color = Color.rgb(16, 185, 129) })
+            canvas.drawCircle(px(coords.last().second), py(coords.last().first), 6f, Paint().apply { color = Color.rgb(220, 38, 38) })
+            y = box.bottom + 16f
+        }
+        steps.forEachIndexed { i, s ->
+            if (y > H - 80f) { doc.finishPage(page); pageNo++; page = doc.startPage(PdfDocument.PageInfo.Builder(W, H, pageNo).create()); canvas = page.canvas; y = M }
+            y = drawRtl("${i + 1}. $s", bodyP, y) + 4f
+        }
+        doc.finishPage(page)
+        val dir = File(context.cacheDir, "exports").apply { mkdirs() }
+        val f = File(dir, "route_${System.currentTimeMillis()}.pdf")
+        FileOutputStream(f).use { doc.writeTo(it) }
+        doc.close()
+        FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", f)
+    } catch (e: Exception) { null }
+}
+```
+زر «PDF» في بطاقة الملاحة: `RoutePdfBuilder.build(context, "رحلتي إلى ${target.name}", "المسافة ${…} • الوقت ${…}${if (isApproximate) " (تقريبي)" else ""}", steps.map { it.instruction }, result.coordinates)` ثم مشاركة بـ`ACTION_SEND` (`application/pdf`). (يعمل أوفلاين تماماً؛ الرسم تخطيطي لا خريطة.)
+
+## 7) HUD عاكس للزجاج الأمامي
+شاشة سوداء بأرقام كبيرة (السرعة + المسافة للمنعطف + السهم) تنعكس أفقياً لتظهر صحيحة عند وضع الهاتف على لوحة القيادة. مفتاح في بطاقة الملاحة.
+```kotlin
+@Composable
+fun HudMirror(speedKmh: Int, distToManeuverText: String, instruction: String, mirrored: Boolean, onClose: () -> Unit) {
+    Box(Modifier.fillMaxSize().background(Color.Black).clickable { onClose() }) {
+        Column(
+            Modifier.align(Alignment.Center).graphicsLayer(scaleX = if (mirrored) -1f else 1f),
+            horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Text(distToManeuverText, color = Color(0xFF00E5FF), fontSize = 64.sp, fontWeight = FontWeight.ExtraBold)
+            Text(instruction, color = Color.White, fontSize = 28.sp, textAlign = TextAlign.Center, maxLines = 3)
+            Text("$speedKmh كم/س", color = Color(0xFF10B981), fontSize = 44.sp, fontWeight = FontWeight.Bold)
+        }
+        Text("اضغط للإغلاق", color = Color(0xFF475569), fontSize = 11.sp, modifier = Modifier.align(Alignment.BottomCenter).padding(12.dp))
+    }
+}
+```
+في `NavigationScreen`: `var hud by remember { mutableStateOf(false) }` وزر «HUD» يفتحها فوق الشاشة (مع `keepScreenOn` الموجود)، وتمرّر `speedKmh = currentSpeedKmh`، والمسافة `MapDistanceCalculator.formatDistance(distToManeuver)`، والتعليمة `upcoming?.instruction`. (الشاشة سوداء توفر البطارية على OLED.)
+
+## 8) فلتر كالمان ثنائي المحور (تنعيم الموقع)
+يقلل ارتجاج GPS (وخصوصاً مع التشويش في اليمن) بفلترين مستقلين للشرق والشمال بالأمتار (فلا يحدث انجراف بين المحورين)، ويستعمل دقة كل قراءة كتباين للقياس.
+```kotlin
+package com.example.utils
+
+import kotlin.math.cos
+import kotlin.math.max
+
+class LatLngKalman(private val processNoiseMps: Double = 3.0) {
+    private class Axis { var x = Double.NaN; var p = 0.0
+        fun update(z: Double, r: Double, dt: Double, q: Double): Double {
+            if (x.isNaN()) { x = z; p = r; return x }
+            p += q * q * dt                      // تنامي عدم اليقين مع الزمن
+            val k = p / (p + r)
+            x += k * (z - x); p *= (1 - k)
+            return x
+        } }
+    private var originLat = Double.NaN; private var originLng = Double.NaN
+    private var east = Axis(); private var north = Axis(); private var lastMs = 0L
+
+    fun reset() { originLat = Double.NaN; east = Axis(); north = Axis(); lastMs = 0L }
+
+    fun process(lat: Double, lng: Double, accuracyM: Float, timeMs: Long): Pair<Double, Double> {
+        if (originLat.isNaN() || timeMs - lastMs > 10_000L) { reset(); originLat = lat; originLng = lng }
+        val dt = if (lastMs == 0L) 0.0 else ((timeMs - lastMs).coerceAtLeast(0L)) / 1000.0
+        lastMs = timeMs
+        val mLat = 111_195.0; val mLng = 111_195.0 * cos(Math.toRadians(originLat))
+        val r = max(accuracyM.toDouble(), 3.0).let { it * it }
+        val e = east.update((lng - originLng) * mLng, r, dt, processNoiseMps)
+        val n = north.update((lat - originLat) * mLat, r, dt, processNoiseMps)
+        return (originLat + n / mLat) to (originLng + e / mLng)
+    }
+}
+```
+**التكامل** في `LocationService.locationUpdates` (قبل `trySend`):
+```kotlin
+val kalman = LatLngKalman()                 // خارج callback، داخل callbackFlow
+// ... داخل onLocationResult بعد الفلاتر الحالية:
+val (fl, fg) = kalman.process(loc.latitude, loc.longitude, if (loc.hasAccuracy()) loc.accuracy else 20f, loc.time)
+trySend(LocationCoordinates(latitude = fl, longitude = fg, accuracyMeters = loc.accuracy, timestamp = loc.time))
+```
+**ضبط:** `processNoiseMps = 3.0` مناسب للسيارة؛ للمشي استعمل 1.0. القيم الأكبر تتبع الحركة بسرعة وتنعّم أقل. **اختبار JVM:**
+```kotlin
+class LatLngKalmanTest {
+    @org.junit.Test fun noisyStationaryConverges() {
+        val k = LatLngKalman(); val rnd = java.util.Random(1)
+        var last = 0.0 to 0.0
+        repeat(60) { i -> last = k.process(15.0 + rnd.nextGaussian() * 0.00005, 44.0 + rnd.nextGaussian() * 0.00005, 8f, 1000L * i) }
+        org.junit.Assert.assertEquals(15.0, last.first, 0.00004); org.junit.Assert.assertEquals(44.0, last.second, 0.00004)
+    }
+    @org.junit.Test fun gapResets() {
+        val k = LatLngKalman(); k.process(15.0, 44.0, 5f, 0L)
+        val p = k.process(16.0, 45.0, 5f, 60_000L)        // فجوة > 10 ث: لا تنعيم عبر القفزة
+        org.junit.Assert.assertEquals(16.0, p.first, 1e-6)
+    }
+}
+```
+
+## 9) «مجموعة»: تتبع أفراد العائلة/الفريق بتحديث يدوي
+كل فرد يُنشئ رمز تتبع من جهازه (المستند 62) ويرسله؛ المجموعة تحفظ الرموز محلياً وتقرأها بـ`get()` عند الضغط على «تحديث» (≤ 5 أشخاص، مهلة 20 ث).
+```kotlin
+data class GroupMember(val label: String, val token: String)
+
+class GroupStore(context: android.content.Context) {
+    private val prefs = context.applicationContext.getSharedPreferences("group_tracking", android.content.Context.MODE_PRIVATE)
+    fun all(): List<GroupMember> = try {
+        val a = org.json.JSONArray(prefs.getString("m", "[]")); (0 until a.length()).map { GroupMember(a.getJSONObject(it).getString("l"), a.getJSONObject(it).getString("t")) }
+    } catch (e: Exception) { emptyList() }
+    fun add(label: String, token: String): Boolean {
+        if (!TrackingShareManager.TOKEN_REGEX.matches(token) || label.isBlank()) return false
+        val cur = all().filterNot { it.token == token }
+        if (cur.size >= 5) return false
+        save(cur + GroupMember(label.take(20), token)); return true
+    }
+    fun remove(token: String) = save(all().filterNot { it.token == token })
+    private fun save(l: List<GroupMember>) {
+        val a = org.json.JSONArray(); l.forEach { a.put(org.json.JSONObject().put("l", it.label).put("t", it.token)) }
+        prefs.edit().putString("m", a.toString()).apply()
+    }
+}
+// عند «تحديث»: val snaps = members.map { it to TrackingShareManager.fetch(db, it.token) }   // 5 قراءات كحد أقصى
+// الخريطة: waypointMarkers = snaps.mapNotNull { (m, s) -> s?.let { Triple(m.label, it.lat, it.lng) } }
+// عنصر منتهٍ (null) يُعرض «انتهت المشاركة» مع زر إزالة. لا مستمعين لحظيين.
+```
+**الخصوصية:** لا مشاركة بلا إنشاء الفرد نفسه الرمز، ويستطيع إيقافها فوراً (`revoke`).
+
+## 10) ملخص ما يبقى من الإصلاحات السابقة (لا ملفات جديدة منك منذ المستند 58)
+1) حذف `MapTestRunner` (النسختين) وربط المشخّص الحقيقي. 2) حذف قواعد Proguard الزائدة (hilt/inject/coroutines) عند تفعيل R8 وتفعيل `isMinifyEnabled` للإصدار. 3) المستند 57: موافقة التحليلات، تنظيف `tel:` (7 مواضع)، تهريب CSV، فحص الإشعارات و`target_screen`. 4) المستند 56: تنفيذ `voteReviewHelpful` بمعاملة. 5) تحقق من 16KB وABI وApp Check قبل التوزيع من GitHub (المستندان 46 و51).
+## ترتيب التنفيذ
+7 (HUD) ← 8 (كالمان) ← 5 (GPX) ← 6 (PDF) ← 1 (الطبقات) ← 3 و4 ← 9. وبعد كل خطوة: `./gradlew testDebugUnitTest` ثم الاختبار الميداني.

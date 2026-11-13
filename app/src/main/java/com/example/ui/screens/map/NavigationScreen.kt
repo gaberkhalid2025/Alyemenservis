@@ -83,6 +83,7 @@ fun NavigationScreen(
     isDrivingMode: Boolean = true,
     bookingId: String? = null,
     chatBridge: com.example.utils.BookingChatBridge? = null,
+    hazardZones: List<MapZone> = emptyList(),
     onArrivedAtWaypoint: ((Int) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
@@ -210,10 +211,45 @@ fun NavigationScreen(
 
     var isTopCardCollapsed by remember { mutableStateOf(false) }
     var isBottomCardCollapsed by remember { mutableStateOf(false) }
+    var showHud by remember { mutableStateOf(false) }
+    var isHudMirrored by remember { mutableStateOf(true) }
+
+    val tripRecorder = remember { TripRecorder() }
+    var isRecordingTrip by remember { mutableStateOf(false) }
+    var recordedPointCount by remember { mutableIntStateOf(0) }
+    val warnedHazards = remember { mutableSetOf<String>() }
+    var activeHazardBanner by remember { mutableStateOf<String?>(null) }
 
     var drActive by remember { mutableStateOf(false) }
     var lastAlong by remember { mutableDoubleStateOf(0.0) }
     var lastSpeedMps by remember { mutableDoubleStateOf(0.0) }
+
+    // تنبيه صوتي ومرئي مسبق قبل الدخول لمناطق وعورة الطريق
+    LaunchedEffect(userLat, userLng, hazardZones, hasRealLocation) {
+        if (!hasRealLocation || hazardZones.isEmpty()) {
+            activeHazardBanner = null
+            return@LaunchedEffect
+        }
+        val z = HazardAlerts.nearest(userLat, userLng, hazardZones, thresholdMeters = 300.0)
+        if (z != null) {
+            val msg = HazardAlerts.describeZone(z)
+            activeHazardBanner = msg
+            val key = "${String.format(Locale.US, "%.4f", z.lat)},${String.format(Locale.US, "%.4f", z.lng)}"
+            if (warnedHazards.add(key)) {
+                speak(msg, ManeuverType.STRAIGHT, true)
+            }
+        } else {
+            activeHazardBanner = null
+        }
+    }
+
+    // تسجيل مسار الرحلة عند التفعيل
+    LaunchedEffect(userLat, userLng, isRecordingTrip, hasRealLocation) {
+        if (isRecordingTrip && hasRealLocation) {
+            tripRecorder.record(userLat, userLng)
+            recordedPointCount = tripRecorder.size
+        }
+    }
 
     // تذكّر آخر وضع موثوق للـ Dead Reckoning
     LaunchedEffect(trackerState, hasRealLocation) {
@@ -633,6 +669,24 @@ fun NavigationScreen(
                     }
                 }
             }
+
+            activeHazardBanner?.let { hazardText ->
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color(0xDD7F1D1D),
+                    border = BorderStroke(1.dp, Color(0xFFEF4444)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(Icons.Default.Warning, contentDescription = null, tint = Color(0xFFFCA5A5), modifier = Modifier.size(18.dp))
+                        Text(hazardText, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
         }
 
         // زر إعادة التمركز
@@ -759,10 +813,124 @@ fun NavigationScreen(
                                 modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
                                 color = Color(0xFF00E5FF), trackColor = Color(0xFF334155)
                             )
+                            LazyRow(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                item {
+                                    AssistChip(
+                                        onClick = { showHud = true },
+                                        label = { Text("🚘 HUD", fontSize = 11.5.sp, color = Color(0xFF10B981), fontWeight = FontWeight.Bold) },
+                                        colors = AssistChipDefaults.assistChipColors(containerColor = Color(0xFF1E293B)),
+                                        modifier = Modifier.heightIn(min = 40.dp).testTag("nav_hud_btn")
+                                    )
+                                }
+                                item {
+                                    AssistChip(
+                                        onClick = {
+                                            isRecordingTrip = !isRecordingTrip
+                                            if (isRecordingTrip && hasRealLocation) {
+                                                tripRecorder.record(userLat, userLng)
+                                                recordedPointCount = tripRecorder.size
+                                            }
+                                            scope.launch {
+                                                snackbarHostState.showSnackbar(
+                                                    if (isRecordingTrip) "⏺️ بدأ تسجيل مسار الرحلة"
+                                                    else "⏸️ توقف التسجيل ($recordedPointCount نقطة محفوظة)"
+                                                )
+                                            }
+                                        },
+                                        label = {
+                                            Text(
+                                                if (isRecordingTrip) "⏹️ إيقاف ($recordedPointCount)" else "⏺️ تسجيل",
+                                                fontSize = 11.5.sp,
+                                                color = if (isRecordingTrip) Color(0xFFFCA5A5) else Color.White
+                                            )
+                                        },
+                                        colors = AssistChipDefaults.assistChipColors(
+                                            containerColor = if (isRecordingTrip) Color(0xFF7F1D1D) else Color(0xFF1E293B)
+                                        ),
+                                        modifier = Modifier.heightIn(min = 40.dp).testTag("nav_record_trip_btn")
+                                    )
+                                }
+                                item {
+                                    AssistChip(
+                                        onClick = {
+                                            val recPts = tripRecorder.snapshot()
+                                            val routePts = result?.coordinates.orEmpty()
+                                            val gpxTitle = target?.name?.ifBlank { "رحلة" } ?: "رحلة"
+                                            val gpxContent = when {
+                                                recPts.size >= 2 -> GpxWriter.track(gpxTitle, recPts)
+                                                routePts.size >= 2 -> GpxWriter.route(gpxTitle, routePts)
+                                                else -> null
+                                            }
+                                            if (gpxContent == null) {
+                                                scope.launch { snackbarHostState.showSnackbar("لا توجد نقاط مسار كافية لتصدير GPX") }
+                                            } else {
+                                                val uri = GpxWriter.saveAndUri(context, "route_${System.currentTimeMillis()}.gpx", gpxContent)
+                                                if (uri != null) {
+                                                    val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                                        type = "application/gpx+xml"
+                                                        putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                                                        addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                                    }
+                                                    SosDispatcher.safeStart(context, android.content.Intent.createChooser(intent, "مشاركة ملف GPX"))
+                                                } else {
+                                                    scope.launch { snackbarHostState.showSnackbar("تعذر حفظ ملف GPX") }
+                                                }
+                                            }
+                                        },
+                                        label = { Text("🛰️ GPX", fontSize = 11.5.sp, color = Color(0xFF00E5FF), fontWeight = FontWeight.Bold) },
+                                        colors = AssistChipDefaults.assistChipColors(containerColor = Color(0xFF1E293B)),
+                                        modifier = Modifier.heightIn(min = 40.dp).testTag("nav_export_gpx_btn")
+                                    )
+                                }
+                                item {
+                                    AssistChip(
+                                        onClick = {
+                                            val uri = RoutePdfBuilder.buildAndUri(
+                                                context = context,
+                                                title = "خطة المسار: ${target?.name ?: "الوجهة"}",
+                                                coords = result?.coordinates.orEmpty(),
+                                                waypoints = waypoints.toList(),
+                                                steps = steps,
+                                                totalDistanceMeters = totalMeters,
+                                                totalDurationSeconds = result?.totalDurationSeconds ?: 0.0
+                                            )
+                                            if (uri != null) {
+                                                val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                                    type = "application/pdf"
+                                                    putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                                                    addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                                }
+                                                SosDispatcher.safeStart(context, android.content.Intent.createChooser(intent, "مشاركة خطة المسار PDF"))
+                                            } else {
+                                                scope.launch { snackbarHostState.showSnackbar("تعذر إنشاء ملف PDF") }
+                                            }
+                                        },
+                                        label = { Text("📄 PDF", fontSize = 11.5.sp, color = Color(0xFFFBBF24), fontWeight = FontWeight.Bold) },
+                                        colors = AssistChipDefaults.assistChipColors(containerColor = Color(0xFF1E293B)),
+                                        modifier = Modifier.heightIn(min = 40.dp).testTag("nav_export_pdf_btn")
+                                    )
+                                }
+                            }
                         }
                     }
                 }
             }
+        }
+
+        if (showHud) {
+            androidx.activity.compose.BackHandler(enabled = true) { showHud = false }
+            com.example.ui.screens.map.components.HudMirrorOverlay(
+                speedKmh = currentSpeedKmh,
+                distToManeuverText = MapDistanceCalculator.formatDistance(distToManeuver),
+                instruction = instructionText,
+                maneuverType = if (isApproximate) null else upcoming?.maneuverType,
+                mirrored = isHudMirrored,
+                onToggleMirror = { isHudMirrored = !isHudMirrored },
+                onClose = { showHud = false }
+            )
         }
 
         // ───────── تأكيد إضافة محطة من الخريطة ─────────

@@ -77,7 +77,10 @@ fun MapControls(
     onTogglePinPickMode: () -> Unit = {},
     isEcoMode: Boolean = false,
     onToggleEcoMode: () -> Unit = {},
-    onOpenCoordinateEntry: () -> Unit = {}
+    onOpenCoordinateEntry: () -> Unit = {},
+    hasMoreLayersActive: Boolean = false,
+    onOpenMoreLayers: () -> Unit = {},
+    onOpenGroupTracking: () -> Unit = {}
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "gps_pulse")
     val gpsPulseAlpha by infiniteTransition.animateFloat(
@@ -282,7 +285,7 @@ fun MapControls(
                 DockButton(
                     icon = Icons.Default.Tune,
                     label = "أدوات",
-                    active = isGibsActive || isZonesActive || isPinPickMode || isEcoMode,
+                    active = isGibsActive || isZonesActive || isPinPickMode || isEcoMode || hasMoreLayersActive,
                     activeColor = Color(0xFF00E5FF),
                     onClick = { showMoreTools = true },
                     testTag = "map_tools_btn",
@@ -348,6 +351,30 @@ fun MapControls(
                             onClick = { toggleZonesAction(); showMoreTools = false }
                         )
                     }
+                    HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+                    // 14. طبقات إضافية (EOX / USGS / RainViewer / التغطية / الذروة / الوعورة)
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                "🗂️ طبقات إضافية",
+                                color = if (hasMoreLayersActive) Color(0xFF00E5FF) else Color.White
+                            )
+                        },
+                        leadingIcon = {
+                            Icon(
+                                Icons.Default.Layers,
+                                contentDescription = null,
+                                tint = if (hasMoreLayersActive) Color(0xFF00E5FF) else Color(0xFFFBBF24)
+                            )
+                        },
+                        onClick = { onOpenMoreLayers(); showMoreTools = false }
+                    )
+                    // 15. تتبع المجموعة (تحديث يدوي ≤ 5 أعضاء)
+                    DropdownMenuItem(
+                        text = { Text("👥 تتبع المجموعة", color = Color.White) },
+                        leadingIcon = { Icon(Icons.Default.Group, contentDescription = null, tint = Color(0xFF10B981)) },
+                        onClick = { onOpenGroupTracking(); showMoreTools = false }
+                    )
                 }
             }
         }

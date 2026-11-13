@@ -389,6 +389,13 @@ class MainViewModel @Inject constructor(
     fun updateUserLocation(lat: Double, lng: Double) {
         _userLatitude.value = lat
         _userLongitude.value = lng
+        if (!_isManualLocationSet.value && LandmarkAddress.isValid(lat, lng)) {
+            appContext?.let { ctx ->
+                try {
+                    CoverageLog.sample(ctx, lat, lng, com.example.NetworkUtils.hasInternetTransport(ctx))
+                } catch (_: Throwable) {}
+            }
+        }
     }
 
     fun setManualUserLocation(lat: Double, lng: Double) {

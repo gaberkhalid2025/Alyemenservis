@@ -211,6 +211,7 @@ class LocationService(
             .build()
 
         var last: Location? = null
+        val kalman = LatLngKalman()
         val callback = object : com.google.android.gms.location.LocationCallback() {
             override fun onLocationResult(result: com.google.android.gms.location.LocationResult) {
                 val loc = result.lastLocation ?: return
@@ -223,9 +224,11 @@ class LocationService(
                     if (dt > 0 && prev.distanceTo(loc) / dt > 70.0) return
                 }
                 last = loc
+                val acc = if (loc.hasAccuracy()) loc.accuracy else 20f
+                val (sLat, sLng) = kalman.update(loc.latitude, loc.longitude, acc, loc.time)
                 trySend(LocationCoordinates(
-                    latitude = loc.latitude,
-                    longitude = loc.longitude,
+                    latitude = sLat,
+                    longitude = sLng,
                     accuracyMeters = loc.accuracy,
                     timestamp = loc.time
                 ))

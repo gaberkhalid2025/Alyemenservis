@@ -92,6 +92,10 @@ fun RealLeafletMapView(
     useZoomTicks: Boolean = false,
     navZoom: Int? = null,
     zones: List<MapZone> = emptyList(),
+    eoxEnabled: Boolean = false,
+    quakesJson: String? = null,
+    rainUrl: String? = null,
+    onOverlayStatus: ((name: String, failing: Boolean, msg: String) -> Unit)? = null,
     themeColors: VisualThemePalette = resolveThemePalette(AdminSettingsEntity()),
     modifier: Modifier = Modifier
 ) {
@@ -115,6 +119,7 @@ fun RealLeafletMapView(
     val onMapLongPressedState by rememberUpdatedState(onMapLongPressed)
     val onMapCenterChangedState by rememberUpdatedState(onMapCenterChanged)
     val onGibsStatusState by rememberUpdatedState(onGibsStatus)
+    val onOverlayStatusState by rememberUpdatedState(onOverlayStatus)
 
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner, webViewRef) {
@@ -346,6 +351,31 @@ fun RealLeafletMapView(
         }
     }
 
+    LaunchedEffect(isMapReady, eoxEnabled) {
+        if (isMapReady && webViewRef != null) {
+            webViewRef?.evaluateJavascript("if (window.setEox) { window.setEox($eoxEnabled); }", null)
+        }
+    }
+
+    LaunchedEffect(isMapReady, quakesJson) {
+        if (isMapReady && webViewRef != null) {
+            val json = quakesJson
+            if (json.isNullOrBlank()) {
+                webViewRef?.evaluateJavascript("if (window.setQuakesBase64) { window.setQuakesBase64(''); }", null)
+            } else {
+                val b64 = Base64.encodeToString(json.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
+                webViewRef?.evaluateJavascript("if (window.setQuakesBase64) { window.setQuakesBase64('$b64'); }", null)
+            }
+        }
+    }
+
+    LaunchedEffect(isMapReady, rainUrl) {
+        if (isMapReady && webViewRef != null) {
+            val safeUrl = (rainUrl ?: "").replace("'", "").replace("\"", "").trim()
+            webViewRef?.evaluateJavascript("if (window.setRainUrl) { window.setRainUrl('$safeUrl'); }", null)
+        }
+    }
+
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -429,6 +459,11 @@ fun RealLeafletMapView(
                             }
 
                             @JavascriptInterface
+                            fun onOverlayStatus(name: String, failing: Boolean, msg: String) {
+                                mainHandler.post { onOverlayStatusState?.invoke(name, failing, msg) }
+                            }
+
+                            @JavascriptInterface
                             fun onMapPicked(lat: Double, lng: Double) {
                                 mainHandler.post { onMapPickedState?.invoke(lat, lng) }
                             }
@@ -455,7 +490,16 @@ fun RealLeafletMapView(
                         }, "AndroidBridge")
 
                         webViewClient = object : WebViewClient() {
-                            private val ALLOWED_HOSTS = setOf("www.openstreetmap.org", "www.hotosm.org", "opentopomap.org", "www.esri.com", "earthdata.nasa.gov")
+                            private val ALLOWED_HOSTS = setOf(
+                                "www.openstreetmap.org",
+                                "www.hotosm.org",
+                                "opentopomap.org",
+                                "www.esri.com",
+                                "earthdata.nasa.gov",
+                                "s2maps.eu",
+                                "creativecommons.org",
+                                "www.rainviewer.com"
+                            )
 
                             override fun shouldInterceptRequest(
                                 view: WebView?,

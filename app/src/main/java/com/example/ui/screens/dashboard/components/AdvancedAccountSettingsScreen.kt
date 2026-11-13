@@ -93,6 +93,38 @@ fun AdvancedAccountSettingsScreen(
             }
         }
 
+        val ctx = androidx.compose.ui.platform.LocalContext.current
+        var coverageCount by remember { mutableIntStateOf(com.example.utils.CoverageLog.cellCount(ctx)) }
+        var showClearCoverageConfirm by remember { mutableStateOf(false) }
+
+        OutlinedButton(
+            onClick = { showClearCoverageConfirm = true },
+            enabled = coverageCount > 0,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Icon(Icons.Default.Delete, contentDescription = null)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("مسح بيانات التغطية ($coverageCount)")
+        }
+
+        if (showClearCoverageConfirm) {
+            AlertDialog(
+                onDismissRequest = { showClearCoverageConfirm = false },
+                title = { Text("مسح بيانات التغطية؟") },
+                text = { Text("سيتم حذف سجل مناطق ضعف الشبكة المحفوظ محلياً على جهازك.") },
+                confirmButton = {
+                    TextButton(onClick = {
+                        com.example.utils.CoverageLog.clear(ctx)
+                        coverageCount = 0
+                        showClearCoverageConfirm = false
+                    }) { Text("مسح", color = MaterialTheme.colorScheme.error) }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showClearCoverageConfirm = false }) { Text("إلغاء") }
+                }
+            )
+        }
+
         OutlinedButton(
             onClick = { showDeleteConfirm = true },
             colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),

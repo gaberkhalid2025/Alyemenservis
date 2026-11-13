@@ -130,6 +130,13 @@ fun MapScreenContent(
     var showZones by remember { mutableStateOf(false) }
     var showServicesSheet by remember { mutableStateOf(false) }
     var showDestinationPicker by remember { mutableStateOf(false) }
+    var showMoreLayersSheet by remember { mutableStateOf(false) }
+    var showGroupTracking by remember { mutableStateOf(false) }
+    var coverageRefreshTick by remember { mutableIntStateOf(0) }
+    var quakesJson by remember { mutableStateOf<String?>(null) }
+    var rainUrl by remember { mutableStateOf<String?>(null) }
+    val groupStore = remember { com.example.utils.GroupStore(context) }
+    var groupMembers by remember { mutableStateOf(groupStore.all()) }
 
     LaunchedEffect(Unit) { MapPowerDataPrefs.init(context) }
     val isEcoMode by MapPowerDataPrefs.ecoMode.collectAsState()
@@ -140,6 +147,37 @@ fun MapScreenContent(
     var pinnedLandmarkTarget by remember { mutableStateOf<Pair<Double, Double>?>(null) }
     var showCoordinateDialog by remember { mutableStateOf(false) }
     var showAddLandmarkForPin by remember { mutableStateOf<Pair<Double, Double>?>(null) }
+
+    LaunchedEffect(state.quakesEnabled) {
+        if (!state.quakesEnabled) {
+            quakesJson = null
+            return@LaunchedEffect
+        }
+        val res = com.example.utils.OverlayFeeds.quakes()
+        res.onSuccess { list ->
+            quakesJson = com.example.utils.OverlayFeeds.quakesToJson(list)
+            snackbarHostState.showSnackbar("🌋 تم تحميل ${list.size} هزة أرضية من USGS")
+        }.onFailure {
+            quakesJson = null
+            state.quakesEnabled = false
+            snackbarHostState.showSnackbar("تعذر جلب بيانات الزلازل من USGS — تحقق من الإنترنت")
+        }
+    }
+
+    LaunchedEffect(state.rainEnabled) {
+        if (!state.rainEnabled) {
+            rainUrl = null
+            return@LaunchedEffect
+        }
+        val res = com.example.utils.OverlayFeeds.rainTemplate()
+        res.onSuccess { url ->
+            rainUrl = url
+        }.onFailure { err ->
+            rainUrl = null
+            state.rainEnabled = false
+            snackbarHostState.showSnackbar(err.message ?: "طبقة رادار الأمطار غير متاحة حالياً")
+        }
+    }
 
     androidx.activity.compose.BackHandler(enabled = true) {
         if (isHudMode) {
@@ -161,6 +199,7 @@ fun MapScreenContent(
     val providers by viewModel.providers.collectAsState()
     val stores by viewModel.stores.collectAsState()
     val properties by viewModel.properties.collectAsState()
+    val bookings by viewModel.bookings.collectAsState()
 
     val userLatState by viewModel.userLatitude.collectAsState()
     val userLngState by viewModel.userLongitude.collectAsState()
@@ -384,6 +423,9 @@ fun MapScreenContent(
             viewModel.startNavigationTracking()
             onDispose { viewModel.stopNavigationTracking() }
         }
+        val hazardZones = remember(filteredProviders) {
+            com.example.utils.HazardAlerts.roadDifficultyZones(filteredProviders)
+        }
         NavigationScreen(
             targetEntity = null,
             userLat = safeUserLat,
@@ -393,7 +435,8 @@ fun MapScreenContent(
             initialWaypoints = state.navWaypoints,
             onFinishNavigation = { state.stopNavigation() },
             nearbyProviders = filteredProviders,
-            nearbyStores = filteredStores
+            nearbyStores = filteredStores,
+            hazardZones = hazardZones
         )
         return
     }
@@ -523,7 +566,60 @@ fun MapScreenContent(
                     onMapCenterChanged = { lat, lng ->
                         centerCoords = lat to lng
                     },
-                    zones = if (showZones) com.example.utils.ReliabilityZones.build(filteredProviders, filteredStores) else emptyList(),
+                    waypointMarkers = remember(groupMembers) {
+                        groupMembers.mapNotNull { m ->
+                            val lat = m.lastLat
+                            val lng = m.lastLng
+                            if (!m.expired && lat != null && lng != null && LandmarkAddress.isValid(lat, lng)) {
+                                Triple("👥 ${m.label}", lat, lng)
+                            } else null
+                        }
+                    },
+                    zones = remember(
+                        showZones,
+                        state.reliabilityEnabled,
+                        state.peakEnabled,
+                        state.coverageEnabled,
+                        state.hazardEnabled,
+                        coverageRefreshTick,
+                        filteredProviders,
+                        filteredStores,
+                        bookings
+                    ) {
+                        val combined = mutableListOf<MapZone>()
+                        if (showZones || state.reliabilityEnabled) {
+                            combined.addAll(com.example.utils.ReliabilityZones.build(filteredProviders, filteredStores))
+                        }
+                        if (state.peakEnabled) {
+                            val provById = filteredProviders.associateBy { it.id }
+                            val stamps = bookings.mapNotNull { b ->
+                                val p = provById[b.providerId] ?: return@mapNotNull null
+                                val t = if (b.scheduledAt > 0L) b.scheduledAt else b.createdAt
+                                if (t > 0L && LandmarkAddress.isValid(p.latitude, p.longitude)) {
+                                    com.example.utils.BookingStamp(p.latitude, p.longitude, t)
+                                } else null
+                            }
+                            if (stamps.isNotEmpty()) {
+                                val peakZones = com.example.utils.PeakPredictor.predict(stamps, System.currentTimeMillis())
+                                combined.addAll(com.example.utils.PeakPredictor.toMapZones(peakZones))
+                            }
+                        }
+                        if (state.coverageEnabled) {
+                            combined.addAll(com.example.utils.CoverageLog.deadZones(context))
+                        }
+                        if (state.hazardEnabled) {
+                            combined.addAll(com.example.utils.HazardAlerts.roadDifficultyZones(filteredProviders))
+                        }
+                        combined
+                    },
+                    eoxEnabled = state.eoxEnabled,
+                    quakesJson = quakesJson,
+                    rainUrl = rainUrl,
+                    onOverlayStatus = { _, failing, msg ->
+                        if (failing && msg.isNotBlank()) {
+                            coroutineScope.launch { snackbarHostState.showSnackbar(msg) }
+                        }
+                    },
                     modifier = Modifier.fillMaxSize()
                 )
 
@@ -1121,11 +1217,13 @@ fun MapScreenContent(
                     }
                 },
                 onShowGnss = { showGnss = true },
-                isZonesActive = showZones,
+                isZonesActive = showZones || state.reliabilityEnabled,
                 onToggleZones = {
-                    showZones = !showZones
+                    val next = !(showZones || state.reliabilityEnabled)
+                    showZones = next
+                    state.reliabilityEnabled = next
                     coroutineScope.launch {
-                        snackbarHostState.showSnackbar(if (showZones) "🟢 تم تفعيل طبقة توفر وموثوقية الخدمات" else "تم إخفاء طبقة توفر الخدمات")
+                        snackbarHostState.showSnackbar(if (next) "🟢 تم تفعيل طبقة توفر وموثوقية الخدمات" else "تم إخفاء طبقة توفر الخدمات")
                     }
                 },
                 onToggleArVela = {
@@ -1159,6 +1257,10 @@ fun MapScreenContent(
                     }
                 },
                 onOpenCoordinateEntry = { showCoordinateDialog = true },
+                hasMoreLayersActive = state.eoxEnabled || state.quakesEnabled || state.rainEnabled ||
+                    state.peakEnabled || state.coverageEnabled || state.hazardEnabled || state.gibsEnabled,
+                onOpenMoreLayers = { showMoreLayersSheet = true },
+                onOpenGroupTracking = { showGroupTracking = true },
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
                     .padding(end = 16.dp)
@@ -1317,6 +1419,59 @@ fun MapScreenContent(
                     accuracyM = accuracyM.takeIf { it < Float.MAX_VALUE },
                     onOpenLandmarkAddress = { showLandmarkAddress = true },
                     onDismiss = { showGnss = false }
+                )
+            }
+
+            if (showMoreLayersSheet) {
+                MoreLayersSheet(
+                    nightMode = state.nightMode,
+                    onToggleNight = { state.nightMode = it },
+                    gibsEnabled = state.gibsEnabled,
+                    onToggleGibs = { state.gibsEnabled = it },
+                    eoxEnabled = state.eoxEnabled,
+                    onToggleEox = { state.eoxEnabled = it },
+                    quakesEnabled = state.quakesEnabled,
+                    onToggleQuakes = { state.quakesEnabled = it },
+                    rainEnabled = state.rainEnabled,
+                    onToggleRain = { state.rainEnabled = it },
+                    reliabilityEnabled = showZones || state.reliabilityEnabled,
+                    onToggleReliability = {
+                        state.reliabilityEnabled = it
+                        showZones = it
+                    },
+                    peakEnabled = state.peakEnabled,
+                    onTogglePeak = { state.peakEnabled = it },
+                    coverageEnabled = state.coverageEnabled,
+                    onToggleCoverage = { state.coverageEnabled = it },
+                    hazardEnabled = state.hazardEnabled,
+                    onToggleHazard = { state.hazardEnabled = it },
+                    onCoverageCleared = {
+                        coverageRefreshTick++
+                        coroutineScope.launch { snackbarHostState.showSnackbar("✓ تم مسح سجل التغطية المحلي") }
+                    },
+                    onDismiss = { showMoreLayersSheet = false }
+                )
+            }
+
+            if (showGroupTracking) {
+                GroupTrackingDialog(
+                    onMembersUpdated = { groupMembers = it },
+                    onFocusMember = { member ->
+                        val lat = member.lastLat
+                        val lng = member.lastLng
+                        if (lat != null && lng != null) {
+                            searchedPlace = RealValhallaNavigator.SearchAddressResult(
+                                displayName = "موقع ${member.label} في المجموعة",
+                                shortName = "👥 ${member.label}",
+                                latitude = lat,
+                                longitude = lng,
+                                type = "group",
+                                icon = "👥"
+                            )
+                            showGroupTracking = false
+                        }
+                    },
+                    onDismiss = { showGroupTracking = false }
                 )
             }
 

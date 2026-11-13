@@ -5,10 +5,13 @@ package com.example.utils
  * الإعدادات المركزية لنظام الملاحة والخرائط لليمن.
  */
 object NavConfig {
-    // Endpoints
+    // Endpoints (100% Free, Zero API keys)
     const val OSRM_BASE_URL = "https://router.project-osrm.org/route/v1/driving/"
     const val OSRM_IS_DEMO_SERVER = true // اضبطه false عند استخدام خادمك الخاص
     const val NOMINATIM_BASE_URL = "https://nominatim.openstreetmap.org/search"
+    const val QUAKES_FEED_URL = "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_week.geojson"
+    const val RAINVIEWER_FEED_URL = "https://api.rainviewer.com/public/weather-maps.json"
+    const val ENABLE_RAINVIEWER = false // طبقة الرادار الجوي معطّلة افتراضياً (بدون مفاتيح API)
     
     // Valhalla Local Config
     const val VALHALLA_DIR = "valhalla"
