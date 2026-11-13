@@ -5,27 +5,37 @@ import android.content.ClipboardManager
 import android.content.Context
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.screens.map.utils.OfflineMapManager
 import com.example.ui.screens.map.utils.OfflineTileInterceptor
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.Locale
@@ -41,17 +51,21 @@ object MapDiagnostics {
 
             // 1) حزمة الملاحة
             val tilesOk = ValhallaTileDownloader.isTilesDownloaded(context)
-            val tarFile = File(ValhallaTileDownloader.getValhallaDir(context), NavConfig.VALHALLA_TILES_FILE)
-            out += if (tilesOk) DiagnosticItem("حزمة الملاحة الأوفلاين", DiagStatus.OK, "مثبّتة (${tarFile.length() / 1024 / 1024} MB)")
-            else DiagnosticItem("حزمة الملاحة الأوفلاين", DiagStatus.FAIL, "غير مثبّتة أو تالفة")
+            val tarFile = ValhallaTileDownloader.resolveTilesFile(ValhallaTileDownloader.getValhallaDir(context))
+            val tarMb = if (tarFile.exists()) String.format(Locale.US, "%.1f", tarFile.length() / 1024.0 / 1024.0) else "0"
+            out += if (tilesOk) DiagnosticItem("حزمة الملاحة الأوفلاين", DiagStatus.OK, "مثبّتة وسليمة ($tarMb MB مفكوكة)")
+            else DiagnosticItem("حزمة الملاحة الأوفلاين", DiagStatus.FAIL, "غير مثبّتة أو تالفة (المطلوب ~26 MB مضغوطة / ~65 MB مفكوكة)")
 
-            // 2) محرك Valhalla: مسار حقيقي صغير داخل صنعاء (يُقبل فقط إن جاء من Valhalla نفسه)
+            // 2) محرك Valhalla: إصلاح الإعدادات تلقائياً عند الحاجة ثم مسار حقيقي داخل صنعاء
             if (tilesOk) {
+                if (!ValhallaTileDownloader.isValhallaConfigValid(context)) {
+                    ValhallaTileDownloader.repairConfig(context)
+                }
                 val origin = NavWaypoint(name = "أ", latitude = 15.3694, longitude = 44.1910, type = WaypointType.START)
                 val dest = NavWaypoint(name = "ب", latitude = 15.3500, longitude = 44.2000, type = WaypointType.BREAK)
                 val r = try { RealValhallaNavigator.calculateRoute(context, origin, listOf(dest)) } catch (t: Throwable) { null }
                 val viaValhalla = r != null && r.error == null && r.coordinates.size >= 2 && r.engineSource.contains("Valhalla")
-                out += if (viaValhalla) DiagnosticItem("محرك Valhalla (اختبار في صنعاء)", DiagStatus.OK, "مسار تجريبي ${r!!.totalDistanceMeters.toInt()} م")
+                out += if (viaValhalla) DiagnosticItem("محرك Valhalla (اختبار في صنعاء)", DiagStatus.OK, "مسار تجريبي ${r!!.totalDistanceMeters.toInt()} م (يعمل أوفلاين بنجاح)")
                 else DiagnosticItem("محرك Valhalla (اختبار في صنعاء)", DiagStatus.FAIL, NativeValhallaStatus.lastError ?: "لم يُنتج مساراً (المصدر: ${r?.engineSource ?: "—"})")
             }
 
@@ -74,7 +88,7 @@ object MapDiagnostics {
                 else -> DiagnosticItem("الموقع", DiagStatus.OK, "دقة ≈ ${accuracyM?.toInt() ?: "؟"} م")
             }
 
-            // 5) صوت عربي (يفحص المحرك الافتراضي ثم Google TTS وباقي المحركات المثبتة)
+            // 5) صوت عربي
             val (ttsOk, ttsEngine) = try {
                 ArabicNavigationVoiceEngine.probeArabicSupport(context)
             } catch (_: Throwable) {
@@ -105,59 +119,150 @@ object MapDiagnostics {
             out
         }
 
-
     fun toText(items: List<DiagnosticItem>): String =
         items.joinToString("\n") { "${it.status.icon} ${it.title}: ${it.detail}" }
 }
 
 @Composable
-fun MapDiagnosticsDialog(hasRealLocation: Boolean, accuracyM: Float?, onDismiss: () -> Unit) {
+fun MapDiagnosticsDialog(
+    hasRealLocation: Boolean,
+    accuracyM: Float?,
+    onTilesUpdated: () -> Unit = {},
+    onDismiss: () -> Unit
+) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var items by remember { mutableStateOf<List<DiagnosticItem>?>(null) }
-    LaunchedEffect(Unit) { items = MapDiagnostics.run(context, hasRealLocation, accuracyM) }
-    val recentLogs = remember { AppErrorLogManager.logs.value.take(5) }
+    var isRepairing by remember { mutableStateOf(false) }
+    var isDownloading by remember { mutableStateOf(false) }
+    var downloadProgress by remember { mutableFloatStateOf(0f) }
+    var actionStatus by remember { mutableStateOf<String?>(null) }
+    var refreshTrigger by remember { mutableStateOf(0) }
+
+    LaunchedEffect(refreshTrigger) {
+        items = null
+        items = MapDiagnostics.run(context, hasRealLocation, accuracyM)
+    }
+    val recentLogs = remember(refreshTrigger) { AppErrorLogManager.logs.value.take(5) }
+    val valhallaFailed = items?.any { it.title.contains("Valhalla") && it.status == DiagStatus.FAIL } == true ||
+        items?.any { it.title.contains("حزمة الملاحة") && it.status == DiagStatus.FAIL } == true
 
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = { if (!isDownloading && !isRepairing) onDismiss() },
         containerColor = Color(0xFF0F172A),
-        title = { Text("فحص نظام الخرائط", color = Color.White) },
+        title = { Text("فحص نظام الخرائط", color = Color.White, fontWeight = FontWeight.Bold) },
         text = {
             val list = items
-            if (list == null) CircularProgressIndicator()
-            else Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                list.forEach {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(it.status.icon, fontSize = 14.sp)
-                        Column {
-                            Text(it.title, color = Color.White, fontSize = 13.sp)
-                            Text(it.detail, color = Color(0xFF94A3B8), fontSize = 11.sp)
+            if (list == null && !isDownloading) {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color(0xFF38BDF8))
+                    Text("جاري فحص حزمة الأوفلاين ومحرك الملاحة...", color = Color(0xFFCBD5E1), fontSize = 13.sp)
+                }
+            } else {
+                Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    list?.forEach {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(it.status.icon, fontSize = 14.sp)
+                            Column {
+                                Text(it.title, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                                Text(it.detail, color = Color(0xFF94A3B8), fontSize = 11.sp)
+                            }
                         }
                     }
-                }
-                if (recentLogs.isNotEmpty()) {
-                    Spacer(Modifier.height(8.dp))
-                    Text("سجل الأخطاء الأخير:", color = Color(0xFFF59E0B), fontSize = 12.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
-                    recentLogs.forEach { log ->
-                        Text("• [${log.tag}] ${log.message}", color = Color(0xFFE2E8F0), fontSize = 10.sp)
+
+                    if (isDownloading) {
+                        Spacer(Modifier.height(6.dp))
+                        LinearProgressIndicator(
+                            progress = { downloadProgress },
+                            modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
+                            color = Color(0xFF10B981),
+                            trackColor = Color(0xFF1E293B)
+                        )
+                    }
+                    actionStatus?.let { msg ->
+                        Text(msg, color = Color(0xFF38BDF8), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                    }
+
+                    if (!isDownloading && !isRepairing) {
+                        Spacer(Modifier.height(4.dp))
+                        if (valhallaFailed) {
+                            Button(
+                                onClick = {
+                                    isRepairing = true
+                                    actionStatus = "جاري إصلاح ملف إعدادات Valhalla..."
+                                    scope.launch {
+                                        val repaired = ValhallaTileDownloader.repairConfig(context)
+                                        isRepairing = false
+                                        actionStatus = if (repaired) "تم إصلاح الإعدادات — جاري إعادة الفحص..." else "تعذر الإصلاح، جرّب إعادة تنزيل الحزمة."
+                                        onTilesUpdated()
+                                        refreshTrigger++
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("diag_repair_valhalla_button"),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0284C7))
+                            ) {
+                                Text("إصلاح إعدادات الأوفلاين وإعادة الفحص", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                isDownloading = true
+                                downloadProgress = 0.02f
+                                actionStatus = "جاري تنزيل حزمة خرائط اليمن (~26 MB)..."
+                                scope.launch {
+                                    val res = ValhallaTileDownloader.downloadAndExtractTiles(context) { p, status ->
+                                        downloadProgress = p
+                                        actionStatus = status
+                                    }
+                                    isDownloading = false
+                                    if (res.isSuccess) {
+                                        actionStatus = "✅ تم التحديث والتثبيت بنجاح"
+                                        onTilesUpdated()
+                                        refreshTrigger++
+                                    } else {
+                                        actionStatus = "❌ فشل التنزيل: ${res.exceptionOrNull()?.message ?: "تحقق من الإنترنت"}"
+                                    }
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("diag_redownload_valhalla_button")
+                        ) {
+                            Text("إعادة تنزيل الحزمة (~26 MB ← 65 MB)", color = Color(0xFF38BDF8), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+
+                    if (recentLogs.isNotEmpty()) {
+                        Spacer(Modifier.height(6.dp))
+                        Text("سجل الأخطاء الأخير:", color = Color(0xFFF59E0B), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        recentLogs.forEach { log ->
+                            Text("• [${log.tag}] ${log.message}", color = Color(0xFFE2E8F0), fontSize = 10.sp)
+                        }
                     }
                 }
             }
         },
         confirmButton = {
-            TextButton(onClick = {
-                val reportText = buildString {
-                    items?.let { append(MapDiagnostics.toText(it)) }
-                    if (recentLogs.isNotEmpty()) {
-                        append("\n\n--- Recent Error Logs ---\n")
-                        recentLogs.forEach { log ->
-                            append("[${log.tag}] ${log.message}\n")
+            TextButton(
+                enabled = !isDownloading && !isRepairing,
+                onClick = {
+                    val reportText = buildString {
+                        items?.let { append(MapDiagnostics.toText(it)) }
+                        if (recentLogs.isNotEmpty()) {
+                            append("\n\n--- Recent Error Logs ---\n")
+                            recentLogs.forEach { log ->
+                                append("[${log.tag}] ${log.message}\n")
+                            }
                         }
                     }
+                    (context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager)
+                        .setPrimaryClip(ClipData.newPlainText("map-diagnostics", reportText))
                 }
-                (context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager)
-                    .setPrimaryClip(ClipData.newPlainText("map-diagnostics", reportText))
-            }) { Text("نسخ التقرير", color = Color(0xFF10B981)) }
+            ) { Text("نسخ التقرير", color = Color(0xFF10B981)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("إغلاق", color = Color(0xFF94A3B8)) } }
+        dismissButton = {
+            TextButton(
+                enabled = !isDownloading && !isRepairing,
+                onClick = onDismiss
+            ) { Text("إغلاق", color = Color(0xFF94A3B8)) }
+        }
     )
 }

@@ -532,9 +532,12 @@ fun NavigationScreen(
                         IconButton(onClick = { showAddStopDialog = true }, modifier = Modifier.size(30.dp)) {
                             Icon(Icons.Default.Add, contentDescription = "إضافة محطة", tint = Color(0xFF10B981), modifier = Modifier.size(20.dp))
                         }
-                        if (!isTilesDownloaded) {
-                            IconButton(onClick = { showDownloadDialog = true }, modifier = Modifier.size(30.dp)) {
-                                Icon(Icons.Default.CloudDownload, contentDescription = "تحميل الخرائط", tint = Color(0xFF0284C7), modifier = Modifier.size(20.dp))
+                        if (!isTilesDownloaded || nativeError != null) {
+                            IconButton(
+                                onClick = { showDownloadDialog = true },
+                                modifier = Modifier.size(48.dp).testTag("nav_download_offline_button")
+                            ) {
+                                Icon(Icons.Default.CloudDownload, contentDescription = "تحميل أو إصلاح خرائط الأوفلاين", tint = Color(0xFF0284C7), modifier = Modifier.size(20.dp))
                             }
                         }
                     }
@@ -1152,7 +1155,11 @@ fun NavigationScreen(
                 title = { Text("تحميل حزمة الملاحة (أوفلاين)", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White, textAlign = TextAlign.Center) },
                 text = {
                     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text("لتفعيل الملاحة بدون إنترنت يحتاج التطبيق إلى تحميل ملف الخرائط (حوالي 25 ميجابايت).", fontSize = 13.sp, color = Color(0xFFCBD5E1))
+                        Text(
+                            "لتفعيل الملاحة بدون إنترنت يحتاج التطبيق إلى تحميل حزمة خرائط اليمن.\nحجم التنزيل: ~${ValhallaTileDownloader.EXPECTED_DOWNLOAD_MB} ميجابايت مضغوطة (تُفكّ إلى ~${ValhallaTileDownloader.EXPECTED_INSTALLED_MB} ميجابايت على الجهاز).",
+                            fontSize = 13.sp,
+                            color = Color(0xFFCBD5E1)
+                        )
                         if (isDownloading) {
                             LinearProgressIndicator(progress = { downloadProgress }, modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)), color = Color(0xFF10B981), trackColor = Color(0xFF334155))
                             Text(downloadStatusText, fontSize = 12.sp, color = Color(0xFF10B981), fontWeight = FontWeight.SemiBold)
@@ -1170,14 +1177,17 @@ fun NavigationScreen(
                                     if (r.isSuccess) {
                                         isTilesDownloaded = true
                                         showDownloadDialog = false
-                                        snackbarHostState.showSnackbar("تم تثبيت حزمة الملاحة الأوفلاين ✓")
+                                        routeVersion++
+                                        snackbarHostState.showSnackbar("تم تثبيت حزمة الملاحة الأوفلاين (~${ValhallaTileDownloader.EXPECTED_INSTALLED_MB} MB) ✓")
                                     } else {
                                         snackbarHostState.showSnackbar("فشل التحميل: ${r.exceptionOrNull()?.message ?: "تحقق من الاتصال"}")
                                     }
                                 }
                             },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0284C7)), shape = RoundedCornerShape(10.dp)
-                        ) { Text("تحميل الآن", fontWeight = FontWeight.Bold) }
+                            modifier = Modifier.heightIn(min = 48.dp).testTag("nav_download_offline_confirm_button"),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0284C7)),
+                            shape = RoundedCornerShape(10.dp)
+                        ) { Text("تحميل الآن (~${ValhallaTileDownloader.EXPECTED_DOWNLOAD_MB} MB)", fontWeight = FontWeight.Bold) }
                     }
                 },
                 dismissButton = { if (!isDownloading) TextButton(onClick = { showDownloadDialog = false }) { Text("لاحقاً", color = Color(0xFF94A3B8)) } },

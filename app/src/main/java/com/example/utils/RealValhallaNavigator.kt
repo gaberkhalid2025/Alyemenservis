@@ -161,14 +161,11 @@ object RealValhallaNavigator {
     ): NavRouteResult? {
         return try {
             val valhallaDir = ValhallaTileDownloader.getValhallaDir(context)
-            val tilesFile = File(valhallaDir, NavConfig.VALHALLA_TILES_FILE)
+            val tilesFile = ValhallaTileDownloader.resolveTilesFile(valhallaDir)
             val configFile = File(valhallaDir, "valhalla.json")
-            val needsRebuild = !configFile.exists() || runCatching {
-                val txt = configFile.readText()
-                !txt.contains("service_limits") ||
-                    !txt.contains("isochrone") ||
-                    (tilesFile.exists() && !txt.contains(tilesFile.absolutePath))
-            }.getOrDefault(true)
+            val needsRebuild = !configFile.exists() ||
+                !tilesFile.exists() ||
+                !ValhallaTileDownloader.isValhallaConfigValid(context)
             if (needsRebuild) {
                 try { cachedEngine?.close() } catch (_: Throwable) {}
                 cachedEngine = null
@@ -187,15 +184,27 @@ object RealValhallaNavigator {
                 engineFor(configFile.absolutePath).routeRaw(requestJson)
             } catch (t: Throwable) {
                 val msg = ((t as? java.lang.reflect.InvocationTargetException)?.targetException ?: t).message ?: ""
-                if (msg.contains("No suitable edges", ignoreCase = true) || msg.contains("171")) {
-                    // إعادة المحاولة بنطاق التقاط طريق أوسع للنقاط البعيدة عن الطريق المرسوم
-                    val wideRequest = formatValhallaRequest(origin, waypoints, driving, snapRadiusMeters = 800)
-                    engineFor(configFile.absolutePath).routeRaw(wideRequest)
-                } else {
-                    try { cachedEngine?.close() } catch (_: Throwable) {}
-                    cachedEngine = null
-                    cachedConfigPath = null
-                    throw t
+                when {
+                    msg.contains("No such node", ignoreCase = true) ||
+                        msg.contains("Exceeded max radius", ignoreCase = true) -> {
+                        // إصلاح فوري لملف الإعدادات وإعادة تهيئة المحرك مرة واحدة
+                        try { cachedEngine?.close() } catch (_: Throwable) {}
+                        cachedEngine = null
+                        cachedConfigPath = null
+                        ValhallaTileDownloader.createValhallaConfig(context)
+                        engineFor(configFile.absolutePath).routeRaw(requestJson)
+                    }
+                    msg.contains("No suitable edges", ignoreCase = true) || msg.contains("171") -> {
+                        // إعادة المحاولة بنطاق التقاط طريق أوسع للنقاط البعيدة عن الطريق المرسوم
+                        val wideRequest = formatValhallaRequest(origin, waypoints, driving, snapRadiusMeters = 800)
+                        engineFor(configFile.absolutePath).routeRaw(wideRequest)
+                    }
+                    else -> {
+                        try { cachedEngine?.close() } catch (_: Throwable) {}
+                        cachedEngine = null
+                        cachedConfigPath = null
+                        throw t
+                    }
                 }
             }
 

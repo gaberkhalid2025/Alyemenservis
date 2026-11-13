@@ -1805,7 +1805,7 @@ fun MapScreenContent(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
-                        "للحصول على أدق النتائج والملاحة في اليمن بدون إنترنت، يرجى تحميل حزمة الخرائط (حوالي 25 ميجابايت).",
+                        "للحصول على أدق النتائج والملاحة في اليمن بدون إنترنت، يرجى تحميل حزمة خرائط اليمن.\nحجم التنزيل: ~${ValhallaTileDownloader.EXPECTED_DOWNLOAD_MB} ميجابايت مضغوطة (تُفكّ إلى ~${ValhallaTileDownloader.EXPECTED_INSTALLED_MB} ميجابايت على الجهاز).",
                         color = Color.White,
                         fontSize = 13.sp
                     )
@@ -1833,16 +1833,17 @@ fun MapScreenContent(
                                 if (result.isSuccess) {
                                     isTilesDownloaded = true
                                     showDownloadDialog = false
-                                    snackbarHostState.showSnackbar("✅ تم تثبيت خرائط اليمن بنجاح! استمتع بالملاحة أوفلاين.")
+                                    snackbarHostState.showSnackbar("✅ تم تثبيت خرائط اليمن (~${ValhallaTileDownloader.EXPECTED_INSTALLED_MB} MB) بنجاح! استمتع بالملاحة أوفلاين.")
                                 } else {
                                     isDownloading = false
-                                    snackbarHostState.showSnackbar("❌ فشل التحميل، يرجى التحقق من الاتصال.")
+                                    snackbarHostState.showSnackbar("❌ فشل التحميل: ${result.exceptionOrNull()?.message ?: "يرجى التحقق من الاتصال."}")
                                 }
                             }
                         },
+                        modifier = Modifier.heightIn(min = 48.dp).testTag("map_download_offline_confirm_button"),
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981))
                     ) {
-                        Text("تحميل الآن (25MB)", color = Color.White, fontWeight = FontWeight.Bold)
+                        Text("تحميل الآن (~${ValhallaTileDownloader.EXPECTED_DOWNLOAD_MB} MB)", color = Color.White, fontWeight = FontWeight.Bold)
                     }
                 }
             },
@@ -1955,7 +1956,8 @@ fun MapScreenContent(
     if (showDiagnostics) {
         MapDiagnosticsDialog(
             hasRealLocation = hasRealLocation,
-            accuracyM = accuracyM.takeIf { it < Float.MAX_VALUE }
+            accuracyM = accuracyM.takeIf { it < Float.MAX_VALUE },
+            onTilesUpdated = { isTilesDownloaded = ValhallaTileDownloader.isTilesDownloaded(context) }
         ) {
             showDiagnostics = false
         }
