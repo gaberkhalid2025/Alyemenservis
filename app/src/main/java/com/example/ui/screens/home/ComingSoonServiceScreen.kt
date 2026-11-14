@@ -65,7 +65,9 @@ fun ComingSoonServiceScreen(
         label = "scale"
     )
 
-    var hasSubscribedAlert by remember { mutableStateOf(false) }
+    val prefs = remember { context.getSharedPreferences("coming_soon_alerts", android.content.Context.MODE_PRIVATE) }
+    val serviceKey = if (isDelivery) "delivery" else "home_services"
+    var hasSubscribedAlert by remember { mutableStateOf(prefs.getBoolean("subscribed_$serviceKey", false)) }
 
     Column(
         modifier = Modifier
@@ -84,7 +86,7 @@ fun ComingSoonServiceScreen(
             IconButton(
                 onClick = onBackClick,
                 modifier = Modifier
-                    .size(38.dp)
+                    .size(48.dp)
                     .background(Color(0xFF131C2E), CircleShape)
                     .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)), CircleShape)
             ) {
@@ -195,12 +197,38 @@ fun ComingSoonServiceScreen(
                     // "إشعارني فور الإطلاق" Button
                     Button(
                         onClick = {
-                            hasSubscribedAlert = true
-                            Toast.makeText(
-                                context,
-                                "🔔 تم تسجيل اهتمامك بنجاح! سنقوم بإشعارك فور إطلاق الخدمة.",
-                                Toast.LENGTH_LONG
-                            ).show()
+                            if (!hasSubscribedAlert) {
+                                hasSubscribedAlert = true
+                                prefs.edit().putBoolean("subscribed_$serviceKey", true).apply()
+                                val uid = viewModel.authViewModel.getOrGenerateUserId()
+                                val phone = viewModel.currentUserPhone.value
+                                val subId = "${serviceKey}_${uid}"
+                                runCatching {
+                                    com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                                        .collection("coming_soon_subscribers")
+                                        .document(subId)
+                                        .set(
+                                            mapOf(
+                                                "serviceKey" to serviceKey,
+                                                "serviceName" to serviceTitle,
+                                                "userId" to uid,
+                                                "phone" to phone,
+                                                "subscribedAt" to System.currentTimeMillis()
+                                            )
+                                        )
+                                }
+                                Toast.makeText(
+                                    context,
+                                    "🔔 تم تسجيل اهتمامك وحفظه بنجاح! سنقوم بإشعارك فور إطلاق الخدمة.",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            } else {
+                                Toast.makeText(
+                                    context,
+                                    "✅ تنبيه الإطلاق مفعل بالفعل لحسابك.",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
                         },
                         colors = ButtonDefaults.buttonColors(
                             containerColor = if (hasSubscribedAlert) Color(0xFF10B981) else Color(0xFF6C5CE7)

@@ -30,6 +30,7 @@ import com.example.data.UnifiedBusinessAccount
 import com.example.rememberBase64Bitmap
 import com.example.ui.MainViewModel
 import com.example.utils.VisualThemePalette
+import kotlinx.coroutines.launch
 import java.util.UUID
 
 @Composable
@@ -195,14 +196,14 @@ fun ProductItemCard(
                     text = product.name,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White,
+                    color = themeColors.textPrimary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     text = product.description.ifBlank { "منتج ممتاز متوفر حالياً" },
                     fontSize = 10.sp,
-                    color = Color.LightGray,
+                    color = themeColors.textSecondary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -216,7 +217,7 @@ fun ProductItemCard(
 
             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("متوفر:", fontSize = 9.sp, color = Color.Gray)
+                    Text("متوفر:", fontSize = 9.sp, color = themeColors.textSecondary)
                     Switch(
                         checked = product.isAvailable,
                         onCheckedChange = onToggleAvailable
@@ -224,11 +225,11 @@ fun ProductItemCard(
                 }
 
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    IconButton(onClick = onEdit, modifier = Modifier.size(28.dp)) {
-                        Icon(Icons.Default.Edit, contentDescription = "تعديل", tint = Color(0xFF3B82F6), modifier = Modifier.size(16.dp))
+                    IconButton(onClick = onEdit, modifier = Modifier.size(48.dp)) {
+                        Icon(Icons.Default.Edit, contentDescription = "تعديل", tint = Color(0xFF3B82F6), modifier = Modifier.size(18.dp))
                     }
-                    IconButton(onClick = onDelete, modifier = Modifier.size(28.dp)) {
-                        Icon(Icons.Default.Delete, contentDescription = "حذف", tint = Color(0xFFEF4444), modifier = Modifier.size(16.dp))
+                    IconButton(onClick = onDelete, modifier = Modifier.size(48.dp)) {
+                        Icon(Icons.Default.Delete, contentDescription = "حذف", tint = Color(0xFFEF4444), modifier = Modifier.size(18.dp))
                     }
                 }
             }
@@ -243,10 +244,32 @@ fun AddEditProductDialog(
     onDismiss: () -> Unit,
     onSave: (ProductEntity) -> Unit
 ) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var titleInput by remember { mutableStateOf(product?.name ?: "") }
     var descInput by remember { mutableStateOf(product?.description ?: "") }
-    var priceInput by remember { mutableStateOf(product?.price?.toString() ?: "1000") }
+    var priceInput by remember { mutableStateOf(product?.price?.let { if (it > 0.0) it.toString() else "" } ?: "") }
     var imageInput by remember { mutableStateOf(product?.imageUrl ?: "") }
+    var isUploading by remember { mutableStateOf(false) }
+
+    val photoPicker = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) {
+            isUploading = true
+            scope.launch {
+                val path = "products/${account.id}/${UUID.randomUUID()}.webp"
+                val result = com.example.utils.FirebaseStorageUploader.uploadImageUri(context, uri, path)
+                isUploading = false
+                result.onSuccess { url ->
+                    imageInput = url
+                    Toast.makeText(context, "تم رفع صورة المنتج بنجاح", Toast.LENGTH_SHORT).show()
+                }.onFailure { err ->
+                    Toast.makeText(context, err.message ?: "فشل رفع الصورة", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -257,6 +280,7 @@ fun AddEditProductDialog(
                     value = titleInput,
                     onValueChange = { titleInput = it },
                     label = { Text("اسم المنتج أو الخدمة") },
+                    singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
                 OutlinedTextField(
@@ -269,12 +293,36 @@ fun AddEditProductDialog(
                     value = priceInput,
                     onValueChange = { priceInput = it },
                     label = { Text("السعر (YER)") },
+                    singleLine = true,
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                        keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+                    ),
                     modifier = Modifier.fillMaxWidth()
                 )
+                OutlinedButton(
+                    onClick = {
+                        photoPicker.launch(
+                            androidx.activity.result.PickVisualMediaRequest(
+                                androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly
+                            )
+                        )
+                    },
+                    enabled = !isUploading,
+                    modifier = Modifier.fillMaxWidth().height(48.dp)
+                ) {
+                    if (isUploading) {
+                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                        Spacer(Modifier.width(8.dp))
+                        Text("جاري رفع الصورة...")
+                    } else {
+                        Text(if (imageInput.isBlank()) "📷 اختيار صورة من المعرض" else "✅ تغيير صورة المنتج")
+                    }
+                }
                 OutlinedTextField(
                     value = imageInput,
                     onValueChange = { imageInput = it },
-                    label = { Text("رابط أو صورة المنتج (Base64)") },
+                    label = { Text("رابط الصورة (اختياري)") },
+                    singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -282,20 +330,27 @@ fun AddEditProductDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    val parsedPrice = priceInput.toDoubleOrNull() ?: 0.0
-                    if (titleInput.isNotBlank()) {
-                        val newProd = (product ?: ProductEntity(
-                            id = UUID.randomUUID().toString(),
-                            storeId = account.id
-                        )).copy(
-                            name = titleInput,
-                            description = descInput,
-                            price = parsedPrice,
-                            imageUrl = imageInput
-                        )
-                        onSave(newProd)
+                    val parsedPrice = priceInput.trim().toDoubleOrNull()
+                    if (titleInput.isBlank()) {
+                        Toast.makeText(context, "يرجى إدخال اسم المنتج أو الخدمة", Toast.LENGTH_SHORT).show()
+                        return@Button
                     }
+                    if (parsedPrice == null || parsedPrice <= 0.0) {
+                        Toast.makeText(context, "يرجى إدخال سعر صحيح أكبر من صفر", Toast.LENGTH_SHORT).show()
+                        return@Button
+                    }
+                    val newProd = (product ?: ProductEntity(
+                        id = UUID.randomUUID().toString(),
+                        storeId = account.id
+                    )).copy(
+                        name = titleInput.trim(),
+                        description = descInput.trim(),
+                        price = parsedPrice,
+                        imageUrl = imageInput.trim()
+                    )
+                    onSave(newProd)
                 },
+                enabled = !isUploading,
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981))
             ) {
                 Text("حفظ المنتج", color = Color.White)

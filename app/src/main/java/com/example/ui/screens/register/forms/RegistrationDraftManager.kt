@@ -37,31 +37,44 @@ class RegistrationDraftManager(context: Context) {
         }
     }
 
+    private val ignoredKeys = setOf("password", "confirmPassword", "rawPassword")
+
     fun saveDraft(role: String, data: Map<String, String>) {
         val editor = prefs.edit()
+        val prefix = "${role}_"
+        // Clear stale keys for this role not present or emptied
+        prefs.all.keys.filter { it.startsWith(prefix) }.forEach { existingKey ->
+            val shortKey = existingKey.removePrefix(prefix)
+            if (shortKey !in data || shortKey in ignoredKeys) {
+                editor.remove(existingKey)
+            }
+        }
         data.forEach { (key, value) ->
-            if (key == "password" || key == "confirmPassword") return@forEach
-            editor.putString("${role}_$key", value)
+            if (key in ignoredKeys) return@forEach
+            editor.putString("$prefix$key", value)
         }
         editor.apply()
     }
 
     fun getDraft(role: String): Map<String, String> {
-        val keys = listOf("entityName", "managerName", "phone", "city", "specialization")
+        val prefix = "${role}_"
         val map = mutableMapOf<String, String>()
-        keys.forEach { key ->
-            prefs.getString("${role}_$key", null)?.let { value ->
-                map[key] = value
+        prefs.all.forEach { (fullKey, rawVal) ->
+            if (fullKey.startsWith(prefix) && rawVal is String) {
+                val shortKey = fullKey.removePrefix(prefix)
+                if (shortKey !in ignoredKeys) {
+                    map[shortKey] = rawVal
+                }
             }
         }
         return map
     }
 
     fun clearDraft(role: String) {
-        val keys = listOf("entityName", "managerName", "phone", "city", "specialization")
+        val prefix = "${role}_"
         val editor = prefs.edit()
-        keys.forEach { key ->
-            editor.remove("${role}_$key")
+        prefs.all.keys.filter { it.startsWith(prefix) }.forEach { fullKey ->
+            editor.remove(fullKey)
         }
         editor.apply()
     }

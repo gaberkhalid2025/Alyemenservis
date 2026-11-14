@@ -26,13 +26,21 @@ object OfflineTileInterceptor {
     }
     @Volatile private var lastPruneAt = 0L
 
+    private val CORS_HEADERS = mapOf(
+        "Access-Control-Allow-Origin" to "*",
+        "Access-Control-Allow-Methods" to "GET, HEAD, OPTIONS",
+        "Access-Control-Allow-Headers" to "*",
+        "Cache-Control" to "public, max-age=2592000"
+    )
+
     private val OSM = Regex("^https://(?:[a-c]\\.)?tile\\.openstreetmap\\.org/(\\d+)/(\\d+)/(\\d+)\\.png$")
     private val HOT = Regex("^https://[a-c]\\.tile\\.openstreetmap\\.fr/hot/(\\d+)/(\\d+)/(\\d+)\\.png$")
     private val TOPO = Regex("^https://[a-c]\\.tile\\.opentopomap\\.org/(\\d+)/(\\d+)/(\\d+)\\.png$")
     private val SAT = Regex("^https://server\\.arcgisonline\\.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/(\\d+)/(\\d+)/(\\d+)$")
     private val SAT_CLARITY = Regex("^https://clarity\\.maptiles\\.arcgis\\.com/arcgis/rest/services/World_Imagery/MapServer/tile/(\\d+)/(\\d+)/(\\d+)$")
-    private val VELA = Regex("^https://[a-d]\\.basemaps\\.cartocdn\\.com/rastertiles/voyager/(\\d+)/(\\d+)/(\\d+)\\.png$")
+    private val VELA = Regex("^https://server\\.arcgisonline\\.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/(\\d+)/(\\d+)/(\\d+)$")
     private val EOX = Regex("^https://tiles\\.maps\\.eox\\.at/wmts/1\\.0\\.0/s2cloudless-2021_3857/default/GoogleMapsCompatible/(\\d+)/(\\d+)/(\\d+)\\.jpg$")
+    private val DEM_TERRARIUM = Regex("^https://s3\\.amazonaws\\.com/elevation-tiles-prod/terrarium/(\\d+)/(\\d+)/(\\d+)\\.png$")
 
     private data class Tile(val source: String, val z: Int, val x: Int, val y: Int, val ext: String, val mime: String) {
         val key: String get() = "$source/$z/$x/$y"
@@ -42,16 +50,42 @@ object OfflineTileInterceptor {
         OSM.matchEntire(url)?.let { return Tile("osm", it.groupValues[1].toInt(), it.groupValues[2].toInt(), it.groupValues[3].toInt(), "png", "image/png") }
         HOT.matchEntire(url)?.let { return Tile("hot", it.groupValues[1].toInt(), it.groupValues[2].toInt(), it.groupValues[3].toInt(), "png", "image/png") }
         TOPO.matchEntire(url)?.let { return Tile("topo", it.groupValues[1].toInt(), it.groupValues[2].toInt(), it.groupValues[3].toInt(), "png", "image/png") }
-        VELA.matchEntire(url)?.let { return Tile("vela", it.groupValues[1].toInt(), it.groupValues[2].toInt(), it.groupValues[3].toInt(), "png", "image/png") }
+        DEM_TERRARIUM.matchEntire(url)?.let { return Tile("dem", it.groupValues[1].toInt(), it.groupValues[2].toInt(), it.groupValues[3].toInt(), "png", "image/png") }
         // Esri & EOX: {z}/{y}/{x} (JPEG)
+        VELA.matchEntire(url)?.let { return Tile("vela_esri", it.groupValues[1].toInt(), it.groupValues[3].toInt(), it.groupValues[2].toInt(), "jpg", "image/jpeg") }
         SAT.matchEntire(url)?.let { return Tile("sat", it.groupValues[1].toInt(), it.groupValues[3].toInt(), it.groupValues[2].toInt(), "jpg", "image/jpeg") }
         SAT_CLARITY.matchEntire(url)?.let { return Tile("sat_clarity", it.groupValues[1].toInt(), it.groupValues[3].toInt(), it.groupValues[2].toInt(), "jpg", "image/jpeg") }
         EOX.matchEntire(url)?.let { return Tile("eox21", it.groupValues[1].toInt(), it.groupValues[3].toInt(), it.groupValues[2].toInt(), "jpg", "image/jpeg") }
         return null
     }
 
-    /** يعيد استجابة البلاطة من الذاكرة أو الكاش المحلي أو الشبكة (مع تخزين دائم للصور الفضائية والخرائط لتوفير الباقة). */
-    fun intercept(context: Context, url: String): WebResourceResponse? {
+    private fun findFallbackCachedTile(context: Context, requested: Tile): Pair<ByteArray, String>? {
+        if (requested.source == "dem" || requested.source == "eox21") return null
+        val fallbackOrder = listOf(
+            "sat" to ("jpg" to "image/jpeg"),
+            "sat_clarity" to ("jpg" to "image/jpeg"),
+            "vela_esri" to ("jpg" to "image/jpeg"),
+            "osm" to ("png" to "image/png"),
+            "hot" to ("png" to "image/png"),
+            "topo" to ("png" to "image/png")
+        )
+        for ((src, extMime) in fallbackOrder) {
+            if (src == requested.source) continue
+            if (src == "osm") {
+                readMbtile(context, requested.copy(source = "osm", ext = "png", mime = "image/png"))?.let {
+                    return it to "image/png"
+                }
+            }
+            val f = File(OfflineMapManager.getTileCacheDir(context), "$src/${requested.z}/${requested.x}/${requested.y}.${extMime.first}")
+            if (f.exists() && f.length() > 0) {
+                return f.readBytes() to extMime.second
+            }
+        }
+        return null
+    }
+
+    /** يعيد استجابة البلاطة من الذاكرة أو الكاش المحلي أو الشبكة (مع وضع أوفلاين صارم لـ MapLayer.VALHALLA_OFFLINE). */
+    fun intercept(context: Context, url: String, offlineOnly: Boolean = false): WebResourceResponse? {
         val tile = parse(url) ?: return null
 
         memoryCache.get(tile.key)?.let { cached ->
@@ -69,21 +103,33 @@ object OfflineTileInterceptor {
         val eco = com.example.utils.MapPowerDataPrefs.isEcoMode(context)
         if (cache.exists() && cache.length() > 0) {
             val age = System.currentTimeMillis() - cache.lastModified()
-            if (eco || age <= CACHE_TTL_MS) {
+            if (offlineOnly || eco || age <= CACHE_TTL_MS) {
                 val bytes = cache.readBytes()
                 memoryCache.put(tile.key, CachedTile(bytes, tile.mime))
                 return tileResponse(bytes, tile.mime)
             }
         }
 
+        if (offlineOnly) {
+            findFallbackCachedTile(context, tile)?.let { (bytes, mime) ->
+                memoryCache.put(tile.key, CachedTile(bytes, mime))
+                return tileResponse(bytes, mime)
+            }
+            return WebResourceResponse("text/plain", "utf-8", 404, "Not Cached", CORS_HEADERS, ByteArrayInputStream(ByteArray(0)))
+        }
+
         val bytes = download(url) ?: run {
-            // إذا فشل الاتصال نعيد النسخة المخزنة حتى لو قديمة
+            // إذا فشل الاتصال نعيد النسخة المخزنة حتى لو قديمة أو بديل متوفر محلياً
             if (cache.exists() && cache.length() > 0) {
                 val old = cache.readBytes()
                 memoryCache.put(tile.key, CachedTile(old, tile.mime))
                 return tileResponse(old, tile.mime)
             }
-            return null
+            findFallbackCachedTile(context, tile)?.let { (fallbackBytes, mime) ->
+                memoryCache.put(tile.key, CachedTile(fallbackBytes, mime))
+                return tileResponse(fallbackBytes, mime)
+            }
+            return WebResourceResponse("text/plain", "utf-8", 504, "Offline", CORS_HEADERS, ByteArrayInputStream(ByteArray(0)))
         }
 
         memoryCache.put(tile.key, CachedTile(bytes, tile.mime))
@@ -97,7 +143,7 @@ object OfflineTileInterceptor {
     }
 
     private fun tileResponse(bytes: ByteArray, mime: String) =
-        WebResourceResponse(mime, null, ByteArrayInputStream(bytes))
+        WebResourceResponse(mime, null, 200, "OK", CORS_HEADERS, ByteArrayInputStream(bytes))
 
     private fun cacheFile(context: Context, t: Tile) =
         File(OfflineMapManager.getTileCacheDir(context), "${t.source}/${t.z}/${t.x}/${t.y}.${t.ext}")

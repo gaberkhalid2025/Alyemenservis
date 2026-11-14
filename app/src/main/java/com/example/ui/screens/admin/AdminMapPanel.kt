@@ -63,7 +63,7 @@ fun AdminMapPanel(
 
     Column(
         modifier = Modifier
-            .fillMaxSize()
+            .fillMaxWidth()
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
@@ -80,7 +80,7 @@ fun AdminMapPanel(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.weight(1f)) {
                         Box(
                             modifier = Modifier
                                 .size(36.dp)
@@ -91,8 +91,8 @@ fun AdminMapPanel(
                             Icon(Icons.Default.Place, contentDescription = null, tint = Color(0xFF00E5FF), modifier = Modifier.size(22.dp))
                         }
                         Column {
-                            Text("إدارة الخرائط والمواقع الجغرافية", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color.White)
-                            Text("نظام الرادار والتوزيع الجغرافي للخدمات", fontSize = 11.sp, color = Color.LightGray)
+                            Text("إدارة الخرائط والمواقع الجغرافية", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = themeColors.textPrimary)
+                            Text("نظام الرادار والتوزيع الجغرافي للخدمات", fontSize = 11.sp, color = themeColors.textSecondary)
                         }
                     }
 
@@ -100,7 +100,8 @@ fun AdminMapPanel(
                         onClick = onOpenMap,
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00E5FF)),
                         shape = RoundedCornerShape(10.dp),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                        modifier = Modifier.heightIn(min = 48.dp)
                     ) {
                         Icon(Icons.Default.LocationOn, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
@@ -113,10 +114,10 @@ fun AdminMapPanel(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    StatBadge(title = "إجمالي العلامات", count = "$grandTotalPins", color = Color(0xFF00E5FF), modifier = Modifier.weight(1f))
-                    StatBadge(title = "فنيون معتمدون", count = "$totalProvidersWithGps", color = Color(0xFF38BDF8), modifier = Modifier.weight(1f))
-                    StatBadge(title = "متاجر ومطاعم", count = "$totalStoresWithGps", color = Color(0xFF10B981), modifier = Modifier.weight(1f))
-                    StatBadge(title = "عقارات معروضة", count = "$totalPropertiesWithGps", color = Color(0xFF8B5CF6), modifier = Modifier.weight(1f))
+                    StatBadge(title = "إجمالي العلامات", count = "$grandTotalPins", color = Color(0xFF00E5FF), themeColors = themeColors, modifier = Modifier.weight(1f))
+                    StatBadge(title = "فنيون معتمدون", count = "$totalProvidersWithGps", color = Color(0xFF38BDF8), themeColors = themeColors, modifier = Modifier.weight(1f))
+                    StatBadge(title = "متاجر ومطاعم", count = "$totalStoresWithGps", color = Color(0xFF10B981), themeColors = themeColors, modifier = Modifier.weight(1f))
+                    StatBadge(title = "عقارات معروضة", count = "$totalPropertiesWithGps", color = Color(0xFF8B5CF6), themeColors = themeColors, modifier = Modifier.weight(1f))
                 }
             }
         }
@@ -126,7 +127,7 @@ fun AdminMapPanel(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
-            items(yemeniCities) { city ->
+            items(yemeniCities, key = { it }) { city ->
                 FilterChip(
                     selected = selectedCityFilter == city,
                     onClick = { selectedCityFilter = city },
@@ -134,6 +135,34 @@ fun AdminMapPanel(
                     colors = FilterChipDefaults.filterChipColors(
                         selectedContainerColor = Color(0xFF00E5FF).copy(alpha = 0.2f),
                         selectedLabelColor = Color(0xFF00E5FF)
+                    )
+                )
+            }
+        }
+
+        // Entity Type Filters
+        val typeFilterOptions = remember {
+            listOf(
+                "ALL" to "الكل",
+                "PROVIDER" to "فنيين",
+                "STORE" to "متاجر",
+                "RESTAURANT" to "مطاعم",
+                "MEDICAL" to "طبي",
+                "PROPERTY" to "عقارات"
+            )
+        }
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            items(typeFilterOptions, key = { it.first }) { (typeKey, typeLabel) ->
+                FilterChip(
+                    selected = selectedTypeFilter == typeKey,
+                    onClick = { selectedTypeFilter = typeKey },
+                    label = { Text(typeLabel, fontSize = 11.sp) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = themeColors.accent.copy(alpha = 0.2f),
+                        selectedLabelColor = themeColors.accent
                     )
                 )
             }
@@ -147,7 +176,7 @@ fun AdminMapPanel(
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color.Gray) },
             trailingIcon = {
                 if (searchQuery.isNotEmpty()) {
-                    IconButton(onClick = { searchQuery = "" }) {
+                    IconButton(onClick = { searchQuery = "" }, modifier = Modifier.size(48.dp)) {
                         Icon(Icons.Default.Clear, contentDescription = "مسح", tint = Color.Gray)
                     }
                 }
@@ -157,18 +186,47 @@ fun AdminMapPanel(
             singleLine = true
         )
 
-        // List of Pinned Entities
-        LazyColumn(
-            modifier = Modifier.fillMaxWidth().weight(1f),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            // Providers
-            val matchedProviders = providers.filter { p ->
+        val matchedProviders = remember(providers, selectedCityFilter, selectedTypeFilter, searchQuery) {
+            if (selectedTypeFilter != "ALL" && selectedTypeFilter != "PROVIDER") emptyList()
+            else providers.filter { p ->
                 (selectedCityFilter == "الكل" || p.cityId.contains(selectedCityFilter) || p.area.contains(selectedCityFilter)) &&
                 (searchQuery.isEmpty() || p.name.contains(searchQuery, ignoreCase = true) || p.profession.contains(searchQuery, ignoreCase = true))
             }
+        }
 
-            items(matchedProviders) { p ->
+        val matchedStores = remember(stores, selectedCityFilter, selectedTypeFilter, searchQuery) {
+            if (selectedTypeFilter == "PROVIDER" || selectedTypeFilter == "PROPERTY") emptyList()
+            else stores.filter { s ->
+                val isMedical = s.sectionId.contains("medical", true) || s.name.contains("طبي") || s.name.contains("صيدلية")
+                val isRestaurant = s.sectionId.contains("restaurant", true) || s.name.contains("مطعم") || s.name.contains("كافيه")
+                val matchesType = when (selectedTypeFilter) {
+                    "MEDICAL" -> isMedical
+                    "RESTAURANT" -> isRestaurant
+                    "STORE" -> !isMedical && !isRestaurant
+                    else -> true
+                }
+                matchesType &&
+                (selectedCityFilter == "الكل" || s.cityId.contains(selectedCityFilter) || s.localNeighborhood.contains(selectedCityFilter)) &&
+                (searchQuery.isEmpty() || s.name.contains(searchQuery, ignoreCase = true) || s.categoryId.contains(searchQuery, ignoreCase = true))
+            }
+        }
+
+        val matchedProperties = remember(properties, selectedCityFilter, selectedTypeFilter, searchQuery) {
+            if (selectedTypeFilter != "ALL" && selectedTypeFilter != "PROPERTY") emptyList()
+            else properties.filter { pr ->
+                (selectedCityFilter == "الكل" || pr.cityId.contains(selectedCityFilter) || pr.localNeighborhood.contains(selectedCityFilter)) &&
+                (searchQuery.isEmpty() || pr.title.contains(searchQuery, ignoreCase = true))
+            }
+        }
+
+        // List of Pinned Entities (height-bounded for safe embedding inside AdminPanelLayout LazyColumn)
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 520.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(matchedProviders, key = { "prov_${it.id}" }) { p ->
                 AdminMapEntityItem(
                     title = p.name,
                     subtitle = "${p.profession} - ${p.area.ifEmpty { p.cityId.ifEmpty { "صنعاء" } }}",
@@ -181,15 +239,9 @@ fun AdminMapPanel(
                 )
             }
 
-            // Stores
-            val matchedStores = stores.filter { s ->
-                (selectedCityFilter == "الكل" || s.cityId.contains(selectedCityFilter) || s.localNeighborhood.contains(selectedCityFilter)) &&
-                (searchQuery.isEmpty() || s.name.contains(searchQuery, ignoreCase = true) || s.categoryId.contains(searchQuery, ignoreCase = true))
-            }
-
-            items(matchedStores) { s ->
-                val isMedical = s.sectionId.contains("medical") || s.name.contains("طبي") || s.name.contains("صيدلية")
-                val isRestaurant = s.sectionId.contains("restaurant") || s.name.contains("مطعم") || s.name.contains("كافيه")
+            items(matchedStores, key = { "store_${it.id}" }) { s ->
+                val isMedical = s.sectionId.contains("medical", true) || s.name.contains("طبي") || s.name.contains("صيدلية")
+                val isRestaurant = s.sectionId.contains("restaurant", true) || s.name.contains("مطعم") || s.name.contains("كافيه")
                 val (label, color) = when {
                     isMedical -> Pair("مركز طبي 🏥", Color(0xFFEC4899))
                     isRestaurant -> Pair("مطعم 🍔", Color(0xFFF59E0B))
@@ -207,13 +259,7 @@ fun AdminMapPanel(
                 )
             }
 
-            // Properties
-            val matchedProperties = properties.filter { pr ->
-                (selectedCityFilter == "الكل" || pr.cityId.contains(selectedCityFilter) || pr.localNeighborhood.contains(selectedCityFilter)) &&
-                (searchQuery.isEmpty() || pr.title.contains(searchQuery, ignoreCase = true))
-            }
-
-            items(matchedProperties) { pr ->
+            items(matchedProperties, key = { "prop_${it.id}" }) { pr ->
                 AdminMapEntityItem(
                     title = pr.title,
                     subtitle = "عقار - ${pr.cityId.ifEmpty { "صنعاء" }} (${pr.price} ${pr.currency})",
@@ -230,7 +276,13 @@ fun AdminMapPanel(
 }
 
 @Composable
-private fun StatBadge(title: String, count: String, color: Color, modifier: Modifier = Modifier) {
+private fun StatBadge(
+    title: String,
+    count: String,
+    color: Color,
+    themeColors: VisualThemePalette,
+    modifier: Modifier = Modifier
+) {
     Card(
         shape = RoundedCornerShape(10.dp),
         colors = CardDefaults.cardColors(containerColor = color.copy(alpha = 0.12f)),
@@ -241,7 +293,7 @@ private fun StatBadge(title: String, count: String, color: Color, modifier: Modi
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(count, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = color)
-            Text(title, fontSize = 9.sp, color = Color.LightGray, maxLines = 1, textAlign = TextAlign.Center)
+            Text(title, fontSize = 9.sp, color = themeColors.textSecondary, maxLines = 1, textAlign = TextAlign.Center)
         }
     }
 }
@@ -263,7 +315,7 @@ private fun AdminMapEntityItem(
     Card(
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = themeColors.surface),
-        border = BorderStroke(1.dp, if (hasGps) typeColor.copy(alpha = 0.25f) else Color.DarkGray),
+        border = BorderStroke(1.dp, if (hasGps) typeColor.copy(alpha = 0.25f) else themeColors.textSecondary.copy(alpha = 0.2f)),
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
@@ -288,16 +340,20 @@ private fun AdminMapEntityItem(
                         text = title,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White,
+                        color = themeColors.textPrimary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
 
-                Text(subtitle, fontSize = 11.sp, color = Color.Gray, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(subtitle, fontSize = 11.sp, color = themeColors.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
 
                 if (hasGps) {
-                    Text("📍 الإحداثيات: ${String.format("%.4f", lat)}, ${String.format("%.4f", lng)}", fontSize = 10.sp, color = Color(0xFF38BDF8))
+                    Text(
+                        "📍 الإحداثيات: ${String.format(java.util.Locale.US, "%.4f", lat)}, ${String.format(java.util.Locale.US, "%.4f", lng)}",
+                        fontSize = 10.sp,
+                        color = Color(0xFF38BDF8)
+                    )
                 } else {
                     Text("⚠️ الإحداثيات غير محددة (موقع المدينة الافتراضي)", fontSize = 10.sp, color = Color(0xFFF59E0B))
                 }
@@ -307,34 +363,19 @@ private fun AdminMapEntityItem(
             if (hasGps) {
                 IconButton(
                     onClick = {
-                        val provider = "GOOGLE_MAPS"
                         try {
-                            when (provider) {
-                                "MAPBOX" -> {
-                                    val uri = android.net.Uri.parse("mapbox://directions/profile/mapbox/driving/$lng,$lat")
-                                    context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, uri))
-                                    android.widget.Toast.makeText(context, "تم فتح Mapbox", android.widget.Toast.LENGTH_SHORT).show()
-                                }
-                                "MAPLIBRE" -> {
-                                    val uri = android.net.Uri.parse("geo:$lat,$lng?q=$lat,$lng")
-                                    context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, uri))
-                                    android.widget.Toast.makeText(context, "تم فتح MapLibre / الخريطة الافتراضية", android.widget.Toast.LENGTH_SHORT).show()
-                                }
-                                else -> {
-                                    val uri = android.net.Uri.parse("google.navigation:q=$lat,$lng")
-                                    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, uri).apply {
-                                        setPackage("com.google.android.apps.maps")
-                                    }
-                                    context.startActivity(intent)
-                                    android.widget.Toast.makeText(context, "تم فتح خرائط جوجل", android.widget.Toast.LENGTH_SHORT).show()
-                                }
-                            }
+                            val geoUri = Uri.parse("geo:$lat,$lng?q=$lat,$lng(${Uri.encode(title)})")
+                            context.startActivity(Intent(Intent.ACTION_VIEW, geoUri))
                         } catch (e: Exception) {
-                            val fallbackUri = android.net.Uri.parse("https://www.google.com/maps/search/?api=1&query=$lat,$lng")
-                            context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, fallbackUri))
+                            try {
+                                val fallbackUri = Uri.parse("https://www.openstreetmap.org/?mlat=$lat&mlon=$lng#map=16/$lat/$lng")
+                                context.startActivity(Intent(Intent.ACTION_VIEW, fallbackUri))
+                            } catch (e2: Exception) {
+                                Toast.makeText(context, "تعذر فتح تطبيق الخرائط على هذا الجهاز", Toast.LENGTH_SHORT).show()
+                            }
                         }
                     },
-                    modifier = androidx.compose.ui.Modifier.size(32.dp)
+                    modifier = Modifier.size(48.dp)
                 ) {
                     Icon(Icons.Default.LocationOn, contentDescription = "توجيه", tint = Color(0xFF00E5FF))
                 }

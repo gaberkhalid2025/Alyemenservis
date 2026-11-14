@@ -662,13 +662,16 @@ fun QuickProductOrderModal(
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
-    var customerPhoneInput by remember { mutableStateOf("") }
-    var customerNameInput by remember { mutableStateOf("") }
+    val savedPhone by viewModel.currentUserPhone.collectAsState()
+    val savedName by viewModel.currentUserName.collectAsState()
+    var customerPhoneInput by remember(savedPhone) { mutableStateOf(savedPhone) }
+    var customerNameInput by remember(savedName) { mutableStateOf(savedName) }
     var notesInput by remember { mutableStateOf("") }
     var quantity by remember { mutableIntStateOf(1) }
+    var isSubmitting by remember { mutableStateOf(false) }
 
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = { if (!isSubmitting) onDismiss() },
         title = {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -695,14 +698,14 @@ fun QuickProductOrderModal(
                     Text("الكمية:", fontSize = 12.sp, fontWeight = FontWeight.Medium)
                     IconButton(
                         onClick = { if (quantity > 1) quantity-- },
-                        modifier = Modifier.size(32.dp)
+                        modifier = Modifier.size(48.dp)
                     ) {
                         Text("-", fontSize = 20.sp, fontWeight = FontWeight.Bold)
                     }
                     Text("$quantity", fontSize = 14.sp, fontWeight = FontWeight.Bold)
                     IconButton(
                         onClick = { quantity++ },
-                        modifier = Modifier.size(32.dp)
+                        modifier = Modifier.size(48.dp)
                     ) {
                         Text("+", fontSize = 20.sp, fontWeight = FontWeight.Bold)
                     }
@@ -719,6 +722,9 @@ fun QuickProductOrderModal(
                     value = customerPhoneInput,
                     onValueChange = { customerPhoneInput = it },
                     label = { Text("رقم هاتفك للتواصل") },
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                        keyboardType = androidx.compose.ui.text.input.KeyboardType.Phone
+                    ),
                     modifier = Modifier.fillMaxWidth()
                 )
 
@@ -751,30 +757,54 @@ fun QuickProductOrderModal(
                         }
                         onDismiss()
                     },
+                    enabled = !isSubmitting,
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981))
                 ) {
                     Text("واتساب 💬", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                 }
 
-                // تسجيل الطلب بالمنصة
+                // تسجيل الطلب الحقيقي بالمنصة
                 Button(
                     onClick = {
                         if (customerPhoneInput.isBlank()) {
                             Toast.makeText(context, "يرجى إدخال رقم هاتفك أولاً", Toast.LENGTH_SHORT).show()
-                        } else {
-                            viewModel.triggerNotification("🛒 تم إرسال طلب ${product.name} إلى ${store.name} بنجاح!")
-                            Toast.makeText(context, "تم تسجيل طلبك بنجاح ✅", Toast.LENGTH_SHORT).show()
-                            onDismiss()
+                        } else if (!isSubmitting) {
+                            isSubmitting = true
+                            val orderTotal = product.price * quantity
+                            val booking = com.example.data.BookingEntity(
+                                customerName = customerNameInput.trim().ifBlank { "عميل المتجر" },
+                                customerPhone = customerPhoneInput.trim(),
+                                customerArea = notesInput.trim().ifBlank { store.localNeighborhood.ifBlank { store.cityId } },
+                                serviceType = "${product.name} × $quantity",
+                                serviceDetails = notesInput.trim(),
+                                providerId = store.id,
+                                providerName = store.name,
+                                providerPhone = store.phone,
+                                category = store.categoryId.ifBlank { "STORE" },
+                                totalAmount = orderTotal,
+                                price = orderTotal,
+                                status = com.example.utils.BookingStatus.PENDING.code
+                            )
+                            viewModel.bookingViewModel.createBooking(booking) { success ->
+                                isSubmitting = false
+                                if (success) {
+                                    Toast.makeText(context, "تم تسجيل طلبك وإرساله للمتجر بنجاح ✅", Toast.LENGTH_SHORT).show()
+                                    onDismiss()
+                                } else {
+                                    Toast.makeText(context, "تعذر إرسال الطلب، يرجى التحقق من الاتصال", Toast.LENGTH_SHORT).show()
+                                }
+                            }
                         }
                     },
+                    enabled = !isSubmitting,
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0F2B48))
                 ) {
-                    Text("تأكيد الطلب 🛒", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                    Text(if (isSubmitting) "جاري الإرسال..." else "تأكيد الطلب 🛒", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                 }
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(onClick = { if (!isSubmitting) onDismiss() }, enabled = !isSubmitting) {
                 Text("إلغاء")
             }
         }

@@ -16,6 +16,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import com.example.utils.MapDiagnosticsDialog
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -295,8 +297,11 @@ fun MapScreenContent(
     var hybridLabels by remember { mutableStateOf(false) }
 
     val is3DAvailable = remember { Map3D.isAvailable(context) }
-    var show3D by remember { mutableStateOf(false) }
     var map3dMessage by remember { mutableStateOf<String?>(null) }
+    var use3DCssFallback by remember { mutableStateOf(false) }
+    val valhallaSizeMb = remember(isTilesDownloaded) {
+        if (isTilesDownloaded) ValhallaTileDownloader.getInstalledSizeMb(context) else 0
+    }
 
     // Location Permission launcher
     val locationPermissionLauncher = rememberLauncherForActivityResult(
@@ -512,6 +517,68 @@ fun MapScreenContent(
                             .padding(16.dp)
                     )
                 }
+            } else if (state.is3DTerrainEnabled && is3DAvailable && !use3DCssFallback) {
+                Map3DView(
+                    centerLat = safeUserLat,
+                    centerLng = safeUserLng,
+                    userCoords = if (hasRealLocation) Pair(safeUserLat, safeUserLng) else null,
+                    markersJson = com.example.ui.screens.map.utils.MapJsonBuilder.buildMarkersJson(
+                        nearbyProviders = filteredProviders.take(com.example.ui.screens.map.utils.MapJsonBuilder.MAX_PER_TYPE),
+                        nearbyStores = filteredStores.take(com.example.ui.screens.map.utils.MapJsonBuilder.MAX_PER_TYPE),
+                        nearbyProperties = filteredProperties.take(com.example.ui.screens.map.utils.MapJsonBuilder.MAX_PER_TYPE),
+                        dynamicOffsets = state.dynamicOffsets,
+                        safeUserLat = safeUserLat,
+                        safeUserLng = safeUserLng
+                    ),
+                    currentMapMode = state.currentMapMode,
+                    selectedCity = state.selectedCity,
+                    hybridLabels = hybridLabels,
+                    gibsEnabled = state.gibsEnabled,
+                    gibsProduct = state.gibsProduct,
+                    eoxEnabled = state.eoxEnabled,
+                    realTimeSatEnabled = state.realTimeSatEnabled,
+                    realTimeSatFeed = state.realTimeSatFeed,
+                    offlineOnly = state.mapLayer == MapLayer.VALHALLA_OFFLINE,
+                    pickMode = isPinPickMode,
+                    focusPoint = searchedPlace?.let { Triple(it.shortName, it.latitude, it.longitude) }
+                        ?: pinnedPoint?.let { Triple("📌 نقطة محددة", it.first, it.second) },
+                    zoomInTick = state.zoomInTick,
+                    zoomOutTick = state.zoomOutTick,
+                    recenterTick = state.recenterTick,
+                    onMarkerClicked = { id, type ->
+                        when (type) {
+                            "PROVIDER" -> filteredProviders.find { it.id == id }?.let { state.selectedEntity = it }
+                            "STORE", "RESTAURANT", "MEDICAL" -> filteredStores.find { it.id == id }?.let { state.selectedEntity = it }
+                            "PROPERTY" -> filteredProperties.find { it.id == id }?.let { state.selectedEntity = it }
+                        }
+                    },
+                    onDeselect = { state.selectedEntity = null },
+                    onMapPicked = { lat, lng ->
+                        isPinPickMode = false
+                        pinnedPoint = lat to lng
+                        state.selectedEntity = null
+                        searchedPlace = null
+                    },
+                    onMapLongPressed = { lat, lng ->
+                        isPinPickMode = false
+                        pinnedPoint = lat to lng
+                        state.selectedEntity = null
+                        searchedPlace = null
+                    },
+                    onMapCenterChanged = { lat, lng ->
+                        centerCoords = lat to lng
+                    },
+                    onFallbackCss3D = { reason ->
+                        map3dMessage = reason
+                        use3DCssFallback = true
+                    },
+                    onUnavailable = { reason ->
+                        map3dMessage = reason
+                        use3DCssFallback = true
+                        coroutineScope.launch { snackbarHostState.showSnackbar(reason) }
+                    },
+                    modifier = Modifier.fillMaxSize()
+                )
             } else {
                 RealLeafletMapView(
                     userCoords = if (hasRealLocation) Pair(safeUserLat, safeUserLng) else Pair(0.0, 0.0),
@@ -521,6 +588,7 @@ fun MapScreenContent(
                     dynamicOffsets = state.dynamicOffsets,
                     currentMapMode = state.currentMapMode,
                     selectedCity = state.selectedCity,
+                    tilt = if (state.is3DTerrainEnabled) 55f else 0f,
                     zoomScale = state.zoomScale,
                     onZoomScaleChange = { state.zoomScale = it },
                     panOffset = state.panOffset,
@@ -620,10 +688,15 @@ fun MapScreenContent(
                             coroutineScope.launch { snackbarHostState.showSnackbar(msg) }
                         }
                     },
+                    offlineOnly = state.mapLayer == MapLayer.VALHALLA_OFFLINE,
+                    isValhallaDownloaded = isTilesDownloaded,
+                    valhallaSizeMb = valhallaSizeMb,
+                    realTimeSatEnabled = state.realTimeSatEnabled,
+                    realTimeSatFeed = state.realTimeSatFeed,
                     modifier = Modifier.fillMaxSize()
                 )
 
-                if (areTilesFailing && !state.isRadarMode) {
+                if (areTilesFailing && !state.isRadarMode && state.mapLayer != MapLayer.VALHALLA_OFFLINE) {
                     Surface(
                         color = Color(0xDD7F1D1D),
                         shape = RoundedCornerShape(10.dp),
@@ -690,15 +763,49 @@ fun MapScreenContent(
                     }
                 }
 
-                // 🏷️ شريط الشارات السريعة (أسماء الشوارع + وضع التوفير + الموقع اليدوي)
+                // 🏷️ شريط الشارات والتبديل السريع (أوفلاين Valhalla + تضاريس 3D + أسماء الشوارع + توفير + موقع يدوي)
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .align(Alignment.TopStart)
                         .statusBarsPadding()
-                        .padding(top = 100.dp, start = 16.dp)
+                        .padding(top = 100.dp, start = 16.dp, end = 86.dp)
+                        .horizontalScroll(rememberScrollState())
                 ) {
+                    val isOfflineLayer = state.mapLayer == MapLayer.VALHALLA_OFFLINE
+                    FilterChip(
+                        selected = isOfflineLayer,
+                        onClick = {
+                            val next = if (isOfflineLayer) MapLayer.STANDARD else MapLayer.VALHALLA_OFFLINE
+                            state.mapLayer = next
+                            areTilesFailing = false
+                            coroutineScope.launch {
+                                snackbarHostState.showSnackbar(
+                                    if (next == MapLayer.VALHALLA_OFFLINE) {
+                                        if (isTilesDownloaded) "📦 وضع أوفلاين Valhalla مفعّل (${valhallaSizeMb} MB) — بدون إنترنت"
+                                        else "📦 وضع الكاش الأوفلاين مفعّل (يمكنك تحميل حزمة Valhalla من زر الطبقات)"
+                                    } else {
+                                        "🌐 تم العودة إلى وضع الخريطة القياسي"
+                                    }
+                                )
+                            }
+                        },
+                        label = {
+                            Text(
+                                text = if (isOfflineLayer) "📦 أوفلاين Valhalla" else "🌐 قياسي",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isOfflineLayer) Color(0xFF10B981) else Color.White
+                            )
+                        },
+                        colors = FilterChipDefaults.filterChipColors(
+                            containerColor = Color(0xCC0F172A),
+                            selectedContainerColor = Color(0xCC064E3B)
+                        ),
+                        modifier = Modifier.testTag("map_valhalla_offline_toggle_btn")
+                    )
+
                     if (state.currentMapMode == MapMode.SATELLITE || state.currentMapMode == MapMode.SATELLITE_CLARITY || state.currentMapMode == MapMode.VELA_3D) {
                         FilterChip(
                             selected = hybridLabels,
@@ -802,23 +909,6 @@ fun MapScreenContent(
                     }
                 }
 
-                // 🧊 زر 3D الحقيقي (MapLibre + OpenFreeMap)
-                if (is3DAvailable && !state.isNavigating) {
-                    SmallFloatingActionButton(
-                        onClick = {
-                            map3dMessage = null
-                            show3D = true
-                        },
-                        containerColor = Color(0xFF0F172A),
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .statusBarsPadding()
-                            .padding(top = 150.dp, end = 16.dp)
-                    ) {
-                        Text("3D", color = Color(0xFF00E5FF), fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                    }
-                }
-
                 // 🏠 زر «عنواني بالمعلم» (حل تشويش GPS)
                 SmallFloatingActionButton(
                     onClick = {
@@ -831,48 +921,6 @@ fun MapScreenContent(
                         .padding(end = 16.dp, bottom = 190.dp)
                 ) {
                     Text("🏠", fontSize = 16.sp)
-                }
-
-                // 🗺️ عرض الخريطة ثلاثية الأبعاد (3D View Overlay)
-                if (show3D) {
-                    Box(
-                        Modifier
-                            .fillMaxSize()
-                            .zIndex(10f)
-                            .background(Color(0xFF0B0F19))
-                    ) {
-                        Map3DView(
-                            centerLat = safeUserLat,
-                            centerLng = safeUserLng,
-                            userCoords = if (hasRealLocation) Pair(safeUserLat, safeUserLng) else null,
-                            markersJson = com.example.ui.screens.map.utils.MapJsonBuilder.buildMarkersJson(
-                                nearbyProviders = filteredProviders.take(com.example.ui.screens.map.utils.MapJsonBuilder.MAX_PER_TYPE),
-                                nearbyStores = filteredStores.take(com.example.ui.screens.map.utils.MapJsonBuilder.MAX_PER_TYPE),
-                                nearbyProperties = emptyList(),
-                                dynamicOffsets = emptyMap(),
-                                safeUserLat = safeUserLat,
-                                safeUserLng = safeUserLng
-                            ),
-                            onMarkerClicked = { id, type ->
-                                when (type) {
-                                    "PROVIDER" -> filteredProviders.find { it.id == id }?.let { state.selectedEntity = it; show3D = false }
-                                    "STORE", "RESTAURANT", "MEDICAL" -> filteredStores.find { it.id == id }?.let { state.selectedEntity = it; show3D = false }
-                                }
-                            },
-                            onUnavailable = { reason -> map3dMessage = reason; show3D = false },
-                            modifier = Modifier.fillMaxSize()
-                        )
-                        IconButton(
-                            onClick = { show3D = false },
-                            modifier = Modifier
-                                .align(Alignment.TopStart)
-                                .statusBarsPadding()
-                                .padding(8.dp)
-                        ) {
-                            Icon(Icons.Default.Close, contentDescription = "إغلاق", tint = Color.White)
-                        }
-                    }
-                    BackHandler { show3D = false }
                 }
             }
 
@@ -1122,6 +1170,7 @@ fun MapScreenContent(
                 onRecenterLocation = {
                     state.panOffset = Offset.Zero
                     state.zoomScale = 1.0f
+                    state.recenterTick++
                     val hasFine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
                     val hasCoarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
                     if (hasFine || hasCoarse) {
@@ -1137,7 +1186,10 @@ fun MapScreenContent(
                         )
                     }
                 },
-                onOpenLayerDialog = { state.showLayerDialog = true },
+                onOpenLayerDialog = {
+                    showMoreLayersSheet = false
+                    state.showLayerDialog = true
+                },
                 isNavigationActive = state.isNavigating,
                 onToggleNavigation = {
                     val searchedWp = searchedPlace?.let {
@@ -1260,12 +1312,17 @@ fun MapScreenContent(
                     }
                 },
                 onOpenCoordinateEntry = { showCoordinateDialog = true },
-                hasMoreLayersActive = state.quakesEnabled || state.rainEnabled ||
+                hasMoreLayersActive = state.gibsEnabled || state.eoxEnabled || state.realTimeSatEnabled ||
+                    state.quakesEnabled || state.rainEnabled ||
                     state.peakEnabled || state.coverageEnabled || state.hazardEnabled ||
                     state.reliabilityEnabled || state.nightMode,
-                hasLayerOverlayActive = state.gibsEnabled || state.eoxEnabled || show3D ||
-                    state.currentMapMode == MapMode.VELA || state.currentMapMode == MapMode.SATELLITE_CLARITY,
-                onOpenMoreLayers = { showMoreLayersSheet = true },
+                hasLayerOverlayActive = state.is3DTerrainEnabled || state.mapLayer == MapLayer.VALHALLA_OFFLINE ||
+                    state.currentMapMode == MapMode.VELA || state.currentMapMode == MapMode.SATELLITE_CLARITY ||
+                    state.currentMapMode == MapMode.OSM || state.currentMapMode == MapMode.TOPO,
+                onOpenMoreLayers = {
+                    state.showLayerDialog = false
+                    showMoreLayersSheet = true
+                },
                 onOpenGroupTracking = { showGroupTracking = true },
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
@@ -1404,15 +1461,31 @@ fun MapScreenContent(
                 }
             }
 
-            // 🗺️ 8. Layer Selection Dialog (نظام الطبقات المجاني الشامل)
+            // 🗺️ 8. Primary Layers Bottom Sheet (الطبقات الأساسية فقط)
             if (state.showLayerDialog) {
-                MapLayersDialog(
+                PrimaryLayersBottomSheet(
+                    mapLayer = state.mapLayer,
+                    onToggleMapLayer = { next ->
+                        state.mapLayer = next
+                        areTilesFailing = false
+                        coroutineScope.launch {
+                            snackbarHostState.showSnackbar(
+                                if (next == MapLayer.VALHALLA_OFFLINE) {
+                                    if (isTilesDownloaded) "📦 تم تفعيل وضع أوفلاين Valhalla (${valhallaSizeMb} MB)"
+                                    else "📦 تم تفعيل وضع الكاش الأوفلاين"
+                                } else {
+                                    "🌐 تم العودة إلى وضع الخريطة القياسي"
+                                }
+                            )
+                        }
+                    },
+                    isValhallaDownloaded = isTilesDownloaded,
+                    valhallaSizeMb = valhallaSizeMb,
+                    onOpenValhallaDownload = { showDownloadDialog = true },
                     currentMapMode = state.currentMapMode,
-                    onSelectLayer = { mode, _ ->
-                        show3D = false
+                    onSelectMapMode = { mode ->
                         state.currentMapMode = mode
                         state.isRadarMode = false
-                        state.showLayerDialog = false
                         val modeLabel = when (mode) {
                             MapMode.VELA -> "✨ تم تفعيل خرائط VELA المجانية"
                             MapMode.SATELLITE -> "🛰️ تم تفعيل أقمار Esri القياسية"
@@ -1422,24 +1495,28 @@ fun MapScreenContent(
                             MapMode.TOPO -> "⛰️ تم تفعيل خريطة التضاريس"
                             else -> "تم تفعيل الطبقة بنجاح ✓"
                         }
-                        coroutineScope.launch {
-                            snackbarHostState.showSnackbar(modeLabel)
-                        }
+                        coroutineScope.launch { snackbarHostState.showSnackbar(modeLabel) }
                     },
                     is3DAvailable = is3DAvailable,
-                    is3DActive = show3D,
-                    onOpen3D = {
-                        state.showLayerDialog = false
-                        state.isRadarMode = false
-                        if (is3DAvailable) {
-                            map3dMessage = null
-                            show3D = true
-                        } else {
-                            coroutineScope.launch {
-                                snackbarHostState.showSnackbar("العرض ثلاثي الأبعاد غير مدعوم على هذا الجهاز")
-                            }
+                    is3DTerrainEnabled = state.is3DTerrainEnabled,
+                    onToggle3DTerrain = { enabled ->
+                        map3dMessage = null
+                        if (enabled) use3DCssFallback = false
+                        state.is3DTerrainEnabled = enabled
+                        coroutineScope.launch {
+                            snackbarHostState.showSnackbar(
+                                if (enabled) "⛰️ تم تفعيل التضاريس ثلاثية الأبعاد وزاوية الكاميرا (62°)"
+                                else "🗺️ تم العودة إلى العرض ثنائي الأبعاد (2D)"
+                            )
                         }
                     },
+                    onDismiss = { state.showLayerDialog = false }
+                )
+            }
+
+            // 🛰️ 9. Secondary Layers Bottom Sheet (الطبقات الثانوية والأقمار الحية فقط)
+            if (showMoreLayersSheet) {
+                SecondaryLayersBottomSheet(
                     gibsEnabled = state.gibsEnabled,
                     gibsProduct = state.gibsProduct,
                     onToggleGibs = { enabled ->
@@ -1455,12 +1532,32 @@ fun MapScreenContent(
                         state.gibsProduct = productKey
                         state.gibsEnabled = true
                         val prodName = when (productKey) {
+                            "noaa20" -> "VIIRS NOAA-20 المباشر"
                             "modis" -> "MODIS الألوان الحقيقية"
                             "landtemp" -> "حرارة السطح النهاري"
-                            else -> "VIIRS البث المباشر (375م)"
+                            else -> "VIIRS SNPP المباشر"
                         }
+                        coroutineScope.launch { snackbarHostState.showSnackbar("📡 تم التبديل إلى بث ناسا: $prodName") }
+                    },
+                    realTimeSatEnabled = state.realTimeSatEnabled,
+                    realTimeSatFeed = state.realTimeSatFeed,
+                    onToggleRealTimeSat = { enabled ->
+                        state.realTimeSatEnabled = enabled
                         coroutineScope.launch {
-                            snackbarHostState.showSnackbar("📡 تم التبديل إلى بث ناسا: $prodName")
+                            snackbarHostState.showSnackbar(
+                                if (enabled) "🛰️ تم تشغيل البث الفضائي الحي في الوقت الفعلي (RealEarth)"
+                                else "تم إيقاف البث الفضائي المباشر"
+                            )
+                        }
+                    },
+                    onSelectRealTimeSatFeed = { feed ->
+                        state.realTimeSatFeed = feed
+                        state.realTimeSatEnabled = true
+                        coroutineScope.launch {
+                            snackbarHostState.showSnackbar(
+                                if (feed == "globalir") "🛰️ بث الأشعة تحت الحمراء المباشر (ليل/نهار)"
+                                else "🛰️ بث الأقمار المرئية المباشر (RealEarth)"
+                            )
                         }
                     },
                     eoxEnabled = state.eoxEnabled,
@@ -1473,20 +1570,6 @@ fun MapScreenContent(
                             )
                         }
                     },
-                    onDismiss = { state.showLayerDialog = false }
-                )
-            }
-
-            if (showGnss) {
-                GnssPanelDialog(
-                    accuracyM = accuracyM.takeIf { it < Float.MAX_VALUE },
-                    onOpenLandmarkAddress = { showLandmarkAddress = true },
-                    onDismiss = { showGnss = false }
-                )
-            }
-
-            if (showMoreLayersSheet) {
-                MoreLayersSheet(
                     nightMode = state.nightMode,
                     onToggleNight = { state.nightMode = it },
                     quakesEnabled = state.quakesEnabled,
@@ -1509,6 +1592,14 @@ fun MapScreenContent(
                         coroutineScope.launch { snackbarHostState.showSnackbar("✓ تم مسح سجل التغطية المحلي") }
                     },
                     onDismiss = { showMoreLayersSheet = false }
+                )
+            }
+
+            if (showGnss) {
+                GnssPanelDialog(
+                    accuracyM = accuracyM.takeIf { it < Float.MAX_VALUE },
+                    onOpenLandmarkAddress = { showLandmarkAddress = true },
+                    onDismiss = { showGnss = false }
                 )
             }
 

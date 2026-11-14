@@ -6,9 +6,11 @@ import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -18,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -108,7 +111,7 @@ fun AdminStoresPropertiesPanel(
                         text = if (selectedSection == "المتاجر") "🏪 إدارة المحلات والمراكز التجارية (${stores.size})" else "🏠 إدارة العقارات والأراضي (${properties.size})",
                         fontWeight = FontWeight.Bold,
                         fontSize = 13.5.sp,
-                        color = Color.White
+                        color = themeColors.textPrimary
                     )
 
                     Button(
@@ -118,7 +121,8 @@ fun AdminStoresPropertiesPanel(
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
                         shape = RoundedCornerShape(8.dp),
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                        modifier = Modifier.heightIn(min = 48.dp)
                     ) {
                         Icon(Icons.Default.Add, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
@@ -139,16 +143,16 @@ fun AdminStoresPropertiesPanel(
                             selectedFilter = "الكل"
                         },
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = if (selectedSection == "المتاجر") themeColors.accent else Color.White.copy(alpha = 0.08f)
+                            containerColor = if (selectedSection == "المتاجر") themeColors.accent else themeColors.textPrimary.copy(alpha = 0.08f)
                         ),
                         shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f).heightIn(min = 48.dp)
                     ) {
                         Text(
                             "🏪 المحلات التجارية (${stores.size})",
                             fontSize = 11.5.sp,
                             fontWeight = FontWeight.Bold,
-                            color = if (selectedSection == "المتاجر") Color.Black else Color.White
+                            color = if (selectedSection == "المتاجر") Color.Black else themeColors.textPrimary
                         )
                     }
 
@@ -158,16 +162,16 @@ fun AdminStoresPropertiesPanel(
                             selectedFilter = "الكل"
                         },
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = if (selectedSection == "العقارات") themeColors.accent else Color.White.copy(alpha = 0.08f)
+                            containerColor = if (selectedSection == "العقارات") themeColors.accent else themeColors.textPrimary.copy(alpha = 0.08f)
                         ),
                         shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f).heightIn(min = 48.dp)
                     ) {
                         Text(
                             "🏠 العقارات والأراضي (${properties.size})",
                             fontSize = 11.5.sp,
                             fontWeight = FontWeight.Bold,
-                            color = if (selectedSection == "العقارات") Color.Black else Color.White
+                            color = if (selectedSection == "العقارات") Color.Black else themeColors.textPrimary
                         )
                     }
                 }
@@ -176,29 +180,29 @@ fun AdminStoresPropertiesPanel(
                 OutlinedTextField(
                     value = searchQuery,
                     onValueChange = { searchQuery = it },
-                    placeholder = { Text(if (selectedSection == "المتاجر") "بحث باسم المتجر، المدينة، الهاتف، النشاط..." else "بحث بنوع العقار، المدينة، الهاتف، السعر...", fontSize = 11.5.sp, color = Color.Gray) },
+                    placeholder = { Text(if (selectedSection == "المتاجر") "بحث باسم المتجر، المدينة، الهاتف، النشاط..." else "بحث بنوع العقار، المدينة، الهاتف، السعر...", fontSize = 11.5.sp, color = themeColors.textSecondary) },
                     leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = themeColors.accent, modifier = Modifier.size(18.dp)) },
                     trailingIcon = {
                         if (searchQuery.isNotEmpty()) {
-                            IconButton(onClick = { searchQuery = "" }) {
-                                Icon(Icons.Default.Clear, contentDescription = "مسح", tint = Color.Gray, modifier = Modifier.size(16.dp))
+                            IconButton(onClick = { searchQuery = "" }, modifier = Modifier.size(48.dp)) {
+                                Icon(Icons.Default.Clear, contentDescription = "مسح", tint = themeColors.textSecondary, modifier = Modifier.size(16.dp))
                             }
                         }
                     },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(10.dp),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
+                        focusedTextColor = themeColors.textPrimary,
+                        unfocusedTextColor = themeColors.textPrimary,
                         focusedBorderColor = themeColors.accent,
-                        unfocusedBorderColor = Color.White.copy(alpha = 0.15f)
+                        unfocusedBorderColor = themeColors.textSecondary.copy(alpha = 0.25f)
                     )
                 )
 
                 // Filter Chips
                 val currentFilters = if (selectedSection == "المتاجر") listOf("الكل", "مميز VIP", "نشط", "محظور") else listOf("الكل", "مميز VIP", "للإيجار", "للبيع", "محظور")
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    items(currentFilters) { f ->
+                    items(currentFilters, key = { it }) { f ->
                         val isSelected = selectedFilter == f
                         FilterChip(
                             selected = isSelected,
@@ -207,8 +211,8 @@ fun AdminStoresPropertiesPanel(
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = themeColors.accent,
                                 selectedLabelColor = Color.Black,
-                                containerColor = Color.White.copy(alpha = 0.05f),
-                                labelColor = Color.White
+                                containerColor = themeColors.textPrimary.copy(alpha = 0.05f),
+                                labelColor = themeColors.textPrimary
                             )
                         )
                     }
@@ -225,71 +229,80 @@ fun AdminStoresPropertiesPanel(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-                        Text("لا توجد محلات تجارية مطابقة 🏪", color = Color.Gray, fontSize = 13.sp)
+                        Text("لا توجد محلات تجارية مطابقة 🏪", color = themeColors.textSecondary, fontSize = 13.sp)
                     }
                 }
             } else {
-                filteredStores.forEach { store ->
-                    AdminEntityCard(
-                        title = store.name.ifBlank { "متجر تجاري" },
-                        subtitle = "📱 ${store.phone} • 📍 ${store.cityId} - ${store.localNeighborhood.ifBlank { "المركز" }}",
-                        details = "🏢 النشاط: ${store.description.ifBlank { "تجارة وخدمات" }} • ساعات العمل: ${store.workingHours.ifBlank { "يومياً" }}",
-                        statusText = if (store.isBlocked) "🚫 محظور" else if (store.isVip) "⭐ VIP" else "نشط ✅",
-                        statusColor = if (store.isBlocked) Color(0xFFEF4444) else if (store.isVip) Color(0xFFF59E0B) else Color(0xFF10B981),
-                        isVip = store.isVip,
-                        isBlocked = store.isBlocked,
-                        themeColors = themeColors,
-                        actions = {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                OutlinedButton(
-                                    onClick = {
-                                        viewModel.adminViewModel.toggleStoreBlocked(store.id, !store.isBlocked)
-                                        Toast.makeText(context, if (store.isBlocked) "تم إلغاء حظر المتجر ✅" else "تم حظر المتجر 🚫", Toast.LENGTH_SHORT).show()
-                                    },
-                                    shape = RoundedCornerShape(8.dp),
-                                    border = BorderStroke(1.dp, if (store.isBlocked) Color(0xFF10B981) else Color(0xFFEF5350)),
-                                    modifier = Modifier.weight(1f)
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 560.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(filteredStores, key = { it.id }) { store ->
+                        AdminEntityCard(
+                            title = store.name.ifBlank { "متجر تجاري" },
+                            subtitle = "📱 ${store.phone} • 📍 ${store.cityId} - ${store.localNeighborhood.ifBlank { "المركز" }}",
+                            details = "🏢 النشاط: ${store.description.ifBlank { "تجارة وخدمات" }} • ساعات العمل: ${store.workingHours.ifBlank { "يومياً" }}",
+                            imageUrl = store.logoImage.ifBlank { store.coverImage }.ifBlank { null },
+                            statusText = if (store.isBlocked) "🚫 محظور" else if (store.isVip) "⭐ VIP" else "نشط ✅",
+                            statusColor = if (store.isBlocked) Color(0xFFEF4444) else if (store.isVip) Color(0xFFF59E0B) else Color(0xFF10B981),
+                            isVip = store.isVip,
+                            isBlocked = store.isBlocked,
+                            themeColors = themeColors,
+                            actions = {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text(
-                                        if (store.isBlocked) "فك الحظر ✅" else "حظر 🚫",
-                                        fontSize = 10.5.sp,
-                                        color = if (store.isBlocked) Color(0xFF10B981) else Color(0xFFEF5350)
-                                    )
-                                }
+                                    OutlinedButton(
+                                        onClick = {
+                                            viewModel.adminViewModel.toggleStoreBlocked(store.id, !store.isBlocked)
+                                            Toast.makeText(context, if (store.isBlocked) "تم إلغاء حظر المتجر ✅" else "تم حظر المتجر 🚫", Toast.LENGTH_SHORT).show()
+                                        },
+                                        shape = RoundedCornerShape(8.dp),
+                                        border = BorderStroke(1.dp, if (store.isBlocked) Color(0xFF10B981) else Color(0xFFEF5350)),
+                                        modifier = Modifier.weight(1f).heightIn(min = 48.dp)
+                                    ) {
+                                        Text(
+                                            if (store.isBlocked) "فك الحظر ✅" else "حظر 🚫",
+                                            fontSize = 10.5.sp,
+                                            color = if (store.isBlocked) Color(0xFF10B981) else Color(0xFFEF5350)
+                                        )
+                                    }
 
-                                if (store.phone.isNotBlank()) {
+                                    if (store.phone.isNotBlank()) {
+                                        IconButton(
+                                            onClick = {
+                                                try {
+                                                    val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${store.phone}"))
+                                                    context.startActivity(intent)
+                                                } catch (e: Exception) {
+                                                    Toast.makeText(context, "تعذر فتح تطبيق الاتصال", Toast.LENGTH_SHORT).show()
+                                                }
+                                            },
+                                            modifier = Modifier
+                                                .size(48.dp)
+                                                .background(Color(0xFF10B981).copy(alpha = 0.15f), RoundedCornerShape(8.dp))
+                                        ) {
+                                            Icon(Icons.Default.Call, contentDescription = "اتصال", tint = Color(0xFF10B981), modifier = Modifier.size(18.dp))
+                                        }
+                                    }
+
                                     IconButton(
                                         onClick = {
-                                            try {
-                                                val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${store.phone}"))
-                                                context.startActivity(intent)
-                                            } catch (e: Exception) {
-                                                Toast.makeText(context, "تعذر فتح تطبيق الاتصال", Toast.LENGTH_SHORT).show()
-                                            }
+                                            viewModel.adminViewModel.deleteStore(store.id)
+                                            Toast.makeText(context, "🗑️ تم حذف المتجر", Toast.LENGTH_SHORT).show()
                                         },
-                                        modifier = Modifier.background(Color(0xFF10B981).copy(alpha = 0.15f), RoundedCornerShape(8.dp))
+                                        modifier = Modifier
+                                            .size(48.dp)
+                                            .background(Color(0xFFEF5350).copy(alpha = 0.15f), RoundedCornerShape(8.dp))
                                     ) {
-                                        Icon(Icons.Default.Call, contentDescription = "اتصال", tint = Color(0xFF10B981), modifier = Modifier.size(18.dp))
+                                        Icon(Icons.Default.Delete, contentDescription = "حذف", tint = Color(0xFFEF5350), modifier = Modifier.size(18.dp))
                                     }
                                 }
-
-                                IconButton(
-                                    onClick = {
-                                        viewModel.adminViewModel.deleteStore(store.id)
-                                        Toast.makeText(context, "🗑️ تم حذف المتجر", Toast.LENGTH_SHORT).show()
-                                    },
-                                    modifier = Modifier.background(Color(0xFFEF5350).copy(alpha = 0.15f), RoundedCornerShape(8.dp))
-                                ) {
-                                    Icon(Icons.Default.Delete, contentDescription = "حذف", tint = Color(0xFFEF5350), modifier = Modifier.size(18.dp))
-                                }
                             }
-                        }
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
+                        )
+                    }
                 }
             }
         } else {
@@ -301,71 +314,80 @@ fun AdminStoresPropertiesPanel(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-                        Text("لا توجد عقارات أو أراضي مطابقة 🏠", color = Color.Gray, fontSize = 13.sp)
+                        Text("لا توجد عقارات أو أراضي مطابقة 🏠", color = themeColors.textSecondary, fontSize = 13.sp)
                     }
                 }
             } else {
-                filteredProperties.forEach { prop ->
-                    AdminEntityCard(
-                        title = prop.title.ifBlank { "عقار معروض" },
-                        subtitle = "📱 ${prop.phone} • 📍 ${prop.cityId} - ${prop.localNeighborhood.ifBlank { "المنطقة" }}",
-                        details = "💰 السعر: ${prop.price} ${prop.currency} • 🏷️ النوع: ${prop.type}",
-                        statusText = if (prop.isBlocked) "🚫 محظور" else if (prop.isVip) "⭐ VIP" else "متاح ✅",
-                        statusColor = if (prop.isBlocked) Color(0xFFEF4444) else if (prop.isVip) Color(0xFFF59E0B) else Color(0xFF10B981),
-                        isVip = prop.isVip,
-                        isBlocked = prop.isBlocked,
-                        themeColors = themeColors,
-                        actions = {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                OutlinedButton(
-                                    onClick = {
-                                        viewModel.adminViewModel.togglePropertyBlocked(prop.id, !prop.isBlocked)
-                                        Toast.makeText(context, if (prop.isBlocked) "تم فك الحظر عن العقار ✅" else "تم حظر العقار 🚫", Toast.LENGTH_SHORT).show()
-                                    },
-                                    shape = RoundedCornerShape(8.dp),
-                                    border = BorderStroke(1.dp, if (prop.isBlocked) Color(0xFF10B981) else Color(0xFFEF5350)),
-                                    modifier = Modifier.weight(1f)
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 560.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(filteredProperties, key = { it.id }) { prop ->
+                        AdminEntityCard(
+                            title = prop.title.ifBlank { "عقار معروض" },
+                            subtitle = "📱 ${prop.phone} • 📍 ${prop.cityId} - ${prop.localNeighborhood.ifBlank { "المنطقة" }}",
+                            details = "💰 السعر: ${prop.price} ${prop.currency} • 🏷️ النوع: ${prop.type}",
+                            imageUrl = prop.images.firstOrNull()?.takeIf { it.isNotBlank() },
+                            statusText = if (prop.isBlocked) "🚫 محظور" else if (prop.isVip) "⭐ VIP" else "متاح ✅",
+                            statusColor = if (prop.isBlocked) Color(0xFFEF4444) else if (prop.isVip) Color(0xFFF59E0B) else Color(0xFF10B981),
+                            isVip = prop.isVip,
+                            isBlocked = prop.isBlocked,
+                            themeColors = themeColors,
+                            actions = {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text(
-                                        if (prop.isBlocked) "فك الحظر ✅" else "حظر 🚫",
-                                        fontSize = 10.5.sp,
-                                        color = if (prop.isBlocked) Color(0xFF10B981) else Color(0xFFEF5350)
-                                    )
-                                }
+                                    OutlinedButton(
+                                        onClick = {
+                                            viewModel.adminViewModel.togglePropertyBlocked(prop.id, !prop.isBlocked)
+                                            Toast.makeText(context, if (prop.isBlocked) "تم فك الحظر عن العقار ✅" else "تم حظر العقار 🚫", Toast.LENGTH_SHORT).show()
+                                        },
+                                        shape = RoundedCornerShape(8.dp),
+                                        border = BorderStroke(1.dp, if (prop.isBlocked) Color(0xFF10B981) else Color(0xFFEF5350)),
+                                        modifier = Modifier.weight(1f).heightIn(min = 48.dp)
+                                    ) {
+                                        Text(
+                                            if (prop.isBlocked) "فك الحظر ✅" else "حظر 🚫",
+                                            fontSize = 10.5.sp,
+                                            color = if (prop.isBlocked) Color(0xFF10B981) else Color(0xFFEF5350)
+                                        )
+                                    }
 
-                                if (prop.phone.isNotBlank()) {
+                                    if (prop.phone.isNotBlank()) {
+                                        IconButton(
+                                            onClick = {
+                                                try {
+                                                    val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${prop.phone}"))
+                                                    context.startActivity(intent)
+                                                } catch (e: Exception) {
+                                                    Toast.makeText(context, "تعذر فتح تطبيق الاتصال", Toast.LENGTH_SHORT).show()
+                                                }
+                                            },
+                                            modifier = Modifier
+                                                .size(48.dp)
+                                                .background(Color(0xFF10B981).copy(alpha = 0.15f), RoundedCornerShape(8.dp))
+                                        ) {
+                                            Icon(Icons.Default.Call, contentDescription = "اتصال", tint = Color(0xFF10B981), modifier = Modifier.size(18.dp))
+                                        }
+                                    }
+
                                     IconButton(
                                         onClick = {
-                                            try {
-                                                val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${prop.phone}"))
-                                                context.startActivity(intent)
-                                            } catch (e: Exception) {
-                                                Toast.makeText(context, "تعذر فتح تطبيق الاتصال", Toast.LENGTH_SHORT).show()
-                                            }
+                                            viewModel.adminViewModel.deleteProperty(prop.id)
+                                            Toast.makeText(context, "🗑️ تم حذف العقار", Toast.LENGTH_SHORT).show()
                                         },
-                                        modifier = Modifier.background(Color(0xFF10B981).copy(alpha = 0.15f), RoundedCornerShape(8.dp))
+                                        modifier = Modifier
+                                            .size(48.dp)
+                                            .background(Color(0xFFEF5350).copy(alpha = 0.15f), RoundedCornerShape(8.dp))
                                     ) {
-                                        Icon(Icons.Default.Call, contentDescription = "اتصال", tint = Color(0xFF10B981), modifier = Modifier.size(18.dp))
+                                        Icon(Icons.Default.Delete, contentDescription = "حذف", tint = Color(0xFFEF5350), modifier = Modifier.size(18.dp))
                                     }
                                 }
-
-                                IconButton(
-                                    onClick = {
-                                        viewModel.adminViewModel.deleteProperty(prop.id)
-                                        Toast.makeText(context, "🗑️ تم حذف العقار", Toast.LENGTH_SHORT).show()
-                                    },
-                                    modifier = Modifier.background(Color(0xFFEF5350).copy(alpha = 0.15f), RoundedCornerShape(8.dp))
-                                ) {
-                                    Icon(Icons.Default.Delete, contentDescription = "حذف", tint = Color(0xFFEF5350), modifier = Modifier.size(18.dp))
-                                }
                             }
-                        }
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
+                        )
+                    }
                 }
             }
         }
@@ -381,11 +403,18 @@ fun AdminStoresPropertiesPanel(
 
         AlertDialog(
             onDismissRequest = { showAddStoreDialog = false },
-            title = { Text("➕ إضافة متجر أو مركز تجاري", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color.White) },
+            title = { Text("➕ إضافة متجر أو مركز تجاري", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = themeColors.textPrimary) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(value = sName, onValueChange = { sName = it }, label = { Text("اسم المتجر / المركز") }, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(value = sPhone, onValueChange = { sPhone = it }, label = { Text("رقم الهاتف والتواصل") }, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(
+                        value = sPhone,
+                        onValueChange = { sPhone = it },
+                        label = { Text("رقم الهاتف والتواصل") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
                     OutlinedTextField(value = sCity, onValueChange = { sCity = it }, label = { Text("المدينة / المحافظة") }, modifier = Modifier.fillMaxWidth())
                     OutlinedTextField(value = sAddress, onValueChange = { sAddress = it }, label = { Text("الحي والشارع") }, modifier = Modifier.fillMaxWidth())
                     OutlinedTextField(value = sCategory, onValueChange = { sCategory = it }, label = { Text("النشاط والتصنيف") }, modifier = Modifier.fillMaxWidth())
@@ -396,6 +425,11 @@ fun AdminStoresPropertiesPanel(
                     onClick = {
                         if (sName.isBlank()) {
                             Toast.makeText(context, "يرجى كتابة اسم المتجر", Toast.LENGTH_SHORT).show()
+                            return@Button
+                        }
+                        val cleanPhone = sPhone.filter { it.isDigit() }
+                        if (sPhone.isNotBlank() && cleanPhone.length < 9) {
+                            Toast.makeText(context, "يرجى إدخال رقم هاتف صحيح (9 أرقام على الأقل)", Toast.LENGTH_SHORT).show()
                             return@Button
                         }
                         val newStore = StoreEntity(
@@ -420,9 +454,9 @@ fun AdminStoresPropertiesPanel(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showAddStoreDialog = false }) { Text("إلغاء", color = Color.Gray) }
+                TextButton(onClick = { showAddStoreDialog = false }) { Text("إلغاء", color = themeColors.textSecondary) }
             },
-            containerColor = Color(0xFF1E293B)
+            containerColor = themeColors.surface
         )
     }
 
@@ -437,14 +471,28 @@ fun AdminStoresPropertiesPanel(
 
         AlertDialog(
             onDismissRequest = { showAddPropertyDialog = false },
-            title = { Text("➕ إضافة عقار أو أرض جديدة", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color.White) },
+            title = { Text("➕ إضافة عقار أو أرض جديدة", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = themeColors.textPrimary) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(value = pTitle, onValueChange = { pTitle = it }, label = { Text("عنوان العقار (مثال: شقة مفروشة راقية)") }, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(value = pPhone, onValueChange = { pPhone = it }, label = { Text("رقم التواصل") }, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(
+                        value = pPhone,
+                        onValueChange = { pPhone = it },
+                        label = { Text("رقم التواصل") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
                     OutlinedTextField(value = pCity, onValueChange = { pCity = it }, label = { Text("المدينة / المحافظة") }, modifier = Modifier.fillMaxWidth())
                     OutlinedTextField(value = pType, onValueChange = { pType = it }, label = { Text("النوع (شقة، فيلا، أرض، محل، مكتب)") }, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(value = pPrice, onValueChange = { pPrice = it }, label = { Text("السعر أو الإيجار") }, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(
+                        value = pPrice,
+                        onValueChange = { pPrice = it },
+                        label = { Text("السعر أو الإيجار") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
                     OutlinedTextField(value = pDesc, onValueChange = { pDesc = it }, label = { Text("تفاصيل ومواصفات العقار") }, modifier = Modifier.fillMaxWidth().height(70.dp))
                 }
             },
@@ -455,13 +503,23 @@ fun AdminStoresPropertiesPanel(
                             Toast.makeText(context, "يرجى كتابة عنوان العقار", Toast.LENGTH_SHORT).show()
                             return@Button
                         }
+                        val cleanPhone = pPhone.filter { it.isDigit() }
+                        if (pPhone.isNotBlank() && cleanPhone.length < 9) {
+                            Toast.makeText(context, "يرجى إدخال رقم هاتف صحيح (9 أرقام على الأقل)", Toast.LENGTH_SHORT).show()
+                            return@Button
+                        }
+                        val parsedPrice = if (pPrice.isBlank()) 0.0 else (pPrice.trim().toDoubleOrNull() ?: -1.0)
+                        if (pPrice.isNotBlank() && parsedPrice <= 0.0) {
+                            Toast.makeText(context, "يرجى إدخال سعر رقمي صالح أكبر من صفر", Toast.LENGTH_SHORT).show()
+                            return@Button
+                        }
                         val newProp = PropertyEntity(
                             id = "prop_${System.currentTimeMillis()}",
                             title = pTitle.trim(),
                             phone = pPhone.trim(),
                             cityId = pCity.trim(),
                             type = pType.trim(),
-                            price = pPrice.toDoubleOrNull() ?: 0.0,
+                            price = parsedPrice,
                             description = pDesc.trim(),
                             isApproved = true,
                             isActive = true
@@ -476,9 +534,9 @@ fun AdminStoresPropertiesPanel(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showAddPropertyDialog = false }) { Text("إلغاء", color = Color.Gray) }
+                TextButton(onClick = { showAddPropertyDialog = false }) { Text("إلغاء", color = themeColors.textSecondary) }
             },
-            containerColor = Color(0xFF1E293B)
+            containerColor = themeColors.surface
         )
     }
 }

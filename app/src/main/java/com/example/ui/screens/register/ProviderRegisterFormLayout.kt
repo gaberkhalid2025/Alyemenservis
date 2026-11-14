@@ -68,7 +68,7 @@ fun ProviderRegisterFormLayout(
                     }
                 },
                 navigationIcon = {
-                    IconButton(onClick = { viewModel.cancelOrResetJoinRequest(context) }) {
+                    IconButton(onClick = { viewModel.goBack() }) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "رجوع",
@@ -128,18 +128,22 @@ fun ProviderRegisterFormLayout(
                     val name = data["entityName"] ?: ""
                     val phone = data["phone"] ?: ""
                     val pass = data["password"] ?: ""
-                    
-                    viewModel.setUserSessionDetails(context, name, phone, "صنعاء")
-                    
+                    val cityArea = data["city"] ?: "صنعاء"
+                    val neighborhoodVal = data["address"] ?: ""
+                    val photoVal = data["imageUri"] ?: ""
+                    val idCardVal = data["idCardUri"] ?: ""
+
+                    viewModel.setUserSessionDetails(context, name, phone, cityArea)
+
                     viewModel.submitJoinForm(
                         context = context,
                         name = name,
                         phone = phone,
                         catId = activeType.id,
-                        area = data["city"] ?: "صنعاء",
-                        neighborhood = "",
-                        photoPath = "",
-                        idCardPath = "",
+                        area = cityArea,
+                        neighborhood = neighborhoodVal,
+                        photoPath = photoVal,
+                        idCardPath = idCardVal,
                         gpsCoords = "",
                         workPhotos = emptyList(),
                         customCategoryName = data["specialization"] ?: "عام",

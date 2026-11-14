@@ -32,6 +32,14 @@ class AccountRecoveryHelper(
         recoveryScope.coroutineContext.cancelChildren()
     }
 
+    private fun maskDisplayName(raw: String): String {
+        val trimmed = raw.trim()
+        if (trimmed.length <= 2) return "***"
+        return trimmed.split(Regex("\\s+")).filter { it.isNotBlank() }.joinToString(" ") { part ->
+            if (part.length <= 1) "*" else "${part.first()}${"*".repeat((part.length - 1).coerceIn(2, 4))}"
+        }
+    }
+
     fun searchAccountForRestore(cleanPhone: String, onResult: (RestoreAccountMatch?) -> Unit) {
         val normalizedPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(cleanPhone).filter { it.isDigit() }
         if (normalizedPhone.isBlank() || normalizedPhone.length < 7) {
@@ -65,7 +73,7 @@ class AccountRecoveryHelper(
                                 if (chosen != null) {
                                     return@runCatching RestoreAccountMatch(
                                         type = "PROVIDER",
-                                        name = chosen.name.ifBlank { "مزود خدمة" },
+                                        name = maskDisplayName(chosen.name.ifBlank { "مزود خدمة" }),
                                         provider = chosen
                                     )
                                 }
@@ -93,7 +101,7 @@ class AccountRecoveryHelper(
                                     }
                                     return@runCatching RestoreAccountMatch(
                                         type = resolvedType,
-                                        name = chosen.name.ifBlank { "متجر معتمد" },
+                                        name = maskDisplayName(chosen.name.ifBlank { "متجر معتمد" }),
                                         store = chosen
                                     )
                                 }
@@ -116,7 +124,7 @@ class AccountRecoveryHelper(
                                 if (chosen != null) {
                                     return@runCatching RestoreAccountMatch(
                                         type = "PROPERTY",
-                                        name = chosen.title.ifBlank { "مكتب عقارات" },
+                                        name = maskDisplayName(chosen.title.ifBlank { "مكتب عقارات" }),
                                         property = chosen
                                     )
                                 }
@@ -136,7 +144,7 @@ class AccountRecoveryHelper(
                                         ?: doc.getString("jobTitle")?.takeIf { it.isNotBlank() }
                                         ?: doc.getString("companyName")?.takeIf { it.isNotBlank() }
                                         ?: "معلن وظائف"
-                                    return@runCatching RestoreAccountMatch("JOB", jName)
+                                    return@runCatching RestoreAccountMatch("JOB", maskDisplayName(jName))
                                 }
                             }
                             null
@@ -161,7 +169,7 @@ class AccountRecoveryHelper(
                                     val uName = doc.getString("name")?.takeIf { it.isNotBlank() }
                                         ?: doc.getString("fullName")?.takeIf { it.isNotBlank() }
                                         ?: "مستخدم مسجل"
-                                    return@runCatching RestoreAccountMatch("CLIENT", uName)
+                                    return@runCatching RestoreAccountMatch("CLIENT", maskDisplayName(uName))
                                 }
                             }
                             null
@@ -182,7 +190,7 @@ class AccountRecoveryHelper(
                                         ?: rDoc.getString("name")?.takeIf { it.isNotBlank() }
                                         ?: "حساب مسجل"
                                     val rType = rDoc.getString("type")?.takeIf { it.isNotBlank() } ?: "CLIENT"
-                                    return@runCatching RestoreAccountMatch(rType, rName)
+                                    return@runCatching RestoreAccountMatch(rType, maskDisplayName(rName))
                                 }
                             }
                             null

@@ -5,48 +5,381 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <link rel="stylesheet" href="maplibre-gl.css">
 <style>
-  html, body, #map { margin:0; height:100%; width:100%; background:#0B0F19; }
-  .pin { font-size:18px; line-height:1; background:#fff; border:2px solid #2563EB; border-radius:50%; width:30px; height:30px;
-         display:flex; align-items:center; justify-content:center; box-shadow:0 2px 6px rgba(0,0,0,.45); }
-  .pin.approx { opacity:.6; border-style:dashed; }
-  .me { width:18px; height:18px; background:#10B981; border:3px solid #fff; border-radius:50%; box-shadow:0 0 0 6px rgba(16,185,129,.30); }
+  html, body, #map { margin:0; height:100%; width:100%; background:#0F172A; overflow:hidden; }
+  .pin { font-size:18px; line-height:1; background:#0F172A; border:2px solid #00E5FF; border-radius:50%; width:34px; height:34px;
+         display:flex; align-items:center; justify-content:center; box-shadow:0 3px 10px rgba(0,0,0,.55); color:#fff; }
+  .pin.approx { opacity:.65; border-style:dashed; }
+  .pin.search { border-color:#F59E0B; background:#78350F; }
+  .me { width:18px; height:18px; background:#00E5FF; border:3px solid #fff; border-radius:50%; box-shadow:0 0 0 6px rgba(0,229,255,.30); }
+  .mode-indicator {
+    position: absolute; top: 14px; right: 14px; z-index: 10;
+    background: rgba(15, 23, 42, 0.90); border: 1px solid rgba(167, 139, 250, 0.5);
+    border-radius: 20px; padding: 4px 12px; display: flex; align-items: center; gap: 6px;
+    color: #C4B5FD; font-size: 11px; font-weight: 700; font-family: sans-serif;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.5); pointer-events: none; direction: rtl;
+  }
 </style>
 </head>
 <body>
 <div id="map"></div>
+<div id="mode3dBadge" class="mode-indicator">
+  <span>⛰️</span>
+  <span id="mode3dTitle">تضاريس 3D • زاوية 62°</span>
+</div>
 <script src="maplibre-gl.js"></script>
 <script>
 (function () {
-  var STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty';   // قابل للاستبدال (ثابت واحد)
-  var map = null, markers = [], meMarker = null, styleReady = false;
+  var map = null, markers = [], meMarker = null, searchPinMarker = null, styleReady = false, readyNotified = false;
+  var pickMode = false, currentMode = 'SATELLITE', offlineOnlyMode = false;
+  var demAttached = false, demErrorCount = 0, baseTileLoaded = false, baseTileErrorCount = 0;
+  var fallbackTriggered = false;
 
-  function unavailable(msg) { try { if (window.AndroidBridge && window.AndroidBridge.onUnavailable) window.AndroidBridge.onUnavailable(String(msg)); } catch (e) {} }
-  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
-
-  // كشف الدعم قبل أي شيء
-  var probe = document.createElement('canvas');
-  if (!window.maplibregl) { unavailable('مكتبة الخريطة ثلاثية الأبعاد غير موجودة'); return; }
-  if (!probe.getContext('webgl2')) { unavailable('جهازك لا يدعم الرسم ثلاثي الأبعاد (WebGL2)'); return; }
-
-  window.init3D = function (lat, lng) {
-    try {
-      map = new maplibregl.Map({
-        container: 'map', style: STYLE_URL,
-        center: [lng, lat], zoom: 16, pitch: 60, bearing: -17,
-        attributionControl: { compact: true }          // الإسناد يبقى ظاهراً (مطلوب)
-      });
-      map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right');
-      map.on('load', function () {
-        styleReady = true;
-        if (window.AndroidBridge && window.AndroidBridge.onMapReady) window.AndroidBridge.onMapReady();
-      });
-      map.on('error', function (e) { if (!styleReady) unavailable('تعذر تحميل نمط الخريطة (تحتاج إنترنت)'); });
-      setTimeout(function () { if (!styleReady) unavailable('انتهت مهلة تحميل الخريطة (تحتاج إنترنت)'); }, 15000);
-    } catch (e) { unavailable('تعذر تشغيل الخريطة: ' + e); }
+  // طوابير انتظار لمنع ضياع أي بيانات تصل قبل اكتمال تحميل النمط
+  var pending = {
+    markersB64: null,
+    searchPinB64: null,
+    clearSearch: false,
+    user: null,
+    routeB64: null,
+    hybrid: null,
+    eox: null,
+    gibs: null,
+    rtsat: null
   };
 
+  function unavailable(msg) {
+    if (fallbackTriggered) return;
+    fallbackTriggered = true;
+    try {
+      if (window.AndroidBridge && window.AndroidBridge.onFallbackCss3D) {
+        window.AndroidBridge.onFallbackCss3D(String(msg));
+      } else if (window.AndroidBridge && window.AndroidBridge.onUnavailable) {
+        window.AndroidBridge.onUnavailable(String(msg));
+      }
+    } catch (e) {}
+  }
+
+  function notifyReady() {
+    if (readyNotified) return;
+    readyNotified = true;
+    try {
+      if (window.AndroidBridge && window.AndroidBridge.onMapReady) {
+        window.AndroidBridge.onMapReady();
+      }
+    } catch (e) {}
+  }
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; });
+  }
+
+  if (!window.maplibregl) { unavailable('مكتبة الخريطة ثلاثية الأبعاد غير موجودة'); return; }
+  var probe = document.createElement('canvas');
+  var hasGl2 = !!(probe.getContext('webgl2') || probe.getContext('webgl') || probe.getContext('experimental-webgl'));
+  if (!hasGl2) { unavailable('وضع التوافق 3D التلقائي (بدون WebGL2)'); return; }
+
+  function baseTileUrls(mode) {
+    switch (mode) {
+      case 'OSM':
+        return ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'];
+      case 'HOT':
+        return ['https://a.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', 'https://b.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png'];
+      case 'TOPO':
+        return ['https://a.tile.opentopomap.org/{z}/{x}/{y}.png', 'https://b.tile.opentopomap.org/{z}/{x}/{y}.png'];
+      case 'VELA':
+        return ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}'];
+      case 'SATELLITE_CLARITY':
+        return ['https://clarity.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'];
+      default:
+        return ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'];
+    }
+  }
+
+  // نمط خفيف يضمن التحميل الفوري بدون تعليق بسبب شبكة التضاريس
+  function buildInitialStyle(mode) {
+    return {
+      version: 8,
+      sources: {
+        'base-raster': {
+          type: 'raster',
+          tiles: baseTileUrls(mode),
+          tileSize: 256,
+          maxzoom: 19,
+          attribution: '© OpenStreetMap / Esri / CARTO'
+        }
+      },
+      layers: [
+        { id: 'bg', type: 'background', paint: { 'background-color': '#0F172A' } },
+        { id: 'base-layer', type: 'raster', source: 'base-raster', paint: { 'raster-opacity': 1 } }
+      ]
+    };
+  }
+
+  function ensureDemTerrain(enabled) {
+    if (!map || !styleReady) return;
+    try {
+      if (enabled && !offlineOnlyMode && navigator.onLine !== false) {
+        if (!map.getSource('terrain-dem')) {
+          map.addSource('terrain-dem', {
+            type: 'raster-dem',
+            tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'],
+            encoding: 'terrarium',
+            tileSize: 256,
+            maxzoom: 15
+          });
+        }
+        if (!demAttached && demErrorCount < 3) {
+          map.setTerrain({ source: 'terrain-dem', exaggeration: 1.55 });
+          demAttached = true;
+        }
+        try {
+          if (typeof map.setSky === 'function') {
+            map.setSky({
+              'sky-color': '#1E293B',
+              'sky-horizon-blend': 0.5,
+              'horizon-color': '#38BDF8',
+              'horizon-fog-blend': 0.3,
+              'fog-color': '#0F172A',
+              'fog-ground-blend': 0.35
+            });
+          }
+        } catch (_skyErr) {}
+      } else {
+        if (map.getTerrain()) map.setTerrain(null);
+        demAttached = false;
+      }
+    } catch (e) {
+      try { map.setTerrain(null); } catch (_e2) {}
+      demAttached = false;
+    }
+  }
+
+  function applyTerrainAndPerspective(enabled, pitchDeg, bearingDeg) {
+    if (!map || !styleReady) return;
+    var p = typeof pitchDeg === 'number' ? pitchDeg : (enabled ? 62 : 0);
+    var b = typeof bearingDeg === 'number' ? bearingDeg : (enabled ? -20 : 0);
+    try {
+      ensureDemTerrain(enabled);
+      map.easeTo({ pitch: Math.max(0, Math.min(72, p)), bearing: b, duration: 650 });
+      var titleEl = document.getElementById('mode3dTitle');
+      if (titleEl) {
+        titleEl.innerText = enabled ? ('تضاريس 3D • ميل ' + Math.round(p) + '°') : 'منظور مسطح 2D';
+      }
+    } catch (e) { console.error('terrain', e); }
+  }
+
+  function checkCanvasHasVisiblePixels() {
+    if (!map || fallbackTriggered) return false;
+    try {
+      var canvas = map.getCanvas();
+      if (!canvas || canvas.width < 10 || canvas.height < 10) return false;
+      var gl = canvas.getContext('webgl2') || canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+      if (!gl || (typeof gl.isContextLost === 'function' && gl.isContextLost())) return false;
+      var px = new Uint8Array(4);
+      var samples = [
+        [0.25, 0.25], [0.5, 0.5], [0.75, 0.75],
+        [0.25, 0.75], [0.75, 0.25], [0.5, 0.35], [0.5, 0.65]
+      ];
+      var nonBgCount = 0;
+      for (var i = 0; i < samples.length; i++) {
+        var sx = Math.max(1, Math.min(canvas.width - 2, Math.floor(canvas.width * samples[i][0])));
+        var sy = Math.max(1, Math.min(canvas.height - 2, Math.floor(canvas.height * samples[i][1])));
+        gl.readPixels(sx, sy, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+        // أي بكسل يختلف عن الخلفية الداكنة #0F172A (15, 23, 42) أو الأسود (0, 0, 0) يعني وجود رسم فعلي
+        var isDarkBg = (px[0] <= 20 && px[1] <= 28 && px[2] <= 48) || px[3] === 0;
+        if (!isDarkBg) nonBgCount++;
+      }
+      return nonBgCount > 0;
+    } catch (e) {
+      return baseTileLoaded;
+    }
+  }
+
+  function flushPending() {
+    if (pending.markersB64) { var m = pending.markersB64; pending.markersB64 = null; window.setMarkersBase64(m); }
+    if (pending.user) { var u = pending.user; pending.user = null; window.setUser(u[0], u[1], u[2]); }
+    if (pending.clearSearch) { pending.clearSearch = false; window.clearSearchPin(); }
+    if (pending.searchPinB64) { var s = pending.searchPinB64; pending.searchPinB64 = null; window.showSearchPinBase64(s); }
+    if (pending.routeB64) { var r = pending.routeB64; pending.routeB64 = null; window.setRouteBase64(r); }
+    if (pending.hybrid !== null) { var h = pending.hybrid; pending.hybrid = null; window.setHybridLabels3D(h); }
+    if (pending.eox !== null) { var ex = pending.eox; pending.eox = null; window.setEox3D(ex); }
+    if (pending.gibs !== null) { var gb = pending.gibs; pending.gibs = null; window.setGibs3D(gb[0], gb[1]); }
+    if (pending.rtsat !== null) { var rt = pending.rtsat; pending.rtsat = null; window.setRealTimeSat3D(rt[0], rt[1]); }
+  }
+
+  window.init3D = function (lat, lng, mode, offlineOnly) {
+    if (map) return;
+    currentMode = mode || 'SATELLITE';
+    offlineOnlyMode = !!offlineOnly;
+    try {
+      map = new maplibregl.Map({
+        container: 'map',
+        style: buildInitialStyle(currentMode),
+        center: [lng || 44.1910, lat || 15.3694],
+        zoom: 15,
+        pitch: 62,
+        bearing: -20,
+        maxPitch: 75,
+        canvasContextAttributes: { antialias: true, preserveDrawingBuffer: true },
+        preserveDrawingBuffer: true,
+        attributionControl: { compact: true }
+      });
+
+      map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'bottom-left');
+
+      var canvas = map.getCanvas();
+      if (canvas) {
+        canvas.addEventListener('webglcontextlost', function (ev) {
+          ev.preventDefault();
+          unavailable('تم التحويل للمحرك البديل 3D بعد فقدان سياق WebGL');
+        }, false);
+      }
+
+      map.on('sourcedata', function (e) {
+        if (e.sourceId === 'base-raster' && e.isSourceLoaded) {
+          baseTileLoaded = true;
+        }
+      });
+
+      map.on('error', function (e) {
+        var src = e && e.sourceId ? e.sourceId : '';
+        if (src === 'terrain-dem') {
+          demErrorCount++;
+          if (demErrorCount >= 3) {
+            try { map.setTerrain(null); } catch (_e) {}
+            demAttached = false;
+          }
+          return;
+        }
+        if (src === 'base-raster') {
+          baseTileErrorCount++;
+          if (baseTileErrorCount >= 2 && !baseTileLoaded) {
+            unavailable('التحويل التلقائي لعرض 3D التوافقي لتفادي الشاشة السوداء');
+          }
+        }
+      });
+
+      function onStyleReadyOnce() {
+        if (styleReady) return;
+        styleReady = true;
+        applyTerrainAndPerspective(true, 62, -20);
+        notifyReady();
+        flushPending();
+      }
+
+      map.on('load', onStyleReadyOnce);
+      map.once('render', function () {
+        if (map.isStyleLoaded()) onStyleReadyOnce();
+      });
+
+      // مؤقت أمان لعدم بقاء الشاشة منتظرة أبداً
+      setTimeout(function () {
+        if (!styleReady && map) onStyleReadyOnce();
+      }, 900);
+
+      // فحص فعلي لبلاطات الخريطة والبكسلات لضمان عدم بقاء شاشة سوداء أو فارغة
+      setTimeout(function () {
+        if (!fallbackTriggered && (!baseTileLoaded || !checkCanvasHasVisiblePixels())) {
+          unavailable('التحويل التلقائي لعرض 3D التوافقي لتفادي الشاشة السوداء');
+        }
+      }, 2800);
+
+      map.on('dragstart', function () {
+        if (window.AndroidBridge && window.AndroidBridge.onUserPanned) window.AndroidBridge.onUserPanned();
+      });
+      map.on('moveend', function () {
+        if (window.AndroidBridge && window.AndroidBridge.onMapCenterChanged) {
+          var c = map.getCenter();
+          window.AndroidBridge.onMapCenterChanged(c.lat, c.lng);
+        }
+      });
+      map.on('click', function (e) {
+        if (pickMode && window.AndroidBridge && window.AndroidBridge.onMapPicked) {
+          window.AndroidBridge.onMapPicked(e.lngLat.lat, e.lngLat.lng);
+          return;
+        }
+        if (window.AndroidBridge && window.AndroidBridge.onMapClicked) window.AndroidBridge.onMapClicked();
+      });
+      map.on('contextmenu', function (e) {
+        if (window.AndroidBridge && window.AndroidBridge.onMapLongPressed) {
+          window.AndroidBridge.onMapLongPressed(e.lngLat.lat, e.lngLat.lng);
+        }
+      });
+    } catch (e) {
+      unavailable('تعذر تشغيل WebGL2 ثلاثي الأبعاد: ' + e);
+    }
+  };
+
+  window.setBaseMode3D = function (mode) {
+    currentMode = mode || 'SATELLITE';
+    if (!map || !styleReady) return;
+    try {
+      var src = map.getSource('base-raster');
+      if (src && src.setTiles) {
+        baseTileErrorCount = 0;
+        src.setTiles(baseTileUrls(currentMode));
+      }
+    } catch (e) { console.error('baseMode3D', e); }
+  };
+
+  window.setOfflineOnly3D = function (off) {
+    offlineOnlyMode = !!off;
+    applyTerrainAndPerspective(true, 62, -20);
+  };
+
+  window.setTerrainPerspective = function (enabled, pitch, bearing) {
+    applyTerrainAndPerspective(!!enabled, pitch, bearing);
+  };
+
+  function toggleRasterOverlay(id, url, opacity, on) {
+    if (!map || !styleReady) return;
+    try {
+      if (map.getLayer(id)) map.removeLayer(id);
+      if (map.getSource(id)) map.removeSource(id);
+      if (!on || !url) return;
+      map.addSource(id, { type: 'raster', tiles: [url], tileSize: 256, maxzoom: 19 });
+      map.addLayer({ id: id, type: 'raster', source: id, paint: { 'raster-opacity': opacity || 0.85 } });
+    } catch (e) { console.error('overlay3d', e); }
+  }
+
+  window.setHybridLabels3D = function (on) {
+    if (!map || !styleReady) { pending.hybrid = !!on; return; }
+    toggleRasterOverlay('labels-3d', 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', 0.95, on);
+  };
+
+  window.setEox3D = function (on) {
+    if (!map || !styleReady) { pending.eox = !!on; return; }
+    toggleRasterOverlay('eox-3d', 'https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2021_3857/default/GoogleMapsCompatible/{z}/{y}/{x}.jpg', 0.90, on);
+  };
+
+  window.setRealTimeSat3D = function (on, feed) {
+    if (!map || !styleReady) { pending.rtsat = [!!on, feed]; return; }
+    var f = (feed === 'globalir') ? 'globalir' : 'globalvis';
+    toggleRasterOverlay('rtsat-3d', 'https://realearth.ssec.wisc.edu/tiles/' + f + '/{z}/{x}/{y}.png', 0.78, on);
+  };
+
+  window.setGibs3D = function (on, prodKey) {
+    if (!map || !styleReady) { pending.gibs = [!!on, prodKey]; return; }
+    if (!on) { toggleRasterOverlay('gibs-3d', '', 0, false); return; }
+    var d = new Date();
+    d.setUTCDate(d.getUTCDate() - 1);
+    var dateStr = d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0') + '-' + String(d.getUTCDate()).padStart(2, '0');
+    var layer = prodKey === 'modis' ? 'MODIS_Terra_CorrectedReflectance_TrueColor'
+      : (prodKey === 'noaa20' ? 'VIIRS_NOAA20_CorrectedReflectance_TrueColor'
+      : (prodKey === 'landtemp' ? 'MODIS_Terra_Land_Surface_Temp_Day' : 'VIIRS_SNPP_CorrectedReflectance_TrueColor'));
+    var ext = prodKey === 'landtemp' ? 'png' : 'jpg';
+    var url = 'https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/' + layer + '/default/' + dateStr + '/GoogleMapsCompatible_Level9/{z}/{y}/{x}.' + ext;
+    toggleRasterOverlay('gibs-3d', url, 0.82, true);
+  };
+
+  window.setPickMode3D = function (on) { pickMode = !!on; };
+  window.zoomIn3D = function () { if (map) map.zoomIn({ duration: 300 }); };
+  window.zoomOut3D = function () { if (map) map.zoomOut({ duration: 300 }); };
+  window.recenter3D = function (lat, lng) { if (map && isFinite(lat) && isFinite(lng)) map.flyTo({ center: [lng, lat], zoom: 15.5, pitch: 62, bearing: -20, duration: 700 }); };
+  window.setCity3D = function (lat, lng, zoom) { if (map) map.flyTo({ center: [lng, lat], zoom: zoom || 14, pitch: 62, bearing: -20, duration: 700 }); };
+
   window.setMarkersBase64 = function (b64) {
-    if (!map) return;
+    if (!map || !styleReady) { pending.markersB64 = b64; return; }
     try {
       markers.forEach(function (m) { m.remove(); }); markers = [];
       var list = JSON.parse(decodeURIComponent(escape(window.atob(b64))));
@@ -66,17 +399,42 @@
     } catch (e) { console.error('markers3d', e); }
   };
 
+  window.showSearchPinBase64 = function (b64) {
+    if (!map || !styleReady) { pending.searchPinB64 = b64; pending.clearSearch = false; return; }
+    try {
+      if (searchPinMarker) { searchPinMarker.remove(); searchPinMarker = null; }
+      var p = JSON.parse(decodeURIComponent(escape(window.atob(b64))));
+      var el = document.createElement('div');
+      el.className = 'pin search';
+      el.textContent = '📍';
+      el.title = esc(p.name);
+      searchPinMarker = new maplibregl.Marker({ element: el }).setLngLat([p.lng, p.lat]).addTo(map);
+      map.flyTo({ center: [p.lng, p.lat], zoom: 16.5, pitch: 62, bearing: -20, duration: 900 });
+    } catch (e) { console.error('searchPin3d', e); }
+  };
+
+  window.clearSearchPin = function () {
+    if (!map || !styleReady) { pending.clearSearch = true; pending.searchPinB64 = null; return; }
+    if (searchPinMarker) { searchPinMarker.remove(); searchPinMarker = null; }
+  };
+
   window.setUser = function (lat, lng, follow) {
-    if (!map || !isFinite(lat) || !isFinite(lng) || (lat === 0 && lng === 0)) return;
-    if (!meMarker) { var el = document.createElement('div'); el.className = 'me'; meMarker = new maplibregl.Marker({ element: el }).setLngLat([lng, lat]).addTo(map); }
-    else meMarker.setLngLat([lng, lat]);
+    if (!isFinite(lat) || !isFinite(lng) || (lat === 0 && lng === 0)) return;
+    if (!map || !styleReady) { pending.user = [lat, lng, !!follow]; return; }
+    if (!meMarker) {
+      var el = document.createElement('div');
+      el.className = 'me';
+      meMarker = new maplibregl.Marker({ element: el }).setLngLat([lng, lat]).addTo(map);
+    } else {
+      meMarker.setLngLat([lng, lat]);
+    }
     if (follow) map.easeTo({ center: [lng, lat], duration: 600 });
   };
 
   window.setRouteBase64 = function (b64) {
-    if (!map || !styleReady) return;
+    if (!map || !styleReady) { pending.routeB64 = b64; return; }
     try {
-      var pts = JSON.parse(window.atob(b64));                         // [[lat,lng],...]
+      var pts = JSON.parse(window.atob(b64));
       var coords = pts.map(function (p) { return [p[1], p[0]]; });
       var data = { type: 'Feature', geometry: { type: 'LineString', coordinates: coords } };
       if (map.getSource('route')) { map.getSource('route').setData(data); return; }
@@ -87,15 +445,6 @@
   };
 
   window.setPitch = function (deg) { if (map) map.easeTo({ pitch: Math.max(0, Math.min(75, deg)), duration: 500 }); };
-
-  window.setNavigatingBuildings = function (on) {
-    if (!map || !styleReady) return;
-    try {
-      map.getStyle().layers.forEach(function (l) {
-        if (l.type === 'fill-extrusion') map.setPaintProperty(l.id, 'fill-extrusion-opacity', on ? 0.25 : 0.85);
-      });
-    } catch (e) { console.error('buildings', e); }
-  };
 })();
 </script>
 </body>

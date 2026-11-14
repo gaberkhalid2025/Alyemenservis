@@ -84,6 +84,118 @@ class DashboardRepositoryImpl(
             Result.failure(e)
         }
     }
+
+    private fun resolveCollection(role: String): String = when (role.trim().uppercase()) {
+        "PROVIDER", "TECHNICIAN" -> AppConstants.COL_PROVIDERS
+        "STORE", "STORE_OWNER", "RESTAURANT", "RESTAURANT_OWNER", "MEDICAL", "MEDICAL_CENTER" -> AppConstants.COL_STORES
+        "PROPERTY", "REAL_ESTATE", "PROPERTY_OWNER" -> AppConstants.COL_PROPERTIES
+        "JOB", "JOB_POSTER" -> AppConstants.COL_JOBS
+        else -> AppConstants.COL_USER_PROFILES
+    }
+
+    override suspend fun updateBusinessProfile(
+        ownerId: String,
+        role: String,
+        name: String,
+        cityArea: String,
+        description: String,
+        workingHours: String,
+        isAvailable: Boolean,
+        photoUrl: String?,
+        coverUrl: String?
+    ): Result<Unit> {
+        val cleanOwnerId = ownerId.trim()
+        if (cleanOwnerId.isBlank()) return Result.failure(IllegalArgumentException("معرف الحساب غير صالح"))
+        if (name.isBlank()) return Result.failure(IllegalArgumentException("الاسم مطلوب"))
+        return try {
+            val collectionName = resolveCollection(role)
+            val updates = mutableMapOf<String, Any>(
+                "description" to description.trim(),
+                "workingHours" to workingHours.trim(),
+                "isAvailable" to isAvailable,
+                "isActive" to isAvailable,
+                "updatedAt" to System.currentTimeMillis()
+            )
+            when (collectionName) {
+                AppConstants.COL_PROVIDERS -> {
+                    updates["name"] = name.trim()
+                    updates["localNeighborhood"] = cityArea.trim()
+                    updates["area"] = cityArea.trim()
+                    if (description.isNotBlank()) updates["profession"] = description.trim()
+                    if (!photoUrl.isNullOrBlank()) updates["profileImage"] = photoUrl.trim()
+                    if (!coverUrl.isNullOrBlank()) updates["coverImage"] = coverUrl.trim()
+                }
+                AppConstants.COL_PROPERTIES -> {
+                    updates["title"] = name.trim()
+                    updates["localNeighborhood"] = cityArea.trim()
+                }
+                AppConstants.COL_JOBS -> {
+                    updates["companyName"] = name.trim()
+                    updates["address"] = cityArea.trim()
+                }
+                else -> {
+                    updates["name"] = name.trim()
+                    updates["localNeighborhood"] = cityArea.trim()
+                    if (!photoUrl.isNullOrBlank()) updates["logoImage"] = photoUrl.trim()
+                    if (!coverUrl.isNullOrBlank()) updates["coverImage"] = coverUrl.trim()
+                }
+            }
+            firestore.collection(collectionName).document(cleanOwnerId).update(updates).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun changeBusinessPassword(
+        ownerId: String,
+        role: String,
+        oldPassword: String,
+        newPassword: String
+    ): Result<Unit> {
+        val cleanOwnerId = ownerId.trim()
+        if (cleanOwnerId.isBlank()) return Result.failure(IllegalArgumentException("معرف الحساب غير صالح"))
+        val cleanOld = oldPassword.trim()
+        val cleanNew = newPassword.trim()
+        if (cleanOld.isBlank() || cleanNew.isBlank()) {
+            return Result.failure(IllegalArgumentException("يرجى إدخال كلمة المرور الحالية والجديدة"))
+        }
+        val (policyValid, policyMsg) = com.example.utils.SecurityCryptoUtils.validatePasswordPolicy(cleanNew)
+        if (!policyValid) {
+            return Result.failure(IllegalArgumentException(policyMsg ?: "كلمة المرور الجديدة ضعيفة"))
+        }
+        return try {
+            val collectionName = resolveCollection(role)
+            val docRef = firestore.collection(collectionName).document(cleanOwnerId)
+            val snapshot = docRef.get().await()
+            if (!snapshot.exists()) {
+                return Result.failure(IllegalStateException("لم يتم العثور على سجل الحساب"))
+            }
+            val storedHash = snapshot.getString("passwordHash")?.takeIf { it.isNotBlank() }
+                ?: snapshot.getString("password")
+                ?: ""
+            if (storedHash.isBlank()) {
+                return Result.failure(IllegalStateException("لا توجد كلمة مرور مسجلة لهذا الحساب"))
+            }
+            val verified = com.example.utils.PasswordHasher.verifyPassword(cleanOld, storedHash) ||
+                com.example.utils.SecureHasher.verifyPassword(cleanOld, storedHash) ||
+                storedHash == cleanOld
+            if (!verified) {
+                return Result.failure(IllegalArgumentException("كلمة المرور الحالية غير صحيحة ❌"))
+            }
+            val newHash = com.example.utils.PasswordHasher.hash(cleanNew)
+            docRef.update(
+                mapOf(
+                    "passwordHash" to newHash,
+                    "password" to "",
+                    "updatedAt" to System.currentTimeMillis()
+                )
+            ).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 }
 
 /**
@@ -363,7 +475,8 @@ class RatingsRepositoryImpl(
                             ?: "",
                         rating = doc.getDouble("rating") ?: entity?.rating?.toDouble() ?: 5.0,
                         comment = doc.getString("comment") ?: doc.getString("review") ?: entity?.comment ?: "",
-                        dateTimestamp = doc.getLong("timestamp") ?: doc.getLong("dateTimestamp") ?: entity?.timestamp ?: System.currentTimeMillis()
+                        dateTimestamp = doc.getLong("timestamp") ?: doc.getLong("dateTimestamp") ?: entity?.timestamp ?: System.currentTimeMillis(),
+                        ownerReply = doc.getString("ownerReply") ?: doc.getString("replyText") ?: ""
                     )
                 }
                 trySend(list)
@@ -408,6 +521,27 @@ class RatingsRepositoryImpl(
             )
             firestore.collection(AppConstants.COL_RATINGS).document(id).set(map).await()
             Result.success(id)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun replyToRating(ratingId: String, replyText: String): Result<Unit> {
+        val cleanId = ratingId.trim()
+        val cleanReply = replyText.trim()
+        if (cleanId.isBlank() || cleanReply.isBlank()) {
+            return Result.failure(IllegalArgumentException("نص الرد ومعرف التقييم مطلوبان"))
+        }
+        return try {
+            firestore.collection(AppConstants.COL_RATINGS).document(cleanId)
+                .update(
+                    mapOf(
+                        "ownerReply" to cleanReply,
+                        "replyText" to cleanReply,
+                        "repliedAt" to System.currentTimeMillis()
+                    )
+                ).await()
+            Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
         }

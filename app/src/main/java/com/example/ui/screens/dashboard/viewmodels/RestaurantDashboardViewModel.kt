@@ -98,4 +98,60 @@ class RestaurantDashboardViewModel(
             }
         }
     }
+
+    fun updateMeal(product: ProductItemEntity) {
+        viewModelScope.launch {
+            productsRepository.updateProduct(product).onSuccess {
+                _eventFlow.emit(DashboardEvent.ShowToast("تم تحديث الوجبة بنجاح ✅"))
+            }.onFailure { e ->
+                _eventFlow.emit(DashboardEvent.ShowToast(e.localizedMessage ?: "فشل تحديث الوجبة"))
+            }
+        }
+    }
+
+    fun replyToReview(reviewId: String, replyText: String) {
+        viewModelScope.launch {
+            ratingsRepository.replyToRating(reviewId, replyText).onSuccess {
+                _eventFlow.emit(DashboardEvent.ShowToast("تم الرد على تقييم المطعم بنجاح ✅"))
+            }.onFailure { e ->
+                _eventFlow.emit(DashboardEvent.ShowToast(e.localizedMessage ?: "تعذر حفظ الرد"))
+            }
+        }
+    }
+
+    fun updateProfile(
+        name: String,
+        cityArea: String,
+        description: String,
+        workingHours: String,
+        isAvailable: Boolean,
+        photoUrl: String? = null,
+        coverUrl: String? = null
+    ) {
+        viewModelScope.launch {
+            dashboardRepository.updateBusinessProfile(
+                ownerId = ownerId,
+                role = "RESTAURANT",
+                name = name,
+                cityArea = cityArea,
+                description = description,
+                workingHours = workingHours,
+                isAvailable = isAvailable,
+                photoUrl = photoUrl,
+                coverUrl = coverUrl
+            ).onSuccess {
+                _eventFlow.emit(DashboardEvent.ShowToast("تم تحديث بيانات المطعم بنجاح ✅"))
+            }.onFailure { e ->
+                _eventFlow.emit(DashboardEvent.ShowToast(e.localizedMessage ?: "فشل حفظ البيانات"))
+            }
+        }
+    }
+
+    fun changePassword(oldPass: String, newPass: String) {
+        viewModelScope.launch {
+            dashboardRepository.changeBusinessPassword(ownerId, "RESTAURANT", oldPass, newPass)
+                .onSuccess { _eventFlow.emit(DashboardEvent.ShowToast("تم تغيير كلمة المرور بنجاح 🔑")) }
+                .onFailure { e -> _eventFlow.emit(DashboardEvent.ShowToast(e.localizedMessage ?: "فشل تغيير كلمة المرور")) }
+        }
+    }
 }

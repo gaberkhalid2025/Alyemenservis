@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.sp
 import com.example.ui.MainViewModel
 import com.example.ui.AppScreens
 import com.example.utils.VisualThemePalette
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 
@@ -98,6 +99,7 @@ fun PasswordResetWaitingScreen(
     var accountType by rememberSaveable { mutableStateOf("حساب معتمد") }
     var isSubmittingLogin by remember { mutableStateOf(false) }
     var enteredPassword by rememberSaveable { mutableStateOf("") }
+    val clipboardScope = rememberCoroutineScope()
     var passwordError by remember { mutableStateOf<String?>(null) }
     var isPasswordVisible by remember { mutableStateOf(false) }
 
@@ -266,9 +268,25 @@ fun PasswordResetWaitingScreen(
                                         IconButton(
                                             onClick = {
                                                 val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                                val clip = ClipData.newPlainText("New Password", newPassword)
+                                                val clip = ClipData.newPlainText("New Password", newPassword).apply {
+                                                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                                                        description.extras = android.os.PersistableBundle().apply {
+                                                            putBoolean(android.content.ClipDescription.EXTRA_IS_SENSITIVE, true)
+                                                        }
+                                                    }
+                                                }
                                                 clipboard.setPrimaryClip(clip)
-                                                Toast.makeText(context, "📋 تم نسخ كلمة المرور!", Toast.LENGTH_SHORT).show()
+                                                Toast.makeText(context, "📋 تم نسخ كلمة المرور (سيتم مسح الحافظة تلقائياً بعد 45 ثانية)", Toast.LENGTH_SHORT).show()
+                                                clipboardScope.launch {
+                                                    kotlinx.coroutines.delay(45_000L)
+                                                    try {
+                                                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                                                            clipboard.clearPrimaryClip()
+                                                        } else {
+                                                            clipboard.setPrimaryClip(ClipData.newPlainText("", ""))
+                                                        }
+                                                    } catch (_: Exception) {}
+                                                }
                                             }
                                         ) {
                                             Icon(Icons.Default.ContentCopy, contentDescription = "نسخ", tint = themeColors.accent)

@@ -36,7 +36,8 @@ fun TabStatisticsGrowth(
         }
 
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            StatCard("متوسط التقييمات ⭐", "%.1f من 5".format(stats.averageRating), Color(0xFFFFA000), themeColors, Modifier.weight(1f))
+            val ratingDisplay = if (stats.totalReviewsCount > 0) stats.averageRating else 0.0
+            StatCard("متوسط التقييمات ⭐", String.format(java.util.Locale.US, "%.1f من 5", ratingDisplay), Color(0xFFFFA000), themeColors, Modifier.weight(1f))
             StatCard("مشاهدات الملف 👁️", "${stats.totalViews} مشاهدة", Color(0xFF8B5CF6), themeColors, Modifier.weight(1f))
         }
 
@@ -44,14 +45,17 @@ fun TabStatisticsGrowth(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = themeColors.surface),
             shape = RoundedCornerShape(14.dp),
-            border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))
+            border = androidx.compose.foundation.BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.25f))
         ) {
+            val numberFormat = androidx.compose.runtime.remember {
+                java.text.DecimalFormat("#,###", java.text.DecimalFormatSymbols(java.util.Locale.US))
+            }
             Column(
                 modifier = Modifier.padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(text = "💰 الإيرادات التقديرية", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
-                Text(text = "${stats.totalRevenueYer} ريال يمني", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Text(text = "${numberFormat.format(stats.totalRevenueYer)} ريال يمني", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = themeColors.textPrimary)
                 Text(text = "يتم احتساب الإيرادات التقديرية بناءً على الطلبات المكتملة بنجاح.", fontSize = 11.sp, color = themeColors.textSecondary)
             }
         }

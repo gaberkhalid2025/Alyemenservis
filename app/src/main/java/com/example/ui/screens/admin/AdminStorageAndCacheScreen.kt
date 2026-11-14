@@ -57,9 +57,11 @@ fun AdminStorageAndCacheScreenContent(
     var sectionToWipe by remember { mutableStateOf<Pair<String, String>?>(null) } // CollectionName to DisplayTitle
     var inputAdminPassword by remember { mutableStateOf("") }
     var isPasswordError by remember { mutableStateOf(false) }
+    var confirmDoubleWipe by remember { mutableStateOf(false) }
     var isDeleting by remember { mutableStateOf(false) }
     var deletionProgress by remember { mutableStateOf(0f) }
     var deletionProgressText by remember { mutableStateOf("") }
+    var chatChannelsCount by remember { mutableStateOf(0) }
     val dataRepo: com.example.data.repositories.IDataManagementRepository = remember { com.example.data.repositories.DataManagementRepositoryImpl() }
     val coroutineScope = rememberCoroutineScope()
 
@@ -77,6 +79,12 @@ fun AdminStorageAndCacheScreenContent(
              context.codeCacheDir.walkTopDown().sumOf { it.length() })
         } catch (e: Exception) { 0L }
         cacheSizeText = "${String.format(java.util.Locale.US, "%.1f", bytes / (1024.0 * 1024.0))} ميجابايت"
+        try {
+            com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                .collection("chat_channels")
+                .get()
+                .addOnSuccessListener { snap -> chatChannelsCount = snap.size() }
+        } catch (_: Exception) {}
     }
 
     val sectionsList = listOf(
@@ -87,7 +95,7 @@ fun AdminStorageAndCacheScreenContent(
         Triple("jobs", "💼 قسم إعلانات الوظائف", jobs.size),
         Triple("providers", "👤 قسم الفنيين ومقدمي الخدمات", providers.size),
         Triple("bookings", "📅 قسم الحجوزات والمواعيد", bookings.size),
-        Triple("chat_channels", "💬 قسم المحادثات والشات", 14),
+        Triple("chat_channels", "💬 قسم المحادثات والشات", chatChannelsCount),
         Triple("banners", "📢 قسم الإعلانات والبنرات", banners.size),
         Triple("reports", "⚠️ قسم البلاغات والشكاوى", reports.size)
     )
@@ -155,6 +163,7 @@ fun AdminStorageAndCacheScreenContent(
                         onClick = {
                             sectionToWipe = Pair(colId, label)
                             inputAdminPassword = ""
+                            confirmDoubleWipe = false
                             isPasswordError = false
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626)),
@@ -226,6 +235,20 @@ fun AdminStorageAndCacheScreenContent(
                                 unfocusedBorderColor = Color.LightGray
                             )
                         )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Checkbox(
+                                checked = confirmDoubleWipe,
+                                onCheckedChange = { confirmDoubleWipe = it }
+                            )
+                            Text(
+                                "أؤكد رغبتي النهائية في حذف هذا القسم نهائياً",
+                                color = Color.LightGray,
+                                fontSize = 11.sp
+                            )
+                        }
                     }
 
                     if (isPasswordError) {
@@ -237,6 +260,10 @@ fun AdminStorageAndCacheScreenContent(
                 Button(
                     onClick = {
                         if (isDeleting) return@Button
+                        if (!confirmDoubleWipe) {
+                            Toast.makeText(context, "يرجى تحديد مربع التأكيد أولاً", Toast.LENGTH_SHORT).show()
+                            return@Button
+                        }
                         if (viewModel.verifyAdminOrOwnerPassword(inputAdminPassword)) {
                             isDeleting = true
                             deletionProgress = 0f
@@ -266,7 +293,7 @@ fun AdminStorageAndCacheScreenContent(
                             isPasswordError = true
                         }
                     },
-                    enabled = !isDeleting,
+                    enabled = !isDeleting && confirmDoubleWipe,
                     colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
                 ) {
                     if (isDeleting) {

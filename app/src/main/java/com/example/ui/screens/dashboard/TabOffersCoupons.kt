@@ -5,12 +5,14 @@ import com.example.ui.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.screens.dashboard.components.UnifiedEmptyState
@@ -42,7 +44,7 @@ fun TabOffersCoupons(
 
     val displayedOffers = remember(offersList, storeId) {
         if (storeId.isNotBlank()) {
-            offersList.filter { it.providerId == storeId || it.providerId.isBlank() }
+            offersList.filter { it.providerId == storeId }
         } else {
             offersList
         }
@@ -121,7 +123,7 @@ fun TabOffersCoupons(
                                 }
                                 IconButton(
                                     onClick = { itemToDelete = offer },
-                                    modifier = Modifier.size(32.dp)
+                                    modifier = Modifier.size(48.dp)
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Delete,
@@ -193,6 +195,7 @@ fun TabOffersCoupons(
                         value = discountInput,
                         onValueChange = { discountInput = it },
                         label = { Text("نسبة الخصم %") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.fillMaxWidth()
                     )
                     OutlinedTextField(
@@ -206,8 +209,12 @@ fun TabOffersCoupons(
             confirmButton = {
                 Button(
                     onClick = {
-                        val disc = discountInput.toIntOrNull() ?: 10
-                        if (titleInput.isNotBlank()) {
+                        val disc = discountInput.trim().toIntOrNull()
+                        if (titleInput.isBlank()) {
+                            Toast.makeText(context, "يرجى إدخال عنوان العرض أولاً", Toast.LENGTH_SHORT).show()
+                        } else if (disc == null || disc !in 1..99) {
+                            Toast.makeText(context, "نسبة الخصم يجب أن تكون رقماً بين 1 و 99%", Toast.LENGTH_SHORT).show()
+                        } else {
                             val newOffer = SpecialOfferEntity(
                                 id = java.util.UUID.randomUUID().toString(),
                                 providerId = storeId,
@@ -224,8 +231,6 @@ fun TabOffersCoupons(
                             discountInput = ""
                             codeInput = ""
                             showAddDialog = false
-                        } else {
-                            Toast.makeText(context, "يرجى إدخال عنوان العرض أولاً", Toast.LENGTH_SHORT).show()
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent)

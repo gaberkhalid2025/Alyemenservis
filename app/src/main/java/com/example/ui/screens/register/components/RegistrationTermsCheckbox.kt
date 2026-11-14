@@ -33,13 +33,25 @@ fun RegistrationTermsCheckbox(
     var showTermsDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
-    // Auto-load previous consent
+    val termsVersion = "2.0"
+
+    // Auto-load previous consent only if it matches the latest terms version
     LaunchedEffect(Unit) {
         val prefs = context.getSharedPreferences("yemen_services_terms", Context.MODE_PRIVATE)
-        val agreedBefore = prefs.getBoolean("has_agreed_terms", false)
+        val agreedBefore = prefs.getBoolean("has_agreed_terms", false) &&
+            prefs.getString("agreed_terms_version", "") == termsVersion
         if (agreedBefore && !checked) {
             onCheckedChange(true)
         }
+    }
+
+    fun persistTermsConsent(isChecked: Boolean) {
+        context.getSharedPreferences("yemen_services_terms", Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean("has_agreed_terms", isChecked)
+            .putString("agreed_terms_version", if (isChecked) termsVersion else "")
+            .putLong("agreed_terms_at", if (isChecked) System.currentTimeMillis() else 0L)
+            .apply()
     }
 
     Row(
@@ -48,10 +60,7 @@ fun RegistrationTermsCheckbox(
             .clickable {
                 val newChecked = !checked
                 onCheckedChange(newChecked)
-                context.getSharedPreferences("yemen_services_terms", Context.MODE_PRIVATE)
-                    .edit()
-                    .putBoolean("has_agreed_terms", newChecked)
-                    .apply()
+                persistTermsConsent(newChecked)
             }
             .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -61,10 +70,7 @@ fun RegistrationTermsCheckbox(
             checked = checked,
             onCheckedChange = { isChecked ->
                 onCheckedChange(isChecked)
-                context.getSharedPreferences("yemen_services_terms", Context.MODE_PRIVATE)
-                    .edit()
-                    .putBoolean("has_agreed_terms", isChecked)
-                    .apply()
+                persistTermsConsent(isChecked)
             },
             colors = CheckboxDefaults.colors(
                 checkedColor = themeColors.accent,
@@ -155,10 +161,7 @@ fun RegistrationTermsCheckbox(
                 Button(
                     onClick = {
                         onCheckedChange(true)
-                        context.getSharedPreferences("yemen_services_terms", Context.MODE_PRIVATE)
-                            .edit()
-                            .putBoolean("has_agreed_terms", true)
-                            .apply()
+                        persistTermsConsent(true)
                         showTermsDialog = false
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent)

@@ -62,4 +62,23 @@ class ToggleMapModeTest {
         assertEquals("modis", state.gibsProduct)
         assertEquals(true, state.eoxEnabled)
     }
+
+    @Test
+    fun testMapLayerOffline3DAndRealTimeSat() {
+        val state = MapScreenState()
+        assertEquals(com.example.ui.screens.map.MapLayer.STANDARD, state.mapLayer)
+        assertEquals(false, state.is3DTerrainEnabled)
+        assertEquals(false, state.realTimeSatEnabled)
+        assertEquals("globalvis", state.realTimeSatFeed)
+
+        state.mapLayer = com.example.ui.screens.map.MapLayer.VALHALLA_OFFLINE
+        state.is3DTerrainEnabled = true
+        state.realTimeSatEnabled = true
+        state.realTimeSatFeed = "globalir"
+
+        assertEquals(com.example.ui.screens.map.MapLayer.VALHALLA_OFFLINE, state.mapLayer)
+        assertEquals(true, state.is3DTerrainEnabled)
+        assertEquals(true, state.realTimeSatEnabled)
+        assertEquals("globalir", state.realTimeSatFeed)
+    }
 }

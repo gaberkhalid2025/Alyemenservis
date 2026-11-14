@@ -8,7 +8,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -30,6 +30,7 @@ fun StatusNotificationsSection(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    var showAll by remember { mutableStateOf(false) }
 
     Column(
         modifier = modifier.fillMaxWidth(),
@@ -76,7 +77,8 @@ fun StatusNotificationsSection(
                 }
             }
         } else {
-            notifications.take(4).forEach { notif ->
+            val displayed = if (showAll) notifications else notifications.take(4)
+            displayed.forEach { notif ->
                 Card(
                     colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.05f)),
                     border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)),
@@ -100,12 +102,16 @@ fun StatusNotificationsSection(
                             ) {
                                 Button(
                                     onClick = {
-                                        val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${notif.customerPhone}"))
-                                        context.startActivity(intent)
+                                        try {
+                                            val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${notif.customerPhone}"))
+                                            context.startActivity(intent)
+                                        } catch (_: Exception) {
+                                            android.widget.Toast.makeText(context, "تعذر فتح تطبيق الاتصال", android.widget.Toast.LENGTH_SHORT).show()
+                                        }
                                     },
                                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
                                     shape = RoundedCornerShape(6.dp),
-                                    modifier = Modifier.weight(1f),
+                                    modifier = Modifier.weight(1f).height(48.dp),
                                     contentPadding = PaddingValues(vertical = 4.dp, horizontal = 8.dp)
                                 ) {
                                     Text("📞 اتصال مباشر", fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold)
@@ -117,7 +123,7 @@ fun StatusNotificationsSection(
                                     },
                                     colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
                                     shape = RoundedCornerShape(6.dp),
-                                    modifier = Modifier.weight(1f),
+                                    modifier = Modifier.weight(1f).height(48.dp),
                                     contentPadding = PaddingValues(vertical = 4.dp, horizontal = 8.dp)
                                 ) {
                                     Text("💬 مراسلة فورية", fontSize = 10.sp, color = Color.Black, fontWeight = FontWeight.Bold)
@@ -125,6 +131,19 @@ fun StatusNotificationsSection(
                             }
                         }
                     }
+                }
+            }
+            if (notifications.size > 4) {
+                TextButton(
+                    onClick = { showAll = !showAll },
+                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                ) {
+                    Text(
+                        text = if (showAll) "عرض أقل ▲" else "عرض كل الإشعارات (${notifications.size}) ▼",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = themeColors.accent
+                    )
                 }
             }
         }

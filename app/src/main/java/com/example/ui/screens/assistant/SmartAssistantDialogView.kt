@@ -63,8 +63,33 @@ fun SmartAssistantDialogView(
     onNavigateToMap: () -> Unit = {}
 ) {
     val context = LocalContext.current
-    val isOnline = remember(context) {
-        try { NetworkUtils.isNetworkAvailable(context) } catch (_: Exception) { true }
+    var isOnline by remember {
+        mutableStateOf(
+            try { NetworkUtils.isNetworkAvailable(context) } catch (_: Exception) { true }
+        )
+    }
+    DisposableEffect(context) {
+        val cm = context.getSystemService(android.content.Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager
+        val callback = object : android.net.ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: android.net.Network) {
+                isOnline = true
+            }
+            override fun onLost(network: android.net.Network) {
+                isOnline = try { NetworkUtils.isNetworkAvailable(context) } catch (_: Exception) { false }
+            }
+            override fun onCapabilitiesChanged(
+                network: android.net.Network,
+                networkCapabilities: android.net.NetworkCapabilities
+            ) {
+                isOnline = networkCapabilities.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)
+            }
+        }
+        try {
+            cm?.registerDefaultNetworkCallback(callback)
+        } catch (_: Exception) {}
+        onDispose {
+            try { cm?.unregisterNetworkCallback(callback) } catch (_: Exception) {}
+        }
     }
     val coroutineScope = rememberCoroutineScope()
     val listState = rememberLazyListState()

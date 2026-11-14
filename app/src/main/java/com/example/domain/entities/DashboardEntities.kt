@@ -55,7 +55,8 @@ data class RatingReviewEntity(
     val authorPhone: String = "",
     val rating: Double = 5.0,
     val comment: String = "",
-    val dateTimestamp: Long = System.currentTimeMillis()
+    val dateTimestamp: Long = System.currentTimeMillis(),
+    val ownerReply: String = ""
 ) {
     val userName: String get() = authorName
     val userPhone: String get() = authorPhone

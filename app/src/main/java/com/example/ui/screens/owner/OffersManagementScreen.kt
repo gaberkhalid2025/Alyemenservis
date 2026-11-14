@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
@@ -19,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -35,7 +37,10 @@ fun OffersManagementScreen(
     themeColors: VisualThemePalette
 ) {
     val context = LocalContext.current
-    val couponsList by viewModel.coupons.collectAsState()
+    val allCoupons by viewModel.coupons.collectAsState()
+    val couponsList = remember(allCoupons, account.id) {
+        if (account.id.isNotBlank()) allCoupons.filter { it.storeId == account.id } else allCoupons
+    }
 
     var showAddOfferDialog by remember { mutableStateOf(false) }
     var offerToEdit by remember { mutableStateOf<CouponEntity?>(null) }
@@ -122,7 +127,11 @@ fun OffersManagementScreen(
             onSave = { newCoupon ->
                 viewModel.saveCoupon(newCoupon)
                 showAddOfferDialog = false
-                Toast.makeText(context, "تم نشر كوبون الخصم بنجاح!", Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    context,
+                    if (offerToEdit == null) "تم نشر كوبون الخصم بنجاح!" else "تم حفظ تعديلات الكوبون بنجاح!",
+                    Toast.LENGTH_SHORT
+                ).show()
             }
         )
     }
@@ -185,11 +194,11 @@ fun OfferItemCard(
             }
 
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                IconButton(onClick = onEdit, modifier = Modifier.size(28.dp)) {
-                    Icon(Icons.Default.Edit, contentDescription = "تعديل", tint = Color(0xFF3B82F6), modifier = Modifier.size(16.dp))
+                IconButton(onClick = onEdit, modifier = Modifier.size(48.dp)) {
+                    Icon(Icons.Default.Edit, contentDescription = "تعديل", tint = Color(0xFF3B82F6), modifier = Modifier.size(18.dp))
                 }
-                IconButton(onClick = onDelete, modifier = Modifier.size(28.dp)) {
-                    Icon(Icons.Default.Delete, contentDescription = "حذف", tint = Color(0xFFEF4444), modifier = Modifier.size(16.dp))
+                IconButton(onClick = onDelete, modifier = Modifier.size(48.dp)) {
+                    Icon(Icons.Default.Delete, contentDescription = "حذف", tint = Color(0xFFEF4444), modifier = Modifier.size(18.dp))
                 }
             }
         }
@@ -203,9 +212,10 @@ fun AddEditOfferDialog(
     onDismiss: () -> Unit,
     onSave: (CouponEntity) -> Unit
 ) {
-    var codeInput by remember { mutableStateOf(offer?.code ?: "YEMEN2026") }
-    var percentInput by remember { mutableStateOf(offer?.discountPercentage?.toString() ?: "20") }
-    var pointsInput by remember { mutableStateOf(offer?.pointsValue?.toString() ?: "50") }
+    val context = LocalContext.current
+    var codeInput by remember(offer) { mutableStateOf(offer?.code ?: "YEMEN2026") }
+    var percentInput by remember(offer) { mutableStateOf(offer?.discountPercentage?.toString() ?: "20") }
+    var pointsInput by remember(offer) { mutableStateOf(offer?.pointsValue?.toString() ?: "50") }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -222,12 +232,14 @@ fun AddEditOfferDialog(
                     value = percentInput,
                     onValueChange = { percentInput = it },
                     label = { Text("نسبة الخصم (%)") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.fillMaxWidth()
                 )
                 OutlinedTextField(
                     value = pointsInput,
                     onValueChange = { pointsInput = it },
                     label = { Text("قيمة النقاط (Points)") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -235,20 +247,28 @@ fun AddEditOfferDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    if (codeInput.isNotBlank()) {
-                        val newOffer = (offer ?: CouponEntity(
-                            id = UUID.randomUUID().toString()
-                        )).copy(
-                            code = codeInput,
-                            discountPercentage = percentInput.toIntOrNull() ?: 20,
-                            pointsValue = pointsInput.toIntOrNull() ?: 50
-                        )
-                        onSave(newOffer)
+                    val disc = percentInput.trim().toIntOrNull()
+                    val pts = pointsInput.trim().toIntOrNull()
+                    when {
+                        codeInput.isBlank() -> Toast.makeText(context, "يرجى إدخال رمز الكوبون", Toast.LENGTH_SHORT).show()
+                        disc == null || disc !in 1..99 -> Toast.makeText(context, "نسبة الخصم يجب أن تكون بين 1 و 99%", Toast.LENGTH_SHORT).show()
+                        pts == null || pts < 0 -> Toast.makeText(context, "قيمة النقاط يجب أن تكون رقماً غير سالب", Toast.LENGTH_SHORT).show()
+                        else -> {
+                            val newOffer = (offer ?: CouponEntity(
+                                id = UUID.randomUUID().toString()
+                            )).copy(
+                                code = codeInput.trim().uppercase(),
+                                discountPercentage = disc,
+                                pointsValue = pts,
+                                storeId = account.id
+                            )
+                            onSave(newOffer)
+                        }
                     }
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF59E0B))
             ) {
-                Text("نشر الكوبون", color = Color.Black, fontWeight = FontWeight.Bold)
+                Text(if (offer == null) "نشر الكوبون" else "حفظ التعديلات 💾", color = Color.Black, fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {

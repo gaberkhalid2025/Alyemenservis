@@ -15,6 +15,23 @@ import kotlinx.coroutines.flow.Flow
 interface IDashboardRepository {
     fun getDashboardStats(ownerId: String, role: String): Flow<DashboardStatsEntity>
     suspend fun refreshDashboardStats(ownerId: String, role: String): Result<Unit>
+    suspend fun updateBusinessProfile(
+        ownerId: String,
+        role: String,
+        name: String,
+        cityArea: String,
+        description: String,
+        workingHours: String,
+        isAvailable: Boolean,
+        photoUrl: String? = null,
+        coverUrl: String? = null
+    ): Result<Unit> = Result.success(Unit)
+    suspend fun changeBusinessPassword(
+        ownerId: String,
+        role: String,
+        oldPassword: String,
+        newPassword: String
+    ): Result<Unit> = Result.success(Unit)
 }
 
 interface IFavoritesRepository {
@@ -35,6 +52,7 @@ interface IProductsRepository {
 interface IRatingsRepository {
     fun getTargetRatings(targetId: String): Flow<List<RatingReviewEntity>>
     suspend fun addRating(rating: RatingReviewEntity): Result<String>
+    suspend fun replyToRating(ratingId: String, replyText: String): Result<Unit> = Result.success(Unit)
 }
 
 interface IGalleryRepository {

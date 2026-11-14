@@ -34,10 +34,16 @@ fun PriceManagementScreen(
     val productsList by viewModel.products.collectAsState()
 
     var selectedCategoryFilter by remember { mutableStateOf("الكل") }
-    val categories = listOf("الكل", "منتجات رئيسية", "عروض وتخفيضات", "خدمات إضافية")
 
     val myProducts = remember(productsList, account.id) {
         productsList.filter { it.storeId == account.id }
+    }
+    val categories = remember(myProducts) {
+        listOf("الكل") + myProducts.mapNotNull { it.category.takeIf { c -> c.isNotBlank() } }.distinct()
+    }
+    val filteredProducts = remember(myProducts, selectedCategoryFilter) {
+        if (selectedCategoryFilter == "الكل") myProducts
+        else myProducts.filter { it.category == selectedCategoryFilter }
     }
 
     Column(
@@ -49,44 +55,50 @@ fun PriceManagementScreen(
     ) {
         Text("🏷️ إدارة وتحديث الأسعار السريعة:", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
 
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            items(categories.size) { idx ->
-                val cat = categories[idx]
-                val isSel = selectedCategoryFilter == cat
-                Surface(
-                    color = if (isSel) themeColors.accent else themeColors.surface,
-                    shape = RoundedCornerShape(16.dp),
-                    border = BorderStroke(1.dp, if (isSel) Color.White else Color.Gray.copy(alpha = 0.3f)),
-                    modifier = Modifier.clickable { selectedCategoryFilter = cat }
-                ) {
-                    Text(
-                        cat,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (isSel) Color.Black else Color.White
-                    )
+        if (categories.size > 1) {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                items(categories.size) { idx ->
+                    val cat = categories[idx]
+                    val isSel = selectedCategoryFilter == cat
+                    Surface(
+                        color = if (isSel) themeColors.accent else themeColors.surface,
+                        shape = RoundedCornerShape(16.dp),
+                        border = BorderStroke(1.dp, if (isSel) themeColors.textPrimary else Color.Gray.copy(alpha = 0.3f)),
+                        modifier = Modifier.clickable { selectedCategoryFilter = cat }
+                    ) {
+                        Text(
+                            cat,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isSel) Color.Black else themeColors.textPrimary
+                        )
+                    }
                 }
             }
         }
 
-        if (myProducts.isEmpty()) {
+        if (filteredProducts.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("لا توجد منتجات مسجلة لتعديل أسعارها", color = Color.Gray, fontSize = 12.sp)
+                Text("لا توجد منتجات مسجلة لتعديل أسعارها", color = themeColors.textSecondary, fontSize = 12.sp)
             }
         } else {
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.fillMaxSize()
             ) {
-                items(myProducts, key = { it.id }) { product ->
+                items(filteredProducts, key = { it.id }) { product ->
                     PriceItemRow(
                         product = product,
                         themeColors = themeColors,
                         onSavePrice = { newPrice ->
-                            val updated = product.copy(price = newPrice)
-                            viewModel.saveProduct(updated)
-                            Toast.makeText(context, "تم تحديث سعر ${product.name} إلى $newPrice YER", Toast.LENGTH_SHORT).show()
+                            if (newPrice <= 0.0) {
+                                Toast.makeText(context, "يرجى إدخال سعر صحيح أكبر من صفر", Toast.LENGTH_SHORT).show()
+                            } else {
+                                val updated = product.copy(price = newPrice)
+                                viewModel.saveProduct(updated)
+                                Toast.makeText(context, "تم تحديث سعر ${product.name} إلى $newPrice YER", Toast.LENGTH_SHORT).show()
+                            }
                         }
                     )
                 }
@@ -101,7 +113,7 @@ fun PriceItemRow(
     themeColors: VisualThemePalette,
     onSavePrice: (Double) -> Unit
 ) {
-    var editedPriceText by remember(product.price) { mutableStateOf(product.price.toString()) }
+    var editedPriceText by remember(product.id, product.price) { mutableStateOf(product.price.toString()) }
 
     Card(
         shape = RoundedCornerShape(10.dp),
@@ -117,34 +129,37 @@ fun PriceItemRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(product.name, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                Text("السعر الحالي: ${product.price} YER", fontSize = 10.sp, color = Color.LightGray)
+                Text(product.name, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = themeColors.textPrimary)
+                Text("السعر الحالي: ${product.price} YER", fontSize = 10.sp, color = themeColors.textSecondary)
             }
 
             OutlinedTextField(
                 value = editedPriceText,
                 onValueChange = { editedPriceText = it },
-                modifier = Modifier.width(100.dp).height(46.dp),
+                modifier = Modifier.width(100.dp),
                 singleLine = true,
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                    keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+                ),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = themeColors.accent,
                     unfocusedBorderColor = Color.Gray,
-                    focusedContainerColor = Color.Black,
-                    unfocusedContainerColor = Color.Black
+                    focusedTextColor = themeColors.textPrimary,
+                    unfocusedTextColor = themeColors.textPrimary
                 )
             )
 
             Button(
                 onClick = {
-                    val parsed = editedPriceText.toDoubleOrNull() ?: product.price
+                    val parsed = editedPriceText.trim().toDoubleOrNull() ?: -1.0
                     onSavePrice(parsed)
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
-                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
                 shape = RoundedCornerShape(8.dp),
-                modifier = Modifier.height(36.dp)
+                modifier = Modifier.height(48.dp)
             ) {
-                Text("حفظ 💾", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Text("حفظ 💾", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
             }
         }
     }

@@ -60,7 +60,7 @@ fun StatusChatDialog(
     }
 
     val attachmentLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
+        contract = ActivityResultContracts.PickVisualMedia()
     ) { uri ->
         if (uri != null) {
             selectedAttachmentUri = uri
@@ -97,7 +97,7 @@ fun StatusChatDialog(
                         )
                         Text("متصل الآن - دعم فني وتنسيق مباشر", fontSize = 10.sp, color = Color.Gray)
                     }
-                    IconButton(onClick = onDismiss, modifier = Modifier.size(24.dp)) {
+                    IconButton(onClick = onDismiss, modifier = Modifier.size(48.dp)) {
                         Icon(imageVector = Icons.Default.Close, contentDescription = "إغلاق", tint = Color.Red)
                     }
                 }
@@ -169,7 +169,7 @@ fun StatusChatDialog(
                             contentScale = ContentScale.Crop
                         )
                         Text("مرفق جاهز للإرسال", fontSize = 10.5.sp, color = Color.White, modifier = Modifier.weight(1f))
-                        IconButton(onClick = { selectedAttachmentUri = null }, modifier = Modifier.size(20.dp)) {
+                        IconButton(onClick = { selectedAttachmentUri = null }, modifier = Modifier.size(48.dp)) {
                             Icon(Icons.Default.Close, contentDescription = "حذف", tint = Color.Red)
                         }
                     }
@@ -182,10 +182,16 @@ fun StatusChatDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(
-                        onClick = { attachmentLauncher.launch("image/*") },
+                        onClick = {
+                            attachmentLauncher.launch(
+                                androidx.activity.result.PickVisualMediaRequest(
+                                    ActivityResultContracts.PickVisualMedia.ImageOnly
+                                )
+                            )
+                        },
                         modifier = Modifier
                             .background(Color(0xFF1E293B), CircleShape)
-                            .size(40.dp)
+                            .size(48.dp)
                     ) {
                         Icon(Icons.Default.Add, contentDescription = "إرفاق صورة", tint = themeColors.accent)
                     }
@@ -207,20 +213,24 @@ fun StatusChatDialog(
 
                     IconButton(
                         onClick = {
-                            if (inputText.isNotBlank() || selectedAttachmentUri != null) {
-                                val textToSend = if (selectedAttachmentUri != null) {
-                                    "[مرفق صورة] ${inputText.trim()}"
-                                } else {
-                                    inputText.trim()
+                            val attachment = selectedAttachmentUri
+                            if (attachment != null) {
+                                onSendAttachment?.invoke(attachment)
+                                if (inputText.isNotBlank()) {
+                                    onSendMessage(inputText.trim())
+                                } else if (onSendAttachment == null) {
+                                    onSendMessage("[مرفق صورة]")
                                 }
-                                onSendMessage(textToSend)
                                 inputText = ""
                                 selectedAttachmentUri = null
+                            } else if (inputText.isNotBlank()) {
+                                onSendMessage(inputText.trim())
+                                inputText = ""
                             }
                         },
                         modifier = Modifier
                             .background(themeColors.accent, RoundedCornerShape(10.dp))
-                            .size(42.dp)
+                            .size(48.dp)
                     ) {
                         Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "إرسال", tint = Color.Black)
                     }

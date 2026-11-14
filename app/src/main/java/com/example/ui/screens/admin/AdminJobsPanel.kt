@@ -6,9 +6,11 @@ import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -18,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -105,7 +108,7 @@ fun AdminJobsPanel(
                         text = if (activeTab == "إعلانات الوظائف") "💼 إعلانات الوظائف (${allJobs.size})" else "📋 طلبات المتقدمين (${allApplicants.size})",
                         fontWeight = FontWeight.Bold,
                         fontSize = 13.5.sp,
-                        color = Color.White
+                        color = themeColors.textPrimary
                     )
 
                     if (activeTab == "إعلانات الوظائف") {
@@ -113,7 +116,8 @@ fun AdminJobsPanel(
                             onClick = { showAddJobDialog = true },
                             colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
                             shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                            modifier = Modifier.heightIn(min = 48.dp)
                         ) {
                             Icon(Icons.Default.Add, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(4.dp))
@@ -130,32 +134,32 @@ fun AdminJobsPanel(
                     Button(
                         onClick = { activeTab = "إعلانات الوظائف" },
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = if (activeTab == "إعلانات الوظائف") themeColors.accent else Color.White.copy(alpha = 0.08f)
+                            containerColor = if (activeTab == "إعلانات الوظائف") themeColors.accent else themeColors.textPrimary.copy(alpha = 0.08f)
                         ),
                         shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f).heightIn(min = 48.dp)
                     ) {
                         Text(
                             "💼 الوظائف المعروضة (${allJobs.size})",
                             fontSize = 11.5.sp,
                             fontWeight = FontWeight.Bold,
-                            color = if (activeTab == "إعلانات الوظائف") Color.Black else Color.White
+                            color = if (activeTab == "إعلانات الوظائف") Color.Black else themeColors.textPrimary
                         )
                     }
 
                     Button(
                         onClick = { activeTab = "المتقدمين للوظائف" },
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = if (activeTab == "المتقدمين للوظائف") themeColors.accent else Color.White.copy(alpha = 0.08f)
+                            containerColor = if (activeTab == "المتقدمين للوظائف") themeColors.accent else themeColors.textPrimary.copy(alpha = 0.08f)
                         ),
                         shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f).heightIn(min = 48.dp)
                     ) {
                         Text(
                             "📋 المتقدمين (${allApplicants.size})",
                             fontSize = 11.5.sp,
                             fontWeight = FontWeight.Bold,
-                            color = if (activeTab == "المتقدمين للوظائف") Color.Black else Color.White
+                            color = if (activeTab == "المتقدمين للوظائف") Color.Black else themeColors.textPrimary
                         )
                     }
                 }
@@ -168,24 +172,24 @@ fun AdminJobsPanel(
                         Text(
                             if (activeTab == "إعلانات الوظائف") "بحث بعنوان الوظيفة، الشركة، المدينة، الهاتف..." else "بحث باسم المتقدم، المسمى الوظيفي، الهاتف...",
                             fontSize = 11.5.sp,
-                            color = Color.Gray
+                            color = themeColors.textSecondary
                         )
                     },
                     leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = themeColors.accent, modifier = Modifier.size(18.dp)) },
                     trailingIcon = {
                         if (searchQuery.isNotEmpty()) {
-                            IconButton(onClick = { searchQuery = "" }) {
-                                Icon(Icons.Default.Clear, contentDescription = "مسح", tint = Color.Gray, modifier = Modifier.size(16.dp))
+                            IconButton(onClick = { searchQuery = "" }, modifier = Modifier.size(48.dp)) {
+                                Icon(Icons.Default.Clear, contentDescription = "مسح", tint = themeColors.textSecondary, modifier = Modifier.size(16.dp))
                             }
                         }
                     },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(10.dp),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
+                        focusedTextColor = themeColors.textPrimary,
+                        unfocusedTextColor = themeColors.textPrimary,
                         focusedBorderColor = themeColors.accent,
-                        unfocusedBorderColor = Color.White.copy(alpha = 0.15f)
+                        unfocusedBorderColor = themeColors.textSecondary.copy(alpha = 0.25f)
                     )
                 )
 
@@ -193,7 +197,7 @@ fun AdminJobsPanel(
                 if (activeTab == "إعلانات الوظائف") {
                     val filters = listOf("الكل", "نشط", "مميز VIP", "محظور")
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        items(filters) { f ->
+                        items(filters, key = { it }) { f ->
                             val isSelected = selectedFilter == f
                             FilterChip(
                                 selected = isSelected,
@@ -202,8 +206,8 @@ fun AdminJobsPanel(
                                 colors = FilterChipDefaults.filterChipColors(
                                     selectedContainerColor = themeColors.accent,
                                     selectedLabelColor = Color.Black,
-                                    containerColor = Color.White.copy(alpha = 0.05f),
-                                    labelColor = Color.White
+                                    containerColor = themeColors.textPrimary.copy(alpha = 0.05f),
+                                    labelColor = themeColors.textPrimary
                                 )
                             )
                         }
@@ -221,71 +225,79 @@ fun AdminJobsPanel(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-                        Text("لا توجد إعلانات وظائف مطابقة 💼", color = Color.Gray, fontSize = 13.sp)
+                        Text("لا توجد إعلانات وظائف مطابقة 💼", color = themeColors.textSecondary, fontSize = 13.sp)
                     }
                 }
             } else {
-                filteredJobs.forEach { job ->
-                    AdminEntityCard(
-                        title = job.title.ifBlank { "إعلان وظيفة" },
-                        subtitle = "🏢 ${job.companyName.ifBlank { "جهة غير محددة" }} • 📍 ${job.cityId} • 📱 ${job.phone}",
-                        details = "💰 الراتب: ${job.salary.ifBlank { "يحدد بعد المقابلة" }} • ⏱️ نوع الدوام: ${job.jobType.ifBlank { "دوام كامل" }}",
-                        statusText = if (job.isBlocked) "🚫 محظور" else if (job.isVip) "⭐ VIP" else if (job.isActive) "نشط ✅" else "معلق ⏸️",
-                        statusColor = if (job.isBlocked) Color(0xFFEF4444) else if (job.isVip) Color(0xFFF59E0B) else Color(0xFF10B981),
-                        isVip = job.isVip,
-                        isBlocked = job.isBlocked,
-                        themeColors = themeColors,
-                        actions = {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                OutlinedButton(
-                                    onClick = {
-                                        viewModel.adminViewModel.setJobVip(job.id, !job.isVip)
-                                        Toast.makeText(context, if (job.isVip) "تم إلغاء تمييز الوظيفة" else "تم تمييز الوظيفة بنجاح ⭐", Toast.LENGTH_SHORT).show()
-                                    },
-                                    shape = RoundedCornerShape(8.dp),
-                                    border = BorderStroke(1.dp, if (job.isVip) Color(0xFFF59E0B) else Color.White.copy(alpha = 0.3f)),
-                                    modifier = Modifier.weight(1f)
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 560.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(filteredJobs, key = { it.id }) { job ->
+                        AdminEntityCard(
+                            title = job.title.ifBlank { "إعلان وظيفة" },
+                            subtitle = "🏢 ${job.companyName.ifBlank { "جهة غير محددة" }} • 📍 ${job.cityId} • 📱 ${job.phone}",
+                            details = "💰 الراتب: ${job.salary.ifBlank { "يحدد بعد المقابلة" }} • ⏱️ نوع الدوام: ${job.jobType.ifBlank { "دوام كامل" }}",
+                            statusText = if (job.isBlocked) "🚫 محظور" else if (job.isVip) "⭐ VIP" else if (job.isActive) "نشط ✅" else "معلق ⏸️",
+                            statusColor = if (job.isBlocked) Color(0xFFEF4444) else if (job.isVip) Color(0xFFF59E0B) else Color(0xFF10B981),
+                            isVip = job.isVip,
+                            isBlocked = job.isBlocked,
+                            themeColors = themeColors,
+                            actions = {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text(
-                                        if (job.isVip) "إلغاء VIP" else "تمييز VIP ⭐",
-                                        fontSize = 10.5.sp,
-                                        color = if (job.isVip) Color(0xFFF59E0B) else Color.White
-                                    )
-                                }
+                                    OutlinedButton(
+                                        onClick = {
+                                            viewModel.adminViewModel.setJobVip(job.id, !job.isVip)
+                                            Toast.makeText(context, if (job.isVip) "تم إلغاء تمييز الوظيفة" else "تم تمييز الوظيفة بنجاح ⭐", Toast.LENGTH_SHORT).show()
+                                        },
+                                        shape = RoundedCornerShape(8.dp),
+                                        border = BorderStroke(1.dp, if (job.isVip) Color(0xFFF59E0B) else themeColors.textSecondary.copy(alpha = 0.35f)),
+                                        modifier = Modifier.weight(1f).heightIn(min = 48.dp)
+                                    ) {
+                                        Text(
+                                            if (job.isVip) "إلغاء VIP" else "تمييز VIP ⭐",
+                                            fontSize = 10.5.sp,
+                                            color = if (job.isVip) Color(0xFFF59E0B) else themeColors.textPrimary
+                                        )
+                                    }
 
-                                if (job.phone.isNotBlank()) {
+                                    if (job.phone.isNotBlank()) {
+                                        IconButton(
+                                            onClick = {
+                                                try {
+                                                    val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${job.phone}"))
+                                                    context.startActivity(intent)
+                                                } catch (e: Exception) {
+                                                    Toast.makeText(context, "تعذر فتح تطبيق الاتصال", Toast.LENGTH_SHORT).show()
+                                                }
+                                            },
+                                            modifier = Modifier
+                                                .size(48.dp)
+                                                .background(Color(0xFF10B981).copy(alpha = 0.15f), RoundedCornerShape(8.dp))
+                                        ) {
+                                            Icon(Icons.Default.Call, contentDescription = "اتصال", tint = Color(0xFF10B981), modifier = Modifier.size(18.dp))
+                                        }
+                                    }
+
                                     IconButton(
                                         onClick = {
-                                            try {
-                                                val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${job.phone}"))
-                                                context.startActivity(intent)
-                                            } catch (e: Exception) {
-                                                Toast.makeText(context, "تعذر فتح تطبيق الاتصال", Toast.LENGTH_SHORT).show()
-                                            }
+                                            viewModel.adminViewModel.deleteJobPermanently(job.id)
+                                            Toast.makeText(context, "🗑️ تم حذف الإعلان الوظيفي", Toast.LENGTH_SHORT).show()
                                         },
-                                        modifier = Modifier.background(Color(0xFF10B981).copy(alpha = 0.15f), RoundedCornerShape(8.dp))
+                                        modifier = Modifier
+                                            .size(48.dp)
+                                            .background(Color(0xFFEF5350).copy(alpha = 0.15f), RoundedCornerShape(8.dp))
                                     ) {
-                                        Icon(Icons.Default.Call, contentDescription = "اتصال", tint = Color(0xFF10B981), modifier = Modifier.size(18.dp))
+                                        Icon(Icons.Default.Delete, contentDescription = "حذف", tint = Color(0xFFEF5350), modifier = Modifier.size(18.dp))
                                     }
                                 }
-
-                                IconButton(
-                                    onClick = {
-                                        viewModel.adminViewModel.deleteJobPermanently(job.id)
-                                        Toast.makeText(context, "🗑️ تم حذف الإعلان الوظيفي", Toast.LENGTH_SHORT).show()
-                                    },
-                                    modifier = Modifier.background(Color(0xFFEF5350).copy(alpha = 0.15f), RoundedCornerShape(8.dp))
-                                ) {
-                                    Icon(Icons.Default.Delete, contentDescription = "حذف", tint = Color(0xFFEF5350), modifier = Modifier.size(18.dp))
-                                }
                             }
-                        }
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
+                        )
+                    }
                 }
             }
         } else {
@@ -297,85 +309,93 @@ fun AdminJobsPanel(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-                        Text("لا يوجد متقدمين للوظائف حالياً 📋", color = Color.Gray, fontSize = 13.sp)
+                        Text("لا يوجد متقدمين للوظائف حالياً 📋", color = themeColors.textSecondary, fontSize = 13.sp)
                     }
                 }
             } else {
-                filteredApplicants.forEach { app ->
-                    AdminEntityCard(
-                        title = "👤 ${app.applicantName}",
-                        subtitle = "💼 الوظيفة: ${app.jobTitle} • 📱 ${app.applicantPhone}",
-                        details = "🎓 المؤهل والخبرة: ${app.applicantQuals.ifBlank { "مقدم عبر التطبيق" }} • 📅 الحالة: ${app.status}",
-                        statusText = when (app.status) {
-                            "ACCEPTED" -> "مقبول ✅"
-                            "REJECTED" -> "مرفوض ❌"
-                            else -> "قيد المراجعة ⏳"
-                        },
-                        statusColor = when (app.status) {
-                            "ACCEPTED" -> Color(0xFF10B981)
-                            "REJECTED" -> Color(0xFFEF4444)
-                            else -> Color(0xFFF59E0B)
-                        },
-                        themeColors = themeColors,
-                        actions = {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Button(
-                                    onClick = {
-                                        viewModel.adminViewModel.updateJobApplicationStatus(app.id, "ACCEPTED")
-                                        Toast.makeText(context, "تم قبول طلب المتقدم ✅", Toast.LENGTH_SHORT).show()
-                                    },
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
-                                    shape = RoundedCornerShape(8.dp),
-                                    modifier = Modifier.weight(1f)
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 560.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(filteredApplicants, key = { it.id }) { app ->
+                        AdminEntityCard(
+                            title = "👤 ${app.applicantName}",
+                            subtitle = "💼 الوظيفة: ${app.jobTitle} • 📱 ${app.applicantPhone}",
+                            details = "🎓 المؤهل والخبرة: ${app.applicantQuals.ifBlank { "مقدم عبر التطبيق" }} • 📅 الحالة: ${app.status}",
+                            statusText = when (app.status) {
+                                "ACCEPTED" -> "مقبول ✅"
+                                "REJECTED" -> "مرفوض ❌"
+                                else -> "قيد المراجعة ⏳"
+                            },
+                            statusColor = when (app.status) {
+                                "ACCEPTED" -> Color(0xFF10B981)
+                                "REJECTED" -> Color(0xFFEF4444)
+                                else -> Color(0xFFF59E0B)
+                            },
+                            themeColors = themeColors,
+                            actions = {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text("قبول ✅", fontSize = 10.5.sp, color = Color.White, fontWeight = FontWeight.Bold)
-                                }
+                                    Button(
+                                        onClick = {
+                                            viewModel.adminViewModel.updateJobApplicationStatus(app.id, "ACCEPTED")
+                                            Toast.makeText(context, "تم قبول طلب المتقدم ✅", Toast.LENGTH_SHORT).show()
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier.weight(1f).heightIn(min = 48.dp)
+                                    ) {
+                                        Text("قبول ✅", fontSize = 10.5.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                    }
 
-                                OutlinedButton(
-                                    onClick = {
-                                        viewModel.adminViewModel.updateJobApplicationStatus(app.id, "REJECTED")
-                                        Toast.makeText(context, "تم رفض طلب المتقدم ❌", Toast.LENGTH_SHORT).show()
-                                    },
-                                    shape = RoundedCornerShape(8.dp),
-                                    border = BorderStroke(1.dp, Color(0xFFEF4444)),
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Text("رفض ❌", fontSize = 10.5.sp, color = Color(0xFFEF4444))
-                                }
+                                    OutlinedButton(
+                                        onClick = {
+                                            viewModel.adminViewModel.updateJobApplicationStatus(app.id, "REJECTED")
+                                            Toast.makeText(context, "تم رفض طلب المتقدم ❌", Toast.LENGTH_SHORT).show()
+                                        },
+                                        shape = RoundedCornerShape(8.dp),
+                                        border = BorderStroke(1.dp, Color(0xFFEF4444)),
+                                        modifier = Modifier.weight(1f).heightIn(min = 48.dp)
+                                    ) {
+                                        Text("رفض ❌", fontSize = 10.5.sp, color = Color(0xFFEF4444))
+                                    }
 
-                                if (app.applicantPhone.isNotBlank()) {
+                                    if (app.applicantPhone.isNotBlank()) {
+                                        IconButton(
+                                            onClick = {
+                                                try {
+                                                    val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${app.applicantPhone}"))
+                                                    context.startActivity(intent)
+                                                } catch (e: Exception) {
+                                                    Toast.makeText(context, "تعذر فتح تطبيق الاتصال", Toast.LENGTH_SHORT).show()
+                                                }
+                                            },
+                                            modifier = Modifier
+                                                .size(48.dp)
+                                                .background(Color(0xFF10B981).copy(alpha = 0.15f), RoundedCornerShape(8.dp))
+                                        ) {
+                                            Icon(Icons.Default.Call, contentDescription = "اتصال", tint = Color(0xFF10B981), modifier = Modifier.size(18.dp))
+                                        }
+                                    }
+
                                     IconButton(
                                         onClick = {
-                                            try {
-                                                val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${app.applicantPhone}"))
-                                                context.startActivity(intent)
-                                            } catch (e: Exception) {
-                                                Toast.makeText(context, "تعذر فتح تطبيق الاتصال", Toast.LENGTH_SHORT).show()
-                                            }
+                                            viewModel.adminViewModel.deleteJobApplication(app.id)
+                                            Toast.makeText(context, "🗑️ تم حذف طلب المتقدم", Toast.LENGTH_SHORT).show()
                                         },
-                                        modifier = Modifier.background(Color(0xFF10B981).copy(alpha = 0.15f), RoundedCornerShape(8.dp))
+                                        modifier = Modifier
+                                            .size(48.dp)
+                                            .background(Color(0xFFEF5350).copy(alpha = 0.15f), RoundedCornerShape(8.dp))
                                     ) {
-                                        Icon(Icons.Default.Call, contentDescription = "اتصال", tint = Color(0xFF10B981), modifier = Modifier.size(18.dp))
+                                        Icon(Icons.Default.Delete, contentDescription = "حذف", tint = Color(0xFFEF5350), modifier = Modifier.size(18.dp))
                                     }
                                 }
-
-                                IconButton(
-                                    onClick = {
-                                        viewModel.adminViewModel.deleteJobApplication(app.id)
-                                        Toast.makeText(context, "🗑️ تم حذف طلب المتقدم", Toast.LENGTH_SHORT).show()
-                                    },
-                                    modifier = Modifier.background(Color(0xFFEF5350).copy(alpha = 0.15f), RoundedCornerShape(8.dp))
-                                ) {
-                                    Icon(Icons.Default.Delete, contentDescription = "حذف", tint = Color(0xFFEF5350), modifier = Modifier.size(18.dp))
-                                }
                             }
-                        }
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
+                        )
+                    }
                 }
             }
         }
@@ -392,12 +412,19 @@ fun AdminJobsPanel(
 
         AlertDialog(
             onDismissRequest = { showAddJobDialog = false },
-            title = { Text("➕ إضافة إعلان وظيفة جديد", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color.White) },
+            title = { Text("➕ إضافة إعلان وظيفة جديد", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = themeColors.textPrimary) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(value = jobTitleInput, onValueChange = { jobTitleInput = it }, label = { Text("المسمى الوظيفي") }, modifier = Modifier.fillMaxWidth())
                     OutlinedTextField(value = jobCompanyInput, onValueChange = { jobCompanyInput = it }, label = { Text("اسم الشركة / المنشأة") }, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(value = jobPhoneInput, onValueChange = { jobPhoneInput = it }, label = { Text("رقم الهاتف للتقديم") }, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(
+                        value = jobPhoneInput,
+                        onValueChange = { jobPhoneInput = it },
+                        label = { Text("رقم الهاتف للتقديم") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
                     OutlinedTextField(value = jobCityInput, onValueChange = { jobCityInput = it }, label = { Text("المدينة") }, modifier = Modifier.fillMaxWidth())
                     OutlinedTextField(value = jobSalaryInput, onValueChange = { jobSalaryInput = it }, label = { Text("الراتب المتوقع (اختياري)") }, modifier = Modifier.fillMaxWidth())
                     OutlinedTextField(value = jobDescInput, onValueChange = { jobDescInput = it }, label = { Text("شروط ومتطلبات الوظيفة") }, modifier = Modifier.fillMaxWidth().height(70.dp))
@@ -408,6 +435,11 @@ fun AdminJobsPanel(
                     onClick = {
                         if (jobTitleInput.isBlank()) {
                             Toast.makeText(context, "يرجى كتابة المسمى الوظيفي", Toast.LENGTH_SHORT).show()
+                            return@Button
+                        }
+                        val cleanPhone = jobPhoneInput.filter { it.isDigit() }
+                        if (jobPhoneInput.isNotBlank() && cleanPhone.length < 9) {
+                            Toast.makeText(context, "يرجى إدخال رقم هاتف صحيح (9 أرقام على الأقل)", Toast.LENGTH_SHORT).show()
                             return@Button
                         }
                         val newJob = JobEntity(
@@ -431,9 +463,9 @@ fun AdminJobsPanel(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showAddJobDialog = false }) { Text("إلغاء", color = Color.Gray) }
+                TextButton(onClick = { showAddJobDialog = false }) { Text("إلغاء", color = themeColors.textSecondary) }
             },
-            containerColor = Color(0xFF1E293B)
+            containerColor = themeColors.surface
         )
     }
 }

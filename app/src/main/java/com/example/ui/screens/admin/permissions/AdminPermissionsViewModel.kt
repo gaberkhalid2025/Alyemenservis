@@ -33,8 +33,49 @@ class AdminPermissionsViewModel : ViewModel() {
 
     val allPermissions: List<AdminPermissionItem> = AdminPermissionsRegistry.allPermissions
 
+    private var savedRoleOverrides: Map<String, Set<String>> = emptyMap()
+
+    init {
+        loadSavedRolePermissions()
+    }
+
+    fun loadSavedRolePermissions() {
+        try {
+            com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                .collection("settings")
+                .document("admin_permissions_matrix")
+                .get()
+                .addOnSuccessListener { doc ->
+                    if (!doc.exists()) return@addOnSuccessListener
+                    val rolesRaw = doc.get("roles") as? Map<*, *> ?: return@addOnSuccessListener
+                    val parsed = mutableMapOf<String, Set<String>>()
+                    rolesRaw.forEach { (roleKey, value) ->
+                        val rName = roleKey?.toString()?.uppercase() ?: return@forEach
+                        val roleMap = value as? Map<*, *> ?: return@forEach
+                        val perms = (roleMap["activePermissions"] as? List<*>)
+                            ?.mapNotNull { it?.toString() }
+                            ?.toSet()
+                        if (perms != null) {
+                            parsed[rName] = perms
+                        }
+                    }
+                    savedRoleOverrides = parsed
+                    val currentOverride = parsed[_selectedRole.value.uppercase()]
+                    if (currentOverride != null) {
+                        _activePermissions.value = currentOverride
+                    }
+                }
+        } catch (_: Exception) {
+        }
+    }
+
     fun selectRole(roleKey: String) {
         _selectedRole.value = roleKey
+        val saved = savedRoleOverrides[roleKey.uppercase()]
+        if (saved != null) {
+            _activePermissions.value = saved
+            return
+        }
         _activePermissions.value = when (roleKey) {
             "OWNER" -> allPermissions.map { it.key }.toSet()
             "ADMIN" -> allPermissions.map { it.key }.toSet()

@@ -124,6 +124,9 @@ fun PropertyDashboard(
                             },
                             onDeleteProduct = { id ->
                                 propertyViewModel.deleteProperty(id)
+                            },
+                            onUpdateProduct = { updated ->
+                                propertyViewModel.updateProperty(updated)
                             }
                         )
                     }
@@ -131,10 +134,10 @@ fun PropertyDashboard(
                         TabBookingsOrders(
                             bookings = propertyRequests,
                             themeColors = themeColors,
-                            onAcceptBooking = { bId -> viewModel.updateBookingStatus(bId, "APPROVED") },
-                            onRejectBooking = { bId, reason -> viewModel.updateBookingStatus(bId, "REJECTED") },
-                            onStartProgress = { bId -> viewModel.updateBookingStatus(bId, "IN_PROGRESS") },
-                            onCompleteBooking = { bId -> viewModel.updateBookingStatus(bId, "COMPLETED") },
+                            onAcceptBooking = { bId -> viewModel.updateBookingStatus(bId, com.example.utils.BookingStatus.ACCEPTED.code) },
+                            onRejectBooking = { bId, _ -> viewModel.updateBookingStatus(bId, com.example.utils.BookingStatus.REJECTED.code) },
+                            onStartProgress = { bId -> viewModel.updateBookingStatus(bId, com.example.utils.BookingStatus.IN_PROGRESS.code) },
+                            onCompleteBooking = { bId -> viewModel.updateBookingStatus(bId, com.example.utils.BookingStatus.COMPLETED.code) },
                             onChatWithClient = { phone ->
                                 viewModel.openOrCreateChatChannel(
                                     targetId = account.id,
@@ -151,7 +154,7 @@ fun PropertyDashboard(
                             reviews = uiState.reviews,
                             themeColors = themeColors,
                             onReplySubmit = { revId, reply ->
-                                Toast.makeText(context, "تم الرد على تقييم المكتب بنجاح ✅", Toast.LENGTH_SHORT).show()
+                                propertyViewModel.replyToReview(revId, reply)
                             }
                         )
                     }
@@ -164,15 +167,15 @@ fun PropertyDashboard(
                             workingHours = account.workingHours,
                             photoUrl = account.logoImage,
                             coverUrl = account.coverImage,
-                            isAvailable = true,
+                            isAvailable = account.rawProperty?.isActive ?: true,
                             rating = account.rating.toDouble(),
                             reviewCount = account.numReviews,
                             themeColors = themeColors,
-                            onSaveProfile = { name, phone, city, desc, hours, available ->
-                                Toast.makeText(context, "تم تحديث بيانات المكتب العقاري ✅", Toast.LENGTH_SHORT).show()
+                            onSaveProfile = { name, _, city, desc, hours, available ->
+                                propertyViewModel.updateProfile(name, city, desc, hours, available)
                             },
                             onChangePassword = { oldP, newP ->
-                                Toast.makeText(context, "تم تغيير كلمة المرور بنجاح 🔑", Toast.LENGTH_SHORT).show()
+                                propertyViewModel.changePassword(oldP, newP)
                             }
                         )
                     }

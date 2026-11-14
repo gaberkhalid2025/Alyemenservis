@@ -98,7 +98,7 @@ fun AdminPermissionsMatrixListSection(
                                 Column {
                                     Text(
                                         text = "${category.arabicTitle} ($activeInCat / ${category.expectedCount})",
-                                        color = Color.White,
+                                        color = themeColors.textPrimary,
                                         fontSize = 12.sp,
                                         fontWeight = FontWeight.Bold,
                                         maxLines = 1,
@@ -203,7 +203,7 @@ fun AdminPermissionsMatrixListSection(
                                                     text = perm.name,
                                                     fontSize = 11.sp,
                                                     fontWeight = FontWeight.Bold,
-                                                    color = if (isPermActive) Color.White else Color.Gray
+                                                    color = if (isPermActive) themeColors.textPrimary else themeColors.textSecondary
                                                 )
                                             }
 
@@ -268,7 +268,7 @@ fun AdminPermissionsMatrixListSection(
                 ) {
                     Text(
                         text = "🔍 لم يتم العثور على صلاحيات مطابقة لمعايير البحث.",
-                        color = Color.LightGray,
+                        color = themeColors.textSecondary,
                         fontSize = 11.sp
                     )
                 }

@@ -145,16 +145,22 @@ fun TechnicianDashboard(
                     }
                     1 -> {
                         TabBookingsOrders(
-                            bookings = providerBookings.filter { it.status in listOf("APPROVED", "IN_PROGRESS") },
+                            bookings = providerBookings.filter {
+                                it.status in listOf(
+                                    com.example.utils.BookingStatus.ACCEPTED.code,
+                                    "APPROVED",
+                                    com.example.utils.BookingStatus.IN_PROGRESS.code
+                                )
+                            },
                             themeColors = themeColors,
-                            onAcceptBooking = { bId -> viewModel.updateBookingStatus(bId, "APPROVED") },
-                            onRejectBooking = { bId, reason -> viewModel.updateBookingStatus(bId, "REJECTED") },
+                            onAcceptBooking = { bId -> viewModel.updateBookingStatus(bId, com.example.utils.BookingStatus.ACCEPTED.code) },
+                            onRejectBooking = { bId, _ -> viewModel.updateBookingStatus(bId, com.example.utils.BookingStatus.REJECTED.code) },
                             onStartProgress = { bId ->
-                                viewModel.updateBookingStatus(bId, "IN_PROGRESS")
+                                viewModel.updateBookingStatus(bId, com.example.utils.BookingStatus.IN_PROGRESS.code)
                                 Toast.makeText(context, "تم بدء تنفيذ الخدمة ⚙️", Toast.LENGTH_SHORT).show()
                             },
                             onCompleteBooking = { bId ->
-                                viewModel.updateBookingStatus(bId, "COMPLETED")
+                                viewModel.updateBookingStatus(bId, com.example.utils.BookingStatus.COMPLETED.code)
                                 Toast.makeText(context, "تم إكمال الخدمة بنجاح 🏁", Toast.LENGTH_SHORT).show()
                             },
                             onChatWithClient = { phone ->
@@ -179,6 +185,9 @@ fun TechnicianDashboard(
                             },
                             onDeleteProduct = { id ->
                                 techViewModel.deleteProduct(id)
+                            },
+                            onUpdateProduct = { updated ->
+                                techViewModel.updateProduct(updated)
                             }
                         )
                     }
@@ -203,15 +212,35 @@ fun TechnicianDashboard(
                             workingHours = account.workingHours,
                             photoUrl = account.logoImage,
                             coverUrl = account.coverImage,
-                            isAvailable = true,
+                            isAvailable = account.rawProvider?.isAvailable ?: true,
                             rating = account.rating.toDouble(),
                             reviewCount = account.numReviews,
                             themeColors = themeColors,
-                            onSaveProfile = { name, phone, city, desc, hours, available ->
-                                Toast.makeText(context, "تم تحديث بيانات ملفك الشخصي ✅", Toast.LENGTH_SHORT).show()
+                            onChangePhoto = { url ->
+                                techViewModel.updateProfile(
+                                    name = account.name,
+                                    cityArea = account.neighborhood.ifBlank { account.cityId },
+                                    description = account.description,
+                                    workingHours = account.workingHours,
+                                    isAvailable = account.rawProvider?.isAvailable ?: true,
+                                    photoUrl = url
+                                )
+                            },
+                            onChangeCover = { url ->
+                                techViewModel.updateProfile(
+                                    name = account.name,
+                                    cityArea = account.neighborhood.ifBlank { account.cityId },
+                                    description = account.description,
+                                    workingHours = account.workingHours,
+                                    isAvailable = account.rawProvider?.isAvailable ?: true,
+                                    coverUrl = url
+                                )
+                            },
+                            onSaveProfile = { name, _, city, desc, hours, available ->
+                                techViewModel.updateProfile(name, city, desc, hours, available)
                             },
                             onChangePassword = { oldP, newP ->
-                                Toast.makeText(context, "تم تغيير كلمة المرور بنجاح 🔑", Toast.LENGTH_SHORT).show()
+                                techViewModel.changePassword(oldP, newP)
                             }
                         )
                     }

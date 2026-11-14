@@ -157,12 +157,17 @@ class JoinStatusUseCase {
             return JoinStatus.Rejected(matchingPending.reason.ifBlank { "تم رفض طلب الانضمام من قبل الإدارة لعدم استيفاء الشروط." })
         }
 
-        val rejectionNotif = notifications.find {
-            val cleanTarget = AppPreferenceHelper.normalizePhoneNumber(it.targetValue)
-            cleanTarget == cleanPhone && (it.title.contains("رفض") || it.message.contains("رفض"))
+        val targetNotifs = notifications.filter {
+            AppPreferenceHelper.normalizePhoneNumber(it.targetValue) == cleanPhone
         }
-        if (rejectionNotif != null) {
-            return JoinStatus.Rejected(rejectionNotif.message)
+        val latestRejection = targetNotifs
+            .filter { it.title.contains("رفض") || it.message.contains("رفض") }
+            .maxByOrNull { it.timestamp }
+        val latestApproval = targetNotifs
+            .filter { it.title.contains("موافقة") || it.title.contains("قبول") || it.title.contains("تفعيل") || it.message.contains("تمت الموافقة") }
+            .maxByOrNull { it.timestamp }
+        if (latestRejection != null && (latestApproval == null || latestRejection.timestamp >= latestApproval.timestamp)) {
+            return JoinStatus.Rejected(latestRejection.message)
         }
 
         // 8. Check Pending entities in collections
@@ -179,7 +184,7 @@ class JoinStatusUseCase {
             return JoinStatus.PendingProperty(matchingProperty)
         }
         val pendingJob = jobs.find {
-            AppPreferenceHelper.normalizePhoneNumber(it.phone) == cleanPhone && !it.isActive && !it.isApproved
+            AppPreferenceHelper.normalizePhoneNumber(it.phone) == cleanPhone && !it.isActive && !it.isApproved && !it.isDeleted
         }
         if (pendingJob != null) {
             return JoinStatus.PendingJob(pendingJob)

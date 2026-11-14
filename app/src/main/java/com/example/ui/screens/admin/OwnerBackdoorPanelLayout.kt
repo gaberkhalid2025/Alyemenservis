@@ -1326,6 +1326,7 @@ fun OwnerBackdoorPanelLayout(viewModel: MainViewModel, themeColors: VisualThemeP
 
         var showWipeConfirmDialog by remember { mutableStateOf(false) }
         var wipePasswordInput by remember { mutableStateOf("") }
+        var wipeDoubleConfirmed by remember { mutableStateOf(false) }
         var wipeErrorMsg by remember { mutableStateOf("") }
 
         if (showWipeConfirmDialog) {
@@ -1333,12 +1334,13 @@ fun OwnerBackdoorPanelLayout(viewModel: MainViewModel, themeColors: VisualThemeP
                 onDismissRequest = {
                     showWipeConfirmDialog = false
                     wipePasswordInput = ""
+                    wipeDoubleConfirmed = false
                     wipeErrorMsg = ""
                 },
                 title = { Text("🔒 إدخال كلمة المرور لتأكيد الحذف والمسح", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.Red) },
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("⚠️ تنبيه أمني: يتطلب حذف أو تطهير البيانات إدخال كلمة مرور الأدمن:", fontSize = 11.sp, color = Color.White)
+                        Text("⚠️ تنبيه أمني: يتطلب حذف أو تطهير البيانات إدخال كلمة مرور الأدمن وتأكيد الإجراء:", fontSize = 11.sp, color = Color.White)
                         OutlinedTextField(
                             value = wipePasswordInput,
                             onValueChange = {
@@ -1349,6 +1351,19 @@ fun OwnerBackdoorPanelLayout(viewModel: MainViewModel, themeColors: VisualThemeP
                             visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
                             modifier = Modifier.fillMaxWidth()
                         )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Checkbox(
+                                checked = wipeDoubleConfirmed,
+                                onCheckedChange = {
+                                    wipeDoubleConfirmed = it
+                                    wipeErrorMsg = ""
+                                }
+                            )
+                            Text("أؤكد مسؤوليتي الكاملة عن حذف البيانات التجريبية", fontSize = 10.5.sp, color = Color.LightGray)
+                        }
                         if (wipeErrorMsg.isNotEmpty()) {
                             Text(wipeErrorMsg, color = Color.Red, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         }
@@ -1357,10 +1372,13 @@ fun OwnerBackdoorPanelLayout(viewModel: MainViewModel, themeColors: VisualThemeP
                 confirmButton = {
                     Button(
                         onClick = {
-                            if (viewModel.verifyAdminOrOwnerPassword(wipePasswordInput)) {
+                            if (!wipeDoubleConfirmed) {
+                                wipeErrorMsg = "⚠️ يرجى تأكيد خانة الموافقة أولاً."
+                            } else if (viewModel.verifyAdminOrOwnerPassword(wipePasswordInput)) {
                                 viewModel.wipeAllMockAndTemporaryData()
                                 showWipeConfirmDialog = false
                                 wipePasswordInput = ""
+                                wipeDoubleConfirmed = false
                                 wipeErrorMsg = ""
                             } else {
                                 wipeErrorMsg = "❌ كلمة المرور غير صحيحة! تم منع التطهير والحذف."
@@ -1375,6 +1393,7 @@ fun OwnerBackdoorPanelLayout(viewModel: MainViewModel, themeColors: VisualThemeP
                     TextButton(onClick = {
                         showWipeConfirmDialog = false
                         wipePasswordInput = ""
+                        wipeDoubleConfirmed = false
                         wipeErrorMsg = ""
                     }) {
                         Text("إلغاء", color = Color.LightGray)

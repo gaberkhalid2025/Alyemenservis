@@ -54,20 +54,23 @@ fun OwnerDashboardScreen(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                IconButton(onClick = onBackClick) {
-                    Icon(Icons.Default.ArrowBack, contentDescription = "رجوع", tint = Color.White)
+                IconButton(
+                    onClick = onBackClick,
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    Icon(Icons.Default.ArrowBack, contentDescription = "رجوع", tint = themeColors.textPrimary)
                 }
                 Column {
                     Text(
                         text = account.name.ifBlank { "لوحة تحكم المالك" },
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White
+                        color = themeColors.textPrimary
                     )
                     Text(
                         text = "${account.businessType.icon} ${account.businessType.titleArabic} • ID: ${account.id.take(8)}",
                         fontSize = 10.sp,
-                        color = Color.LightGray
+                        color = themeColors.textSecondary
                     )
                 }
             }
@@ -87,16 +90,26 @@ fun OwnerDashboardScreen(
         }
 
         val allBookings by viewModel.bookings.collectAsState()
-        val myBookings = remember(allBookings, account) {
-            allBookings.filter { it.providerId == account.id || it.customerPhone == account.phone }
+        val normalizedAccountPhone = remember(account.phone) {
+            com.example.ui.helpers.AppPreferenceHelper.normalizePhoneNumber(account.phone)
         }
-        val visitorsCount = (myBookings.size * 3 + 12)
+        val myBookings = remember(allBookings, account, normalizedAccountPhone) {
+            allBookings.filter {
+                it.providerId == account.id ||
+                    (normalizedAccountPhone.isNotBlank() &&
+                        com.example.ui.helpers.AppPreferenceHelper.normalizePhoneNumber(it.providerPhone) == normalizedAccountPhone)
+            }
+        }
+        val visitorsCount = remember(myBookings) {
+            myBookings.mapNotNull { it.effectiveCustomerPhone.takeIf { p -> p.isNotBlank() } }.distinct().size
+        }
         val bookingsCount = myBookings.size
-        val ratingVal = if (account.rating > 0.0f) account.rating.toDouble() else 4.8
-        val ratingCount = account.numReviews.coerceAtLeast(myBookings.size)
-        val revenueYer = myBookings.filter { it.status == "COMPLETED" || it.status == "ACCEPTED" }
-            .sumOf { it.totalAmount }
-            .takeIf { it > 0.0 } ?: 0.0
+        val ratingVal = if (account.numReviews > 0) account.rating.toDouble() else 0.0
+        val ratingCount = account.numReviews
+        val revenueYer = myBookings.filter {
+            val st = it.status.uppercase()
+            st == "COMPLETED" || st == "ACCEPTED" || st == "APPROVED"
+        }.sumOf { if (it.totalAmount > 0.0) it.totalAmount else it.price }
 
         Column(
             modifier = Modifier
@@ -203,7 +216,7 @@ fun OwnerDashboardScreen(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("⚙️ خيارات الإدارة الشاملة:", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    Text("⚙️ خيارات الإدارة الشاملة:", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = themeColors.textPrimary)
 
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
                         Button(

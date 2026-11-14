@@ -17,8 +17,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
@@ -80,7 +80,7 @@ fun RegistrationField(
             if (!spokenText.isNullOrBlank()) {
                 onValueChange(if (value.isBlank()) spokenText else "$value $spokenText")
             }
-        } else {
+        } else if (result.resultCode != Activity.RESULT_CANCELED) {
             Toast.makeText(context, "لم يتم التقاط أي صوت، يرجى المحاولة ثانية", Toast.LENGTH_SHORT).show()
         }
     }
@@ -98,7 +98,7 @@ fun RegistrationField(
                 Row {
                     // 1. Clear Button
                     if (value.isNotEmpty() && !isPassword) {
-                        IconButton(onClick = { onValueChange("") }) {
+                        IconButton(onClick = { onValueChange("") }, modifier = Modifier.size(48.dp)) {
                             Icon(
                                 imageVector = Icons.Default.Clear,
                                 contentDescription = "مسح النص",
@@ -109,7 +109,7 @@ fun RegistrationField(
 
                     // 2. Password visibility toggle
                     if (isPassword) {
-                        IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                        IconButton(onClick = { passwordVisible = !passwordVisible }, modifier = Modifier.size(48.dp)) {
                             Icon(
                                 imageVector = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
                                 contentDescription = if (passwordVisible) "إخفاء كلمة المرور" else "عرض كلمة المرور",
@@ -120,23 +120,26 @@ fun RegistrationField(
 
                     // 3. Voice Input
                     if (enableVoiceInput && !isPassword) {
-                        IconButton(onClick = {
-                            try {
-                                val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                                    putExtra(
-                                        RecognizerIntent.EXTRA_LANGUAGE_MODEL,
-                                        RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
-                                    )
-                                    putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale("ar", "YE"))
-                                    putExtra(RecognizerIntent.EXTRA_PROMPT, "تحدث لإدخال $label...")
+                        IconButton(
+                            onClick = {
+                                try {
+                                    val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                                        putExtra(
+                                            RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                                            RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
+                                        )
+                                        putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale("ar", "YE"))
+                                        putExtra(RecognizerIntent.EXTRA_PROMPT, "تحدث لإدخال $label...")
+                                    }
+                                    speechLauncher.launch(intent)
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "خاصية التعرف الصوتي غير متوفرة على جهازك", Toast.LENGTH_SHORT).show()
                                 }
-                                speechLauncher.launch(intent)
-                            } catch (e: Exception) {
-                                Toast.makeText(context, "خاصية التعرف الصوتي غير متوفرة على جهازك", Toast.LENGTH_SHORT).show()
-                            }
-                        }) {
+                            },
+                            modifier = Modifier.size(48.dp)
+                        ) {
                             Icon(
-                                imageVector = Icons.Default.Edit,
+                                imageVector = Icons.Default.Mic,
                                 contentDescription = "إدخال صوتي",
                                 tint = themeColors.accent
                             )

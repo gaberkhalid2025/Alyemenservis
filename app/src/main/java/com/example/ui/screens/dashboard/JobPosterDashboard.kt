@@ -198,15 +198,15 @@ fun JobPosterDashboard(
                             workingHours = account.workingHours,
                             photoUrl = account.logoImage,
                             coverUrl = account.coverImage,
-                            isAvailable = true,
+                            isAvailable = account.isActive,
                             rating = account.rating.toDouble(),
                             reviewCount = account.numReviews,
                             themeColors = themeColors,
-                            onSaveProfile = { name, phone, city, desc, hours, available ->
-                                Toast.makeText(context, "تم حفظ بيانات المعلن بنجاح ✅", Toast.LENGTH_SHORT).show()
+                            onSaveProfile = { name, _, city, desc, hours, available ->
+                                jobViewModel.updateProfile(name, city, desc, hours, available)
                             },
                             onChangePassword = { oldP, newP ->
-                                Toast.makeText(context, "تم تغيير كلمة المرور بنجاح 🔑", Toast.LENGTH_SHORT).show()
+                                jobViewModel.changePassword(oldP, newP)
                             }
                         )
                     }

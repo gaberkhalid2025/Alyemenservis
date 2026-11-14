@@ -17,13 +17,12 @@ import androidx.compose.ui.unit.sp
 import com.example.utils.VisualThemePalette
 import com.example.domain.entities.ReviewUiModel
 
-import java.util.UUID
-
 @Composable
 fun AdvancedReviewsManagementCard(
     reviews: List<ReviewUiModel> = emptyList(),
     themeColors: VisualThemePalette,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onSubmitReply: (reviewId: String, reply: String) -> Unit = { _, _ -> }
 ) {
     var displayReviews by remember(reviews) {
         mutableStateOf(reviews)
@@ -39,8 +38,8 @@ fun AdvancedReviewsManagementCard(
             Spacer(modifier = Modifier.height(8.dp))
 
             LazyColumn(modifier = Modifier.height(200.dp).fillMaxWidth()) {
-                items(displayReviews) { review ->
-                    var replyInput by remember { mutableStateOf(review.replyText) }
+                items(displayReviews, key = { it.id }) { review ->
+                    var replyInput by remember(review.id, review.replyText) { mutableStateOf(review.replyText) }
                     Card(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
@@ -68,8 +67,15 @@ fun AdvancedReviewsManagementCard(
                                     )
                                     Button(
                                         onClick = {
-                                            displayReviews = displayReviews.map { if (it.id == review.id) it.copy(replyText = replyInput) else it }
+                                            val cleanReply = replyInput.trim()
+                                            if (cleanReply.isNotBlank()) {
+                                                onSubmitReply(review.id, cleanReply)
+                                                displayReviews = displayReviews.map {
+                                                    if (it.id == review.id) it.copy(replyText = cleanReply) else it
+                                                }
+                                            }
                                         },
+                                        enabled = replyInput.isNotBlank(),
                                         colors = ButtonDefaults.buttonColors(containerColor = themeColors.primary),
                                         modifier = Modifier.height(48.dp)
                                     ) {

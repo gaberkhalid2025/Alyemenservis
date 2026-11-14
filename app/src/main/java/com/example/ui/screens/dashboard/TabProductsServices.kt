@@ -4,12 +4,14 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.domain.entities.ProductItemEntity
@@ -25,10 +27,12 @@ fun TabProductsServices(
     addButtonLabel: String = "إضافة جديد ➕",
     themeColors: VisualThemePalette,
     onAddProduct: (title: String, priceYer: Double, description: String, imageUrl: String) -> Unit,
-    onDeleteProduct: (id: String) -> Unit
+    onDeleteProduct: (id: String) -> Unit,
+    onUpdateProduct: ((ProductItemEntity) -> Unit)? = null
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     var showAddDialog by remember { mutableStateOf(false) }
+    var editingItem by remember { mutableStateOf<ProductItemEntity?>(null) }
     var itemToDelete by remember { mutableStateOf<ProductItemEntity?>(null) }
     var titleInput by remember { mutableStateOf("") }
     var subCategoryInput by remember { mutableStateOf("") }
@@ -52,7 +56,18 @@ fun TabProductsServices(
         ) {
             Text(text = "$titleLabel (${products.size})", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = themeColors.textPrimary)
             Button(
-                onClick = { showAddDialog = true },
+                onClick = {
+                    editingItem = null
+                    titleInput = ""
+                    subCategoryInput = ""
+                    priceInput = ""
+                    descInput = ""
+                    imageInput = ""
+                    isAvailableInput = true
+                    isOfferInput = false
+                    discountInput = ""
+                    showAddDialog = true
+                },
                 colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
                 shape = RoundedCornerShape(8.dp)
             ) {
@@ -83,15 +98,36 @@ fun TabProductsServices(
                         isAvailable = item.isAvailable,
                         isOffer = false,
                         themeColors = themeColors,
-                        onEditClick = { /* Edit */ },
+                        onEditClick = {
+                            editingItem = item
+                            titleInput = item.title
+                            subCategoryInput = ""
+                            priceInput = if (item.priceYer > 0.0) item.priceYer.toInt().toString() else ""
+                            descInput = item.description
+                            imageInput = item.imageUrl
+                            isAvailableInput = item.isAvailable
+                            showAddDialog = true
+                        },
                         onDeleteClick = { itemToDelete = item },
                         onToggleAvailability = { newStatus ->
-                            // تحديث حالة التوفر
-                            android.widget.Toast.makeText(context, if (newStatus) "تم تعيين السلعة: متوفر بالمخزون ✓" else "تم تعيين السلعة: نفد من المخزون ✕", android.widget.Toast.LENGTH_SHORT).show()
+                            if (onUpdateProduct != null) {
+                                onUpdateProduct(item.copy(isAvailable = newStatus))
+                            } else {
+                                android.widget.Toast.makeText(
+                                    context,
+                                    if (newStatus) "تم تعيين السلعة: متوفر بالمخزون ✓" else "تم تعيين السلعة: نفد من المخزون ✕",
+                                    android.widget.Toast.LENGTH_SHORT
+                                ).show()
+                            }
                         },
                         onQuickPriceUpdate = { newPrice ->
-                            onAddProduct(item.title, newPrice, item.description, item.imageUrl)
-                            android.widget.Toast.makeText(context, "تم تحديث السعر إلى $newPrice ريال بنجاح 💾", android.widget.Toast.LENGTH_SHORT).show()
+                            if (newPrice <= 0.0) {
+                                android.widget.Toast.makeText(context, "يرجى إدخال سعر صحيح أكبر من صفر", android.widget.Toast.LENGTH_SHORT).show()
+                            } else if (onUpdateProduct != null) {
+                                onUpdateProduct(item.copy(priceYer = newPrice))
+                            } else {
+                                onAddProduct(item.title, newPrice, item.description, item.imageUrl)
+                            }
                         }
                     )
                 }
@@ -133,8 +169,17 @@ fun TabProductsServices(
 
     if (showAddDialog) {
         AlertDialog(
-            onDismissRequest = { showAddDialog = false },
-            title = { Text("إضافة سلعة جديدة للقائمة 🛍️", fontSize = 14.sp, fontWeight = FontWeight.Bold) },
+            onDismissRequest = {
+                showAddDialog = false
+                editingItem = null
+            },
+            title = {
+                Text(
+                    if (editingItem == null) "إضافة عنصر جديد للقائمة 🛍️" else "تعديل بيانات: ${editingItem?.title} ✏️",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            },
             text = {
                 Column(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -156,6 +201,7 @@ fun TabProductsServices(
                         value = priceInput,
                         onValueChange = { priceInput = it },
                         label = { Text("السعر (بالريال اليمني)") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.fillMaxWidth()
                     )
                     OutlinedTextField(
@@ -201,6 +247,7 @@ fun TabProductsServices(
                             value = discountInput,
                             onValueChange = { discountInput = it },
                             label = { Text("نسبة الخصم % (مثال: 15)") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             modifier = Modifier.fillMaxWidth()
                         )
                     }
@@ -218,30 +265,52 @@ fun TabProductsServices(
             confirmButton = {
                 Button(
                     onClick = {
-                        val p = priceInput.toDoubleOrNull() ?: 0.0
-                        if (titleInput.isNotBlank()) {
+                        val p = priceInput.trim().toDoubleOrNull()
+                        val disc = discountInput.trim().toIntOrNull()
+                        if (titleInput.isBlank()) {
+                            android.widget.Toast.makeText(context, "يرجى إدخال اسم أو عنوان العنصر أولاً", android.widget.Toast.LENGTH_SHORT).show()
+                        } else if (p == null || p <= 0.0) {
+                            android.widget.Toast.makeText(context, "يرجى إدخال سعر رقمي صحيح أكبر من الصفر", android.widget.Toast.LENGTH_SHORT).show()
+                        } else if (isOfferInput && (disc == null || disc !in 1..99)) {
+                            android.widget.Toast.makeText(context, "نسبة الخصم يجب أن تكون بين 1 و 99%", android.widget.Toast.LENGTH_SHORT).show()
+                        } else {
                             val finalDesc = listOfNotNull(
                                 subCategoryInput.takeIf { it.isNotBlank() }?.let { "[$it]" },
                                 descInput.takeIf { it.isNotBlank() }
                             ).joinToString(" ")
-                            onAddProduct(titleInput.trim(), p, finalDesc.trim(), imageInput.trim())
+                            val targetEdit = editingItem
+                            if (targetEdit != null && onUpdateProduct != null) {
+                                onUpdateProduct(
+                                    targetEdit.copy(
+                                        title = titleInput.trim(),
+                                        priceYer = p,
+                                        description = finalDesc.trim(),
+                                        imageUrl = imageInput.trim(),
+                                        isAvailable = isAvailableInput
+                                    )
+                                )
+                            } else {
+                                onAddProduct(titleInput.trim(), p, finalDesc.trim(), imageInput.trim())
+                            }
+                            editingItem = null
                             titleInput = ""
                             subCategoryInput = ""
                             priceInput = ""
                             descInput = ""
                             imageInput = ""
                             showAddDialog = false
-                        } else {
-                            android.widget.Toast.makeText(context, "يرجى إدخال اسم أو عنوان العنصر أولاً", android.widget.Toast.LENGTH_SHORT).show()
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent)
                 ) {
-                    Text("حفظ السلعة 💾", color = Color.Black, fontWeight = FontWeight.Bold)
+                    Text(if (editingItem == null) "حفظ السلعة 💾" else "حفظ التعديلات 💾", color = Color.Black, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showAddDialog = false }) {
+                TextButton(onClick = {
+                    showAddDialog = false
+                    editingItem = null
+                }) {
                     Text("إلغاء")
                 }
             }

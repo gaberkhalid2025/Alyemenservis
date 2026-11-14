@@ -11,7 +11,8 @@ data class CouponEntity(
     val status: String = "ACTIVE",
     val discountPercentage: Int = 0, // percentage discount (e.g. 15 for 15%)
     val maxUsageCount: Int = 100,
-    val usedCount: Int = 0
+    val usedCount: Int = 0,
+    val storeId: String = ""
 ) {
     fun isValidCoupon(nowMillis: Long = System.currentTimeMillis()): Boolean {
         val active = status.equals("ACTIVE", ignoreCase = true)

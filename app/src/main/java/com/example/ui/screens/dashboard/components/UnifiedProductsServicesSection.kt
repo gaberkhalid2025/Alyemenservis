@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -15,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.components.SmartAsyncImage
@@ -157,13 +159,13 @@ fun UnifiedProductsServicesSection(
 
             Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                 if (onEditClick != null) {
-                    IconButton(onClick = onEditClick, modifier = Modifier.size(32.dp)) {
-                        Icon(Icons.Default.Edit, contentDescription = "تعديل", tint = Color.LightGray, modifier = Modifier.size(16.dp))
+                    IconButton(onClick = onEditClick, modifier = Modifier.size(48.dp)) {
+                        Icon(Icons.Default.Edit, contentDescription = "تعديل", tint = Color.LightGray, modifier = Modifier.size(18.dp))
                     }
                 }
                 if (onDeleteClick != null) {
-                    IconButton(onClick = onDeleteClick, modifier = Modifier.size(32.dp)) {
-                        Icon(Icons.Default.Delete, contentDescription = "حذف", tint = Color(0xFFEF4444), modifier = Modifier.size(16.dp))
+                    IconButton(onClick = onDeleteClick, modifier = Modifier.size(48.dp)) {
+                        Icon(Icons.Default.Delete, contentDescription = "حذف", tint = Color(0xFFEF4444), modifier = Modifier.size(18.dp))
                     }
                 }
             }
@@ -193,6 +195,7 @@ fun UnifiedProductsServicesSection(
                         value = editPriceInput,
                         onValueChange = { editPriceInput = it },
                         label = { Text("السعر (ريال يمني)") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -200,10 +203,13 @@ fun UnifiedProductsServicesSection(
             confirmButton = {
                 Button(
                     onClick = {
-                        val newP = editPriceInput.toDoubleOrNull() ?: 0.0
-                        onQuickPriceUpdate?.invoke(newP)
-                        showQuickPriceDialog = false
+                        val newP = editPriceInput.trim().toDoubleOrNull()
+                        if (newP != null && newP > 0.0) {
+                            onQuickPriceUpdate?.invoke(newP)
+                            showQuickPriceDialog = false
+                        }
                     },
+                    enabled = (editPriceInput.trim().toDoubleOrNull() ?: 0.0) > 0.0,
                     colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent)
                 ) {
                     Text("حفظ السعر 💾", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 11.sp)

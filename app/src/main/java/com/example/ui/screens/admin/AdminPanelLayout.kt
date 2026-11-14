@@ -1713,7 +1713,7 @@ private fun AdminPanelLayoutContent(viewModel: MainViewModel, themeColors: Visua
                                     name = prop.title,
                                     phone = prop.phone,
                                     category = "عقار",
-                                    password = "1234",
+                                    password = "",
                                     onResetPassword = { newPass ->
                                         viewModel.resetAccountPassword("STORE", prop.phone, newPass)
                                         Toast.makeText(context, "🔐 تم تحديث كلمة المرور لـ ${prop.title}", Toast.LENGTH_SHORT).show()
@@ -1732,7 +1732,7 @@ private fun AdminPanelLayoutContent(viewModel: MainViewModel, themeColors: Visua
                                     name = job.title,
                                     phone = job.phone,
                                     category = "وظيفة",
-                                    password = "1234",
+                                    password = "",
                                     onResetPassword = { newPass ->
                                         viewModel.resetAccountPassword("JOB", job.phone, newPass)
                                         Toast.makeText(context, "🔐 تم تحديث كلمة المرور لـ ${job.title}", Toast.LENGTH_SHORT).show()
@@ -8340,7 +8340,7 @@ fun PasswordEntityCard(
     onResetPassword: (String) -> Unit,
     context: android.content.Context
 ) {
-    var editPass by remember { mutableStateOf(password ?: "") }
+    var editPass by remember(phone) { mutableStateOf("") }
     var showPass by remember { mutableStateOf(false) }
 
     Card(
@@ -8371,6 +8371,16 @@ fun PasswordEntityCard(
                     onValueChange = { editPass = it },
                     label = { Text("كلمة مرور جديدة", fontSize = 9.sp) },
                     singleLine = true,
+                    visualTransformation = if (showPass) androidx.compose.ui.text.input.VisualTransformation.None else androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                    trailingIcon = {
+                        IconButton(onClick = { showPass = !showPass }) {
+                            Icon(
+                                imageVector = if (showPass) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                contentDescription = if (showPass) "إخفاء" else "إظهار",
+                                tint = Color.LightGray
+                            )
+                        }
+                    },
                     modifier = Modifier.weight(1f),
                     colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
                 )
@@ -8378,6 +8388,7 @@ fun PasswordEntityCard(
                     onClick = {
                         if (editPass.isNotBlank()) {
                             onResetPassword(editPass)
+                            editPass = ""
                         } else {
                             Toast.makeText(context, "الرجاء إدخال كلمة المرور الجديدة", Toast.LENGTH_SHORT).show()
                         }

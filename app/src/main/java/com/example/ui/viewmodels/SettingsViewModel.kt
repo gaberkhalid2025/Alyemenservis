@@ -659,15 +659,151 @@ fun endVoiceCall() {
     }
 
 fun exportComplaintsToCSV() {
-        mainViewModel.triggerNotification("📁 تم تصدير البلاغات بصيغة CSV")
+        val ctx = appContext
+        val reportsList = appState.reports.value
+        if (ctx == null) {
+            mainViewModel.triggerNotification("❌ تعذر الوصول إلى سياق التطبيق للتصدير")
+            return
+        }
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val exportDir = java.io.File(ctx.cacheDir, "exports").apply { mkdirs() }
+                val ts = com.example.utils.DateFormatter.formatCustom(System.currentTimeMillis(), "yyyyMMdd_HHmmss")
+                val file = java.io.File(exportDir, "Complaints_Report_$ts.csv")
+                fun esc(v: Any?): String {
+                    var s = v?.toString().orEmpty().replace("\"", "\"\"")
+                    if (s.isNotEmpty() && s[0] in charArrayOf('=', '+', '-', '@', '\t', '\r')) s = "'$s"
+                    return "\"$s\""
+                }
+                file.bufferedWriter(Charsets.UTF_8).use { writer ->
+                    writer.write("\uFEFF")
+                    writer.write(listOf(esc("المعرف"), esc("المرسل"), esc("الهاتف"), esc("النوع"), esc("التفاصيل"), esc("الحالة"), esc("التاريخ")).joinToString(",") + "\n")
+                    reportsList.forEach { r ->
+                        writer.write(
+                            listOf(
+                                esc(r.id), esc(r.reporterName), esc(r.reporterPhone),
+                                esc(r.targetType.ifBlank { r.reason }),
+                                esc(r.explanation.ifBlank { r.content }.ifBlank { r.reason }),
+                                esc(r.status),
+                                esc(com.example.utils.DateFormatter.formatDateTime(r.timestamp))
+                            ).joinToString(",") + "\n"
+                        )
+                    }
+                }
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    com.example.utils.ReportExporter.shareExportedFile(ctx, file, "تقرير البلاغات والشكاوى (CSV)")
+                    mainViewModel.triggerNotification("📁 تم تصدير ${reportsList.size} بلاغاً بصيغة CSV")
+                }
+            } catch (e: Exception) {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    mainViewModel.triggerNotification("❌ فشل تصدير ملف CSV: ${e.localizedMessage ?: "خطأ"}")
+                }
+            }
+        }
     }
 
 fun exportComplaintsToPDF() {
-        mainViewModel.triggerNotification("📃 تم تصدير البلاغات بصيغة PDF")
+        val ctx = appContext
+        val reportsList = appState.reports.value
+        if (ctx == null) {
+            mainViewModel.triggerNotification("❌ تعذر الوصول إلى سياق التطبيق للتصدير")
+            return
+        }
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val exportDir = java.io.File(ctx.cacheDir, "exports").apply { mkdirs() }
+                val ts = com.example.utils.DateFormatter.formatCustom(System.currentTimeMillis(), "yyyyMMdd_HHmmss")
+                val file = java.io.File(exportDir, "Complaints_Report_$ts.pdf")
+                val pdfDoc = android.graphics.pdf.PdfDocument()
+                val titlePaint = android.graphics.Paint().apply { textSize = 15f; isFakeBoldText = true; color = android.graphics.Color.BLACK }
+                val bodyPaint = android.graphics.Paint().apply { textSize = 11f; color = android.graphics.Color.DKGRAY }
+                val itemsPerPage = 18
+                val chunks = if (reportsList.isEmpty()) listOf(emptyList()) else reportsList.chunked(itemsPerPage)
+                chunks.forEachIndexed { pageIdx, chunk ->
+                    val page = pdfDoc.startPage(android.graphics.pdf.PdfDocument.PageInfo.Builder(595, 842, pageIdx + 1).create())
+                    val canvas = page.canvas
+                    var y = 50f
+                    canvas.drawText("تقرير البلاغات والشكاوى - صفحة ${pageIdx + 1}", 40f, y, titlePaint)
+                    y += 28f
+                    if (chunk.isEmpty()) {
+                        canvas.drawText("لا توجد بلاغات مسجلة حالياً.", 40f, y, bodyPaint)
+                    } else {
+                        chunk.forEachIndexed { idx, r ->
+                            val detailsText = r.explanation.ifBlank { r.content }.ifBlank { r.reason }.take(65)
+                            val typeLabel = r.targetType.ifBlank { r.reason }
+                            val line = "${pageIdx * itemsPerPage + idx + 1}. [${r.status}] $typeLabel - ${r.reporterName} (${r.reporterPhone}): $detailsText"
+                            canvas.drawText(line, 40f, y, bodyPaint)
+                            y += 36f
+                        }
+                    }
+                    pdfDoc.finishPage(page)
+                }
+                file.outputStream().use { pdfDoc.writeTo(it) }
+                pdfDoc.close()
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    val uri = androidx.core.content.FileProvider.getUriForFile(ctx, "${ctx.packageName}.fileprovider", file)
+                    val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                        type = "application/pdf"
+                        putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                        putExtra(android.content.Intent.EXTRA_SUBJECT, "تقرير البلاغات والشكاوى (PDF)")
+                        addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    ctx.startActivity(android.content.Intent.createChooser(intent, "مشاركة تقرير البلاغات PDF").addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+                    mainViewModel.triggerNotification("📃 تم إنشاء ومشاركة تقرير البلاغات PDF")
+                }
+            } catch (e: Exception) {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    mainViewModel.triggerNotification("❌ فشل تصدير PDF: ${e.localizedMessage ?: "خطأ"}")
+                }
+            }
+        }
     }
 
 fun exportPerformanceReportToPDF() {
-        mainViewModel.triggerNotification("📊 تم تصدير تقرير أداء شبكة الفنيين والمنصة بصيغة PDF بنجاح!")
+        val ctx = appContext
+        if (ctx == null) {
+            mainViewModel.triggerNotification("❌ تعذر الوصول إلى سياق التطبيق للتصدير")
+            return
+        }
+        val provCount = mainViewModel.homeViewModel._providers.value.size
+        val storeCount = mainViewModel.adminViewModel._stores.value.size
+        val bookingList = mainViewModel.bookingViewModel._bookings.value
+        val completedCount = bookingList.count { it.status == "COMPLETED" }
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val exportDir = java.io.File(ctx.cacheDir, "exports").apply { mkdirs() }
+                val ts = com.example.utils.DateFormatter.formatCustom(System.currentTimeMillis(), "yyyyMMdd_HHmmss")
+                val file = java.io.File(exportDir, "Performance_Report_$ts.pdf")
+                val pdfDoc = android.graphics.pdf.PdfDocument()
+                val titlePaint = android.graphics.Paint().apply { textSize = 16f; isFakeBoldText = true; color = android.graphics.Color.BLACK }
+                val bodyPaint = android.graphics.Paint().apply { textSize = 12f; color = android.graphics.Color.DKGRAY }
+                val page = pdfDoc.startPage(android.graphics.pdf.PdfDocument.PageInfo.Builder(595, 842, 1).create())
+                val canvas = page.canvas
+                canvas.drawText("تقرير أداء شبكة الفنيين والمنصة - دليل خدمات اليمن", 40f, 55f, titlePaint)
+                canvas.drawText("التاريخ: ${com.example.utils.DateFormatter.formatDateTime(System.currentTimeMillis())}", 40f, 85f, bodyPaint)
+                canvas.drawText("إجمالي مقدمي الخدمات: $provCount", 40f, 120f, bodyPaint)
+                canvas.drawText("إجمالي المتاجر والمنشآت: $storeCount", 40f, 150f, bodyPaint)
+                canvas.drawText("إجمالي الحجوزات: ${bookingList.size} | المكتملة: $completedCount", 40f, 180f, bodyPaint)
+                pdfDoc.finishPage(page)
+                file.outputStream().use { pdfDoc.writeTo(it) }
+                pdfDoc.close()
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    val uri = androidx.core.content.FileProvider.getUriForFile(ctx, "${ctx.packageName}.fileprovider", file)
+                    val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                        type = "application/pdf"
+                        putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                        putExtra(android.content.Intent.EXTRA_SUBJECT, "تقرير أداء المنصة PDF")
+                        addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    ctx.startActivity(android.content.Intent.createChooser(intent, "مشاركة تقرير الأداء PDF").addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+                    mainViewModel.triggerNotification("📊 تم إنشاء ومشاركة تقرير أداء المنصة PDF")
+                }
+            } catch (e: Exception) {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    mainViewModel.triggerNotification("❌ فشل تصدير تقرير الأداء: ${e.localizedMessage ?: "خطأ"}")
+                }
+            }
+        }
     }
 
 fun createSystemBackup(onComplete: (Boolean, String) -> Unit) {
@@ -961,15 +1097,25 @@ fun setSecondaryFirebaseConfig(projectId: String, apiKey: String, appId: String,
         mainViewModel.triggerNotification(if (isEnabled) "🟢 تم تفعيل المزامنة المزدوجة مع حساب Firebase الثانوي بنجاح!" else "🔴 تم إيقاف المزامنة مع الحساب الثانوي")
     }
 
-fun saveCustomPermissionsMatrixToFirestore(permissions: List<String>) {
+fun saveCustomPermissionsMatrixToFirestore(permissions: List<String>, role: String = "ADMIN") {
+        val cleanRole = role.trim().uppercase().ifBlank { "ADMIN" }
         val payload = mapOf(
+            "roles" to mapOf(
+                cleanRole to mapOf(
+                    "activePermissions" to permissions,
+                    "totalCount" to permissions.size,
+                    "updatedAt" to System.currentTimeMillis()
+                )
+            ),
+            "lastUpdatedRole" to cleanRole,
             "activePermissions" to permissions,
             "totalCount" to permissions.size,
             "updatedAt" to System.currentTimeMillis()
         )
-        db.collection("settings").document("admin_permissions_matrix").set(payload)
+        db.collection("settings").document("admin_permissions_matrix")
+            .set(payload, SetOptions.merge())
             .addOnSuccessListener {
-                mainViewModel.triggerNotification("💾 تم حفظ وتحديث مصفوفة الصلاحيات (${permissions.size} / 538) في قاعدة بيانات Firestore بنجاح!")
+                mainViewModel.triggerNotification("💾 تم حفظ وتحديث مصفوفة الصلاحيات للدور $cleanRole (${permissions.size} / 538) في قاعدة بيانات Firestore بنجاح!")
             }
             .addOnFailureListener {
                 mainViewModel.triggerNotification("❌ تعذر حفظ مصفوفة الصلاحيات في Firestore: ${it.localizedMessage}")
@@ -1344,7 +1490,15 @@ fun wipeAllMockAndTemporaryData() {
                         }
                     }
                 }
-                mainViewModel.triggerNotification("🧹 تم تنظيف البيانات التجريبية والوهمية فقط مع الحفاظ الكامل على جميع بيانات وفنيي الإنتاج!")
+                db.collection("admin_audit_logs").add(
+                    mapOf(
+                        "action" to "WIPE_MOCK_DATA",
+                        "performedBy" to mainViewModel.adminViewModel.adminRole.value,
+                        "details" to "تنظيف البيانات التجريبية والوهمية",
+                        "timestamp" to System.currentTimeMillis()
+                    )
+                )
+                mainViewModel.triggerNotification("🧹 تم تنظيف البيانات التجريبية والوهمية فقط مع تسجيل العملية في سجل التدقيق!")
             } catch (e: Exception) {
                 android.util.Log.e("SettingsViewModel", "Error wiping mock data", e)
                 mainViewModel.triggerNotification("❌ حدث خطأ أثناء عملية التنظيف")

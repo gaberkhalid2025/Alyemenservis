@@ -23,11 +23,21 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import coil.compose.AsyncImage
+import com.example.data.BusinessType
 import com.example.data.UnifiedBusinessAccount
+import com.example.data.repositories.GalleryRepositoryImpl
+import com.example.domain.entities.GalleryAlbumEntity
 import com.example.rememberBase64Bitmap
 import com.example.ui.MainViewModel
+import com.example.utils.AppConstants
+import com.example.utils.FirebaseStorageUploader
 import com.example.utils.VisualThemePalette
+import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.launch
 
 data class GalleryImageItem(
     val id: String,
@@ -42,14 +52,75 @@ fun GalleryManagementScreen(
     themeColors: VisualThemePalette
 ) {
     val context = LocalContext.current
-    var showAddImageDialog by remember { mutableStateOf(false) }
+    val appContext = context.applicationContext
+    val coroutineScope = rememberCoroutineScope()
+    val galleryRepository = remember(appContext) { GalleryRepositoryImpl(appContext) }
+    val firestore = remember { FirebaseFirestore.getInstance() }
 
-    var galleryList by remember {
-        mutableStateOf(
-            listOf(
-                GalleryImageItem("1", account.coverImage.ifBlank { account.logoImage }, isPrimary = true)
-            ).filter { it.urlOrBase64.isNotBlank() }
-        )
+    var showAddImageDialog by remember { mutableStateOf(false) }
+    var isUploading by remember { mutableStateOf(false) }
+    var primaryUrl by remember(account.coverImage, account.logoImage) {
+        mutableStateOf(account.coverImage.ifBlank { account.logoImage })
+    }
+    val remoteAlbums by galleryRepository.getOwnerGallery(account.id).collectAsState(initial = emptyList())
+
+    val galleryList = remember(remoteAlbums, primaryUrl) {
+        val items = mutableListOf<GalleryImageItem>()
+        if (primaryUrl.isNotBlank()) {
+            items.add(GalleryImageItem("primary_cover", primaryUrl, isPrimary = true))
+        }
+        remoteAlbums.forEach { album ->
+            album.imageUrls.filter { it.isNotBlank() && it != primaryUrl }.forEachIndexed { idx, url ->
+                items.add(
+                    GalleryImageItem(
+                        id = if (idx == 0) album.id else "${album.id}_$idx",
+                        urlOrBase64 = url,
+                        isPrimary = false
+                    )
+                )
+            }
+        }
+        items
+    }
+
+    val ownerCollection = remember(account.businessType) {
+        when (account.businessType) {
+            BusinessType.TECHNICIAN -> AppConstants.COL_PROVIDERS
+            BusinessType.REAL_ESTATE -> AppConstants.COL_PROPERTIES
+            BusinessType.JOB_POSTER -> AppConstants.COL_JOBS
+            else -> AppConstants.COL_STORES
+        }
+    }
+
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) {
+            coroutineScope.launch {
+                isUploading = true
+                val uploadRes = FirebaseStorageUploader.uploadImageUri(
+                    context = appContext,
+                    uri = uri,
+                    storagePath = "galleries/${account.id}/${System.currentTimeMillis()}.webp"
+                )
+                uploadRes.onSuccess { downloadUrl ->
+                    val album = GalleryAlbumEntity(
+                        id = java.util.UUID.randomUUID().toString(),
+                        ownerId = account.id,
+                        title = "صورة معرض",
+                        imageUrls = listOf(downloadUrl)
+                    )
+                    galleryRepository.saveGalleryAlbum(album).onSuccess {
+                        Toast.makeText(context, "تم رفع وحفظ الصورة في المعرض ✅", Toast.LENGTH_SHORT).show()
+                    }.onFailure { err ->
+                        Toast.makeText(context, "فشل حفظ سجل الصورة: ${err.localizedMessage}", Toast.LENGTH_SHORT).show()
+                    }
+                }.onFailure { err ->
+                    Toast.makeText(context, "فشل رفع الصورة: ${err.localizedMessage}", Toast.LENGTH_SHORT).show()
+                }
+                isUploading = false
+            }
+        }
     }
 
     Scaffold(
@@ -111,14 +182,34 @@ fun GalleryManagementScreen(
                             item = item,
                             themeColors = themeColors,
                             onSetPrimary = {
-                                galleryList = galleryList.map {
-                                    it.copy(isPrimary = it.id == item.id)
-                                }
-                                Toast.makeText(context, "تم تعيين الصورة كصورة غلاف رئيسية", Toast.LENGTH_SHORT).show()
+                                firestore.collection(ownerCollection).document(account.id)
+                                    .update("coverImage", item.urlOrBase64)
+                                    .addOnSuccessListener {
+                                        primaryUrl = item.urlOrBase64
+                                        Toast.makeText(context, "تم تعيين وحفظ الصورة كغلاف رئيسي ✅", Toast.LENGTH_SHORT).show()
+                                    }
+                                    .addOnFailureListener { e ->
+                                        Toast.makeText(context, "تعذر تحديث الغلاف: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                                    }
                             },
                             onDelete = {
-                                galleryList = galleryList.filter { it.id != item.id }
-                                Toast.makeText(context, "تم حذف الصورة من المعرض", Toast.LENGTH_SHORT).show()
+                                coroutineScope.launch {
+                                    if (item.id == "primary_cover") {
+                                        firestore.collection(ownerCollection).document(account.id)
+                                            .update("coverImage", "")
+                                            .addOnSuccessListener {
+                                                primaryUrl = ""
+                                                Toast.makeText(context, "تم حذف الغلاف الرئيسي 🗑️", Toast.LENGTH_SHORT).show()
+                                            }
+                                    } else {
+                                        val albumId = item.id.substringBefore("_")
+                                        galleryRepository.deleteGalleryAlbum(albumId).onSuccess {
+                                            Toast.makeText(context, "تم حذف الصورة من المعرض 🗑️", Toast.LENGTH_SHORT).show()
+                                        }.onFailure { e ->
+                                            Toast.makeText(context, "فشل الحذف: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                }
                             }
                         )
                     }
@@ -133,30 +224,53 @@ fun GalleryManagementScreen(
             onDismissRequest = { showAddImageDialog = false },
             title = { Text("رفع / إضافة صورة جديدة للمعرض", fontSize = 14.sp, fontWeight = FontWeight.Bold) },
             text = {
-                OutlinedTextField(
-                    value = imageUrlInput,
-                    onValueChange = { imageUrlInput = it },
-                    label = { Text("رابط الصورة أو كود Base64") },
-                    modifier = Modifier.fillMaxWidth()
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedButton(
+                        onClick = {
+                            showAddImageDialog = false
+                            photoPickerLauncher.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                            )
+                        },
+                        enabled = !isUploading,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(if (isUploading) "جاري الرفع..." else "اختيار صورة من الجهاز 📸", fontWeight = FontWeight.Bold)
+                    }
+                    OutlinedTextField(
+                        value = imageUrlInput,
+                        onValueChange = { imageUrlInput = it },
+                        label = { Text("أو أدخل رابط الصورة (https://...)") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             },
             confirmButton = {
                 Button(
                     onClick = {
-                        if (imageUrlInput.isNotBlank()) {
-                            val newItem = GalleryImageItem(
-                                id = java.util.UUID.randomUUID().toString(),
-                                urlOrBase64 = imageUrlInput,
-                                isPrimary = galleryList.isEmpty()
-                            )
-                            galleryList = galleryList + newItem
-                            showAddImageDialog = false
-                            Toast.makeText(context, "تم إضافة الصورة لمعرض الصور!", Toast.LENGTH_SHORT).show()
+                        val cleanUrl = imageUrlInput.trim()
+                        if (cleanUrl.isNotBlank()) {
+                            coroutineScope.launch {
+                                val album = GalleryAlbumEntity(
+                                    id = java.util.UUID.randomUUID().toString(),
+                                    ownerId = account.id,
+                                    title = "صورة معرض",
+                                    imageUrls = listOf(cleanUrl)
+                                )
+                                galleryRepository.saveGalleryAlbum(album).onSuccess {
+                                    Toast.makeText(context, "تم حفظ الصورة في معرض الصور ✅", Toast.LENGTH_SHORT).show()
+                                    showAddImageDialog = false
+                                }.onFailure { e ->
+                                    Toast.makeText(context, "فشل حفظ الصورة: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        } else {
+                            Toast.makeText(context, "يرجى اختيار صورة أو إدخال رابط صالح", Toast.LENGTH_SHORT).show()
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6))
                 ) {
-                    Text("رفع الصورة", color = Color.White)
+                    Text("حفظ الرابط", color = Color.White)
                 }
             },
             dismissButton = {
@@ -236,8 +350,8 @@ fun GalleryGridCard(
                     Spacer(modifier = Modifier.width(1.dp))
                 }
 
-                IconButton(onClick = onDelete, modifier = Modifier.size(26.dp)) {
-                    Icon(Icons.Default.Delete, contentDescription = "حذف", tint = Color(0xFFEF4444), modifier = Modifier.size(16.dp))
+                IconButton(onClick = onDelete, modifier = Modifier.size(48.dp)) {
+                    Icon(Icons.Default.Delete, contentDescription = "حذف", tint = Color(0xFFEF4444), modifier = Modifier.size(18.dp))
                 }
             }
         }

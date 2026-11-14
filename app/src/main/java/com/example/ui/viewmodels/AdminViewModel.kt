@@ -64,49 +64,49 @@ data class StorageUsage(
 
 @Keep
 data class BookingStats(
-    val total: Int = 5120,
-    val pending: Int = 42,
-    val inProgress: Int = 88,
-    val completed: Int = 4850,
-    val cancelled: Int = 140,
-    val today: Int = 34,
-    val thisWeek: Int = 245,
-    val thisMonth: Int = 1120
+    val total: Int = 0,
+    val pending: Int = 0,
+    val inProgress: Int = 0,
+    val completed: Int = 0,
+    val cancelled: Int = 0,
+    val today: Int = 0,
+    val thisWeek: Int = 0,
+    val thisMonth: Int = 0
 )
 
 @Keep
 data class RevenueStats(
-    val totalRevenue: Double = 5420000.0,
-    val platformCommission: Double = 542000.0,
-    val providerPayouts: Double = 4878000.0,
+    val totalRevenue: Double = 0.0,
+    val platformCommission: Double = 0.0,
+    val providerPayouts: Double = 0.0,
     val currency: String = "YER",
-    val todayRevenue: Double = 125000.0,
-    val monthRevenue: Double = 1840000.0
+    val todayRevenue: Double = 0.0,
+    val monthRevenue: Double = 0.0
 )
 
 @Keep
 data class ProviderStats(
-    val totalVerified: Int = 340,
-    val pendingApproval: Int = 12,
-    val topRated: Int = 95,
-    val suspended: Int = 3
+    val totalVerified: Int = 0,
+    val pendingApproval: Int = 0,
+    val topRated: Int = 0,
+    val suspended: Int = 0
 )
 
 @Keep
 data class CategoryStats(
-    val maintenanceCount: Int = 145,
-    val storeCount: Int = 88,
-    val restaurantCount: Int = 64,
-    val medicalCount: Int = 43
+    val maintenanceCount: Int = 0,
+    val storeCount: Int = 0,
+    val restaurantCount: Int = 0,
+    val medicalCount: Int = 0
 )
 
 @Keep
 data class CityStats(
-    val sanaaCount: Int = 420,
-    val adenCount: Int = 240,
-    val taizCount: Int = 160,
-    val ibbCount: Int = 100,
-    val mukallaCount: Int = 80
+    val sanaaCount: Int = 0,
+    val adenCount: Int = 0,
+    val taizCount: Int = 0,
+    val ibbCount: Int = 0,
+    val mukallaCount: Int = 0
 )
 
 @Keep
@@ -3213,13 +3213,22 @@ fun exportJobApplicantsCsv(context: android.content.Context) {
     }
 
     fun loadSystemStats() {
-        val totalProvs = homeViewModel?.providers?.value?.size ?: 0
+        val totalProvs = appState._providers.value.size
+        val usersTotal = maxOf(_registeredUsersList.value.size, _registeredUsersCount.value)
+        val allBookings = appState._bookings.value
+        val activeCount = allBookings.count { b ->
+            val st = b.status.uppercase()
+            st == "PENDING" || st == "ACCEPTED" || st == "APPROVED" || st == "IN_PROGRESS"
+        }
+        val completedCount = allBookings.count { it.status.equals("COMPLETED", ignoreCase = true) }
+        val pendingCount = _pendingRequests.value.count { it.status.equals("PENDING", ignoreCase = true) } +
+            _pendingProviders.value.count { it.status.equals("PENDING", ignoreCase = true) }
         _systemStats.value = SystemStats(
             totalProviders = totalProvs,
-            totalUsers = 0,
-            activeBookings = 0,
-            completedOrders = 0,
-            pendingApprovals = _pendingRequests.value.count { it.status == "PENDING" }
+            totalUsers = usersTotal,
+            activeBookings = activeCount,
+            completedOrders = completedCount,
+            pendingApprovals = pendingCount
         )
     }
 
@@ -3356,13 +3365,141 @@ fun exportJobApplicantsCsv(context: android.content.Context) {
         }
     }
 
+    private fun periodStartMillis(period: String): Long {
+        val now = System.currentTimeMillis()
+        val dayMs = 24L * 60L * 60L * 1000L
+        return when (period.uppercase()) {
+            "TODAY" -> now - dayMs
+            "WEEK" -> now - 7L * dayMs
+            "MONTH" -> now - 30L * dayMs
+            "YEAR" -> now - 365L * dayMs
+            else -> 0L
+        }
+    }
+
     fun getSystemHealth(): SystemHealth = SystemHealth()
     fun getStorageUsage(): StorageUsage = StorageUsage()
-    fun getBookingStats(): BookingStats = BookingStats()
-    fun getRevenueStats(): RevenueStats = RevenueStats()
-    fun getProviderStats(): ProviderStats = ProviderStats()
-    fun getCategoryStats(): CategoryStats = CategoryStats()
-    fun getCityStats(): CityStats = CityStats()
+
+    fun getBookingStats(period: String = "ALL"): BookingStats {
+        val now = System.currentTimeMillis()
+        val dayMs = 24L * 60L * 60L * 1000L
+        val cutoff = periodStartMillis(period)
+        val allBookings = appState._bookings.value
+        val filtered = if (cutoff == 0L) allBookings else allBookings.filter { it.createdAt == 0L || it.createdAt >= cutoff }
+        return BookingStats(
+            total = filtered.size,
+            pending = filtered.count { it.status.equals("PENDING", ignoreCase = true) },
+            inProgress = filtered.count {
+                val st = it.status.uppercase()
+                st == "ACCEPTED" || st == "APPROVED" || st == "IN_PROGRESS"
+            },
+            completed = filtered.count { it.status.equals("COMPLETED", ignoreCase = true) },
+            cancelled = filtered.count {
+                val st = it.status.uppercase()
+                st == "CANCELLED" || st == "REJECTED"
+            },
+            today = allBookings.count { it.createdAt >= now - dayMs },
+            thisWeek = allBookings.count { it.createdAt >= now - 7L * dayMs },
+            thisMonth = allBookings.count { it.createdAt >= now - 30L * dayMs }
+        )
+    }
+
+    fun getRevenueStats(period: String = "ALL"): RevenueStats {
+        val now = System.currentTimeMillis()
+        val dayMs = 24L * 60L * 60L * 1000L
+        val cutoff = periodStartMillis(period)
+        val completedPayments = _payments.value.filter { it.status.equals("COMPLETED", ignoreCase = true) }
+        val filteredPayments = if (cutoff == 0L) completedPayments else completedPayments.filter { it.createdAt == 0L || it.createdAt >= cutoff }
+
+        val paidFromPayments = filteredPayments.sumOf { it.amount }
+        val paidFromBookings = appState._bookings.value
+            .filter {
+                val st = it.status.uppercase()
+                (st == "COMPLETED" || st == "ACCEPTED" || st == "APPROVED") &&
+                    (cutoff == 0L || it.createdAt == 0L || it.createdAt >= cutoff)
+            }
+            .sumOf { if (it.totalAmount > 0.0) it.totalAmount else it.price }
+        val paidFromOrders = _orders.value
+            .filter {
+                it.status.equals("COMPLETED", ignoreCase = true) &&
+                    (cutoff == 0L || it.timestamp == 0L || it.timestamp >= cutoff)
+            }
+            .sumOf { it.totalAmount }
+
+        val totalRev = if (paidFromPayments > 0.0) paidFromPayments else (paidFromBookings + paidFromOrders)
+        val commissionSum = filteredPayments.sumOf { it.commission }.takeIf { it > 0.0 } ?: (totalRev * 0.10)
+        val payoutsSum = filteredPayments.sumOf { it.providerShare }.takeIf { it > 0.0 } ?: (totalRev - commissionSum).coerceAtLeast(0.0)
+        val todayRev = completedPayments.filter { it.createdAt >= now - dayMs }.sumOf { it.amount }
+        val monthRev = completedPayments.filter { it.createdAt >= now - 30L * dayMs }.sumOf { it.amount }
+
+        return RevenueStats(
+            totalRevenue = totalRev,
+            platformCommission = commissionSum,
+            providerPayouts = payoutsSum,
+            currency = "YER",
+            todayRevenue = todayRev,
+            monthRevenue = monthRev
+        )
+    }
+
+    fun getProviderStats(): ProviderStats {
+        val provs = appState._providers.value
+        val pendingCount = _pendingRequests.value.count { it.status.equals("PENDING", ignoreCase = true) } +
+            _pendingProviders.value.count { it.status.equals("PENDING", ignoreCase = true) }
+        return ProviderStats(
+            totalVerified = provs.count { it.isVerified },
+            pendingApproval = pendingCount,
+            topRated = provs.count { it.rating >= 4.5f && it.numReviews > 0 },
+            suspended = provs.count { !it.isAvailable }
+        )
+    }
+
+    fun getCategoryStats(): CategoryStats {
+        val provs = appState._providers.value
+        val storesList = _stores.value
+        val medicalProvs = provs.count {
+            it.categoryId.contains("med", ignoreCase = true) ||
+                it.categoryId.contains("health", ignoreCase = true) ||
+                it.categoryId.contains("clinic", ignoreCase = true) ||
+                it.categoryId.contains("طب")
+        }
+        val medicalStores = storesList.count { it.sectionId.equals("medical", ignoreCase = true) }
+        val restaurantCount = storesList.count {
+            it.sectionId.equals("restaurants", ignoreCase = true) ||
+                it.categoryId.contains("rest", ignoreCase = true) ||
+                it.categoryId.contains("مطعم")
+        }
+        val retailStoreCount = storesList.count {
+            !it.sectionId.equals("restaurants", ignoreCase = true) &&
+                !it.sectionId.equals("medical", ignoreCase = true)
+        }
+        val maintenanceCount = (provs.size - medicalProvs).coerceAtLeast(0)
+        return CategoryStats(
+            maintenanceCount = maintenanceCount,
+            storeCount = retailStoreCount,
+            restaurantCount = restaurantCount,
+            medicalCount = medicalProvs + medicalStores
+        )
+    }
+
+    fun getCityStats(): CityStats {
+        val cityStrings = buildList {
+            appState._providers.value.forEach { add("${it.cityId} ${it.area}") }
+            _stores.value.forEach { add(it.cityId) }
+            _properties.value.forEach { add(it.cityId) }
+            appState._bookings.value.forEach { add("${it.userCity} ${it.customerArea}") }
+        }
+        fun countCity(vararg keys: String): Int = cityStrings.count { text ->
+            keys.any { k -> text.contains(k, ignoreCase = true) }
+        }
+        return CityStats(
+            sanaaCount = countCity("ye_san", "صنعاء", "sanaa", "أمانة"),
+            adenCount = countCity("ye_ade", "عدن", "aden"),
+            taizCount = countCity("ye_tai", "تعز", "taiz"),
+            ibbCount = countCity("ye_ibb", "إب", "اب", "ibb"),
+            mukallaCount = countCity("ye_had", "ye_muk", "حضرموت", "المكلا", "سيئون", "mukalla", "hadramout")
+        )
+    }
 
     fun sendAdminNotification(title: String, message: String, target: String) {
         val notif = AdminNotification(

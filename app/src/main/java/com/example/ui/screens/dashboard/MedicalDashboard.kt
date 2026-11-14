@@ -190,10 +190,10 @@ fun MedicalDashboard(
                         TabBookingsOrders(
                             bookings = medicalBookings,
                             themeColors = themeColors,
-                            onAcceptBooking = { bId -> viewModel.updateBookingStatus(bId, "APPROVED") },
-                            onRejectBooking = { bId, reason -> viewModel.updateBookingStatus(bId, "REJECTED") },
-                            onStartProgress = { bId -> viewModel.updateBookingStatus(bId, "IN_PROGRESS") },
-                            onCompleteBooking = { bId -> viewModel.updateBookingStatus(bId, "COMPLETED") },
+                            onAcceptBooking = { bId -> viewModel.updateBookingStatus(bId, com.example.utils.BookingStatus.ACCEPTED.code) },
+                            onRejectBooking = { bId, _ -> viewModel.updateBookingStatus(bId, com.example.utils.BookingStatus.REJECTED.code) },
+                            onStartProgress = { bId -> viewModel.updateBookingStatus(bId, com.example.utils.BookingStatus.IN_PROGRESS.code) },
+                            onCompleteBooking = { bId -> viewModel.updateBookingStatus(bId, com.example.utils.BookingStatus.COMPLETED.code) },
                             onChatWithClient = { phone ->
                                 viewModel.openOrCreateChatChannel(
                                     targetId = account.id,
@@ -212,9 +212,14 @@ fun MedicalDashboard(
                             addButtonLabel = "إضافة خدمة طبية 💊",
                             themeColors = themeColors,
                             onAddProduct = { title, price, desc, img ->
-                                medicalViewModel.addMedicalService(title, price, desc)
+                                medicalViewModel.addMedicalService(title, price, desc, img)
                             },
-                            onDeleteProduct = { id -> }
+                            onDeleteProduct = { id ->
+                                medicalViewModel.deleteMedicalService(id)
+                            },
+                            onUpdateProduct = { updated ->
+                                medicalViewModel.updateMedicalService(updated)
+                            }
                         )
                     }
                     3 -> {
@@ -222,7 +227,7 @@ fun MedicalDashboard(
                             reviews = uiState.reviews,
                             themeColors = themeColors,
                             onReplySubmit = { revId, reply ->
-                                Toast.makeText(context, "تم الرد على تقييم المريض بنجاح ✅", Toast.LENGTH_SHORT).show()
+                                medicalViewModel.replyToReview(revId, reply)
                             }
                         )
                     }
@@ -235,15 +240,35 @@ fun MedicalDashboard(
                             workingHours = account.workingHours,
                             photoUrl = account.logoImage,
                             coverUrl = account.coverImage,
-                            isAvailable = true,
+                            isAvailable = account.rawStore?.isActive ?: true,
                             rating = account.rating.toDouble(),
                             reviewCount = account.numReviews,
                             themeColors = themeColors,
-                            onSaveProfile = { name, phone, city, desc, hours, available ->
-                                Toast.makeText(context, "تم تحديث بيانات المركز بنجاح ✅", Toast.LENGTH_SHORT).show()
+                            onChangePhoto = { url ->
+                                medicalViewModel.updateProfile(
+                                    name = account.name,
+                                    cityArea = account.neighborhood.ifBlank { account.cityId },
+                                    description = account.description,
+                                    workingHours = account.workingHours,
+                                    isAvailable = account.rawStore?.isActive ?: true,
+                                    photoUrl = url
+                                )
+                            },
+                            onChangeCover = { url ->
+                                medicalViewModel.updateProfile(
+                                    name = account.name,
+                                    cityArea = account.neighborhood.ifBlank { account.cityId },
+                                    description = account.description,
+                                    workingHours = account.workingHours,
+                                    isAvailable = account.rawStore?.isActive ?: true,
+                                    coverUrl = url
+                                )
+                            },
+                            onSaveProfile = { name, _, city, desc, hours, available ->
+                                medicalViewModel.updateProfile(name, city, desc, hours, available)
                             },
                             onChangePassword = { oldP, newP ->
-                                Toast.makeText(context, "تم تغيير كلمة المرور بنجاح 🔑", Toast.LENGTH_SHORT).show()
+                                medicalViewModel.changePassword(oldP, newP)
                             }
                         )
                     }

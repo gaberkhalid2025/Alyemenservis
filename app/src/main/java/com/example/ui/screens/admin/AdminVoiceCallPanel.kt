@@ -30,9 +30,42 @@ fun AdminVoiceCallPanel(
     val textColor = themeColors.textPrimary
     val primaryColor = themeColors.primary
 
-    var voiceCallsEnabled by remember { mutableStateOf(false) } // معطل افتراضياً لتوفير الحجم
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val db = remember { com.google.firebase.firestore.FirebaseFirestore.getInstance() }
+    var voiceCallsEnabled by remember { mutableStateOf(false) }
     var highQualityAudio by remember { mutableStateOf(false) }
     var recordCallsEnabled by remember { mutableStateOf(false) }
+    var isSaving by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        db.collection("settings").document("voice_calls").get()
+            .addOnSuccessListener { doc ->
+                if (doc != null && doc.exists()) {
+                    voiceCallsEnabled = doc.getBoolean("voiceCallsEnabled") ?: false
+                    highQualityAudio = doc.getBoolean("highQualityAudio") ?: false
+                    recordCallsEnabled = doc.getBoolean("recordCallsEnabled") ?: false
+                }
+            }
+    }
+
+    fun persistVoiceSettings(enabled: Boolean, hq: Boolean, rec: Boolean) {
+        isSaving = true
+        val payload = mapOf(
+            "voiceCallsEnabled" to enabled,
+            "highQualityAudio" to hq,
+            "recordCallsEnabled" to rec,
+            "updatedAt" to System.currentTimeMillis()
+        )
+        db.collection("settings").document("voice_calls").set(payload)
+            .addOnSuccessListener {
+                isSaving = false
+                android.widget.Toast.makeText(context, "تم حفظ إعدادات المكالمات الصوتية ✅", android.widget.Toast.LENGTH_SHORT).show()
+            }
+            .addOnFailureListener { e ->
+                isSaving = false
+                android.widget.Toast.makeText(context, "تعذر حفظ الإعدادات: ${e.localizedMessage}", android.widget.Toast.LENGTH_SHORT).show()
+            }
+    }
 
     Card(
         modifier = Modifier
@@ -93,7 +126,11 @@ fun AdminVoiceCallPanel(
                 }
                 Switch(
                     checked = voiceCallsEnabled,
-                    onCheckedChange = { voiceCallsEnabled = it }
+                    enabled = !isSaving,
+                    onCheckedChange = { newVal ->
+                        voiceCallsEnabled = newVal
+                        persistVoiceSettings(newVal, highQualityAudio, recordCallsEnabled)
+                    }
                 )
             }
 
@@ -105,14 +142,21 @@ fun AdminVoiceCallPanel(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text("جودة الصوت العالية (HD Audio)", fontSize = 13.sp, color = textColor)
-                    Switch(checked = highQualityAudio, onCheckedChange = { highQualityAudio = it })
+                    Switch(
+                        checked = highQualityAudio,
+                        enabled = !isSaving,
+                        onCheckedChange = { newHq ->
+                            highQualityAudio = newHq
+                            persistVoiceSettings(voiceCallsEnabled, newHq, recordCallsEnabled)
+                        }
+                    )
                 }
             }
 
             Spacer(modifier = Modifier.height(12.dp))
 
             Surface(
-                color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f),
+                color = if (voiceCallsEnabled) Color(0xFF10B981).copy(alpha = 0.15f) else MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f),
                 shape = RoundedCornerShape(10.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -124,13 +168,17 @@ fun AdminVoiceCallPanel(
                     Icon(
                         imageVector = Icons.Default.Info,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.error,
+                        tint = if (voiceCallsEnabled) Color(0xFF10B981) else MaterialTheme.colorScheme.error,
                         modifier = Modifier.size(20.dp)
                     )
                     Text(
-                        text = "ملاحظة: الميزة معطلة حالياً لتوفير مساحة وحجم التطبيق وسرعة التحميل على شبكات الإنترنت اليمنية.",
+                        text = if (voiceCallsEnabled) {
+                            "المكالمات الصوتية مفعلة حالياً ومحفوظة على الخادم."
+                        } else {
+                            "ملاحظة: الميزة معطلة حالياً لتوفير مساحة وحجم التطبيق وسرعة التحميل على شبكات الإنترنت اليمنية."
+                        },
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onErrorContainer
+                        color = if (voiceCallsEnabled) textColor else MaterialTheme.colorScheme.onErrorContainer
                     )
                 }
             }

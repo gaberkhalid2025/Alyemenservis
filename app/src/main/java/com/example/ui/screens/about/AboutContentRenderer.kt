@@ -43,10 +43,10 @@ fun AboutContentRenderer(
 ) {
     val context = LocalContext.current
     val appTitle = settingsState.appName.ifBlank { "دليل الخدمات الشامل في اليمن" }
-    val appVersion = settingsState.appVersion.ifBlank { "v2.5.0 Gold Edition" }
-    val supportPhone = settingsState.supportPhone.ifBlank { "777644" }
-    val supportWhatsapp = settingsState.supportWhatsapp.ifBlank { "777644" }
-    val supportEmail = settingsState.supportEmail.ifBlank { "" }
+    val appVersion = settingsState.appVersion.ifBlank { com.example.BuildConfig.VERSION_NAME }
+    val supportPhone = settingsState.supportPhone.trim()
+    val supportWhatsapp = settingsState.supportWhatsapp.trim()
+    val supportEmail = settingsState.supportEmail.trim()
 
     val openUrl = { url: String ->
         if (url.isNotBlank()) {
@@ -206,75 +206,83 @@ fun AboutContentRenderer(
         }
 
         // 3. Quick Contact Actions (WhatsApp & Phone & Email)
-        Card(
-            colors = CardDefaults.cardColors(containerColor = themeColors.surface),
-            shape = RoundedCornerShape(16.dp),
-            border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.4f)),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+        if (supportWhatsapp.isNotBlank() || supportPhone.isNotBlank() || supportEmail.isNotBlank()) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.4f)),
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Text(
-                    text = "📞 اتصل وتواصل مع إدارة التطبيق والدعم الفني:",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Button(
-                        onClick = { openWhatsapp(supportWhatsapp) },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(46.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Send,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("💬 واتساب الدعم", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 11.5.sp)
+                    Text(
+                        text = "📞 اتصل وتواصل مع إدارة التطبيق والدعم الفني:",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+
+                    if (supportWhatsapp.isNotBlank() || supportPhone.isNotBlank()) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            if (supportWhatsapp.isNotBlank()) {
+                                Button(
+                                    onClick = { openWhatsapp(supportWhatsapp) },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(48.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Send,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("💬 واتساب الدعم", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 11.5.sp)
+                                }
+                            }
+
+                            if (supportPhone.isNotBlank()) {
+                                Button(
+                                    onClick = { openDialer(supportPhone) },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB)),
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(48.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Phone,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("📞 اتصال مباشر", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 11.5.sp)
+                                }
+                            }
+                        }
                     }
 
-                    Button(
-                        onClick = { openDialer(supportPhone) },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB)),
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(46.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Phone,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("📞 اتصال مباشر", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 11.5.sp)
-                    }
-                }
-
-                if (supportEmail.isNotBlank()) {
-                    OutlinedButton(
-                        onClick = { openEmail(supportEmail) },
-                        shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.2f)),
-                        modifier = Modifier.fillMaxWidth().height(42.dp)
-                    ) {
-                        Icon(Icons.Default.Email, contentDescription = null, tint = Color.LightGray, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("📧 مراسلة عبر البريد: $supportEmail", color = Color.LightGray, fontSize = 11.sp)
+                    if (supportEmail.isNotBlank()) {
+                        OutlinedButton(
+                            onClick = { openEmail(supportEmail) },
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.2f)),
+                            modifier = Modifier.fillMaxWidth().height(48.dp)
+                        ) {
+                            Icon(Icons.Default.Email, contentDescription = null, tint = Color.LightGray, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("📧 مراسلة عبر البريد: $supportEmail", color = Color.LightGray, fontSize = 11.sp)
+                        }
                     }
                 }
             }
@@ -476,31 +484,30 @@ fun AboutContentRenderer(
             }
         }
 
-        // 6. App Download & Update Button
-        Button(
-            onClick = {
-                val url = settingsState.appDownloadUrl.ifBlank { "https://example.com/download" }
-                openUrl(url)
-            },
-            colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
-            shape = RoundedCornerShape(14.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(48.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Default.Share,
-                contentDescription = null,
-                tint = Color.Black,
-                modifier = Modifier.size(18.dp)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = "📥 تحميل وتحديث التطبيق المباشر (APK)",
-                color = Color.Black,
-                fontWeight = FontWeight.Bold,
-                fontSize = 13.sp
-            )
+        // 6. App Download & Update Button (only when configured)
+        if (settingsState.appDownloadUrl.isNotBlank()) {
+            Button(
+                onClick = { openUrl(settingsState.appDownloadUrl) },
+                colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Share,
+                    contentDescription = null,
+                    tint = Color.Black,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "📥 تحميل وتحديث التطبيق المباشر (APK)",
+                    color = Color.Black,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp
+                )
+            }
         }
 
         Text(

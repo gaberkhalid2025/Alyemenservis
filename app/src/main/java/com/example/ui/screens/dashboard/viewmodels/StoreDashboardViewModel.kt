@@ -99,4 +99,60 @@ class StoreDashboardViewModel(
             }
         }
     }
+
+    fun updateProduct(product: ProductItemEntity) {
+        viewModelScope.launch {
+            productsRepository.updateProduct(product).onSuccess {
+                _eventFlow.emit(DashboardEvent.ShowToast("تم تحديث المنتج بنجاح ✅"))
+            }.onFailure { e ->
+                _eventFlow.emit(DashboardEvent.ShowToast(e.localizedMessage ?: "فشل تحديث المنتج"))
+            }
+        }
+    }
+
+    fun replyToReview(reviewId: String, replyText: String) {
+        viewModelScope.launch {
+            ratingsRepository.replyToRating(reviewId, replyText).onSuccess {
+                _eventFlow.emit(DashboardEvent.ShowToast("تم حفظ وإرسال الرد للعميل بنجاح ✅"))
+            }.onFailure { e ->
+                _eventFlow.emit(DashboardEvent.ShowToast(e.localizedMessage ?: "تعذر حفظ الرد"))
+            }
+        }
+    }
+
+    fun updateProfile(
+        name: String,
+        cityArea: String,
+        description: String,
+        workingHours: String,
+        isAvailable: Boolean,
+        photoUrl: String? = null,
+        coverUrl: String? = null
+    ) {
+        viewModelScope.launch {
+            dashboardRepository.updateBusinessProfile(
+                ownerId = ownerId,
+                role = "STORE",
+                name = name,
+                cityArea = cityArea,
+                description = description,
+                workingHours = workingHours,
+                isAvailable = isAvailable,
+                photoUrl = photoUrl,
+                coverUrl = coverUrl
+            ).onSuccess {
+                _eventFlow.emit(DashboardEvent.ShowToast("تم حفظ بيانات المتجر بنجاح ✅"))
+            }.onFailure { e ->
+                _eventFlow.emit(DashboardEvent.ShowToast(e.localizedMessage ?: "فشل حفظ البيانات"))
+            }
+        }
+    }
+
+    fun changePassword(oldPass: String, newPass: String) {
+        viewModelScope.launch {
+            dashboardRepository.changeBusinessPassword(ownerId, "STORE", oldPass, newPass)
+                .onSuccess { _eventFlow.emit(DashboardEvent.ShowToast("تم تحديث كلمة المرور بنجاح 🔑")) }
+                .onFailure { e -> _eventFlow.emit(DashboardEvent.ShowToast(e.localizedMessage ?: "فشل تحديث كلمة المرور")) }
+        }
+    }
 }

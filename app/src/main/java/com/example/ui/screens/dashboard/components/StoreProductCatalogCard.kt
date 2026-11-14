@@ -82,29 +82,29 @@ fun StoreProductCatalogCard(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                            val pBitmap = remember(prod.imageUrl) {
-                                if (prod.imageUrl.isNotEmpty()) {
-                                    try {
-                                        val bytes = android.util.Base64.decode(prod.imageUrl, android.util.Base64.DEFAULT)
-                                        android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
-                                    } catch(e: Exception) { null }
-                                } else null
-                            }
+                            val pBitmap = com.example.rememberBase64Bitmap(prod.imageUrl)
                             if (pBitmap != null) {
                                 Image(
                                     bitmap = pBitmap,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(36.dp).clip(RoundedCornerShape(4.dp)),
+                                    contentDescription = prod.name,
+                                    modifier = Modifier.size(40.dp).clip(RoundedCornerShape(6.dp)),
+                                    contentScale = ContentScale.Crop
+                                )
+                            } else if (prod.imageUrl.startsWith("http")) {
+                                com.example.ui.components.SmartAsyncImage(
+                                    model = prod.imageUrl,
+                                    contentDescription = prod.name,
+                                    modifier = Modifier.size(40.dp).clip(RoundedCornerShape(6.dp)),
                                     contentScale = ContentScale.Crop
                                 )
                             } else {
-                                Box(modifier = Modifier.size(36.dp).background(Color.DarkGray, RoundedCornerShape(4.dp)), contentAlignment = Alignment.Center) {
+                                Box(modifier = Modifier.size(40.dp).background(Color.DarkGray, RoundedCornerShape(6.dp)), contentAlignment = Alignment.Center) {
                                     Text("📦", fontSize = 14.sp)
                                 }
                             }
                             Spacer(modifier = Modifier.width(8.dp))
                             Column {
-                                Text(prod.name, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                Text(prod.name, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = themeColors.textPrimary)
                                 Text("السعر: ${prod.price} ريال يمني", fontSize = 9.sp, color = themeColors.accent)
                             }
                         }
@@ -114,9 +114,9 @@ fun StoreProductCatalogCard(
                                 viewModel.deleteProduct(prod.id)
                                 Toast.makeText(context, "🗑️ تم حذف المنتج بنجاح", Toast.LENGTH_SHORT).show()
                             },
-                            modifier = Modifier.size(24.dp)
+                            modifier = Modifier.size(48.dp)
                         ) {
-                            Text("🗑️", fontSize = 14.sp)
+                            Text("🗑️", fontSize = 16.sp)
                         }
                     }
                 }

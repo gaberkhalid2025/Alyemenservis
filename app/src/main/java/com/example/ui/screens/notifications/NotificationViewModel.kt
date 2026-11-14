@@ -94,7 +94,7 @@ class NotificationViewModel(
         uid: String,
         role: String
     ): List<NotificationEntity> {
-        val cleanPhone = phone.trim().replace(" ", "").replace("+", "")
+        val cleanPhone = com.example.ui.helpers.AppPreferenceHelper.normalizePhoneNumber(phone)
         val cleanUserId = uid.trim()
         val isAdmin = role == "OWNER" || role == "SUPER_ADMIN" || role == "ADMIN" || role == "SUPERVISOR"
         val isProv = isProviderUser
@@ -106,7 +106,7 @@ class NotificationViewModel(
             if (!notif.isValid()) return@filter false
 
             val dKey = if (notif.dedupKey.isNotBlank()) notif.dedupKey else "${notif.notificationType}_${notif.title}_${notif.timestamp / (30 * 1000L)}"
-            if (!seenKeys.add(dKey) && notif.id.isBlank()) return@filter false
+            if (!seenKeys.add(dKey)) return@filter false
 
             NotificationAudienceFilter.isAudienceMatched(
                 notif = notif,

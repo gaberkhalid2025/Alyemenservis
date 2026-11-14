@@ -240,9 +240,9 @@
                 maxZoom: 24, maxNativeZoom: 17, subdomains: ['a', 'b', 'c'], updateWhenIdle: true, updateWhenZooming: false, keepBuffer: 1,
                 attribution: ATTR_OSM + ' — SRTM | نمط © <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA)'
             }),
-            'vela': L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png', {
-                maxZoom: 24, maxNativeZoom: 19, subdomains: ['a', 'b', 'c', 'd'], updateWhenIdle: true, updateWhenZooming: false, keepBuffer: 1,
-                attribution: 'خرائط VELA — ' + ATTR_OSM + ' • © <a href="https://carto.com/attributions">CARTO</a>'
+            'vela': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+                maxZoom: 24, maxNativeZoom: 19, updateWhenIdle: true, updateWhenZooming: false, keepBuffer: 1,
+                attribution: 'خرائط VELA — ' + ATTR_OSM + ' • © Esri Street'
             }),
             'satellite': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
                 maxZoom: 24, maxNativeZoom: 19, updateWhenIdle: true, updateWhenZooming: false, keepBuffer: 1,
@@ -323,6 +323,11 @@
                 format: 'jpg',
                 maxZoom: 9
             },
+            'noaa20': {
+                layer: 'VIIRS_NOAA20_CorrectedReflectance_TrueColor',
+                format: 'jpg',
+                maxZoom: 9
+            },
             'modis': {
                 layer: 'MODIS_Terra_CorrectedReflectance_TrueColor',
                 format: 'jpg',
@@ -355,6 +360,9 @@
         var gibsOverlay = null;
         var gibsActive = false;
         var eoxActive = false;
+        var realTimeSatActive = false;
+        var valhallaOfflineActive = false;
+        var valhallaOfflineSizeMb = 0;
         function notifyGibs(ok) {
             if (window.AndroidBridge && window.AndroidBridge.onGibsStatus) {
                 window.AndroidBridge.onGibsStatus(!!ok);
@@ -455,6 +463,69 @@
             eoxOverlay.addTo(map);
         }
         window.setEox = setEox;
+
+        // Open-Source Real-Time Geostationary / Global Satellite (UW-Madison SSEC RealEarth - Zero API Key)
+        var realTimeSatOverlay = null;
+        function setRealTimeSat(on, feed) {
+            if (!map) return;
+            realTimeSatActive = !!on;
+            feed = (feed === 'globalir') ? 'globalir' : 'globalvis';
+            if (realTimeSatOverlay && map.hasLayer(realTimeSatOverlay)) {
+                map.removeLayer(realTimeSatOverlay);
+                realTimeSatOverlay = null;
+            }
+            refreshModeIndicator();
+            if (!on) return;
+            ensurePane('rtSatPane', 248);
+            var okCount = 0, errCount = 0, failedNotified = false;
+            var layer = L.tileLayer('https://realearth.ssec.wisc.edu/tiles/' + feed + '/{z}/{x}/{y}.png', {
+                maxZoom: 24,
+                maxNativeZoom: 9,
+                opacity: 0.78,
+                pane: 'rtSatPane',
+                attribution: 'بث حي مباشر © <a href="https://realearth.ssec.wisc.edu">UW-Madison SSEC RealEarth</a>'
+            });
+            layer.on('tileload', function() {
+                okCount++;
+                if (okCount === 1) notifyOverlay('realtimesat', false, 'تم تحميل البث الفضائي الحي بنجاح');
+            });
+            layer.on('tileerror', function() {
+                errCount++;
+                if (!failedNotified && okCount === 0 && errCount >= 6) {
+                    failedNotified = true;
+                    notifyOverlay('realtimesat', true, 'تعذر تحميل البث الفضائي المباشر حالياً');
+                }
+            });
+            realTimeSatOverlay = layer;
+            realTimeSatOverlay.addTo(map);
+        }
+        window.setRealTimeSat = setRealTimeSat;
+
+        // Valhalla Offline MapLayer Boundary & Offline Corridor Overlay
+        var valhallaOfflineGroup = null;
+        function setValhallaOfflineLayer(on, isReady, sizeMb) {
+            if (!map) return;
+            valhallaOfflineActive = !!on;
+            valhallaOfflineSizeMb = sizeMb || 0;
+            if (valhallaOfflineGroup && map.hasLayer(valhallaOfflineGroup)) {
+                map.removeLayer(valhallaOfflineGroup);
+                valhallaOfflineGroup = null;
+            }
+            refreshModeIndicator();
+            if (!on) return;
+            valhallaOfflineGroup = L.layerGroup();
+            var bounds = [[12.10, 42.50], [19.00, 54.50]];
+            L.rectangle(bounds, {
+                color: isReady ? '#10B981' : '#F59E0B',
+                weight: 2,
+                dashArray: '8, 6',
+                fillColor: isReady ? '#10B981' : '#F59E0B',
+                fillOpacity: 0.04,
+                interactive: false
+            }).addTo(valhallaOfflineGroup);
+            valhallaOfflineGroup.addTo(map);
+        }
+        window.setValhallaOfflineLayer = setValhallaOfflineLayer;
 
         // USGS Earthquakes Overlay (GeoJSON converted list)
         var quakesLayer = null;
@@ -603,7 +674,13 @@
             var titleEl = document.getElementById('modeTitle');
             var icon = currentBaseIcon;
             var title = currentBaseTitle;
-            if (gibsActive) {
+            if (valhallaOfflineActive) {
+                icon = '📦';
+                title = valhallaOfflineSizeMb > 0 ? ('أوفلاين Valhalla (' + valhallaOfflineSizeMb + ' MB)') : 'وضع الأوفلاين (كاش محلي)';
+            } else if (realTimeSatActive) {
+                icon = '🛰️';
+                title = 'أقمار الوقت الفعلي (RealEarth)';
+            } else if (gibsActive) {
                 icon = '📡';
                 title = 'بث ناسا المباشر (NASA GIBS)';
             } else if (eoxActive) {
@@ -773,8 +850,22 @@
         }
 
         function setMapPerspective(tilt, rotation) {
-            // No CSS tilt skewing to prevent distortion
+            var mapEl = document.getElementById('map');
+            var contEl = document.getElementById('map-container');
+            if (!mapEl) return;
+            var t = typeof tilt === 'number' ? tilt : 0;
+            var r = typeof rotation === 'number' ? rotation : 0;
+            if (t >= 42) {
+                var deg = Math.max(20, Math.min(38, Math.round(t * 0.58)));
+                mapEl.style.transformOrigin = '50% 62%';
+                mapEl.style.transform = 'perspective(1100px) rotateX(' + deg + 'deg) rotateZ(' + r + 'deg) scale(1.22)';
+                if (contEl) contEl.style.background = 'linear-gradient(180deg, #0EA5E922 0%, #0F172A 28%, #0B1120 100%)';
+            } else {
+                mapEl.style.transform = '';
+                if (contEl) contEl.style.background = '';
+            }
         }
+        window.setMapPerspective = setMapPerspective;
 
         function zoomIn() {
             if (map) map.zoomIn();

@@ -51,7 +51,7 @@ fun TabReviewsFeedback(
                         userName = rev.authorName.ifBlank { "عميل" },
                         rating = rev.rating,
                         comment = rev.comment,
-                        ownerReply = "",
+                        ownerReply = rev.ownerReply,
                         themeColors = themeColors,
                         onReplySubmit = { replyText ->
                             onReplySubmit(rev.id, replyText)

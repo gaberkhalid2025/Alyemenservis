@@ -109,6 +109,52 @@ class TechnicianDashboardViewModel(
         }
     }
 
+    fun updateProduct(product: ProductItemEntity) {
+        viewModelScope.launch {
+            productsRepository.updateProduct(product).onSuccess {
+                _eventFlow.emit(DashboardEvent.ShowToast("تم تحديث الخدمة والسعر بنجاح ✅"))
+            }.onFailure { e ->
+                _eventFlow.emit(DashboardEvent.ShowToast(e.localizedMessage ?: "فشل تحديث الخدمة"))
+            }
+        }
+    }
+
+    fun updateProfile(
+        name: String,
+        cityArea: String,
+        description: String,
+        workingHours: String,
+        isAvailable: Boolean,
+        photoUrl: String? = null,
+        coverUrl: String? = null
+    ) {
+        viewModelScope.launch {
+            dashboardRepository.updateBusinessProfile(
+                ownerId = ownerId,
+                role = "PROVIDER",
+                name = name,
+                cityArea = cityArea,
+                description = description,
+                workingHours = workingHours,
+                isAvailable = isAvailable,
+                photoUrl = photoUrl,
+                coverUrl = coverUrl
+            ).onSuccess {
+                _eventFlow.emit(DashboardEvent.ShowToast("تم تحديث بيانات ملفك الشخصي ✅"))
+            }.onFailure { e ->
+                _eventFlow.emit(DashboardEvent.ShowToast(e.localizedMessage ?: "فشل تحديث البيانات"))
+            }
+        }
+    }
+
+    fun changePassword(oldPass: String, newPass: String) {
+        viewModelScope.launch {
+            dashboardRepository.changeBusinessPassword(ownerId, "PROVIDER", oldPass, newPass)
+                .onSuccess { _eventFlow.emit(DashboardEvent.ShowToast("تم تغيير كلمة المرور بنجاح 🔑")) }
+                .onFailure { e -> _eventFlow.emit(DashboardEvent.ShowToast(e.localizedMessage ?: "فشل تغيير كلمة المرور")) }
+        }
+    }
+
     fun saveGalleryAlbum(context: android.content.Context, localUriStr: String) {
         val appContext = context.applicationContext
         viewModelScope.launch {

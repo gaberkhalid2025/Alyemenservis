@@ -82,7 +82,7 @@ fun MultiDimensionRatingDialog(
                             color = Color.White
                         )
                     }
-                    IconButton(onClick = onDismiss, modifier = Modifier.size(24.dp)) {
+                    IconButton(onClick = onDismiss, modifier = Modifier.size(48.dp)) {
                         Icon(Icons.Default.Close, contentDescription = "إغلاق", tint = Color.LightGray)
                     }
                 }
@@ -174,8 +174,8 @@ fun MultiDimensionRatingDialog(
                                 if (bookingId.isNotEmpty()) {
                                     val bk = viewModel.bookings.value.find { it.id == bookingId }
                                     val status = bk?.status?.uppercase() ?: ""
-                                    if (bk != null && status != "COMPLETED") {
-                                        Toast.makeText(context, "لا يمكن التقييم إلا بعد اكتمال الخدمة", Toast.LENGTH_SHORT).show()
+                                    if (bk == null || status != "COMPLETED") {
+                                        Toast.makeText(context, "لا يمكن التقييم إلا بعد اكتمال الخدمة المسجلة", Toast.LENGTH_SHORT).show()
                                     } else {
                                         doSubmit()
                                     }
@@ -230,14 +230,17 @@ fun RatingDimensionRow(
         Text(title, fontSize = 11.sp, color = Color.LightGray, modifier = Modifier.weight(1f))
         Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
             for (i in 1..5) {
-                Icon(
-                    imageVector = Icons.Default.Star,
-                    contentDescription = null,
-                    tint = if (i <= rating) Color(0xFFFFB300) else Color.DarkGray,
-                    modifier = Modifier
-                        .size(18.dp)
-                        .clickable { onRatingChange(i.toFloat()) }
-                )
+                IconButton(
+                    onClick = { onRatingChange(i.toFloat()) },
+                    modifier = Modifier.size(40.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Star,
+                        contentDescription = "تقييم $i من 5",
+                        tint = if (i <= rating) Color(0xFFFFB300) else Color.DarkGray,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
             }
         }
     }

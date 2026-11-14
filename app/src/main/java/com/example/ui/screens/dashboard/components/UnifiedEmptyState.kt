@@ -29,7 +29,7 @@ fun UnifiedEmptyState(
             .padding(vertical = 12.dp),
         colors = CardDefaults.cardColors(containerColor = themeColors.surface),
         shape = RoundedCornerShape(16.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))
+        border = androidx.compose.foundation.BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.2f))
     ) {
         Column(
             modifier = Modifier
@@ -63,7 +63,8 @@ fun UnifiedEmptyState(
                 Button(
                     onClick = onActionClick,
                     colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
-                    shape = RoundedCornerShape(10.dp)
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.heightIn(min = 48.dp)
                 ) {
                     Text(
                         text = actionLabel,

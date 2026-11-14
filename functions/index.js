@@ -233,6 +233,10 @@ exports.verifyAdminLogin = functions.https.onCall(async (data, context) => {
     try {
         // التحقق عبر Firebase Auth REST API
         const apiKey = process.env.FIREBASE_API_KEY || functions.config().auth?.api_key || '';
+        if (!apiKey) {
+            console.error('FIREBASE_API_KEY is missing in Cloud Functions environment');
+            throw new functions.https.HttpsError('failed-precondition', 'إعدادات المصادقة غير مكتملة على الخادم');
+        }
         const response = await fetchWithTimeout(
             `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${apiKey}`,
             {
@@ -537,6 +541,22 @@ async function removeInvalidTokens(tokens) {
  * - يتطلب صلاحيات الأدمن
  * - يسجل كل عملية وصول
  */
+async function enforceApiKeyRateLimit(uid, actionKey, maxCalls = 30, windowMs = 15 * 60 * 1000) {
+    const rateRef = db.collection('security').doc(`apikey_${actionKey}_${uid}`);
+    const doc = await rateRef.get();
+    const now = Date.now();
+    const rate = doc.data() || { count: 0, firstAttempt: now };
+    if (now - rate.firstAttempt > windowMs) {
+        rate.count = 0;
+        rate.firstAttempt = now;
+    }
+    if (rate.count >= maxCalls) {
+        throw new functions.https.HttpsError('resource-exhausted', 'تم تجاوز حد الطلبات المسموح به، حاول لاحقاً');
+    }
+    rate.count += 1;
+    await rateRef.set(rate, { merge: true });
+}
+
 exports.getApiKey = functions.https.onCall(async (data, context) => {
     // التحقق من صلاحيات الأدمن الموحدة
     const token = context.auth?.token || {};
@@ -545,6 +565,7 @@ exports.getApiKey = functions.https.onCall(async (data, context) => {
     if (!isAdmin) {
         throw new functions.https.HttpsError('permission-denied', 'Admin only');
     }
+    await enforceApiKeyRateLimit(context.auth.uid, 'get');
     
     const { keyName } = data;
     
@@ -592,6 +613,7 @@ exports.setApiKey = functions.https.onCall(async (data, context) => {
     if (!isAdmin) {
         throw new functions.https.HttpsError('permission-denied', 'Admin only');
     }
+    await enforceApiKeyRateLimit(context.auth.uid, 'set');
     
     const { keyName, value } = data;
     

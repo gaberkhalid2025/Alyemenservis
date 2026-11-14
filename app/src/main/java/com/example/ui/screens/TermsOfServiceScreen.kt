@@ -12,7 +12,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -111,6 +111,48 @@ fun TermsOfServiceScreen(
                         title = "2. سياسة الإلغاء والضمان",
                         desc = "تخضع الخدمات لضمان الفني أو المحل المباشر، وتحدد إدارة التطبيق شروط استرداد العربون وفقاً للحالة."
                     )
+                }
+            }
+
+            val context = androidx.compose.ui.platform.LocalContext.current
+            val termsPrefs = androidx.compose.runtime.remember {
+                context.getSharedPreferences("yemen_services_terms", android.content.Context.MODE_PRIVATE)
+            }
+            var hasAgreedTerms by androidx.compose.runtime.remember {
+                androidx.compose.runtime.mutableStateOf(
+                    termsPrefs.getBoolean("has_agreed_terms", false) &&
+                        termsPrefs.getString("agreed_terms_version", "") == "2.0"
+                )
+            }
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = cardBg)
+            ) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("الإصدار: 2.0 • محدث لعام 2026", fontSize = 11.sp, color = textColor.copy(alpha = 0.65f))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = hasAgreedTerms, onCheckedChange = { hasAgreedTerms = it })
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("أوافق على شروط وأحكام الاستخدام", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = textColor)
+                    }
+                    Button(
+                        onClick = {
+                            termsPrefs.edit()
+                                .putBoolean("has_agreed_terms", true)
+                                .putString("agreed_terms_version", "2.0")
+                                .putLong("agreed_terms_at", System.currentTimeMillis())
+                                .apply()
+                            onBack()
+                        },
+                        enabled = hasAgreedTerms,
+                        modifier = Modifier.fillMaxWidth().height(48.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = primaryColor),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("حفظ الموافقة والمتابعة", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    }
                 }
             }
         }

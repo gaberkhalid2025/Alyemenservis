@@ -75,6 +75,13 @@ fun UnifiedRegistrationForm(
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isSubmitting by remember { mutableStateOf(false) }
 
+    LaunchedEffect(isSubmitting) {
+        if (isSubmitting) {
+            kotlinx.coroutines.delay(15_000L)
+            isSubmitting = false
+        }
+    }
+
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri: Uri? ->
@@ -503,22 +510,12 @@ fun UnifiedRegistrationForm(
                 }
             }
 
-            // 1️⃣4️⃣ الموافقة على الشروط
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Checkbox(
-                    checked = agreedToTerms,
-                    onCheckedChange = { agreedToTerms = it },
-                    colors = CheckboxDefaults.colors(checkedColor = themeColors.accent)
-                )
-                Text(
-                    text = "أوافق على الشروط والأحكام وسياسة الخصوصية بالمنصة",
-                    fontSize = 11.sp,
-                    color = Color.LightGray
-                )
-            }
+            // 1️⃣4️⃣ الموافقة على الشروط (مع الإصدار والنص التفصيلي)
+            com.example.ui.screens.register.components.RegistrationTermsCheckbox(
+                checked = agreedToTerms,
+                onCheckedChange = { agreedToTerms = it },
+                themeColors = themeColors
+            )
 
             // 🚀 زر الإرسال
             Button(

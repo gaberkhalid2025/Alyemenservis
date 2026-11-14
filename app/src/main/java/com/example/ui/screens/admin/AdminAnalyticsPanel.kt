@@ -44,8 +44,8 @@ fun AdminAnalyticsPanel(
 
     if (adminViewModel == null) return
     val stats = adminViewModel.getSystemStats()
-    val revenueStats = adminViewModel.getRevenueStats()
-    val bookingStats = adminViewModel.getBookingStats()
+    val revenueStats = adminViewModel.getRevenueStats(selectedPeriod)
+    val bookingStats = adminViewModel.getBookingStats(selectedPeriod)
     val categoryStats = adminViewModel.getCategoryStats()
     val cityStats = adminViewModel.getCityStats()
 
@@ -89,15 +89,33 @@ fun AdminAnalyticsPanel(
                         onClick = {
                             adminViewModel.loadSystemStats()
                             Toast.makeText(context, "تم تحديث البيانات والإحصائيات 🔄", Toast.LENGTH_SHORT).show()
-                        }
+                        },
+                        modifier = Modifier.size(48.dp)
                     ) {
                         Icon(Icons.Default.Refresh, contentDescription = "تحديث", tint = Color(0xFFF59E0B))
                     }
                     IconButton(
                         onClick = {
-                            adminViewModel.exportReport("الإحصائيات والتحليلات")
-                            Toast.makeText(context, "تم تصدير التقرير التحليلي بنجاح 📋", Toast.LENGTH_LONG).show()
-                        }
+                            val header = adminViewModel.exportReport("الإحصائيات والتحليلات ($selectedPeriod)")
+                            val summaryText = buildString {
+                                appendLine(header)
+                                appendLine("إجمالي المستخدمين: ${stats.totalUsers}")
+                                appendLine("مقدمو الخدمات: ${stats.totalProviders}")
+                                appendLine("الحجوزات ($selectedPeriod): ${bookingStats.total} (مكتمل: ${bookingStats.completed} / قيد الانتظار: ${bookingStats.pending})")
+                                appendLine("الإيرادات ($selectedPeriod): ${numberFormat.format(revenueStats.totalRevenue)} ر.ي")
+                            }
+                            try {
+                                val sendIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                    type = "text/plain"
+                                    putExtra(android.content.Intent.EXTRA_SUBJECT, "تقرير التحليلات - خدمات اليمن")
+                                    putExtra(android.content.Intent.EXTRA_TEXT, summaryText)
+                                }
+                                context.startActivity(android.content.Intent.createChooser(sendIntent, "مشاركة التقرير التحليلي"))
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "تعذر فتح قائمة المشاركة", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        modifier = Modifier.size(48.dp)
                     ) {
                         Icon(Icons.Default.Share, contentDescription = "تصدير", tint = Color(0xFFF59E0B))
                     }
@@ -205,22 +223,25 @@ fun AdminAnalyticsPanel(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
+                val totalCities = (cityStats.sanaaCount + cityStats.adenCount + cityStats.taizCount + cityStats.ibbCount + cityStats.mukallaCount).coerceAtLeast(1)
                 val governorates = listOf(
-                    Triple("أمانة العاصمة / صنعاء", 0.42f, "42%"),
-                    Triple("عدن", 0.24f, "24%"),
-                    Triple("تعز", 0.16f, "16%"),
-                    Triple("إب", 0.10f, "10%"),
-                    Triple("حضرموت (المكلا / سيئون)", 0.08f, "8%")
-                )
+                    "أمانة العاصمة / صنعاء" to cityStats.sanaaCount,
+                    "عدن" to cityStats.adenCount,
+                    "تعز" to cityStats.taizCount,
+                    "إب" to cityStats.ibbCount,
+                    "حضرموت (المكلا / سيئون)" to cityStats.mukallaCount
+                ).sortedByDescending { it.second }
 
-                governorates.forEach { (city, progress, percent) ->
+                governorates.forEach { (city, count) ->
+                    val progress = (count.toFloat() / totalCities.toFloat()).coerceIn(0f, 1f)
+                    val pct = (progress * 100f).toInt()
                     Column(modifier = Modifier.padding(vertical = 4.dp)) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text(city, fontSize = 12.sp, color = Color.LightGray, fontWeight = FontWeight.Medium)
-                            Text(percent, fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = Color(0xFFF59E0B))
+                            Text("$pct% ($count)", fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = Color(0xFFF59E0B))
                         }
                         Spacer(modifier = Modifier.height(4.dp))
                         LinearProgressIndicator(
@@ -254,21 +275,24 @@ fun AdminAnalyticsPanel(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
+                val totalCats = (categoryStats.maintenanceCount + categoryStats.storeCount + categoryStats.restaurantCount + categoryStats.medicalCount).coerceAtLeast(1)
                 val categories = listOf(
-                    Triple("خدمات الصيانة والكهرباء ⚡", 0.35f, Color(0xFF38BDF8)),
-                    Triple("المتاجر وقطع الغيار 🛍️", 0.25f, Color(0xFF4ADE80)),
-                    Triple("المطاعم وتوصيل الوجبات 🍽️", 0.22f, Color(0xFFFB923C)),
-                    Triple("الرعاية الصحية والمراكز 🏥", 0.18f, Color(0xFFF87171))
+                    Triple("خدمات الصيانة والكهرباء ⚡", categoryStats.maintenanceCount, Color(0xFF38BDF8)),
+                    Triple("المتاجر وقطع الغيار 🛍️", categoryStats.storeCount, Color(0xFF4ADE80)),
+                    Triple("المطاعم وتوصيل الوجبات 🍽️", categoryStats.restaurantCount, Color(0xFFFB923C)),
+                    Triple("الرعاية الصحية والمراكز 🏥", categoryStats.medicalCount, Color(0xFFF87171))
                 )
 
-                categories.forEach { (cat, progress, color) ->
+                categories.forEach { (cat, count, color) ->
+                    val progress = (count.toFloat() / totalCats.toFloat()).coerceIn(0f, 1f)
+                    val pct = (progress * 100f).toInt()
                     Column(modifier = Modifier.padding(vertical = 4.dp)) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text(cat, fontSize = 12.sp, color = Color.LightGray, fontWeight = FontWeight.Medium)
-                            Text("${(progress * 100).toInt()}%", fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = color)
+                            Text("$pct% ($count)", fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = color)
                         }
                         Spacer(modifier = Modifier.height(4.dp))
                         LinearProgressIndicator(

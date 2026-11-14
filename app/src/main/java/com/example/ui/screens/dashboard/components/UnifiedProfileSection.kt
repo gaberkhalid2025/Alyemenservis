@@ -45,7 +45,7 @@ fun UnifiedProfileSection(
     var isUploadingCover by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
 
     val profilePhotoPicker = androidx.activity.compose.rememberLauncherForActivityResult(
-        contract = androidx.activity.result.contract.ActivityResultContracts.GetContent()
+        contract = androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia()
     ) { uri: android.net.Uri? ->
         if (uri != null && onChangePhoto != null) {
             coroutineScope.launch {
@@ -64,7 +64,7 @@ fun UnifiedProfileSection(
     }
 
     val coverPhotoPicker = androidx.activity.compose.rememberLauncherForActivityResult(
-        contract = androidx.activity.result.contract.ActivityResultContracts.GetContent()
+        contract = androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia()
     ) { uri: android.net.Uri? ->
         if (uri != null && onChangeCover != null) {
             coroutineScope.launch {
@@ -112,7 +112,15 @@ fun UnifiedProfileSection(
                             .padding(8.dp)
                     ) {
                         TextButton(
-                            onClick = { if (!isUploadingCover) coverPhotoPicker.launch("image/*") },
+                            onClick = {
+                                if (!isUploadingCover) {
+                                    coverPhotoPicker.launch(
+                                        androidx.activity.result.PickVisualMediaRequest(
+                                            androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly
+                                        )
+                                    )
+                                }
+                            },
                             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                             enabled = !isUploadingCover
                         ) {
@@ -154,7 +162,15 @@ fun UnifiedProfileSection(
                     }
                     if (onChangePhoto != null) {
                         IconButton(
-                            onClick = { if (!isUploadingPhoto) profilePhotoPicker.launch("image/*") },
+                            onClick = {
+                                if (!isUploadingPhoto) {
+                                    profilePhotoPicker.launch(
+                                        androidx.activity.result.PickVisualMediaRequest(
+                                            androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly
+                                        )
+                                    )
+                                }
+                            },
                             enabled = !isUploadingPhoto,
                             modifier = Modifier
                                 .fillMaxSize()

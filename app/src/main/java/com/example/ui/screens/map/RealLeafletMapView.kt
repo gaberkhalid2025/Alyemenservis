@@ -96,6 +96,11 @@ fun RealLeafletMapView(
     quakesJson: String? = null,
     rainUrl: String? = null,
     onOverlayStatus: ((name: String, failing: Boolean, msg: String) -> Unit)? = null,
+    offlineOnly: Boolean = false,
+    isValhallaDownloaded: Boolean = false,
+    valhallaSizeMb: Int = 0,
+    realTimeSatEnabled: Boolean = false,
+    realTimeSatFeed: String = "globalvis",
     themeColors: VisualThemePalette = resolveThemePalette(AdminSettingsEntity()),
     modifier: Modifier = Modifier
 ) {
@@ -120,6 +125,7 @@ fun RealLeafletMapView(
     val onMapCenterChangedState by rememberUpdatedState(onMapCenterChanged)
     val onGibsStatusState by rememberUpdatedState(onGibsStatus)
     val onOverlayStatusState by rememberUpdatedState(onOverlayStatus)
+    val offlineOnlyState by rememberUpdatedState(offlineOnly)
 
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner, webViewRef) {
@@ -346,6 +352,12 @@ fun RealLeafletMapView(
         }
     }
 
+    LaunchedEffect(isMapReady, tilt, rotation) {
+        if (isMapReady && webViewRef != null) {
+            webViewRef?.evaluateJavascript("if (window.setMapPerspective) { window.setMapPerspective($tilt, $rotation); }", null)
+        }
+    }
+
     LaunchedEffect(isMapReady, gibsEnabled, gibsProduct) {
         if (isMapReady && webViewRef != null) {
             val key = gibsProduct.replace("'", "").replace("\"", "")
@@ -356,6 +368,19 @@ fun RealLeafletMapView(
     LaunchedEffect(isMapReady, eoxEnabled) {
         if (isMapReady && webViewRef != null) {
             webViewRef?.evaluateJavascript("if (window.setEox) { window.setEox($eoxEnabled); }", null)
+        }
+    }
+
+    LaunchedEffect(isMapReady, realTimeSatEnabled, realTimeSatFeed) {
+        if (isMapReady && webViewRef != null) {
+            val safeFeed = realTimeSatFeed.replace("'", "").replace("\"", "")
+            webViewRef?.evaluateJavascript("if (window.setRealTimeSat) { window.setRealTimeSat($realTimeSatEnabled, '$safeFeed'); }", null)
+        }
+    }
+
+    LaunchedEffect(isMapReady, offlineOnly, isValhallaDownloaded, valhallaSizeMb) {
+        if (isMapReady && webViewRef != null) {
+            webViewRef?.evaluateJavascript("if (window.setValhallaOfflineLayer) { window.setValhallaOfflineLayer($offlineOnly, $isValhallaDownloaded, $valhallaSizeMb); }", null)
         }
     }
 
@@ -500,6 +525,7 @@ fun RealLeafletMapView(
                                 "carto.com",
                                 "earthdata.nasa.gov",
                                 "s2maps.eu",
+                                "realearth.ssec.wisc.edu",
                                 "creativecommons.org",
                                 "www.rainviewer.com"
                             )
@@ -510,7 +536,7 @@ fun RealLeafletMapView(
                             ): WebResourceResponse? {
                                 val url = request?.url?.toString() ?: return null
                                 return try {
-                                    OfflineTileInterceptor.intercept(context, url)
+                                    OfflineTileInterceptor.intercept(context, url, offlineOnly = offlineOnlyState)
                                 } catch (_: Throwable) {
                                     null
                                 }

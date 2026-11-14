@@ -112,11 +112,11 @@ class PaymentGatewayIntegration(private val context: Context? = null) {
         val list = getGateways(safeCtx).toMutableList()
         list.removeAll { it.id == config.id }
 
-        // Encrypt sensitive fields securely before storage
+        // Encrypt sensitive fields securely with cross-device key matching getDecryptedConfig
         val secureConfig = config.copy(
-            apiKey = if (config.apiKey.isNotBlank() && !config.apiKey.startsWith("gcm:")) SecurityCryptoUtils.encrypt(config.apiKey) else config.apiKey,
-            secret = if (config.secret.isNotBlank() && !config.secret.startsWith("gcm:")) SecurityCryptoUtils.encrypt(config.secret) else config.secret,
-            merchantId = if (config.merchantId.isNotBlank() && !config.merchantId.startsWith("gcm:")) SecurityCryptoUtils.encrypt(config.merchantId) else config.merchantId
+            apiKey = if (config.apiKey.isNotBlank() && !config.apiKey.startsWith("gcm:")) SecurityCryptoUtils.encryptCrossDevice(config.apiKey) else config.apiKey,
+            secret = if (config.secret.isNotBlank() && !config.secret.startsWith("gcm:")) SecurityCryptoUtils.encryptCrossDevice(config.secret) else config.secret,
+            merchantId = if (config.merchantId.isNotBlank() && !config.merchantId.startsWith("gcm:")) SecurityCryptoUtils.encryptCrossDevice(config.merchantId) else config.merchantId
         )
 
         list.add(secureConfig)
@@ -213,28 +213,42 @@ class PaymentGatewayIntegration(private val context: Context? = null) {
             val matchedGateway = gateways.find { it.id.equals(payment.method.trim(), ignoreCase = true) }
 
             if (matchedGateway != null && matchedGateway.isEnabled && matchedGateway.apiKey.isNotBlank() && isSystemEnabled) {
-                // Real Gateway live integration triggered!
                 val decConfig = getDecryptedConfig(matchedGateway)
-                // Simulate real secured HTTP call to gateway decConfig.endpoint with credentials
-                val realTxId = "TXN-LIVE-${UUID.randomUUID().toString().take(12).uppercase()}"
-                activeTransactions[realTxId] = payment.copy(id = realTxId)
+                val txId = "TXN-PENDING-${UUID.randomUUID().toString().take(12).uppercase()}"
+                val recordedPayment = payment.copy(id = txId)
+                activeTransactions[txId] = recordedPayment
+                try {
+                    firestore.collection("payment_transactions").document(txId).set(
+                        mapOf(
+                            "id" to txId,
+                            "userId" to recordedPayment.userId,
+                            "amount" to recordedPayment.amount,
+                            "method" to recordedPayment.method,
+                            "currency" to recordedPayment.currency,
+                            "transferId" to recordedPayment.transferId,
+                            "gatewayName" to decConfig.name,
+                            "status" to "PENDING_VERIFICATION",
+                            "timestamp" to recordedPayment.timestamp
+                        )
+                    )
+                } catch (_: Exception) {}
 
                 val result = PaymentResult(
                     success = true,
-                    transactionId = realTxId,
-                    message = "تمت عملية السداد بنجاح حقيقي وآمن عبر بوابة ${decConfig.name} الرقمية.",
+                    transactionId = txId,
+                    message = "تم تسجيل طلب الدفع رقم $txId لدى بوابة ${decConfig.name} بانتظار تأكيد السداد.",
                     timestamp = System.currentTimeMillis()
                 )
                 Result.success(result)
             } else {
-                // Fallback to local secure demo mode
-                val demoTxId = "TXN-DEMO-${UUID.randomUUID().toString().take(10).uppercase()}"
+                // Local sandbox mode when no gateway API is configured
+                val demoTxId = "TXN-LOCAL-${UUID.randomUUID().toString().take(10).uppercase()}"
                 activeTransactions[demoTxId] = payment.copy(id = demoTxId)
 
                 val result = PaymentResult(
                     success = true,
                     transactionId = demoTxId,
-                    message = "تمت عملية الدفع بنجاح (وضع محلي تجريبي) لعدم تفعيل ربط بوابة حقيقية.",
+                    message = "تم تسجيل العملية محلياً برقم $demoTxId (بوابة الدفع الإلكتروني غير مفعلة حالياً).",
                     timestamp = System.currentTimeMillis()
                 )
                 Result.success(result)

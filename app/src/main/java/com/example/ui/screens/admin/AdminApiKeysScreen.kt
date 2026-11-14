@@ -63,11 +63,13 @@ fun AdminApiKeysScreenContent(
     var openaiApiKey by remember { mutableStateOf("") }
     var selectedAiModel by remember { mutableStateOf("gemini-1.5-flash") }
     var showGeminiKey by remember { mutableStateOf(false) }
+    var showOpenAiKey by remember { mutableStateOf(false) }
 
     var googleMapsKey by remember { mutableStateOf("") }
     var mapboxKey by remember { mutableStateOf("") }
     var selectedMapEngine by remember { mutableStateOf("OPEN_STREET_MAP") }
     var showMapsKey by remember { mutableStateOf(false) }
+    var showMapboxKey by remember { mutableStateOf(false) }
 
     var kuraimiToken by remember { mutableStateOf("") }
     var jawwalPayKey by remember { mutableStateOf("") }
@@ -77,12 +79,16 @@ fun AdminApiKeysScreenContent(
     var webhookUrl by remember { mutableStateOf("") }
     var whatsappToken by remember { mutableStateOf("") }
     var smsGatewayKey by remember { mutableStateOf("") }
+    var showWebhookUrl by remember { mutableStateOf(false) }
+    var showWhatsappToken by remember { mutableStateOf(false) }
+    var showSmsKey by remember { mutableStateOf(false) }
 
     val customKeys = remember { mutableStateListOf<Triple<String, String, String>>() }
     var showAddCustomKeyDialog by remember { mutableStateOf(false) }
     var newKeyName by remember { mutableStateOf("") }
     var newKeyValue by remember { mutableStateOf("") }
     var newKeyEndpoint by remember { mutableStateOf("") }
+    var showNewKeyValue by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         geminiApiKey = apiKeyRepository.getApiKey("geminiApiKey").getOrDefault("")
@@ -136,7 +142,12 @@ fun AdminApiKeysScreenContent(
                     value = openaiApiKey,
                     onValueChange = { openaiApiKey = it },
                     label = { Text("OpenAI / DeepSeek API Key (اختياري)") },
-                    visualTransformation = PasswordVisualTransformation(),
+                    visualTransformation = if (showOpenAiKey) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = {
+                        IconButton(onClick = { showOpenAiKey = !showOpenAiKey }) {
+                            Icon(if (showOpenAiKey) Icons.Default.VisibilityOff else Icons.Default.Visibility, contentDescription = "إظهار/إخفاء", tint = Color.Gray)
+                        }
+                    },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(10.dp),
                     colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
@@ -164,7 +175,7 @@ fun AdminApiKeysScreenContent(
                     visualTransformation = if (showMapsKey) VisualTransformation.None else PasswordVisualTransformation(),
                     trailingIcon = {
                         IconButton(onClick = { showMapsKey = !showMapsKey }) {
-                            Icon(if (showMapsKey) Icons.Default.Close else Icons.Default.Done, contentDescription = null, tint = Color.Gray)
+                            Icon(if (showMapsKey) Icons.Default.VisibilityOff else Icons.Default.Visibility, contentDescription = "إظهار/إخفاء", tint = Color.Gray)
                         }
                     },
                     modifier = Modifier.fillMaxWidth(),
@@ -176,6 +187,12 @@ fun AdminApiKeysScreenContent(
                     value = mapboxKey,
                     onValueChange = { mapboxKey = it },
                     label = { Text("Mapbox Access Token (اختياري)") },
+                    visualTransformation = if (showMapboxKey) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = {
+                        IconButton(onClick = { showMapboxKey = !showMapboxKey }) {
+                            Icon(if (showMapboxKey) Icons.Default.VisibilityOff else Icons.Default.Visibility, contentDescription = "إظهار/إخفاء", tint = Color.Gray)
+                        }
+                    },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(10.dp),
                     colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
@@ -249,6 +266,12 @@ fun AdminApiKeysScreenContent(
                     value = webhookUrl,
                     onValueChange = { webhookUrl = it },
                     label = { Text("رابط الخادم السحابي (Cloud Webhook URL)") },
+                    visualTransformation = if (showWebhookUrl) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = {
+                        IconButton(onClick = { showWebhookUrl = !showWebhookUrl }) {
+                            Icon(if (showWebhookUrl) Icons.Default.VisibilityOff else Icons.Default.Visibility, contentDescription = "إظهار/إخفاء", tint = Color.Gray)
+                        }
+                    },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(10.dp),
                     colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
@@ -258,6 +281,12 @@ fun AdminApiKeysScreenContent(
                     value = whatsappToken,
                     onValueChange = { whatsappToken = it },
                     label = { Text("مفتاح واتساب للأعمال (WhatsApp Cloud API Token)") },
+                    visualTransformation = if (showWhatsappToken) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = {
+                        IconButton(onClick = { showWhatsappToken = !showWhatsappToken }) {
+                            Icon(if (showWhatsappToken) Icons.Default.VisibilityOff else Icons.Default.Visibility, contentDescription = "إظهار/إخفاء", tint = Color.Gray)
+                        }
+                    },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(10.dp),
                     colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
@@ -267,6 +296,12 @@ fun AdminApiKeysScreenContent(
                     value = smsGatewayKey,
                     onValueChange = { smsGatewayKey = it },
                     label = { Text("مفتاح بوابة الرسائل القصيرة (SMS Gateway Key)") },
+                    visualTransformation = if (showSmsKey) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = {
+                        IconButton(onClick = { showSmsKey = !showSmsKey }) {
+                            Icon(if (showSmsKey) Icons.Default.VisibilityOff else Icons.Default.Visibility, contentDescription = "إظهار/إخفاء", tint = Color.Gray)
+                        }
+                    },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(10.dp),
                     colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
@@ -316,21 +351,21 @@ fun AdminApiKeysScreenContent(
                                     Text(name, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.White)
                                     Text("Endpoint: $endpoint", fontSize = 10.sp, color = Color.LightGray)
                                 }
-                                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                                     IconButton(
                                         onClick = {
                                             clipboardManager.setText(AnnotatedString(key))
                                             Toast.makeText(context, "تم نسخ المفتاح للحافظة", Toast.LENGTH_SHORT).show()
                                         },
-                                        modifier = Modifier.size(28.dp)
+                                        modifier = Modifier.size(48.dp)
                                     ) {
-                                        Icon(Icons.Default.Share, contentDescription = "نسخ", tint = Color.LightGray, modifier = Modifier.size(16.dp))
+                                        Icon(Icons.Default.Share, contentDescription = "نسخ", tint = Color.LightGray, modifier = Modifier.size(18.dp))
                                     }
                                     IconButton(
                                         onClick = { customKeys.removeAt(index) },
-                                        modifier = Modifier.size(28.dp)
+                                        modifier = Modifier.size(48.dp)
                                     ) {
-                                        Icon(Icons.Default.Delete, contentDescription = "حذف", tint = Color.Red, modifier = Modifier.size(16.dp))
+                                        Icon(Icons.Default.Delete, contentDescription = "حذف", tint = Color.Red, modifier = Modifier.size(18.dp))
                                     }
                                 }
                             }
@@ -392,6 +427,12 @@ fun AdminApiKeysScreenContent(
                         value = newKeyValue,
                         onValueChange = { newKeyValue = it },
                         label = { Text("مفتاح API السري") },
+                        visualTransformation = if (showNewKeyValue) VisualTransformation.None else PasswordVisualTransformation(),
+                        trailingIcon = {
+                            IconButton(onClick = { showNewKeyValue = !showNewKeyValue }) {
+                                Icon(if (showNewKeyValue) Icons.Default.VisibilityOff else Icons.Default.Visibility, contentDescription = "إظهار/إخفاء", tint = Color.Gray)
+                            }
+                        },
                         modifier = Modifier.fillMaxWidth()
                     )
                     OutlinedTextField(

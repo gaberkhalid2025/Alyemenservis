@@ -44,7 +44,7 @@ fun AdminReportsPanel(
             "📢 البلاغات الواردة وشكاوى المواطنين (${reports.size}):",
             fontSize = 14.sp,
             fontWeight = FontWeight.Bold,
-            color = Color.White
+            color = themeColors.textPrimary
         )
         Text(
             "استخدم الفلتر الذكي للبحث عن بلاغات فني أو مواطن معين وتصدير السجلات:",
@@ -58,8 +58,8 @@ fun AdminReportsPanel(
             label = { Text("بحث باسم الفني أو المشتكي...") },
             modifier = Modifier.fillMaxWidth(),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedTextColor = Color.White,
-                unfocusedTextColor = Color.White
+                focusedTextColor = themeColors.textPrimary,
+                unfocusedTextColor = themeColors.textPrimary
             ),
             trailingIcon = {
                 Icon(
@@ -77,7 +77,6 @@ fun AdminReportsPanel(
             Button(
                 onClick = {
                     viewModel.exportComplaintsToCSV()
-                    Toast.makeText(context, "تم تصدير سجل الشكاوى بصيغة CSV بنجاح 📁", Toast.LENGTH_SHORT).show()
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
                 modifier = Modifier.weight(1f)
@@ -87,7 +86,6 @@ fun AdminReportsPanel(
             Button(
                 onClick = {
                     viewModel.exportComplaintsToPDF()
-                    Toast.makeText(context, "تم تصدير مستند الشكاوى بصيغة PDF بنجاح 📄", Toast.LENGTH_SHORT).show()
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
                 modifier = Modifier.weight(1f)

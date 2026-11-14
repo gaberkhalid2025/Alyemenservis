@@ -11,6 +11,8 @@ import com.example.utils.NavWaypoint
 
 enum class MapMode { OSM, HOT, TOPO, SATELLITE, SATELLITE_CLARITY, VELA, VELA_3D, AR_VPS, ALEPH_ASSISTANT }
 
+enum class MapLayer { STANDARD, VALHALLA_OFFLINE }
+
 @Stable
 class MapScreenState(
     isRadarMode: Boolean = false,
@@ -27,9 +29,13 @@ class MapScreenState(
     var showStreetAlertDialog by mutableStateOf(false)
     var currentMapMode by mutableStateOf(initialMapMode)
     var previousMapMode by mutableStateOf(initialMapMode)
+    var mapLayer by mutableStateOf(MapLayer.STANDARD)
+    var is3DTerrainEnabled by mutableStateOf(false)
     var nightMode by mutableStateOf(false)
     var gibsEnabled by mutableStateOf(false)
     var gibsProduct by mutableStateOf("truecolor")
+    var realTimeSatEnabled by mutableStateOf(false)
+    var realTimeSatFeed by mutableStateOf("globalvis")
     var eoxEnabled by mutableStateOf(false)
     var quakesEnabled by mutableStateOf(false)
     var rainEnabled by mutableStateOf(false)
@@ -39,6 +45,7 @@ class MapScreenState(
     var hazardEnabled by mutableStateOf(false)
     var zoomInTick by mutableIntStateOf(0)
     var zoomOutTick by mutableIntStateOf(0)
+    var recenterTick by mutableIntStateOf(0)
 
     fun toggleMapMode(target: MapMode) {
         if (currentMapMode == target) {
@@ -150,7 +157,8 @@ class MapScreenState(
                 try {
                     listOf(
                         it.isRadarMode, it.isHeatmapActive, it.selectedCategory, it.selectedCity, it.searchQuery,
-                        it.maxRangeKm, it.currentMapMode.name, it.isNavigating, encode(it.navWaypoints)
+                        it.maxRangeKm, it.currentMapMode.name, it.isNavigating, encode(it.navWaypoints),
+                        it.mapLayer.name, it.is3DTerrainEnabled
                     )
                 } catch (_: Throwable) {
                     emptyList()
@@ -160,6 +168,8 @@ class MapScreenState(
                 try {
                     val rawMode = try { MapMode.valueOf(list.getOrNull(6) as? String ?: "SATELLITE") } catch (_: Throwable) { MapMode.SATELLITE }
                     val mode = if (rawMode == MapMode.VELA_3D) MapMode.SATELLITE else rawMode
+                    val restoredLayer = try { MapLayer.valueOf(list.getOrNull(9) as? String ?: "STANDARD") } catch (_: Throwable) { MapLayer.STANDARD }
+                    val restored3D = (list.getOrNull(10) as? Boolean) ?: false
                     MapScreenState(
                         isRadarMode = (list.getOrNull(0) as? Boolean) ?: false,
                         isHeatmapActive = (list.getOrNull(1) as? Boolean) ?: false,
@@ -169,6 +179,8 @@ class MapScreenState(
                         maxRangeKm = (list.getOrNull(5) as? Number)?.toFloat() ?: 25.0f,
                         initialMapMode = mode
                     ).also { st ->
+                        st.mapLayer = restoredLayer
+                        st.is3DTerrainEnabled = restored3D
                         val wps = decode(list.getOrNull(8) as? String ?: "")
                         if ((list.getOrNull(7) as? Boolean) == true && wps.isNotEmpty()) {
                             st.navWaypoints = wps

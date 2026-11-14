@@ -125,6 +125,9 @@ fun RestaurantDashboard(
                             },
                             onDeleteProduct = { id ->
                                 restaurantViewModel.deleteMeal(id)
+                            },
+                            onUpdateProduct = { updated ->
+                                restaurantViewModel.updateMeal(updated)
                             }
                         )
                     }
@@ -133,7 +136,7 @@ fun RestaurantDashboard(
                             bookings = restaurantOrders,
                             themeColors = themeColors,
                             onAcceptBooking = { bId -> viewModel.updateBookingStatus(bId, "IN_PREPARATION") },
-                            onRejectBooking = { bId, reason -> viewModel.updateBookingStatus(bId, "REJECTED") },
+                            onRejectBooking = { bId, _ -> viewModel.updateBookingStatus(bId, "REJECTED") },
                             onStartProgress = { bId -> viewModel.updateBookingStatus(bId, "READY") },
                             onCompleteBooking = { bId -> viewModel.updateBookingStatus(bId, "DELIVERED") },
                             onChatWithClient = { phone ->
@@ -152,14 +155,17 @@ fun RestaurantDashboard(
                         )
                     }
                     2 -> {
-                        TabOffersCoupons(themeColors = themeColors)
+                        TabOffersCoupons(
+                            storeId = account.id,
+                            themeColors = themeColors
+                        )
                     }
                     3 -> {
                         TabReviewsFeedback(
                             reviews = uiState.reviews,
                             themeColors = themeColors,
                             onReplySubmit = { revId, reply ->
-                                Toast.makeText(context, "تم الرد على تقييم المطعم بنجاح ✅", Toast.LENGTH_SHORT).show()
+                                restaurantViewModel.replyToReview(revId, reply)
                             }
                         )
                     }
@@ -172,15 +178,35 @@ fun RestaurantDashboard(
                             workingHours = account.workingHours,
                             photoUrl = account.logoImage,
                             coverUrl = account.coverImage,
-                            isAvailable = true,
+                            isAvailable = account.rawStore?.isActive ?: true,
                             rating = account.rating.toDouble(),
                             reviewCount = account.numReviews,
                             themeColors = themeColors,
-                            onSaveProfile = { name, phone, city, desc, hours, available ->
-                                Toast.makeText(context, "تم تحديث بيانات المطعم بنجاح ✅", Toast.LENGTH_SHORT).show()
+                            onChangePhoto = { url ->
+                                restaurantViewModel.updateProfile(
+                                    name = account.name,
+                                    cityArea = account.neighborhood.ifBlank { account.cityId },
+                                    description = account.description,
+                                    workingHours = account.workingHours,
+                                    isAvailable = account.rawStore?.isActive ?: true,
+                                    photoUrl = url
+                                )
+                            },
+                            onChangeCover = { url ->
+                                restaurantViewModel.updateProfile(
+                                    name = account.name,
+                                    cityArea = account.neighborhood.ifBlank { account.cityId },
+                                    description = account.description,
+                                    workingHours = account.workingHours,
+                                    isAvailable = account.rawStore?.isActive ?: true,
+                                    coverUrl = url
+                                )
+                            },
+                            onSaveProfile = { name, _, city, desc, hours, available ->
+                                restaurantViewModel.updateProfile(name, city, desc, hours, available)
                             },
                             onChangePassword = { oldP, newP ->
-                                Toast.makeText(context, "تم تغيير كلمة المرور بنجاح 🔑", Toast.LENGTH_SHORT).show()
+                                restaurantViewModel.changePassword(oldP, newP)
                             }
                         )
                     }

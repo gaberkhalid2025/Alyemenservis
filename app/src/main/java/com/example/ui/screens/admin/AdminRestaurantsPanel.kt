@@ -6,9 +6,11 @@ import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -18,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.StoreEntity
@@ -114,7 +117,7 @@ fun AdminRestaurantsPanel(
                             text = "🍔 إدارة المطاعم والكافيهات (${restaurants.size})",
                             fontSize = 13.5.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White
+                            color = themeColors.textPrimary
                         )
                     }
 
@@ -122,7 +125,8 @@ fun AdminRestaurantsPanel(
                         onClick = { showAddDialog = true },
                         colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
                         shape = RoundedCornerShape(8.dp),
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                        modifier = Modifier.heightIn(min = 48.dp)
                     ) {
                         Icon(Icons.Default.Add, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
@@ -134,29 +138,29 @@ fun AdminRestaurantsPanel(
                 OutlinedTextField(
                     value = searchQuery,
                     onValueChange = { searchQuery = it },
-                    placeholder = { Text("بحث باسم المطعم، الكافيه، المدينة، الهاتف...", fontSize = 11.5.sp, color = Color.Gray) },
+                    placeholder = { Text("بحث باسم المطعم، الكافيه، المدينة، الهاتف...", fontSize = 11.5.sp, color = themeColors.textSecondary) },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(10.dp),
                     leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = themeColors.accent, modifier = Modifier.size(18.dp)) },
                     trailingIcon = {
                         if (searchQuery.isNotEmpty()) {
-                            IconButton(onClick = { searchQuery = "" }) {
-                                Icon(Icons.Default.Clear, contentDescription = "مسح", tint = Color.Gray, modifier = Modifier.size(16.dp))
+                            IconButton(onClick = { searchQuery = "" }, modifier = Modifier.size(48.dp)) {
+                                Icon(Icons.Default.Clear, contentDescription = "مسح", tint = themeColors.textSecondary, modifier = Modifier.size(16.dp))
                             }
                         }
                     },
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
+                        focusedTextColor = themeColors.textPrimary,
+                        unfocusedTextColor = themeColors.textPrimary,
                         focusedBorderColor = themeColors.accent,
-                        unfocusedBorderColor = Color.White.copy(alpha = 0.15f)
+                        unfocusedBorderColor = themeColors.textSecondary.copy(alpha = 0.25f)
                     )
                 )
 
                 // Category Chips
                 val categories = listOf("الكل", "مطاعم", "كافيهات", "حلويات", "VIP", "محظور")
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    items(categories) { cat ->
+                    items(categories, key = { it }) { cat ->
                         val isSelected = selectedCategory == cat
                         FilterChip(
                             selected = isSelected,
@@ -165,8 +169,8 @@ fun AdminRestaurantsPanel(
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = themeColors.accent,
                                 selectedLabelColor = Color.Black,
-                                containerColor = Color.White.copy(alpha = 0.05f),
-                                labelColor = Color.White
+                                containerColor = themeColors.textPrimary.copy(alpha = 0.05f),
+                                labelColor = themeColors.textPrimary
                             )
                         )
                     }
@@ -182,121 +186,130 @@ fun AdminRestaurantsPanel(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-                    Text("لا توجد مطاعم أو كافيهات مطابقة 🍔", color = Color.Gray, fontSize = 13.sp)
+                    Text("لا توجد مطاعم أو كافيهات مطابقة 🍔", color = themeColors.textSecondary, fontSize = 13.sp)
                 }
             }
         } else {
-            filteredList.forEach { item ->
-                AdminEntityCard(
-                    title = item.name.ifBlank { "مطعم / كافيه" },
-                    subtitle = "📍 ${item.cityId} - ${item.localNeighborhood.ifBlank { "الرئيسي" }} • 📱 ${item.phone}",
-                    details = "🍽️ النشاط: ${item.description.ifBlank { "مأكولات ومشروبات" }}",
-                    statusText = if (item.isBlocked) "🚫 محظور" else if (item.isVip) "⭐ VIP" else if (item.isActive) "نشط ✅" else "غير نشط ⏸️",
-                    statusColor = if (item.isBlocked) Color(0xFFEF4444) else if (item.isVip) Color(0xFFF59E0B) else if (item.isActive) Color(0xFF10B981) else Color.Gray,
-                    isVip = item.isVip,
-                    isBlocked = item.isBlocked,
-                    themeColors = themeColors,
-                    actions = {
-                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                                    Checkbox(
-                                        checked = item.isVip,
-                                        onCheckedChange = {
-                                            viewModel.adminViewModel.setStoreVip(item.id, it)
-                                            Toast.makeText(context, if (it) "تم تفعيل شارة VIP ⭐" else "تم إلغاء VIP", Toast.LENGTH_SHORT).show()
-                                        },
-                                        colors = CheckboxDefaults.colors(checkedColor = Color(0xFFF59E0B)),
-                                        modifier = Modifier.size(24.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(2.dp))
-                                    Text("VIP ⭐", fontSize = 10.sp, color = Color.White)
-                                }
-
-                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                                    Checkbox(
-                                        checked = item.isVerified,
-                                        onCheckedChange = {
-                                            viewModel.adminViewModel.setStoreVerified(item.id, it)
-                                            Toast.makeText(context, if (it) "تم توثيق المطعم ✅" else "تم إلغاء التوثيق", Toast.LENGTH_SHORT).show()
-                                        },
-                                        colors = CheckboxDefaults.colors(checkedColor = Color(0xFF3B82F6)),
-                                        modifier = Modifier.size(24.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(2.dp))
-                                    Text("موثق 🛡️", fontSize = 10.sp, color = Color.White)
-                                }
-
-                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                                    Checkbox(
-                                        checked = item.isRecommended,
-                                        onCheckedChange = {
-                                            viewModel.adminViewModel.setStoreRecommended(item.id, it)
-                                        },
-                                        colors = CheckboxDefaults.colors(checkedColor = Color(0xFFEC4899)),
-                                        modifier = Modifier.size(24.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(2.dp))
-                                    Text("موصى به 🔥", fontSize = 10.sp, color = Color.White)
-                                }
-                            }
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                OutlinedButton(
-                                    onClick = {
-                                        viewModel.adminViewModel.setStoreBlocked(item.id, !item.isBlocked, "حظر إداري")
-                                        Toast.makeText(context, if (item.isBlocked) "تم فك الحظر عن المطعم ✅" else "تم حظر المطعم 🚫", Toast.LENGTH_SHORT).show()
-                                    },
-                                    shape = RoundedCornerShape(8.dp),
-                                    border = BorderStroke(1.dp, if (item.isBlocked) Color(0xFF10B981) else Color(0xFFEF4444)),
-                                    modifier = Modifier.weight(1f),
-                                    contentPadding = PaddingValues(vertical = 4.dp)
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth().heightIn(max = 560.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(filteredList, key = { it.id }) { item ->
+                    AdminEntityCard(
+                        title = item.name.ifBlank { "مطعم / كافيه" },
+                        subtitle = "📍 ${item.cityId} - ${item.localNeighborhood.ifBlank { "الرئيسي" }} • 📱 ${item.phone}",
+                        details = "🍽️ النشاط: ${item.description.ifBlank { "مأكولات ومشروبات" }}",
+                        imageUrl = item.logoImage.ifBlank { item.coverImage }.ifBlank { null },
+                        statusText = if (item.isBlocked) "🚫 محظور" else if (item.isVip) "⭐ VIP" else if (item.isActive) "نشط ✅" else "غير نشط ⏸️",
+                        statusColor = if (item.isBlocked) Color(0xFFEF4444) else if (item.isVip) Color(0xFFF59E0B) else if (item.isActive) Color(0xFF10B981) else Color.Gray,
+                        isVip = item.isVip,
+                        isBlocked = item.isBlocked,
+                        themeColors = themeColors,
+                        actions = {
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text(
-                                        if (item.isBlocked) "فك الحظر ✅" else "حظر 🚫",
-                                        fontSize = 10.5.sp,
-                                        color = if (item.isBlocked) Color(0xFF10B981) else Color(0xFFEF4444)
-                                    )
-                                }
+                                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                        Checkbox(
+                                            checked = item.isVip,
+                                            onCheckedChange = {
+                                                viewModel.adminViewModel.setStoreVip(item.id, it)
+                                                Toast.makeText(context, if (it) "تم تفعيل شارة VIP ⭐" else "تم إلغاء VIP", Toast.LENGTH_SHORT).show()
+                                            },
+                                            colors = CheckboxDefaults.colors(checkedColor = Color(0xFFF59E0B)),
+                                            modifier = Modifier.size(24.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(2.dp))
+                                        Text("VIP ⭐", fontSize = 10.sp, color = themeColors.textPrimary)
+                                    }
 
-                                if (item.phone.isNotBlank()) {
-                                    IconButton(
-                                        onClick = {
-                                            try {
-                                                val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${item.phone}"))
-                                                context.startActivity(intent)
-                                            } catch (e: Exception) {
-                                                Toast.makeText(context, "تعذر فتح تطبيق الاتصال", Toast.LENGTH_SHORT).show()
-                                            }
-                                        },
-                                        modifier = Modifier.background(Color(0xFF10B981).copy(alpha = 0.15f), RoundedCornerShape(8.dp))
-                                    ) {
-                                        Icon(Icons.Default.Call, contentDescription = "اتصال", tint = Color(0xFF10B981), modifier = Modifier.size(18.dp))
+                                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                        Checkbox(
+                                            checked = item.isVerified,
+                                            onCheckedChange = {
+                                                viewModel.adminViewModel.setStoreVerified(item.id, it)
+                                                Toast.makeText(context, if (it) "تم توثيق المطعم ✅" else "تم إلغاء التوثيق", Toast.LENGTH_SHORT).show()
+                                            },
+                                            colors = CheckboxDefaults.colors(checkedColor = Color(0xFF3B82F6)),
+                                            modifier = Modifier.size(24.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(2.dp))
+                                        Text("موثق 🛡️", fontSize = 10.sp, color = themeColors.textPrimary)
+                                    }
+
+                                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                        Checkbox(
+                                            checked = item.isRecommended,
+                                            onCheckedChange = {
+                                                viewModel.adminViewModel.setStoreRecommended(item.id, it)
+                                            },
+                                            colors = CheckboxDefaults.colors(checkedColor = Color(0xFFEC4899)),
+                                            modifier = Modifier.size(24.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(2.dp))
+                                        Text("موصى به 🔥", fontSize = 10.sp, color = themeColors.textPrimary)
                                     }
                                 }
 
-                                IconButton(
-                                    onClick = {
-                                        viewModel.adminViewModel.deleteStore(item.id)
-                                        Toast.makeText(context, "🗑️ تم حذف المطعم", Toast.LENGTH_SHORT).show()
-                                    },
-                                    modifier = Modifier.background(Color(0xFFEF5350).copy(alpha = 0.15f), RoundedCornerShape(8.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color(0xFFEF5350), modifier = Modifier.size(18.dp))
+                                    OutlinedButton(
+                                        onClick = {
+                                            viewModel.adminViewModel.setStoreBlocked(item.id, !item.isBlocked, "حظر إداري")
+                                            Toast.makeText(context, if (item.isBlocked) "تم فك الحظر عن المطعم ✅" else "تم حظر المطعم 🚫", Toast.LENGTH_SHORT).show()
+                                        },
+                                        shape = RoundedCornerShape(8.dp),
+                                        border = BorderStroke(1.dp, if (item.isBlocked) Color(0xFF10B981) else Color(0xFFEF4444)),
+                                        modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                                        contentPadding = PaddingValues(vertical = 4.dp)
+                                    ) {
+                                        Text(
+                                            if (item.isBlocked) "فك الحظر ✅" else "حظر 🚫",
+                                            fontSize = 10.5.sp,
+                                            color = if (item.isBlocked) Color(0xFF10B981) else Color(0xFFEF4444)
+                                        )
+                                    }
+
+                                    if (item.phone.isNotBlank()) {
+                                        IconButton(
+                                            onClick = {
+                                                try {
+                                                    val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${item.phone}"))
+                                                    context.startActivity(intent)
+                                                } catch (e: Exception) {
+                                                    Toast.makeText(context, "تعذر فتح تطبيق الاتصال", Toast.LENGTH_SHORT).show()
+                                                }
+                                            },
+                                            modifier = Modifier
+                                                .size(48.dp)
+                                                .background(Color(0xFF10B981).copy(alpha = 0.15f), RoundedCornerShape(8.dp))
+                                        ) {
+                                            Icon(Icons.Default.Call, contentDescription = "اتصال", tint = Color(0xFF10B981), modifier = Modifier.size(18.dp))
+                                        }
+                                    }
+
+                                    IconButton(
+                                        onClick = {
+                                            viewModel.adminViewModel.deleteStore(item.id)
+                                            Toast.makeText(context, "🗑️ تم حذف المطعم", Toast.LENGTH_SHORT).show()
+                                        },
+                                        modifier = Modifier
+                                            .size(48.dp)
+                                            .background(Color(0xFFEF5350).copy(alpha = 0.15f), RoundedCornerShape(8.dp))
+                                    ) {
+                                        Icon(Icons.Default.Delete, contentDescription = "حذف", tint = Color(0xFFEF5350), modifier = Modifier.size(18.dp))
+                                    }
                                 }
                             }
                         }
-                    }
-                )
-                Spacer(modifier = Modifier.height(8.dp))
+                    )
+                }
             }
         }
     }
@@ -311,7 +324,7 @@ fun AdminRestaurantsPanel(
 
         AlertDialog(
             onDismissRequest = { showAddDialog = false },
-            title = { Text("➕ إضافة مطعم أو كافيه جديد", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color.White) },
+            title = { Text("➕ إضافة مطعم أو كافيه جديد", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = themeColors.textPrimary) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
@@ -324,6 +337,8 @@ fun AdminRestaurantsPanel(
                         value = restPhone,
                         onValueChange = { restPhone = it },
                         label = { Text("رقم الهاتف والطلبات") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                        singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
                     OutlinedTextField(
@@ -353,6 +368,11 @@ fun AdminRestaurantsPanel(
                             Toast.makeText(context, "يرجى كتابة اسم المطعم", Toast.LENGTH_SHORT).show()
                             return@Button
                         }
+                        val cleanPhone = restPhone.filter { it.isDigit() }
+                        if (restPhone.isNotBlank() && cleanPhone.length < 9) {
+                            Toast.makeText(context, "يرجى إدخال رقم هاتف صحيح (9 أرقام على الأقل)", Toast.LENGTH_SHORT).show()
+                            return@Button
+                        }
                         val newStore = StoreEntity(
                             id = "rest_${System.currentTimeMillis()}",
                             name = restName.trim(),
@@ -376,10 +396,10 @@ fun AdminRestaurantsPanel(
             },
             dismissButton = {
                 TextButton(onClick = { showAddDialog = false }) {
-                    Text("إلغاء", color = Color.Gray)
+                    Text("إلغاء", color = themeColors.textSecondary)
                 }
             },
-            containerColor = Color(0xFF1E293B)
+            containerColor = themeColors.surface
         )
     }
 }

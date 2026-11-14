@@ -74,7 +74,7 @@ fun AdminPermissionsActionsSection(
                                 text = "🛡️ مصفوفة الصلاحيات الشاملة (538 صلاحية)",
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Color.White
+                                color = themeColors.textPrimary
                             )
                             Text(
                                 text = "38 مجالاً وقطاعاً إدارياً مفصلاً بدون أي اختصار",
@@ -118,7 +118,7 @@ fun AdminPermissionsActionsSection(
                     text = "⚡ إجراءات جماعية سريعة:",
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White
+                    color = themeColors.textPrimary
                 )
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -165,18 +165,18 @@ fun AdminPermissionsActionsSection(
                     leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = themeColors.accent, modifier = Modifier.size(18.dp)) },
                     trailingIcon = {
                         if (searchQuery.isNotEmpty()) {
-                            IconButton(onClick = { permsViewModel.setSearchQuery("") }) {
-                                Icon(Icons.Default.Close, contentDescription = "مسح", tint = Color.Gray, modifier = Modifier.size(16.dp))
+                            IconButton(onClick = { permsViewModel.setSearchQuery("") }, modifier = Modifier.size(48.dp)) {
+                                Icon(Icons.Default.Close, contentDescription = "مسح", tint = themeColors.textSecondary, modifier = Modifier.size(16.dp))
                             }
                         }
                     },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
+                        focusedTextColor = themeColors.textPrimary,
+                        unfocusedTextColor = themeColors.textPrimary,
                         focusedBorderColor = themeColors.accent,
-                        unfocusedBorderColor = Color.Gray.copy(alpha = 0.4f)
+                        unfocusedBorderColor = themeColors.textSecondary.copy(alpha = 0.4f)
                     )
                 )
 
@@ -281,7 +281,7 @@ fun AdminPermissionsSaveBar(
                         text = "💾 مزامنة وحفظ مصفوفة الصلاحيات",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White
+                        color = themeColors.textPrimary
                     )
                     Text(
                         text = "الدور المحدد: $selectedRole | الصلاحيات الممنوحة: ${activePermissions.size} / 538",
@@ -292,7 +292,7 @@ fun AdminPermissionsSaveBar(
             }
             Button(
                 onClick = {
-                    viewModel.settingsViewModel.saveCustomPermissionsMatrixToFirestore(activePermissions.toList())
+                    viewModel.settingsViewModel.saveCustomPermissionsMatrixToFirestore(activePermissions.toList(), selectedRole)
                     viewModel.triggerNotification("✅ تم حفظ ومزامنة مصفوفة الـ 538 صلاحية للدور $selectedRole بنجاح!")
                     Toast.makeText(
                         context,

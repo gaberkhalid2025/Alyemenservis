@@ -186,21 +186,7 @@ fun MapControls(
 
             HorizontalDivider(modifier = Modifier.width(34.dp), color = Color.White.copy(alpha = 0.08f))
 
-            // 6. Map Layers (طبقات الخريطة)
-            DockButton(
-                icon = Icons.Default.Layers,
-                label = "طبقات",
-                active = hasLayerOverlayActive,
-                activeColor = Color(0xFFFBBF24),
-                inactiveColor = Color(0xFFFBBF24),
-                onClick = onOpenLayerDialog,
-                testTag = "map_layers_btn",
-                contentDescription = "طبقات الخريطة"
-            )
-
-            HorizontalDivider(modifier = Modifier.width(34.dp), color = Color.White.copy(alpha = 0.08f))
-
-            // 7. GPS Button (موقعي الحالي)
+            // 6. GPS Button (موقعي الحالي)
             Surface(
                 onClick = onRecenterLocation,
                 shape = RoundedCornerShape(10.dp),
@@ -245,7 +231,7 @@ fun MapControls(
 
             HorizontalDivider(modifier = Modifier.width(34.dp), color = Color.White.copy(alpha = 0.08f))
 
-            // 8. ➕ تكبير مباشر
+            // 7. ➕ تكبير مباشر
             DockButton(
                 icon = Icons.Default.Add,
                 label = "تكبير",
@@ -255,7 +241,7 @@ fun MapControls(
                 contentDescription = "تكبير الخريطة"
             )
 
-            // 9. ➖ تصغير مباشر
+            // 8. ➖ تصغير مباشر
             DockButton(
                 icon = Icons.Default.Remove,
                 label = "تصغير",
@@ -267,21 +253,33 @@ fun MapControls(
 
             HorizontalDivider(modifier = Modifier.width(34.dp), color = Color.White.copy(alpha = 0.08f))
 
-            // 10. 🗂️ طبقات إضافية (نُقلت إلى الشريط الرئيسي تحت أيقونة التصغير)
+            // 9. 🗺️ طبقات أساسية (Valhalla أوفلاين، 3D، وخرائط الأساس)
             DockButton(
-                icon = Icons.Default.AutoAwesomeMotion,
-                label = "إضافية",
-                active = hasMoreLayersActive,
+                icon = Icons.Default.Layers,
+                label = "أساسية",
+                active = hasLayerOverlayActive,
                 activeColor = Color(0xFF00E5FF),
+                inactiveColor = Color(0xFFFBBF24),
+                onClick = onOpenLayerDialog,
+                testTag = "map_layers_primary_fab",
+                contentDescription = "الطبقات الأساسية والخرائط"
+            )
+
+            // 10. 🛰️ طبقات ثانوية (أقمار حية، طقس، مخاطر وتحليل أوفلاين)
+            DockButton(
+                icon = Icons.Default.SatelliteAlt,
+                label = "ثانوية",
+                active = hasMoreLayersActive,
+                activeColor = Color(0xFFA78BFA),
                 inactiveColor = Color(0xFF38BDF8),
                 onClick = onOpenMoreLayers,
-                testTag = "map_more_layers_btn",
-                contentDescription = "طبقات إضافية"
+                testTag = "map_layers_secondary_fab",
+                contentDescription = "الطبقات الثانوية والأقمار الحية"
             )
 
             HorizontalDivider(modifier = Modifier.width(34.dp), color = Color.White.copy(alpha = 0.08f))
 
-            // 11. 🌙 الوضع الليلي للخريطة
+            // 10. 🌙 الوضع الليلي للخريطة
             DockButton(
                 icon = if (isNightMode) Icons.Default.Bedtime else Icons.Default.WbSunny,
                 label = if (isNightMode) "ليلي" else "نهاري",

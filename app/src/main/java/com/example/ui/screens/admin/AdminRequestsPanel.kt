@@ -35,7 +35,7 @@ import com.example.utils.VisualThemePalette
 fun AdminRequestsPanel(
     viewModel: MainViewModel,
     themeColors: VisualThemePalette,
-    onBack: () -> Unit = {},
+    onBack: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val pendingProviders by viewModel.pendingProviders.collectAsState()
@@ -110,7 +110,7 @@ fun AdminRequestsPanel(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text("📨 طلبات الانضمام والاعتماد المعلقة", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
-            if (onBack != {}) {
+            if (onBack != null) {
                 IconButton(onClick = onBack) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "رجوع", tint = Color.White)
                 }
@@ -154,8 +154,8 @@ fun AdminRequestsPanel(
                                     Text(text = "الاسم: ${req.name}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
                                     Text(text = "المهنة / الخدمة: ${req.customCategoryName.ifBlank { req.categoryId }}", fontSize = 11.5.sp, color = themeColors.accent, fontWeight = FontWeight.Bold)
                                     Text(text = "الهاتف: ${req.phone} | المنطقة: ${req.area} - ${req.localNeighborhood}", fontSize = 11.sp, color = themeColors.textSecondary)
-                                    if (req.password.isNotBlank()) {
-                                        Text(text = "🔑 كلمة المرور: ${req.password}", fontSize = 11.sp, color = Color(0xFFFBBF24), fontWeight = FontWeight.Bold)
+                                    if (req.password.isNotBlank() || req.passwordHash.isNotBlank()) {
+                                        Text(text = "🔒 كلمة المرور: محمية ومشفرة", fontSize = 11.sp, color = Color(0xFF10B981), fontWeight = FontWeight.Bold)
                                     }
                                     Spacer(modifier = Modifier.height(8.dp))
                                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
@@ -196,8 +196,8 @@ fun AdminRequestsPanel(
                                 Column(modifier = Modifier.padding(12.dp)) {
                                     Text(text = "🏠 طلب انضمام عقار: ${req.name}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
                                     Text(text = "الهاتف: ${req.phone} | المنطقة: ${req.area} - ${req.localNeighborhood}", fontSize = 11.sp, color = themeColors.textSecondary)
-                                    if (req.password.isNotBlank()) {
-                                        Text(text = "🔑 كلمة المرور: ${req.password}", fontSize = 11.sp, color = Color(0xFFFBBF24), fontWeight = FontWeight.Bold)
+                                    if (req.password.isNotBlank() || req.passwordHash.isNotBlank()) {
+                                        Text(text = "🔒 كلمة المرور: محمية ومشفرة", fontSize = 11.sp, color = Color(0xFF10B981), fontWeight = FontWeight.Bold)
                                     }
                                     Spacer(modifier = Modifier.height(8.dp))
                                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
@@ -276,8 +276,8 @@ fun AdminRequestsPanel(
                                     if (req.specialization.isNotBlank()) {
                                         Text(text = "النشاط: ${req.specialization}", fontSize = 11.sp, color = themeColors.accent)
                                     }
-                                    if (req.password.isNotBlank()) {
-                                        Text(text = "🔑 كلمة المرور: ${req.password}", fontSize = 11.sp, color = Color(0xFFFBBF24), fontWeight = FontWeight.Bold)
+                                    if (req.password.isNotBlank() || req.passwordHash.isNotBlank()) {
+                                        Text(text = "🔒 كلمة المرور: محمية ومشفرة", fontSize = 11.sp, color = Color(0xFF10B981), fontWeight = FontWeight.Bold)
                                     }
                                     Spacer(modifier = Modifier.height(8.dp))
                                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
@@ -415,8 +415,8 @@ fun AdminRequestsPanel(
                                 Column(modifier = Modifier.padding(12.dp)) {
                                     Text(text = "👤 اسم المستخدم: ${req.name}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
                                     Text(text = "الهاتف: ${req.phone} | المدينة/المحافظة: ${req.area}", fontSize = 11.sp, color = themeColors.textSecondary)
-                                    if (req.password.isNotBlank()) {
-                                        Text(text = "🔑 كلمة المرور: ${req.password}", fontSize = 11.sp, color = Color(0xFFFBBF24), fontWeight = FontWeight.Bold)
+                                    if (req.password.isNotBlank() || req.passwordHash.isNotBlank()) {
+                                        Text(text = "🔒 كلمة المرور: محمية ومشفرة", fontSize = 11.sp, color = Color(0xFF10B981), fontWeight = FontWeight.Bold)
                                     }
                                     Spacer(modifier = Modifier.height(8.dp))
                                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {

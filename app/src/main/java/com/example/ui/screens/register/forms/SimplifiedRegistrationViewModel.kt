@@ -124,6 +124,7 @@ class SimplifiedRegistrationViewModel(application: Application) : AndroidViewMod
 
         viewModelScope.launch {
             _state.value = _state.value.copy(isLoading = true)
+            val securedHash = com.example.utils.PasswordHasher.hash(_state.value.password.trim())
             val data = mapOf(
                 "role" to currentRole,
                 "fullName" to _state.value.entityName,
@@ -132,7 +133,7 @@ class SimplifiedRegistrationViewModel(application: Application) : AndroidViewMod
                 "city" to _state.value.city,
                 "specialization" to _state.value.specialization,
                 "imageUri" to _state.value.imageUri,
-                "password" to _state.value.password,
+                "passwordHash" to securedHash,
                 "status" to "PENDING",
                 "createdAt" to Timestamp.now(),
                 "type" to currentRole

@@ -89,6 +89,10 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
     private var clickCount = 0
     private var lastBackdoorClickTime = 0L
     @Volatile
+    private var failedAdminVerifyAttempts = 0
+    @Volatile
+    private var adminVerifyLockoutUntilMs = 0L
+    @Volatile
     private var cachedAppContext: Context? = null
 
     fun getOrGenerateUserId(): String {
@@ -609,17 +613,37 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
     }
 
     fun verifyAdminOrOwnerPassword(password: String, adminPass: String = "", ownerPass: String = ""): Boolean {
+        val now = System.currentTimeMillis()
+        if (now < adminVerifyLockoutUntilMs) {
+            val remainingSec = ((adminVerifyLockoutUntilMs - now) / 1000L).coerceAtLeast(1L)
+            triggerToast("⏳ محاولات كثيرة خاطئة. يرجى الانتظار $remainingSec ثانية")
+            return false
+        }
+
         val trimmed = password.trim()
         if (trimmed.isEmpty() || com.example.utils.SecureHasher.isHashFormat(trimmed)) return false
-        
-        if (com.example.utils.SecurityCryptoUtils.verifyAdminPassword(trimmed, adminPass) ||
-            com.example.utils.SecurityCryptoUtils.verifyAdminPassword(trimmed, ownerPass)) {
+
+        val isStaffMatch = com.example.utils.SecurityCryptoUtils.verifyAdminPassword(trimmed, adminPass) ||
+            com.example.utils.SecurityCryptoUtils.verifyAdminPassword(trimmed, ownerPass)
+        val matchSup = if (!isStaffMatch) {
+            _supervisors.value.find {
+                it.passcodeHash.isNotBlank() && com.example.utils.SecurityCryptoUtils.verifyAdminPassword(trimmed, it.passcodeHash)
+            }
+        } else null
+
+        if (isStaffMatch || matchSup != null) {
+            failedAdminVerifyAttempts = 0
+            adminVerifyLockoutUntilMs = 0L
             return true
         }
-        val matchSup = _supervisors.value.find {
-            it.passcodeHash.isNotBlank() && com.example.utils.SecurityCryptoUtils.verifyAdminPassword(trimmed, it.passcodeHash)
+
+        failedAdminVerifyAttempts++
+        if (failedAdminVerifyAttempts >= 5) {
+            adminVerifyLockoutUntilMs = now + 30_000L
+            failedAdminVerifyAttempts = 0
+            triggerToast("🔒 تم قفل التحقق لمدة 30 ثانية بعد 5 محاولات خاطئة")
         }
-        return matchSup != null
+        return false
     }
 
     fun registerBackdoorInteraction() {

@@ -79,7 +79,7 @@ fun ClientPersonalAccountDashboard(
                     text = "مرحباً بك: $currentUserName",
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White,
+                    color = themeColors.textPrimary,
                     textAlign = TextAlign.Center
                 )
                 Text(
@@ -101,12 +101,12 @@ fun ClientPersonalAccountDashboard(
                 Text("📋 بيانات الحساب الموثقة:", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text("📱 رقم الهاتف:", fontSize = 11.sp, color = themeColors.textSecondary)
-                    Text(currentUserPhone, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    Text(currentUserPhone, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = themeColors.textPrimary)
                 }
                 HorizontalDivider(color = Color.Gray.copy(alpha = 0.2f))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text("📍 منطقة السكن:", fontSize = 11.sp, color = themeColors.textSecondary)
-                    Text(currentUserResidence, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    Text(currentUserResidence, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = themeColors.textPrimary)
                 }
             }
         }
@@ -125,7 +125,16 @@ fun ClientPersonalAccountDashboard(
 
         // Bookings section
         Text("📅 طلبات وحجوزات الخدمة الخاصة بك:", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
-        val myBookings = remember(bookings, currentUserPhone) { bookings.filter { it.customerPhone == currentUserPhone } }
+        val normalizedUserPhone = remember(currentUserPhone) {
+            com.example.ui.helpers.AppPreferenceHelper.normalizePhoneNumber(currentUserPhone)
+        }
+        val myBookings = remember(bookings, normalizedUserPhone, currentUserId) {
+            bookings.filter { b ->
+                val bPhone = com.example.ui.helpers.AppPreferenceHelper.normalizePhoneNumber(b.effectiveCustomerPhone)
+                (normalizedUserPhone.isNotBlank() && bPhone == normalizedUserPhone) ||
+                    (currentUserId.isNotBlank() && b.clientId == currentUserId)
+            }
+        }
 
         if (myBookings.isEmpty()) {
             Card(
@@ -154,8 +163,8 @@ fun ClientPersonalAccountDashboard(
                             Text("الطلب #${b.bookingNumber}", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
                             Text(b.status, fontSize = 10.sp, color = themeColors.accent)
                         }
-                        Text("الفني: ${b.providerName}", fontSize = 11.sp, color = Color.White)
-                        Text("الموعد: ${b.dateString} - ${b.timeString}", fontSize = 10.sp, color = Color.LightGray)
+                        Text("الفني: ${b.providerName}", fontSize = 11.sp, color = themeColors.textPrimary)
+                        Text("الموعد: ${b.date.ifBlank { b.dateString }} - ${b.time.ifBlank { b.timeString }}", fontSize = 10.sp, color = themeColors.textSecondary)
                     }
                 }
             }
@@ -171,18 +180,18 @@ fun ClientPersonalAccountDashboard(
                 colors = ButtonDefaults.buttonColors(containerColor = themeColors.surface),
                 border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.5f)),
                 shape = RoundedCornerShape(8.dp),
-                modifier = Modifier.weight(1f).height(38.dp)
+                modifier = Modifier.weight(1f).height(48.dp)
             ) {
-                Text("💼 الانضمام كشريك", color = themeColors.accent, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                Text("💼 الانضمام كشريك", color = themeColors.accent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
             }
             Button(
                 onClick = { viewModel.logout(context) },
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7F1D1D).copy(alpha = 0.3f)),
                 border = BorderStroke(1.dp, Color.Red),
                 shape = RoundedCornerShape(8.dp),
-                modifier = Modifier.weight(1f).height(38.dp)
+                modifier = Modifier.weight(1f).height(48.dp)
             ) {
-                Text("🚪 تسجيل الخروج", color = Color.Red, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                Text("🚪 تسجيل الخروج", color = Color.Red, fontSize = 11.sp, fontWeight = FontWeight.Bold)
             }
         }
     }

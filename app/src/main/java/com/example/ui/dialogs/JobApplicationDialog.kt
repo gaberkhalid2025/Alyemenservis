@@ -17,11 +17,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import com.example.domain.entities.RegistrationEntity
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
+import com.example.data.JobApplicationEntity
 import com.example.ui.MainViewModel
-import com.example.ui.registerJobPoster
+import com.example.ui.helpers.AppPreferenceHelper
 import com.example.utils.VisualThemePalette
-import kotlinx.coroutines.launch
+import java.util.UUID
 
 /**
  * 💼 JobApplicationDialog
@@ -34,6 +36,8 @@ fun JobApplicationDialog(
     viewModel: MainViewModel,
     themeColors: VisualThemePalette,
     jobTitle: String = "طلب انضمام لوظيفة",
+    jobId: String = "",
+    companyName: String = "",
     onDismiss: () -> Unit
 ) {
     val adminSettings by viewModel.settings.collectAsState()
@@ -94,7 +98,7 @@ fun JobApplicationDialog(
                             color = Color.White
                         )
                     }
-                    IconButton(onClick = onDismiss) {
+                    IconButton(onClick = onDismiss, modifier = Modifier.size(48.dp)) {
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = "إغلاق",
@@ -206,6 +210,7 @@ fun JobApplicationDialog(
                         onValueChange = { applicantPhone = it },
                         label = { Text("رقم الهاتف / الواتساب", fontSize = 12.sp) },
                         singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = Color(0xFF00E5FF),
                             unfocusedBorderColor = Color.Gray,
@@ -265,35 +270,38 @@ fun JobApplicationDialog(
 
                     Button(
                         onClick = {
-                            if (applicantName.isBlank() || applicantPhone.isBlank()) {
-                                errorMessage = "يرجى كتابة الاسم ورقم الهاتف على الأقل"
+                            val cleanPhone = applicantPhone.filter { it.isDigit() }
+                            if (applicantName.isBlank() || cleanPhone.length < 9) {
+                                errorMessage = "يرجى إدخال الاسم الكامل ورقم هاتف صحيح (9 أرقام على الأقل)"
                                 return@Button
                             }
                             isSubmitting = true
                             errorMessage = null
-                            scope.launch {
-                                try {
-                                    val jobObj = RegistrationEntity.Job(
-                                        jobTitle = jobTitle,
-                                        companyName = applicantName,
-                                        category = applicantQualification,
-                                        contactPhone = applicantPhone,
-                                        contactEmail = "",
-                                        city = selectedCity,
-                                        requirements = "خبرة: $applicantExperience | ملاحظات: $notes",
-                                        rawPassword = "NO_PASS"
-                                    )
-                                    val res = viewModel.registerJobPoster(jobObj)
-                                    isSubmitting = false
-                                    if (res.isSuccess) {
-                                        successMessage = "شكراً لك، تم إرسال طلب الانضمام إلى مسؤول التوظيف بنجاح!"
-                                    } else {
-                                        errorMessage = res.exceptionOrNull()?.message ?: "حدث خطأ أثناء تقديم الطلب"
-                                    }
-                                } catch (e: Exception) {
-                                    isSubmitting = false
-                                    errorMessage = e.message ?: "فشلت العملية"
+                            try {
+                                val normalizedPhone = AppPreferenceHelper.normalizePhoneNumber(applicantPhone.trim())
+                                val qualsSummary = buildString {
+                                    append(applicantQualification.trim().ifBlank { "غير محدد" })
+                                    if (applicantExperience.isNotBlank()) append(" • الخبرة: ${applicantExperience.trim()}")
+                                    append(" • المدينة: $selectedCity")
+                                    if (notes.isNotBlank()) append(" • ملاحظات: ${notes.trim()}")
                                 }
+                                val application = JobApplicationEntity(
+                                    id = "japp_${UUID.randomUUID().toString().take(8)}",
+                                    jobId = jobId,
+                                    jobTitle = jobTitle,
+                                    companyName = companyName,
+                                    applicantName = applicantName.trim(),
+                                    applicantPhone = normalizedPhone.ifBlank { applicantPhone.trim() },
+                                    applicantQuals = qualsSummary,
+                                    status = "PENDING",
+                                    createdAt = System.currentTimeMillis()
+                                )
+                                viewModel.jobManagementViewModel.submitJobApplication(application)
+                                isSubmitting = false
+                                successMessage = "شكراً لك، تم إرسال طلب التوظيف إلى مسؤول التوظيف بنجاح!"
+                            } catch (e: Exception) {
+                                isSubmitting = false
+                                errorMessage = e.message ?: "فشلت العملية"
                             }
                         },
                         enabled = !isSubmitting,

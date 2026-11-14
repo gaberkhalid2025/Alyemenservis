@@ -3,6 +3,7 @@ package com.example.ui.screens.admin.components
 import android.widget.Toast
 import com.example.ui.*
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -108,13 +109,13 @@ fun AdminSwitchRow(
                     text = title,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White
+                    color = themeColors.textPrimary
                 )
                 if (!subtitle.isNullOrBlank()) {
                     Text(
                         text = subtitle,
                         fontSize = 10.5.sp,
-                        color = Color.Gray,
+                        color = themeColors.textSecondary,
                         lineHeight = 14.sp
                     )
                 }
@@ -193,20 +194,20 @@ fun AdminActionButtons(
             IconButton(
                 onClick = onEdit,
                 modifier = Modifier
-                    .size(32.dp)
-                    .background(Color.White.copy(alpha = 0.08f), CircleShape)
+                    .size(48.dp)
+                    .background(themeColors.textPrimary.copy(alpha = 0.08f), CircleShape)
             ) {
-                Icon(Icons.Default.Edit, contentDescription = "تعديل", tint = themeColors.accent, modifier = Modifier.size(16.dp))
+                Icon(Icons.Default.Edit, contentDescription = "تعديل", tint = themeColors.accent, modifier = Modifier.size(18.dp))
             }
         }
         if (onDelete != null) {
             IconButton(
                 onClick = onDelete,
                 modifier = Modifier
-                    .size(32.dp)
+                    .size(48.dp)
                     .background(Color(0xFFEF5350).copy(alpha = 0.15f), CircleShape)
             ) {
-                Icon(Icons.Default.Delete, contentDescription = "حذف", tint = Color(0xFFEF5350), modifier = Modifier.size(16.dp))
+                Icon(Icons.Default.Delete, contentDescription = "حذف", tint = Color(0xFFEF5350), modifier = Modifier.size(18.dp))
             }
         }
     }
@@ -236,7 +237,7 @@ fun AdminEntityCard(
             1.dp,
             if (isBlocked) Color(0xFFEF5350).copy(alpha = 0.5f)
             else if (isVip) Color(0xFFF59E0B).copy(alpha = 0.5f)
-            else Color.White.copy(alpha = 0.08f)
+            else themeColors.textSecondary.copy(alpha = 0.15f)
         ),
         modifier = modifier.fillMaxWidth()
     ) {
@@ -245,13 +246,40 @@ fun AdminEntityCard(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                if (!imageUrl.isNullOrBlank()) {
+                    val decodedBmp = com.example.rememberBase64Bitmap(imageUrl)
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(CircleShape)
+                            .background(themeColors.accent.copy(alpha = 0.12f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (decodedBmp != null) {
+                            Image(
+                                bitmap = decodedBmp,
+                                contentDescription = title,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        } else {
+                            AsyncImage(
+                                model = imageUrl,
+                                contentDescription = title,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(10.dp))
+                }
                 Column(modifier = Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             text = title,
                             fontSize = 13.5.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White,
+                            color = themeColors.textPrimary,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -278,7 +306,7 @@ fun AdminEntityCard(
                 Text(
                     text = details,
                     fontSize = 10.5.sp,
-                    color = Color.LightGray,
+                    color = themeColors.textSecondary,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     lineHeight = 14.sp
@@ -416,16 +444,16 @@ fun AdminSectionEntityCard(
                         }
                     }
                     Column {
-                        Text(title, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color.White, maxLines = 1)
+                        Text(title, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = themeColors.textPrimary, maxLines = 1)
                         Text(phone, fontSize = 10.5.sp, color = themeColors.accent, maxLines = 1)
                     }
                 }
 
                 // زر التوصية
                 Surface(
-                    color = if (isRecommended) Color(0xFFF59E0B).copy(alpha = 0.2f) else Color.White.copy(alpha = 0.08f),
+                    color = if (isRecommended) Color(0xFFF59E0B).copy(alpha = 0.2f) else themeColors.textPrimary.copy(alpha = 0.08f),
                     shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(1.dp, if (isRecommended) Color(0xFFF59E0B) else Color.White.copy(alpha = 0.2f)),
+                    border = BorderStroke(1.dp, if (isRecommended) Color(0xFFF59E0B) else themeColors.textSecondary.copy(alpha = 0.25f)),
                     modifier = Modifier.clickable { onToggleRecommend() }
                 ) {
                     Row(
@@ -433,22 +461,23 @@ fun AdminSectionEntityCard(
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        Icon(Icons.Default.Star, contentDescription = null, tint = if (isRecommended) Color(0xFFF59E0B) else Color.Gray, modifier = Modifier.size(14.dp))
-                        Text(if (isRecommended) "موصى به" else "توصية", fontSize = 10.sp, color = if (isRecommended) Color(0xFFF59E0B) else Color.LightGray, fontWeight = FontWeight.Bold)
+                        Icon(Icons.Default.Star, contentDescription = null, tint = if (isRecommended) Color(0xFFF59E0B) else themeColors.textSecondary, modifier = Modifier.size(14.dp))
+                        Text(if (isRecommended) "موصى به" else "توصية", fontSize = 10.sp, color = if (isRecommended) Color(0xFFF59E0B) else themeColors.textSecondary, fontWeight = FontWeight.Bold)
                     }
                 }
             }
 
-            Text(priceOrDetails, fontSize = 10.5.sp, color = Color.LightGray, maxLines = 1)
+            Text(priceOrDetails, fontSize = 10.5.sp, color = themeColors.textSecondary, maxLines = 1)
 
-            HorizontalDivider(color = Color.White.copy(alpha = 0.06f))
+            HorizontalDivider(color = themeColors.textSecondary.copy(alpha = 0.12f))
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
                 OutlinedButton(
                     onClick = onEdit,
                     shape = RoundedCornerShape(8.dp),
                     border = BorderStroke(1.dp, themeColors.accent),
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                    modifier = Modifier.heightIn(min = 48.dp)
                 ) {
                     Icon(Icons.Default.Edit, contentDescription = null, tint = themeColors.accent, modifier = Modifier.size(14.dp))
                     Spacer(modifier = Modifier.width(4.dp))
@@ -459,9 +488,9 @@ fun AdminSectionEntityCard(
 
                 IconButton(
                     onClick = onDelete,
-                    modifier = Modifier.size(32.dp).background(Color(0xFFEF5350).copy(alpha = 0.15f), CircleShape)
+                    modifier = Modifier.size(48.dp).background(Color(0xFFEF5350).copy(alpha = 0.15f), CircleShape)
                 ) {
-                    Icon(Icons.Default.Delete, contentDescription = "حذف", tint = Color(0xFFEF5350), modifier = Modifier.size(16.dp))
+                    Icon(Icons.Default.Delete, contentDescription = "حذف", tint = Color(0xFFEF5350), modifier = Modifier.size(18.dp))
                 }
             }
         }

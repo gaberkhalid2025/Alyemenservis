@@ -118,7 +118,13 @@ fun PrivacyPolicyScreen(
             }
 
             val context = androidx.compose.ui.platform.LocalContext.current
-            var hasAgreed by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+            val termsPrefs = remember { context.getSharedPreferences("yemen_services_terms", android.content.Context.MODE_PRIVATE) }
+            var hasAgreed by remember {
+                mutableStateOf(
+                    termsPrefs.getBoolean("has_agreed_terms", false) &&
+                        termsPrefs.getString("agreed_terms_version", "") == "2.0"
+                )
+            }
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -129,6 +135,11 @@ fun PrivacyPolicyScreen(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
+                    Text(
+                        "الإصدار: 2.0 • سياسة الخصوصية المحدثة",
+                        fontSize = 11.sp,
+                        color = textColor.copy(alpha = 0.65f)
+                    )
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
@@ -149,8 +160,16 @@ fun PrivacyPolicyScreen(
                     Button(
                         onClick = {
                             if (hasAgreed) {
-                                val sp = context.getSharedPreferences("privacy_prefs", android.content.Context.MODE_PRIVATE)
-                                sp.edit().putBoolean("privacy_agreed", true).apply()
+                                termsPrefs.edit()
+                                    .putBoolean("has_agreed_terms", true)
+                                    .putString("agreed_terms_version", "2.0")
+                                    .putLong("agreed_terms_at", System.currentTimeMillis())
+                                    .apply()
+                                context.getSharedPreferences("privacy_prefs", android.content.Context.MODE_PRIVATE)
+                                    .edit()
+                                    .putBoolean("privacy_agreed", true)
+                                    .putString("privacy_version", "2.0")
+                                    .apply()
                                 onBack()
                             } else {
                                 android.widget.Toast.makeText(context, "يرجى الموافقة على سياسة الخصوصية أولاً", android.widget.Toast.LENGTH_SHORT).show()

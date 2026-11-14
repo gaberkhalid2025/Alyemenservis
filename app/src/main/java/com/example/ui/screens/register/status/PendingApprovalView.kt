@@ -7,7 +7,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -30,6 +30,8 @@ fun PendingApprovalView(
     themeColors: VisualThemePalette,
     modifier: Modifier = Modifier
 ) {
+    var showCancelConfirmDialog by remember { mutableStateOf(false) }
+
     Card(
         modifier = modifier
             .fillMaxWidth()
@@ -87,15 +89,39 @@ fun PendingApprovalView(
             Spacer(modifier = Modifier.height(6.dp))
 
             Button(
-                onClick = onCancelRequest,
+                onClick = { showCancelConfirmDialog = true },
                 colors = ButtonDefaults.buttonColors(containerColor = Color.Gray),
                 shape = RoundedCornerShape(8.dp),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(40.dp)
+                    .height(48.dp)
             ) {
                 Text("❌ إلغاء والعودة لشاشة التسجيل", color = Color.White, fontSize = 11.sp)
             }
         }
+    }
+
+    if (showCancelConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showCancelConfirmDialog = false },
+            title = { Text("تأكيد إلغاء الطلب", fontWeight = FontWeight.Bold, fontSize = 15.sp) },
+            text = { Text("هل أنت متأكد من إلغاء طلب الانضمام الحالي والعودة إلى شاشة التسجيل؟") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showCancelConfirmDialog = false
+                        onCancelRequest()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444))
+                ) {
+                    Text("نعم، إلغاء الطلب", color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCancelConfirmDialog = false }) {
+                    Text("تراجع")
+                }
+            }
+        )
     }
 }
