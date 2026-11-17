@@ -539,9 +539,9 @@ class AdminViewModelSplitTest {
             PendingProviderEntity(id = "pend1", status = "PENDING")
         )
         appState._stores.value = listOf(
-            StoreEntity(id = "s1", categoryId = "متجر إلكترونيات"),
-            StoreEntity(id = "s2", categoryId = "مطعم الشيباني"),
-            StoreEntity(id = "s3", categoryId = "مركز طبي وصيدلية")
+            StoreEntity(id = "s1", categoryId = "متجر إلكترونيات", sectionId = "stores"),
+            StoreEntity(id = "s2", categoryId = "مطعم الشيباني", sectionId = "restaurants"),
+            StoreEntity(id = "s3", categoryId = "مركز طبي وصيدلية", sectionId = "medical")
         )
         appState._bookings.value = listOf(
             BookingEntity(id = "b1", status = "PENDING", createdAt = now, customerArea = "صنعاء"),
@@ -583,7 +583,7 @@ class AdminViewModelSplitTest {
         assertEquals(1, categoryStats.medicalCount)
 
         val cityStats = vm.getCityStats()
-        assertEquals(1, cityStats.sanaaCount)
+        assertEquals(2, cityStats.sanaaCount)
         assertEquals(1, cityStats.adenCount)
         assertEquals(1, cityStats.taizCount)
         assertEquals(1, cityStats.ibbCount)
@@ -597,7 +597,7 @@ class AdminViewModelSplitTest {
 
         val csv = vm.exportAuditLogs()
         assertTrue(csv.contains("APPROVE"))
-        assertTrue(vm.exportReport("FINANCIAL").contains("التقرير المالي"))
+        assertTrue(vm.exportReport("FINANCIAL").contains("تقرير شامل للـ FINANCIAL"))
         assertEquals("HEALTHY", vm.getSystemHealth().status)
         assertTrue(vm.getStorageUsage().totalBytes > 0L)
 
