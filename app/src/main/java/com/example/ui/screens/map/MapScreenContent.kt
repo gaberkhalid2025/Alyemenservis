@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Emergency
+import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.Nightlife
 import androidx.compose.material3.*
@@ -501,39 +502,7 @@ fun MapScreenContent(
                 onShowGroupTracking = { showGroupTracking = true }
             )
 
-            // 🚨 زر الفزعة السريع ولافتة الانتظار
-            Surface(
-                onClick = { showSosDialog = true },
-                shape = RoundedCornerShape(16.dp),
-                color = Color(0xFF0B0F19).copy(alpha = 0.85f),
-                border = BorderStroke(1.dp, Color(0xFFEF4444).copy(alpha = 0.45f)),
-                shadowElevation = 6.dp,
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .navigationBarsPadding()
-                    .padding(start = 16.dp, bottom = if (state.selectedEntity != null) 240.dp else 24.dp)
-                    .testTag("map_sos_btn")
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Emergency,
-                        contentDescription = "فزعة طوارئ",
-                        tint = Color(0xFFEF4444),
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Text(
-                        text = "فزعة",
-                        color = Color(0xFFFCA5A5),
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-
+            // 🚨 لافتة انتظار نداء الفزعة إن وجد طلب معلّق
             if (sosPending) {
                 Surface(
                     color = Color(0xFF7F1D1D),
@@ -554,33 +523,167 @@ fun MapScreenContent(
                 }
             }
 
-            // 🚗 شريط المرافق الذكي (HUD + خدمات الطريق)
-            if (isDrivingMode && state.selectedEntity == null) {
-                Row(
+            // 🌟 الشريط العائم الموحد (Glassmorphic Floating Bar)
+            // يجمع: 1. الفزعة (الأيقونة الحمراء) + 2. خدمات الطريق + 3. زر الكأس (المكافآت) + 4. HUD ليلي
+            if (state.selectedEntity == null) {
+                Surface(
+                    shape = RoundedCornerShape(26.dp),
+                    color = Color(0xFF0F172A).copy(alpha = 0.92f),
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.14f)),
+                    shadowElevation = 14.dp,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .navigationBarsPadding()
-                        .padding(bottom = 24.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                        .padding(bottom = 20.dp, start = 16.dp, end = 16.dp)
+                        .testTag("map_bottom_floating_bar")
                 ) {
-                    FloatingActionButton(
-                        onClick = { isHudMode = true },
-                        containerColor = Color(0xFF0F172A),
-                        contentColor = Color(0xFF38BDF8),
-                        modifier = Modifier.size(48.dp)
+                    Row(
+                        modifier = Modifier
+                            .padding(horizontal = 8.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Icon(Icons.Default.Nightlife, contentDescription = "HUD ليلي", modifier = Modifier.size(24.dp))
-                    }
+                        // 1. 🚨 الأيقونة الحمراء (فزعة طوارئ)
+                        Surface(
+                            onClick = { showSosDialog = true },
+                            shape = RoundedCornerShape(14.dp),
+                            color = Color(0xFFEF4444).copy(alpha = 0.14f),
+                            border = BorderStroke(1.dp, Color(0xFFEF4444).copy(alpha = 0.35f)),
+                            modifier = Modifier
+                                .height(42.dp)
+                                .testTag("map_sos_btn")
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Emergency,
+                                    contentDescription = "فزعة طوارئ",
+                                    tint = Color(0xFFEF4444),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Text(
+                                    text = "فزعة",
+                                    color = Color(0xFFFCA5A5),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
 
-                    ExtendedFloatingActionButton(
-                        onClick = { showServicesSheet = true },
-                        containerColor = Color(0xFF0F172A),
-                        contentColor = Color.White,
-                        icon = { Icon(Icons.Default.LocalShipping, contentDescription = null, tint = Color(0xFF10B981)) },
-                        text = { Text("خدمات الطريق", fontWeight = FontWeight.Bold) },
-                        modifier = Modifier.height(48.dp)
-                    )
+                        VerticalDivider(
+                            modifier = Modifier.height(26.dp),
+                            color = Color.White.copy(alpha = 0.10f)
+                        )
+
+                        // 2. 🚚 خدمات الطريق
+                        Surface(
+                            onClick = { showServicesSheet = true },
+                            shape = RoundedCornerShape(14.dp),
+                            color = if (companionFilter != null) Color(0xFF10B981).copy(alpha = 0.16f) else Color.Transparent,
+                            border = if (companionFilter != null) BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.40f)) else null,
+                            modifier = Modifier
+                                .height(42.dp)
+                                .testTag("map_services_sheet_btn")
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.LocalShipping,
+                                    contentDescription = "خدمات الطريق",
+                                    tint = Color(0xFF10B981),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Text(
+                                    text = "خدمات الطريق",
+                                    color = Color.White,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+
+                        VerticalDivider(
+                            modifier = Modifier.height(26.dp),
+                            color = Color.White.copy(alpha = 0.10f)
+                        )
+
+                        // 3. 🏆 زر الكأس (مكافآت وتحديات الطريق / إنجازات الملاحة)
+                        Surface(
+                            onClick = {
+                                coroutineScope.launch {
+                                    snackbarHostState.showSnackbar("🏆 نقاط الملاحة والتحديات: 450 نقطة • مكتشف مسارات موثوق في اليمن ✓")
+                                }
+                            },
+                            shape = RoundedCornerShape(14.dp),
+                            color = Color(0xFFFBBF24).copy(alpha = 0.12f),
+                            border = BorderStroke(1.dp, Color(0xFFFBBF24).copy(alpha = 0.30f)),
+                            modifier = Modifier
+                                .height(42.dp)
+                                .testTag("map_trophy_rewards_btn")
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.EmojiEvents,
+                                    contentDescription = "المكافآت وتحديات الطريق",
+                                    tint = Color(0xFFFBBF24),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Text(
+                                    text = "المكافآت",
+                                    color = Color(0xFFFDE68A),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+
+                        // 4. 🌙 HUD ليلي (إذا كان وضع القيادة مفعلاً)
+                        if (isDrivingMode) {
+                            VerticalDivider(
+                                modifier = Modifier.height(26.dp),
+                                color = Color.White.copy(alpha = 0.10f)
+                            )
+
+                            Surface(
+                                onClick = { isHudMode = true },
+                                shape = RoundedCornerShape(14.dp),
+                                color = Color(0xFF38BDF8).copy(alpha = 0.12f),
+                                border = BorderStroke(1.dp, Color(0xFF38BDF8).copy(alpha = 0.30f)),
+                                modifier = Modifier
+                                    .height(42.dp)
+                                    .testTag("map_hud_toggle_btn")
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Nightlife,
+                                        contentDescription = "HUD ليلي",
+                                        tint = Color(0xFF38BDF8),
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Text(
+                                        text = "HUD",
+                                        color = Color(0xFFBAE6FD),
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
 

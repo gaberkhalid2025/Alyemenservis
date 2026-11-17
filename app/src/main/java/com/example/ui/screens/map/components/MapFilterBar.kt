@@ -43,7 +43,10 @@ fun MapFilterBar(
     modifier: Modifier = Modifier,
     onBackClick: () -> Unit = {},
     onVoiceSearchClick: () -> Unit = {},
-    onSearchExecute: (String) -> Unit = {}
+    onSearchExecute: (String) -> Unit = {},
+    isTilesDownloaded: Boolean = false,
+    onDownloadMapsClick: () -> Unit = {},
+    onDiagnosticsClick: () -> Unit = {}
 ) {
     var showFilterDialog by remember { mutableStateOf(false) }
     val keyboardController = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
@@ -68,17 +71,18 @@ fun MapFilterBar(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 6.dp)
+            .statusBarsPadding()
+            .padding(horizontal = 20.dp, vertical = 8.dp)
     ) {
         // Single Top Glassmorphism Capsule
         Surface(
             shape = RoundedCornerShape(26.dp),
-            color = Color(0xFF0B0F19).copy(alpha = 0.85f),
-            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.10f)),
-            shadowElevation = 8.dp,
+            color = Color(0xFF0F172A).copy(alpha = 0.92f),
+            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.14f)),
+            shadowElevation = 12.dp,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(52.dp)
+                .height(54.dp)
         ) {
             Row(
                 modifier = Modifier
@@ -201,6 +205,29 @@ fun MapFilterBar(
                                     .align(Alignment.TopEnd)
                             )
                         }
+                    }
+                }
+
+                // 🇾🇪 زر دائري أنيق لتحميل خرائط الملاحة وتشخيصها مدمج بشريط البحث
+                IconButton(
+                    onClick = { if (!isTilesDownloaded) onDownloadMapsClick() else onDiagnosticsClick() },
+                    modifier = Modifier
+                        .size(36.dp)
+                        .testTag("map_offline_download_circle_btn")
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = if (isTilesDownloaded) Icons.Default.CloudDone else Icons.Default.CloudDownload,
+                            contentDescription = if (isTilesDownloaded) "خرائط الملاحة أوفلاين مفعّلة" else "تحميل خرائط الملاحة أوفلاين",
+                            tint = if (isTilesDownloaded) Color(0xFF10B981) else Color(0xFFFBBF24),
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .background(if (isTilesDownloaded) Color(0xFF10B981) else Color(0xFFFBBF24), CircleShape)
+                                .align(Alignment.TopEnd)
+                        )
                     }
                 }
             }

@@ -596,6 +596,31 @@
         }
         window.setRainUrl = setRainUrl;
 
+        var eumetLayer = null, eumetTimer = null;
+        function setEumet(on, layerName) {
+            if (!map) return;
+            ensurePane('eumetPane', 262);
+            if (eumetTimer) { clearInterval(eumetTimer); eumetTimer = null; }
+            if (eumetLayer && map.hasLayer(eumetLayer)) map.removeLayer(eumetLayer);
+            eumetLayer = null;
+            if (!on || !/^[A-Za-z0-9_:.\-]{3,80}$/.test(layerName || '')) return;
+            eumetLayer = L.tileLayer.wms('https://view.eumetsat.int/geoserver/wms', {
+                layers: layerName, format: 'image/png', transparent: true, version: '1.3.0',
+                pane: 'eumetPane', opacity: 0.7, maxZoom: 24, tileSize: 256,
+                attribution: '© <a href="https://www.eumetsat.int">EUMETSAT</a> (Meteosat)'
+            });
+            var ok = 0, err = 0;
+            eumetLayer.on('tileload', function () { ok++; });
+            eumetLayer.on('tileerror', function () {
+                err++;
+                if (ok === 0 && err === 8) notifyOverlay('eumet', true, 'تعذر تحميل صور Meteosat');
+            });
+            eumetLayer.addTo(map);
+            // تجديد الصورة كل 15 دقيقة (معامل يُكسر الكاش فقط)
+            eumetTimer = setInterval(function () { if (eumetLayer) eumetLayer.setParams({ _t: Date.now() }); }, 15 * 60 * 1000);
+        }
+        window.setEumet = setEumet;
+
         function initMap(lat, lng, mode) {
             userLat = lat || 15.3694;
             userLng = lng || 44.1910;

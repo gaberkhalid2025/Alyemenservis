@@ -216,7 +216,7 @@ internal fun BoxScope.MapControlsDockHost(
             }
         },
         onOpenCoordinateEntry = onShowCoordinateDialog,
-        hasMoreLayersActive = state.gibsEnabled || state.eoxEnabled || state.realTimeSatEnabled ||
+        hasMoreLayersActive = state.eumetEnabled || state.gibsEnabled || state.eoxEnabled || state.realTimeSatEnabled ||
             state.quakesEnabled || state.rainEnabled ||
             state.peakEnabled || state.coverageEnabled || state.hazardEnabled ||
             state.reliabilityEnabled || state.nightMode,
@@ -230,7 +230,9 @@ internal fun BoxScope.MapControlsDockHost(
         onOpenGroupTracking = onShowGroupTracking,
         modifier = Modifier
             .align(Alignment.CenterEnd)
-            .padding(end = 16.dp)
+            .statusBarsPadding()
+            .navigationBarsPadding()
+            .padding(end = 20.dp, top = 64.dp, bottom = 84.dp)
     )
 }
 
@@ -423,6 +425,10 @@ internal fun MapLayersAndServicesSheetsHost(
             onToggleCoverage = { state.coverageEnabled = it },
             hazardEnabled = state.hazardEnabled,
             onToggleHazard = { state.hazardEnabled = it },
+            eumetEnabled = state.eumetEnabled,
+            onToggleEumet = { state.eumetEnabled = it },
+            eumetLayerName = state.eumetLayerName,
+            onSelectEumetLayer = { state.eumetLayerName = it },
             onCoverageCleared = {
                 onCoverageCleared()
                 coroutineScope.launch { snackbarHostState.showSnackbar("✓ تم مسح سجل التغطية المحلي") }

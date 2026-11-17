@@ -101,6 +101,8 @@ fun RealLeafletMapView(
     valhallaSizeMb: Int = 0,
     realTimeSatEnabled: Boolean = false,
     realTimeSatFeed: String = "globalvis",
+    eumetEnabled: Boolean = false,
+    eumetLayer: String = "",
     themeColors: VisualThemePalette = resolveThemePalette(AdminSettingsEntity()),
     modifier: Modifier = Modifier
 ) {
@@ -401,6 +403,12 @@ fun RealLeafletMapView(
             val safeUrl = (rainUrl ?: "").replace("'", "").replace("\"", "").trim()
             webViewRef?.evaluateJavascript("if (window.setRainUrl) { window.setRainUrl('$safeUrl'); }", null)
         }
+    }
+
+    LaunchedEffect(isMapReady, eumetEnabled, eumetLayer) {
+        if (!isMapReady) return@LaunchedEffect
+        val safe = if (com.example.utils.EumetViewCatalog.isSafe(eumetLayer)) eumetLayer else ""
+        webViewRef?.evaluateJavascript("if (window.setEumet) { window.setEumet(${eumetEnabled && safe.isNotEmpty()}, '$safe'); }", null)
     }
 
     Box(

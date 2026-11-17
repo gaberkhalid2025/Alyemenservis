@@ -281,9 +281,14 @@ internal fun BoxScope.MapScreenViewport(
             eoxEnabled = state.eoxEnabled,
             quakesJson = quakesJson,
             rainUrl = rainUrl,
-            onOverlayStatus = { _, failing, msg ->
+            eumetEnabled = state.eumetEnabled,
+            eumetLayer = state.eumetLayerName,
+            onOverlayStatus = { name, failing, msg ->
                 if (failing && msg.isNotBlank()) {
                     coroutineScope.launch { snackbarHostState.showSnackbar(msg) }
+                }
+                if (failing && name == "eumet") {
+                    state.eumetEnabled = false
                 }
             },
             offlineOnly = state.mapLayer == MapLayer.VALHALLA_OFFLINE,
@@ -502,18 +507,25 @@ internal fun BoxScope.MapScreenViewport(
             }
         }
 
-        // 🏠 زر «عنواني بالمعلم»
-        SmallFloatingActionButton(
+        // 🏠 زر «عنواني بالمعلم» (Glassmorphic)
+        Surface(
             onClick = {
                 if (savedAddresses.isEmpty()) onOpenLandmarkAddress()
                 else onOpenSavedAddresses()
             },
-            containerColor = Color(0xFF0F172A),
+            shape = RoundedCornerShape(16.dp),
+            color = Color(0xFF0F172A).copy(alpha = 0.92f),
+            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.14f)),
+            shadowElevation = 8.dp,
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(end = 16.dp, bottom = 190.dp)
+                .navigationBarsPadding()
+                .padding(end = 20.dp, bottom = 90.dp)
+                .size(44.dp)
         ) {
-            Text("🏠", fontSize = 16.sp)
+            Box(contentAlignment = Alignment.Center) {
+                Text("🏠", fontSize = 16.sp)
+            }
         }
     }
 }
@@ -646,42 +658,11 @@ internal fun BoxScope.MapScreenTopSearchAndResults(
                 }
                 OfflineMapManager.findCity(q)?.let { city -> state.selectedCity = city.nameAr }
                 keyboardController?.hide()
-            }
+            },
+            isTilesDownloaded = isTilesDownloaded,
+            onDownloadMapsClick = onOpenDownloadDialog,
+            onDiagnosticsClick = onOpenDiagnostics
         )
-
-        // 🇾🇪 Offline Map Status Badge
-        Surface(
-            shape = RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp),
-            color = Color(0xFF0B0F19).copy(alpha = 0.85f),
-            border = BorderStroke(1.dp, if (isTilesDownloaded) Color(0xFF10B981).copy(alpha = 0.4f) else Color(0xFFF59E0B).copy(alpha = 0.4f)),
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(top = 64.dp, end = 24.dp)
-        ) {
-            Row(
-                modifier = Modifier
-                    .combinedClickable(
-                        onClick = { if (!isTilesDownloaded) onOpenDownloadDialog() else onOpenDiagnostics() },
-                        onLongClick = onOpenDiagnostics
-                    )
-                    .padding(horizontal = 10.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(6.dp)
-                        .clip(CircleShape)
-                        .background(if (isTilesDownloaded) Color(0xFF10B981) else Color(0xFFF59E0B))
-                )
-                Text(
-                    text = if (isTilesDownloaded) "خرائط اليمن أوفلاين ✓" else "تحميل خرائط الملاحة 🇾🇪",
-                    color = Color.White,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        }
 
         // 📋 لوحة نتائج البحث
         if (searchPanelOpen && (isSearching || searchResults.isNotEmpty() || searchMessage != null)) {

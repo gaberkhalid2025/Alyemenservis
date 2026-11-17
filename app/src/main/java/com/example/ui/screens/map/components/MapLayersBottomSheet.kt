@@ -270,6 +270,10 @@ fun SecondaryLayersBottomSheet(
     onToggleCoverage: (Boolean) -> Unit,
     hazardEnabled: Boolean,
     onToggleHazard: (Boolean) -> Unit,
+    eumetEnabled: Boolean = false,
+    onToggleEumet: (Boolean) -> Unit = {},
+    eumetLayerName: String = "",
+    onSelectEumetLayer: (String) -> Unit = {},
     onCoverageCleared: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -449,6 +453,82 @@ fun SecondaryLayersBottomSheet(
                 accentColor = Color(0xFF38BDF8),
                 testTag = "sheet_eox_switch"
             )
+
+            // 🛰️ قمر صناعي مباشر مجاني (Meteosat عبر EUMETSAT)
+            var eumetLayers by remember { mutableStateOf<List<com.example.utils.WmsLayerInfo>?>(null) }
+            var eumetMenu by remember { mutableStateOf(false) }
+            LaunchedEffect(eumetEnabled) {
+                if (eumetEnabled && eumetLayers == null) {
+                    eumetLayers = com.example.utils.EumetViewCatalog.iodcLayers() ?: emptyList()
+                }
+            }
+
+            SheetSwitchCard(
+                icon = Icons.Default.Satellite,
+                title = "قمر Meteosat مباشر (EUMETSAT)",
+                subtitle = "يتجدد كل ~15 دقيقة • سحب وغبار فوق اليمن • دقة ≈ 3 كم",
+                checked = eumetEnabled,
+                onCheckedChange = { onToggleEumet(it) },
+                accentColor = Color(0xFF10B981),
+                testTag = "sheet_eumet_switch"
+            )
+
+            if (eumetEnabled) {
+                val list = eumetLayers
+                when {
+                    list == null -> {
+                        LinearProgressIndicator(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 4.dp),
+                            color = Color(0xFF10B981)
+                        )
+                    }
+                    list.isEmpty() -> {
+                        Text(
+                            "تعذر جلب قائمة الطبقات (تحتاج إنترنت).",
+                            color = Color(0xFFF59E0B),
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(horizontal = 16.dp)
+                        )
+                    }
+                    else -> {
+                        if (eumetLayerName.isEmpty()) {
+                            val defaultLayer = (list.firstOrNull { it.title.contains("dust", true) } ?: list.first()).name
+                            onSelectEumetLayer(defaultLayer)
+                        }
+                        Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
+                            OutlinedButton(
+                                onClick = { eumetMenu = true },
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF10B981)),
+                                border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.5f))
+                            ) {
+                                Text(
+                                    list.firstOrNull { it.name == eumetLayerName }?.arabicLabel() ?: "اختر طبقة",
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+                            }
+                            DropdownMenu(
+                                expanded = eumetMenu,
+                                onDismissRequest = { eumetMenu = false },
+                                containerColor = Color(0xFF0F172A)
+                            ) {
+                                list.forEach { l ->
+                                    DropdownMenuItem(
+                                        text = { Text(l.arabicLabel(), color = Color.White) },
+                                        onClick = {
+                                            onSelectEumetLayer(l.name)
+                                            eumetMenu = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
 
             HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
 

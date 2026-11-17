@@ -39,6 +39,8 @@ class MapScreenState(
     var eoxEnabled by mutableStateOf(false)
     var quakesEnabled by mutableStateOf(false)
     var rainEnabled by mutableStateOf(false)
+    var eumetEnabled by mutableStateOf(false)
+    var eumetLayerName by mutableStateOf("")
     var reliabilityEnabled by mutableStateOf(false)
     var peakEnabled by mutableStateOf(false)
     var coverageEnabled by mutableStateOf(false)
@@ -158,7 +160,7 @@ class MapScreenState(
                     listOf(
                         it.isRadarMode, it.isHeatmapActive, it.selectedCategory, it.selectedCity, it.searchQuery,
                         it.maxRangeKm, it.currentMapMode.name, it.isNavigating, encode(it.navWaypoints),
-                        it.mapLayer.name, it.is3DTerrainEnabled
+                        it.mapLayer.name, it.is3DTerrainEnabled, it.eumetEnabled, it.eumetLayerName
                     )
                 } catch (_: Throwable) {
                     emptyList()
@@ -181,6 +183,8 @@ class MapScreenState(
                     ).also { st ->
                         st.mapLayer = restoredLayer
                         st.is3DTerrainEnabled = restored3D
+                        st.eumetEnabled = (list.getOrNull(11) as? Boolean) ?: false
+                        st.eumetLayerName = (list.getOrNull(12) as? String) ?: ""
                         val wps = decode(list.getOrNull(8) as? String ?: "")
                         if ((list.getOrNull(7) as? Boolean) == true && wps.isNotEmpty()) {
                             st.navWaypoints = wps
