@@ -3,6 +3,7 @@ package com.example.ui.screens.entities
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
@@ -54,62 +55,83 @@ fun DynamicPolymorphicProfileScreen(
     onRequestBooking: () -> Unit = {},
     onOrderProduct: () -> Unit = {}
 ) {
+    BackHandler { onBackClick() }
+
     val context = LocalContext.current
     val categories by viewModel.categories.collectAsState()
     val products by viewModel.products.collectAsState()
     val ratings by viewModel.ratings.collectAsState()
     val bookings by viewModel.bookings.collectAsState()
 
+    val allProviders by viewModel.providers.collectAsState()
+    val allStores by viewModel.stores.collectAsState()
+    val allProperties by viewModel.properties.collectAsState()
+    val allJobs by viewModel.jobs.collectAsState()
+
+    val liveProvider = remember(provider, allProviders) {
+        provider?.let { p -> allProviders.find { it.id == p.id } ?: p }
+    }
+    val liveStore = remember(store, allStores) {
+        store?.let { s -> allStores.find { it.id == s.id } ?: s }
+    }
+    val liveProperty = remember(property, allProperties) {
+        property?.let { pr -> allProperties.find { it.id == pr.id } ?: pr }
+    }
+    val liveJob = remember(job, allJobs) {
+        job?.let { j -> allJobs.find { it.id == j.id } ?: j }
+    }
+
     val currentUserId by viewModel.currentUserId.collectAsState()
     val currentUserPhone by viewModel.currentUserPhone.collectAsState()
+    val currentUserName by viewModel.currentUserName.collectAsState()
     val adminRole by viewModel.adminRole.collectAsState()
 
     // Determine Entity Type dynamically
-    val entityType = remember(provider, store, property, job, categories) {
+    val entityType = remember(liveProvider, liveStore, liveProperty, liveJob, categories) {
         when {
-            provider != null -> {
-                val catName = categories.find { it.id == provider.categoryId }?.name?.lowercase() ?: ""
+            liveProvider != null -> {
+                val catName = categories.find { it.id == liveProvider.categoryId }?.name?.lowercase() ?: ""
                 when {
-                    provider.categoryId == "medical" || catName.contains("طب") || catName.contains("عياد") -> ProfileEntityType.MEDICAL
-                    provider.categoryId == "restaurants" || catName.contains("مطعم") || catName.contains("كافيه") -> ProfileEntityType.RESTAURANT
-                    provider.categoryId == "stores" || catName.contains("متجر") || catName.contains("سوق") -> ProfileEntityType.STORE
+                    liveProvider.providerType.contains("medical", ignoreCase = true) || liveProvider.categoryId.contains("medical", ignoreCase = true) || catName.contains("طب") || catName.contains("عياد") || liveProvider.profession.contains("طبي") || liveProvider.profession.contains("عياد") -> ProfileEntityType.MEDICAL
+                    liveProvider.categoryId == "restaurants" || catName.contains("مطعم") || catName.contains("كافيه") -> ProfileEntityType.RESTAURANT
+                    liveProvider.categoryId == "stores" || catName.contains("متجر") || catName.contains("سوق") -> ProfileEntityType.STORE
                     else -> ProfileEntityType.TECHNICIAN
                 }
             }
-            store != null -> {
-                when (store.sectionId) {
-                    "restaurants" -> ProfileEntityType.RESTAURANT
-                    "medical" -> ProfileEntityType.MEDICAL
+            liveStore != null -> {
+                when {
+                    liveStore.sectionId.contains("restaurant", ignoreCase = true) -> ProfileEntityType.RESTAURANT
+                    liveStore.sectionId.contains("medical", ignoreCase = true) || liveStore.medicalLicenseNo.isNotBlank() -> ProfileEntityType.MEDICAL
                     else -> ProfileEntityType.STORE
                 }
             }
-            property != null -> ProfileEntityType.REAL_ESTATE
-            job != null -> ProfileEntityType.JOB
+            liveProperty != null -> ProfileEntityType.REAL_ESTATE
+            liveJob != null -> ProfileEntityType.JOB
             else -> ProfileEntityType.GENERAL
         }
     }
 
     // Unify primary fields
-    val entityName = provider?.name ?: store?.name ?: property?.title ?: job?.title ?: "ملف النشاط"
-    val entityPhone = provider?.phone ?: store?.phone ?: property?.phone ?: job?.phone ?: ""
-    val entityAddress = provider?.localNeighborhood?.ifEmpty { provider.area }
-        ?: store?.localNeighborhood?.ifEmpty { store.cityId }
-        ?: property?.localNeighborhood?.ifEmpty { property.cityId }
-        ?: job?.address?.ifEmpty { job.cityId } ?: "اليمن"
-    val ratingValue = provider?.rating ?: store?.rating ?: property?.rating ?: 5.0f
-    val reviewsCount = provider?.numReviews ?: store?.numReviews ?: property?.numReviews ?: 0
-    val profileCover = provider?.coverImage?.ifEmpty { provider.profileImage }
-        ?: store?.coverImage?.ifEmpty { store.logoImage }
-        ?: property?.images?.firstOrNull() ?: ""
-    val entityDescription = provider?.profession?.ifEmpty { provider.specialization }
-        ?: store?.description
-        ?: property?.description
-        ?: job?.description ?: "لا يوجد وصف متاح."
+    val entityName = liveProvider?.name ?: liveStore?.name ?: liveProperty?.title ?: liveJob?.title ?: "ملف النشاط"
+    val entityPhone = liveProvider?.phone ?: liveStore?.phone ?: liveProperty?.phone ?: liveJob?.phone ?: ""
+    val entityAddress = liveProvider?.localNeighborhood?.ifEmpty { liveProvider.area }
+        ?: liveStore?.localNeighborhood?.ifEmpty { liveStore.cityId }
+        ?: liveProperty?.localNeighborhood?.ifEmpty { liveProperty.cityId }
+        ?: liveJob?.address?.ifEmpty { liveJob.cityId } ?: "اليمن"
+    val ratingValue = liveProvider?.rating ?: liveStore?.rating ?: liveProperty?.rating ?: 5.0f
+    val reviewsCount = liveProvider?.numReviews ?: liveStore?.numReviews ?: liveProperty?.numReviews ?: 0
+    val profileCover = liveProvider?.coverImage?.ifEmpty { liveProvider.profileImage }
+        ?: liveStore?.coverImage?.ifEmpty { liveStore.logoImage }
+        ?: liveProperty?.images?.firstOrNull() ?: ""
+    val entityDescription = liveProvider?.profession?.ifEmpty { liveProvider.specialization }
+        ?: liveStore?.description
+        ?: liveProperty?.description
+        ?: liveJob?.description ?: "لا يوجد وصف متاح."
 
     var selectedTab by remember { mutableIntStateOf(0) }
     var showRatingDialog by remember { mutableStateOf(false) }
 
-    val entityId = provider?.id ?: store?.id ?: property?.id ?: job?.id ?: ""
+    val entityId = liveProvider?.id ?: liveStore?.id ?: liveProperty?.id ?: liveJob?.id ?: ""
     val favoriteIds by viewModel.favoriteIds.collectAsState()
     val isFav = remember(favoriteIds, entityId) { favoriteIds.contains(entityId) }
     val entityReviews = remember(ratings, entityId) {
@@ -118,20 +140,19 @@ fun DynamicPolymorphicProfileScreen(
 
     // Ownership logic: check if logged-in user is the owner
     val joinPhoneState by viewModel.joinRequestPhone.collectAsState()
-    val isOwner = remember(currentUserId, currentUserPhone, provider, store, property, adminRole, joinPhoneState) {
+    val isOwner = remember(currentUserId, currentUserPhone, liveProvider, liveStore, liveProperty, adminRole, joinPhoneState) {
         val phoneClean = AppPreferenceHelper.normalizePhoneNumber(currentUserPhone)
         val uidClean = currentUserId.trim()
-        val provPhone = AppPreferenceHelper.normalizePhoneNumber(provider?.phone ?: "")
-        val storePhone = AppPreferenceHelper.normalizePhoneNumber(store?.phone ?: "")
-        val storeOwner = store?.ownerId?.trim() ?: ""
-        val propPhone = AppPreferenceHelper.normalizePhoneNumber(property?.phone ?: "")
-        val propOwner = property?.ownerId?.trim() ?: ""
+        val provPhone = AppPreferenceHelper.normalizePhoneNumber(liveProvider?.phone ?: "")
+        val storePhone = AppPreferenceHelper.normalizePhoneNumber(liveStore?.phone ?: "")
+        val storeOwner = liveStore?.ownerId?.trim() ?: ""
+        val propPhone = AppPreferenceHelper.normalizePhoneNumber(liveProperty?.phone ?: "")
+        val propOwner = liveProperty?.ownerId?.trim() ?: ""
         val joinPhone = AppPreferenceHelper.normalizePhoneNumber(joinPhoneState)
-        val isAdmin = adminRole != "GUEST"
 
-        val provId = provider?.id?.trim() ?: ""
-        val storeId = store?.id?.trim() ?: ""
-        val propId = property?.id?.trim() ?: ""
+        val provId = liveProvider?.id?.trim() ?: ""
+        val storeId = liveStore?.id?.trim() ?: ""
+        val propId = liveProperty?.id?.trim() ?: ""
 
         (uidClean.isNotEmpty() && (uidClean == provId || uidClean == storeId || uidClean == propId || uidClean == storeOwner || uidClean == propOwner)) ||
         (phoneClean.isNotEmpty() && (phoneClean == provPhone || phoneClean == storePhone || phoneClean == propPhone)) ||
@@ -139,18 +160,20 @@ fun DynamicPolymorphicProfileScreen(
     }
 
     val entityBookings = remember(bookings, entityId, entityPhone) {
-        val cleanP = com.example.ui.helpers.AppPreferenceHelper.normalizePhoneNumber(entityPhone)
+        val cleanP = AppPreferenceHelper.normalizePhoneNumber(entityPhone)
         bookings.filter { b ->
             b.providerId == entityId ||
-            (cleanP.isNotEmpty() && com.example.ui.helpers.AppPreferenceHelper.normalizePhoneNumber(b.providerPhone) == cleanP)
+            (cleanP.isNotEmpty() && AppPreferenceHelper.normalizePhoneNumber(b.providerPhone) == cleanP)
         }
     }
     val calculatedBookingsCount = entityBookings.size
-    val calculatedRevenue = entityBookings.filter { it.status == "COMPLETED" }.sumOf { it.totalAmount }
+    val calculatedRevenue = entityBookings
+        .filter { it.status.uppercase() in listOf("COMPLETED", "PAID", "CLOSED", "DELIVERED") }
+        .sumOf { if (it.totalAmount > 0.0) it.totalAmount else it.price }
 
-    if (store != null && !isOwner) {
+    if (liveStore != null && !isOwner) {
         StoreCustomerCatalogView(
-            store = store,
+            store = liveStore,
             products = products,
             viewModel = viewModel,
             themeColors = themeColors,
@@ -168,7 +191,7 @@ fun DynamicPolymorphicProfileScreen(
                             text = entityName,
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White,
+                            color = themeColors.textPrimary,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -185,7 +208,7 @@ fun DynamicPolymorphicProfileScreen(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "رجوع",
-                            tint = Color.White
+                            tint = themeColors.textPrimary
                         )
                     }
                 },
@@ -194,7 +217,7 @@ fun DynamicPolymorphicProfileScreen(
                         Icon(
                             imageVector = if (isFav) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                             contentDescription = "المفضلة",
-                            tint = if (isFav) Color(0xFFEF4444) else Color.White
+                            tint = if (isFav) Color(0xFFEF4444) else themeColors.textPrimary
                         )
                     }
                     if (entityPhone.isNotBlank()) {
@@ -213,7 +236,7 @@ fun DynamicPolymorphicProfileScreen(
                         }
                         context.startActivity(Intent.createChooser(intent, "مشاركة الملف"))
                     }) {
-                        Icon(imageVector = Icons.Default.Share, contentDescription = "مشاركة", tint = Color.White)
+                        Icon(imageVector = Icons.Default.Share, contentDescription = "مشاركة", tint = themeColors.textPrimary)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = themeColors.surface)
@@ -255,8 +278,8 @@ fun DynamicPolymorphicProfileScreen(
                     reviewsCount = reviewsCount,
                     profileCover = profileCover,
                     entityDescription = entityDescription,
-                    isVerified = provider?.isVerified ?: store?.isVerified ?: property?.isVerified ?: true,
-                    isVip = provider?.isVip ?: store?.isVip ?: property?.isVip ?: false,
+                    isVerified = liveProvider?.isVerified ?: liveStore?.isVerified ?: liveProperty?.isVerified ?: true,
+                    isVip = liveProvider?.isVip ?: liveStore?.isVip ?: liveProperty?.isVip ?: false,
                     isOwner = isOwner,
                     bookingsCount = calculatedBookingsCount,
                     completedRevenue = calculatedRevenue,
@@ -319,10 +342,10 @@ fun DynamicPolymorphicProfileScreen(
                     ProfileOwnerAdminControlBar(
                         entityId = entityId,
                         entityType = entityType,
-                        provider = provider,
-                        store = store,
-                        property = property,
-                        job = job,
+                        provider = liveProvider,
+                        store = liveStore,
+                        property = liveProperty,
+                        job = liveJob,
                         isOwner = isOwner,
                         isAdmin = adminRole != "GUEST",
                         viewModel = viewModel,
@@ -335,10 +358,10 @@ fun DynamicPolymorphicProfileScreen(
             item {
                 ProfileSpecs(
                     entityType = entityType,
-                    provider = provider,
-                    store = store,
-                    property = property,
-                    job = job,
+                    provider = liveProvider,
+                    store = liveStore,
+                    property = liveProperty,
+                    job = liveJob,
                     products = products,
                     themeColors = themeColors
                 )
@@ -358,18 +381,86 @@ fun DynamicPolymorphicProfileScreen(
                 ProfileTabContent(
                     selectedTab = selectedTab,
                     entityType = entityType,
-                    provider = provider,
-                    store = store,
-                    property = property,
-                    job = job,
+                    provider = liveProvider,
+                    store = liveStore,
+                    property = liveProperty,
+                    job = liveJob,
                     products = products,
                     entityReviews = entityReviews,
                     entityDescription = entityDescription,
                     themeColors = themeColors,
                     isOwner = isOwner,
-                    onAddReviewClick = { showRatingDialog = true }
+                    onAddReviewClick = { showRatingDialog = true },
+                    onRequestBooking = onRequestBooking
                 )
             }
         }
+    }
+
+    if (showRatingDialog) {
+        var ratingStars by remember { mutableIntStateOf(5) }
+        var reviewComment by remember { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { showRatingDialog = false },
+            containerColor = themeColors.surface,
+            titleContentColor = themeColors.textPrimary,
+            title = {
+                Text("تقييم $entityName ⭐", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = themeColors.textPrimary)
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        (1..5).forEach { star ->
+                            IconButton(onClick = { ratingStars = star }) {
+                                Icon(
+                                    imageVector = Icons.Default.Star,
+                                    contentDescription = "$star نجوم",
+                                    tint = if (star <= ratingStars) Color(0xFFFFD700) else themeColors.textSecondary.copy(alpha = 0.4f),
+                                    modifier = Modifier.size(30.dp)
+                                )
+                            }
+                        }
+                    }
+                    OutlinedTextField(
+                        value = reviewComment,
+                        onValueChange = { reviewComment = it },
+                        label = { Text("اكتب رأيك وتجربتك (اختياري)", color = themeColors.textSecondary) },
+                        minLines = 2,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val ratingObj = RatingEntity(
+                            id = com.example.utils.EntityIdGenerator.generate("REV"),
+                            targetId = entityId,
+                            targetType = entityType.name,
+                            userId = currentUserId.ifBlank { "guest" },
+                            userName = currentUserName.ifBlank { "عميل" },
+                            rating = ratingStars.toFloat(),
+                            comment = reviewComment.trim(),
+                            timestamp = System.currentTimeMillis()
+                        )
+                        viewModel.adminViewModel.submitRating(ratingObj) {
+                            Toast.makeText(context, "شكراً لك! تم حفظ تقييمك بنجاح ✅", Toast.LENGTH_SHORT).show()
+                        }
+                        showRatingDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent)
+                ) {
+                    Text("إرسال التقييم ⭐", color = Color.Black, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRatingDialog = false }) {
+                    Text("إلغاء", color = themeColors.textSecondary)
+                }
+            }
+        )
     }
 }

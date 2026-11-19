@@ -121,13 +121,26 @@ class DashboardRepositoryImpl(
                     updates["name"] = name.trim()
                     updates["localNeighborhood"] = cityArea.trim()
                     updates["area"] = cityArea.trim()
-                    if (description.isNotBlank()) updates["profession"] = description.trim()
                     if (!photoUrl.isNullOrBlank()) updates["profileImage"] = photoUrl.trim()
                     if (!coverUrl.isNullOrBlank()) updates["coverImage"] = coverUrl.trim()
                 }
                 AppConstants.COL_PROPERTIES -> {
                     updates["title"] = name.trim()
                     updates["localNeighborhood"] = cityArea.trim()
+                    if (!photoUrl.isNullOrBlank()) updates["profileImage"] = photoUrl.trim()
+                    if (!coverUrl.isNullOrBlank()) updates["coverImage"] = coverUrl.trim()
+                    val newImgs = listOfNotNull(
+                        coverUrl?.trim()?.takeIf { it.isNotBlank() },
+                        photoUrl?.trim()?.takeIf { it.isNotBlank() }
+                    )
+                    if (newImgs.isNotEmpty()) {
+                        val existingSnap = try {
+                            firestore.collection(collectionName).document(cleanOwnerId).get().await()
+                        } catch (_: Exception) { null }
+                        @Suppress("UNCHECKED_CAST")
+                        val existingImgs = (existingSnap?.get("images") as? List<String>)?.filter { it.isNotBlank() } ?: emptyList()
+                        updates["images"] = (newImgs + existingImgs).distinct()
+                    }
                 }
                 AppConstants.COL_JOBS -> {
                     updates["companyName"] = name.trim()
@@ -211,6 +224,7 @@ class FavoritesRepositoryImpl(
         val cleanUserId = userId.trim()
         if (cleanUserId.isBlank()) {
             trySend(emptyList())
+            close()
             return@callbackFlow
         }
 
@@ -310,6 +324,7 @@ class ProductsRepositoryImpl(
         val cleanOwnerId = ownerId.trim()
         if (cleanOwnerId.isBlank()) {
             trySend(emptyList())
+            close()
             return@callbackFlow
         }
 
@@ -322,16 +337,23 @@ class ProductsRepositoryImpl(
                 }
 
                 val items = snapshot.documents.mapNotNull { doc ->
+                    val isDel = doc.getBoolean("isDeleted") == true || doc.getBoolean("deleted") == true
+                    if (isDel) return@mapNotNull null
                     ProductItemEntity(
                         id = doc.id,
                         ownerId = doc.getString("ownerId") ?: cleanOwnerId,
                         title = doc.getString("title") ?: doc.getString("name") ?: "",
                         description = doc.getString("description") ?: "",
-                        category = doc.getString("category") ?: "",
+                        category = doc.getString("category")?.takeIf { it.isNotBlank() }
+                            ?: doc.getString("subCategory") ?: "",
                         priceYer = doc.getDouble("priceYer") ?: doc.getDouble("price") ?: 0.0,
                         imageUrl = doc.getString("imageUrl") ?: "",
                         isAvailable = doc.getBoolean("isAvailable") ?: true,
-                        createdAt = doc.getLong("createdAt") ?: System.currentTimeMillis()
+                        createdAt = doc.getLong("createdAt") ?: System.currentTimeMillis(),
+                        isOffer = doc.getBoolean("isOffer") == true,
+                        discountPercent = (doc.getLong("discountPercent") ?: 0L).toInt(),
+                        oldPriceYer = doc.getDouble("oldPriceYer") ?: doc.getDouble("oldPrice") ?: 0.0,
+                        unit = doc.getString("unit") ?: ""
                     )
                 }
                 trySend(items)
@@ -350,16 +372,23 @@ class ProductsRepositoryImpl(
                 }
 
                 val items = snapshot.documents.mapNotNull { doc ->
+                    val isDel = doc.getBoolean("isDeleted") == true || doc.getBoolean("deleted") == true
+                    if (isDel) return@mapNotNull null
                     ProductItemEntity(
                         id = doc.id,
                         ownerId = doc.getString("ownerId") ?: "",
                         title = doc.getString("title") ?: doc.getString("name") ?: "",
                         description = doc.getString("description") ?: "",
-                        category = doc.getString("category") ?: "",
+                        category = doc.getString("category")?.takeIf { it.isNotBlank() }
+                            ?: doc.getString("subCategory") ?: "",
                         priceYer = doc.getDouble("priceYer") ?: doc.getDouble("price") ?: 0.0,
                         imageUrl = doc.getString("imageUrl") ?: "",
                         isAvailable = true,
-                        createdAt = doc.getLong("createdAt") ?: System.currentTimeMillis()
+                        createdAt = doc.getLong("createdAt") ?: System.currentTimeMillis(),
+                        isOffer = doc.getBoolean("isOffer") == true,
+                        discountPercent = (doc.getLong("discountPercent") ?: 0L).toInt(),
+                        oldPriceYer = doc.getDouble("oldPriceYer") ?: doc.getDouble("oldPrice") ?: 0.0,
+                        unit = doc.getString("unit") ?: ""
                     )
                 }
                 trySend(items)
@@ -373,6 +402,8 @@ class ProductsRepositoryImpl(
             val id = product.id.trim().ifBlank { UUID.randomUUID().toString() }
             val createdAt = if (product.createdAt > 0L) product.createdAt else System.currentTimeMillis()
             val safePrice = if (product.priceYer.isNaN() || product.priceYer.isInfinite() || product.priceYer < 0.0) 0.0 else product.priceYer
+            val safeOldPrice = if (product.oldPriceYer.isNaN() || product.oldPriceYer.isInfinite() || product.oldPriceYer < 0.0) 0.0 else product.oldPriceYer
+            val safeDiscount = product.discountPercent.coerceIn(0, 99)
             val map = mapOf(
                 "id" to id,
                 "ownerId" to product.ownerId.trim(),
@@ -381,10 +412,17 @@ class ProductsRepositoryImpl(
                 "name" to product.title.trim(),
                 "description" to product.description.trim(),
                 "category" to product.category.trim(),
+                "subCategory" to product.category.trim(),
                 "priceYer" to safePrice,
                 "price" to safePrice,
                 "imageUrl" to product.imageUrl.trim(),
                 "isAvailable" to product.isAvailable,
+                "isDeleted" to false,
+                "isOffer" to (product.isOffer || safeDiscount > 0),
+                "discountPercent" to safeDiscount,
+                "oldPriceYer" to safeOldPrice,
+                "oldPrice" to safeOldPrice,
+                "unit" to product.unit.trim(),
                 "createdAt" to createdAt
             )
             firestore.collection(AppConstants.COL_PRODUCTS).document(id).set(map).await()
@@ -401,15 +439,23 @@ class ProductsRepositoryImpl(
                 return Result.failure(IllegalArgumentException("معرف المنتج غير صالح"))
             }
             val safePrice = if (product.priceYer.isNaN() || product.priceYer.isInfinite() || product.priceYer < 0.0) 0.0 else product.priceYer
+            val safeOldPrice = if (product.oldPriceYer.isNaN() || product.oldPriceYer.isInfinite() || product.oldPriceYer < 0.0) 0.0 else product.oldPriceYer
+            val safeDiscount = product.discountPercent.coerceIn(0, 99)
             val map = mapOf(
                 "title" to product.title.trim(),
                 "name" to product.title.trim(),
                 "description" to product.description.trim(),
                 "category" to product.category.trim(),
+                "subCategory" to product.category.trim(),
                 "priceYer" to safePrice,
                 "price" to safePrice,
                 "imageUrl" to product.imageUrl.trim(),
-                "isAvailable" to product.isAvailable
+                "isAvailable" to product.isAvailable,
+                "isOffer" to (product.isOffer || safeDiscount > 0),
+                "discountPercent" to safeDiscount,
+                "oldPriceYer" to safeOldPrice,
+                "oldPrice" to safeOldPrice,
+                "unit" to product.unit.trim()
             )
             firestore.collection(AppConstants.COL_PRODUCTS).document(cleanId).update(map).await()
             Result.success(Unit)
@@ -445,6 +491,7 @@ class RatingsRepositoryImpl(
         val cleanTargetId = targetId.trim()
         if (cleanTargetId.isBlank()) {
             trySend(emptyList())
+            close()
             return@callbackFlow
         }
 
@@ -561,6 +608,7 @@ class GalleryRepositoryImpl(
         val cleanOwnerId = ownerId.trim()
         if (cleanOwnerId.isBlank()) {
             trySend(emptyList())
+            close()
             return@callbackFlow
         }
 

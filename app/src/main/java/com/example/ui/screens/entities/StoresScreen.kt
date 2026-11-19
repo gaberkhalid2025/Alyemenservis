@@ -63,14 +63,27 @@ fun StoresScreen(
 
     val categories = remember { com.example.ui.categories.AppCategoryTaxonomy.storesSubCategories.map { it.name } }
 
-    val isLoading = remember(stores) { stores.isEmpty() }
+    var initialLoadWaitDone by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(1800)
+        initialLoadWaitDone = true
+    }
+    val isLoading = remember(stores, initialLoadWaitDone) { stores.isEmpty() && !initialLoadWaitDone }
 
     val filteredStores = remember(stores, searchQuery, selectedCategory, selectedCityId, selectedMinRating, currentUserId, adminRole) {
         stores.filter { store ->
             val isApprovedOrOwner = store.isApproved || store.ownerId == currentUserId || isAdminUser
-            val isPureStore = store.sectionId != "restaurants" &&
-                    !store.categoryId.contains("rest", ignoreCase = true) &&
-                    !store.categoryId.contains("food", ignoreCase = true) &&
+            val sec = store.sectionId.lowercase()
+            val cat = store.categoryId.lowercase()
+            val isPureStore = sec != "restaurants" && !sec.startsWith("restaurant") &&
+                    sec != "medical" && !sec.startsWith("medical") &&
+                    store.medicalLicenseNo.isBlank() &&
+                    !cat.contains("rest") &&
+                    !cat.contains("food") &&
+                    !cat.contains("med") &&
+                    !cat.contains("طبي") &&
+                    !cat.contains("عياد") &&
+                    !cat.contains("صيدل") &&
                     !store.name.contains("مطعم", ignoreCase = true) &&
                     !store.isDeleted
 
@@ -356,7 +369,7 @@ fun StoreItemCard(
                             text = store.name,
                             fontSize = 12.5.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White,
+                            color = themeColors.textPrimary,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -383,13 +396,13 @@ fun StoreItemCard(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.weight(1f)
                     ) {
-                        Icon(Icons.Default.LocationOn, contentDescription = null, tint = Color.LightGray, modifier = Modifier.size(11.dp))
+                        Icon(Icons.Default.LocationOn, contentDescription = null, tint = themeColors.textSecondary, modifier = Modifier.size(11.dp))
                         Spacer(modifier = Modifier.width(2.dp))
                         val locText = store.localNeighborhood.ifBlank { "اليمن" }
                         Text(
                             text = locText,
                             fontSize = 9.sp,
-                            color = Color.LightGray,
+                            color = themeColors.textSecondary,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )

@@ -99,12 +99,11 @@ fun MapControls(
         color = Color(0xFF0F172A).copy(alpha = 0.94f),
         border = BorderStroke(1.dp, Color.White.copy(alpha = 0.12f)),
         shadowElevation = 14.dp,
-        modifier = modifier.width(58.dp).heightIn(max = 580.dp)
+        modifier = modifier.width(58.dp).wrapContentHeight()
     ) {
         Column(
             modifier = Modifier
-                .padding(vertical = 6.dp)
-                .verticalScroll(rememberScrollState()),
+                .padding(vertical = 6.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
@@ -121,117 +120,20 @@ fun MapControls(
 
             HorizontalDivider(modifier = Modifier.width(34.dp), color = Color.White.copy(alpha = 0.08f))
 
-            // 1.5 📷 VELA AR (الواقع المعزز)
+            // 2. 📍 موقعي الحالي (GPS)
             DockButton(
-                icon = Icons.Default.ViewInAr,
-                label = "VELA",
-                active = currentMapMode == MapMode.AR_VPS,
+                icon = if (isGpsActive) Icons.Default.GpsFixed else Icons.Default.MyLocation,
+                label = "موقعي",
+                active = isGpsActive,
                 activeColor = Color(0xFF10B981),
-                onClick = onToggleArVela,
-                testTag = "map_ar_vela_btn",
-                contentDescription = "الواقع المعزز VELA AR"
-            )
-
-            HorizontalDivider(modifier = Modifier.width(34.dp), color = Color.White.copy(alpha = 0.08f))
-
-            // 2. 🎯 رادار المسح والاستكشاف الحي
-            DockButton(
-                icon = Icons.Default.TrackChanges,
-                label = "رادار",
-                active = isRadarMode,
-                activeColor = Color(0xFF10B981),
-                onClick = onToggleRadarMode,
-                testTag = "map_radar_btn",
-                contentDescription = "رادار المسح والاستكشاف الحي"
-            )
-
-            HorizontalDivider(modifier = Modifier.width(34.dp), color = Color.White.copy(alpha = 0.08f))
-
-            // 3. 🛰️ التبديل السريع للأقمار الصناعية
-            DockButton(
-                icon = Icons.Default.Satellite,
-                label = "أقمار",
-                active = currentMapMode == MapMode.SATELLITE,
-                activeColor = Color(0xFF10B981),
-                onClick = { onSelectMapMode(MapMode.SATELLITE, 0f) },
-                testTag = "map_satellite_btn",
-                contentDescription = "الأقمار الصناعية"
-            )
-
-            HorizontalDivider(modifier = Modifier.width(34.dp), color = Color.White.copy(alpha = 0.08f))
-
-            // 4. 🗺️ خريطة الشوارع (HOT)
-            DockButton(
-                icon = Icons.Default.Map,
-                label = "شوارع",
-                active = currentMapMode == MapMode.HOT,
-                activeColor = Color(0xFF10B981),
-                onClick = { onSelectMapMode(MapMode.HOT, 0f) },
-                testTag = "map_pano_btn",
-                contentDescription = "خريطة الشوارع (HOT)"
-            )
-
-            HorizontalDivider(modifier = Modifier.width(34.dp), color = Color.White.copy(alpha = 0.08f))
-
-            // 5. ☁️ الخريطة الحرارية
-            DockButton(
-                icon = if (isHeatmapActive) Icons.Default.CloudDone else Icons.Default.CloudQueue,
-                label = "حراري",
-                active = isHeatmapActive,
-                activeColor = Color(0xFF10B981),
-                onClick = onToggleHeatmap,
-                testTag = "map_heatmap_sync_btn",
-                contentDescription = "الخريطة الحرارية"
-            )
-
-            HorizontalDivider(modifier = Modifier.width(34.dp), color = Color.White.copy(alpha = 0.08f))
-
-            // 6. GPS Button (موقعي الحالي)
-            Surface(
                 onClick = onRecenterLocation,
-                shape = RoundedCornerShape(10.dp),
-                color = Color.Transparent,
-                modifier = Modifier
-                    .size(width = 52.dp, height = 48.dp)
-                    .testTag("recenter_location_btn")
-            ) {
-                Column(
-                    modifier = Modifier.fillMaxSize().padding(horizontal = 2.dp, vertical = 3.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Box(modifier = Modifier.size(24.dp), contentAlignment = Alignment.Center) {
-                        if (isGpsActive) {
-                            Box(
-                                modifier = Modifier
-                                    .size(24.dp)
-                                    .clip(CircleShape)
-                                    .background(Color(0xFF10B981).copy(alpha = gpsPulseAlpha))
-                            )
-                        }
-                        Icon(
-                            imageVector = if (isGpsActive) Icons.Default.GpsFixed else Icons.Default.MyLocation,
-                            contentDescription = "موقعي الحالي (GPS)",
-                            tint = if (isGpsActive) Color(0xFF10B981) else Color.White,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = "موقعي",
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = if (isGpsActive) Color(0xFF10B981) else Color.White.copy(alpha = 0.85f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        textAlign = TextAlign.Center
-                    )
-                }
-            }
+                testTag = "recenter_location_btn",
+                contentDescription = "موقعي الحالي (GPS)"
+            )
 
             HorizontalDivider(modifier = Modifier.width(34.dp), color = Color.White.copy(alpha = 0.08f))
 
-            // 7. ➕ تكبير مباشر
+            // 3. ➕ تكبير مباشر
             DockButton(
                 icon = Icons.Default.Add,
                 label = "تكبير",
@@ -241,7 +143,7 @@ fun MapControls(
                 contentDescription = "تكبير الخريطة"
             )
 
-            // 8. ➖ تصغير مباشر
+            // 4. ➖ تصغير مباشر
             DockButton(
                 icon = Icons.Default.Remove,
                 label = "تصغير",
@@ -253,52 +155,26 @@ fun MapControls(
 
             HorizontalDivider(modifier = Modifier.width(34.dp), color = Color.White.copy(alpha = 0.08f))
 
-            // 9. 🗺️ طبقات أساسية (Valhalla أوفلاين، 3D، وخرائط الأساس)
+            // 5. 🗺️ طبقات موحدة (نافذة الطبقات الموحدة)
             DockButton(
                 icon = Icons.Default.Layers,
-                label = "أساسية",
-                active = hasLayerOverlayActive,
-                activeColor = Color(0xFF00E5FF),
-                inactiveColor = Color(0xFFFBBF24),
+                label = "طبقات",
+                active = hasLayerOverlayActive || hasMoreLayersActive,
+                activeColor = Color(0xFF10B981),
                 onClick = onOpenLayerDialog,
                 testTag = "map_layers_primary_fab",
-                contentDescription = "الطبقات الأساسية والخرائط"
-            )
-
-            // 10. 🛰️ طبقات ثانوية (أقمار حية، طقس، مخاطر وتحليل أوفلاين)
-            DockButton(
-                icon = Icons.Default.SatelliteAlt,
-                label = "ثانوية",
-                active = hasMoreLayersActive,
-                activeColor = Color(0xFFA78BFA),
-                inactiveColor = Color(0xFF38BDF8),
-                onClick = onOpenMoreLayers,
-                testTag = "map_layers_secondary_fab",
-                contentDescription = "الطبقات الثانوية والأقمار الحية"
+                contentDescription = "طبقات الخريطة والأقمار الحية"
             )
 
             HorizontalDivider(modifier = Modifier.width(34.dp), color = Color.White.copy(alpha = 0.08f))
 
-            // 10. 🌙 الوضع الليلي للخريطة
-            DockButton(
-                icon = if (isNightMode) Icons.Default.Bedtime else Icons.Default.WbSunny,
-                label = if (isNightMode) "ليلي" else "نهاري",
-                active = isNightMode,
-                activeColor = Color(0xFFA78BFA),
-                onClick = onToggleNight,
-                testTag = "map_night_mode_btn",
-                contentDescription = "تبديل الوضع الليلي للخريطة"
-            )
-
-            HorizontalDivider(modifier = Modifier.width(34.dp), color = Color.White.copy(alpha = 0.08f))
-
-            // 🛠️ أدوات إضافية (قائمة منسدلة)
+            // 6. 🛠️ أدوات إضافية (قائمة منسدلة أنيقة تجمع باقي الوظائف)
             var showMoreTools by remember { mutableStateOf(false) }
             Box {
                 DockButton(
                     icon = Icons.Default.Tune,
                     label = "أدوات",
-                    active = isZonesActive || isPinPickMode || isEcoMode,
+                    active = isRadarMode || currentMapMode == MapMode.AR_VPS || isHeatmapActive || isNightMode || isZonesActive || isPinPickMode || isEcoMode,
                     activeColor = Color(0xFF00E5FF),
                     onClick = { showMoreTools = true },
                     testTag = "map_tools_btn",
@@ -310,6 +186,32 @@ fun MapControls(
                     containerColor = Color(0xFF0F172A),
                     modifier = Modifier.border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(12.dp))
                 ) {
+                    // 1. VELA AR
+                    DropdownMenuItem(
+                        text = { Text("📷 الواقع المعزز (VELA AR)", color = if (currentMapMode == MapMode.AR_VPS) Color(0xFF10B981) else Color.White) },
+                        leadingIcon = { Icon(Icons.Default.ViewInAr, contentDescription = null, tint = if (currentMapMode == MapMode.AR_VPS) Color(0xFF10B981) else Color.White) },
+                        onClick = { onToggleArVela(); showMoreTools = false }
+                    )
+                    // 2. رادار
+                    DropdownMenuItem(
+                        text = { Text("🎯 رادار المسح والاستكشاف", color = if (isRadarMode) Color(0xFF10B981) else Color.White) },
+                        leadingIcon = { Icon(Icons.Default.TrackChanges, contentDescription = null, tint = if (isRadarMode) Color(0xFF10B981) else Color.White) },
+                        onClick = { onToggleRadarMode(); showMoreTools = false }
+                    )
+                    // 3. الخريطة الحرارية
+                    DropdownMenuItem(
+                        text = { Text("☁️ الخريطة الحرارية", color = if (isHeatmapActive) Color(0xFF10B981) else Color.White) },
+                        leadingIcon = { Icon(if (isHeatmapActive) Icons.Default.CloudDone else Icons.Default.CloudQueue, contentDescription = null, tint = if (isHeatmapActive) Color(0xFF10B981) else Color.White) },
+                        onClick = { onToggleHeatmap(); showMoreTools = false }
+                    )
+                    // 4. الوضع الليلي
+                    DropdownMenuItem(
+                        text = { Text(if (isNightMode) "🌙 الوضع الليلي (مفعّل)" else "☀️ وضع النهار", color = if (isNightMode) Color(0xFFA78BFA) else Color.White) },
+                        leadingIcon = { Icon(if (isNightMode) Icons.Default.Bedtime else Icons.Default.WbSunny, contentDescription = null, tint = if (isNightMode) Color(0xFFA78BFA) else Color.White) },
+                        onClick = { onToggleNight(); showMoreTools = false }
+                    )
+                    HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+                    // 5. تحديد نقطة بدبوس
                     DropdownMenuItem(
                         text = {
                             Text(
@@ -320,11 +222,13 @@ fun MapControls(
                         leadingIcon = { Icon(Icons.Default.PinDrop, contentDescription = null, tint = if (isPinPickMode) Color(0xFF00E5FF) else Color.White) },
                         onClick = { onTogglePinPickMode(); showMoreTools = false }
                     )
+                    // 6. إدخال إحداثيات
                     DropdownMenuItem(
                         text = { Text("🔢 إدخال إحداثيات يدوياً", color = Color.White) },
                         leadingIcon = { Icon(Icons.Default.EditLocationAlt, contentDescription = null, tint = Color(0xFF38BDF8)) },
                         onClick = { onOpenCoordinateEntry(); showMoreTools = false }
                     )
+                    // 7. وضع التوفير
                     DropdownMenuItem(
                         text = {
                             Text(
@@ -342,15 +246,15 @@ fun MapControls(
                         onClick = { onToggleEcoMode(); showMoreTools = false }
                     )
                     HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
-                    // 12. GNSS
+                    // 8. GNSS
                     onShowGnss?.let { showGnssAction ->
                         DropdownMenuItem(
-                            text = { Text("تشخيص إشارة GPS", color = Color.White) },
+                            text = { Text("🛰️ تشخيص إشارة GPS", color = Color.White) },
                             leadingIcon = { Icon(Icons.Default.SatelliteAlt, contentDescription = null, tint = Color.White) },
                             onClick = { showGnssAction(); showMoreTools = false }
                         )
                     }
-                    // 13. Zones
+                    // 9. Zones
                     onToggleZones?.let { toggleZonesAction ->
                         DropdownMenuItem(
                             text = { Text("مناطق توفر الخدمات", color = if (isZonesActive) Color(0xFF10B981) else Color.White) },
@@ -358,8 +262,7 @@ fun MapControls(
                             onClick = { toggleZonesAction(); showMoreTools = false }
                         )
                     }
-                    HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
-                    // 14. تتبع المجموعة (تحديث يدوي ≤ 5 أعضاء)
+                    // 10. تتبع المجموعة
                     DropdownMenuItem(
                         text = { Text("👥 تتبع المجموعة", color = Color.White) },
                         leadingIcon = { Icon(Icons.Default.Group, contentDescription = null, tint = Color(0xFF10B981)) },
@@ -372,7 +275,7 @@ fun MapControls(
 }
 
 /**
- * 🔘 DockButton: زر مخصص لشريط الخريطة بمقاس مريح (52×48dp) وأيقونة ونص صغير وسمات إمكانية الوصول
+ * 🔘 DockButton: زر مخصص لشريط الخريطة بمقاس مريح يمنع قطع الأحرف العربية
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -399,7 +302,7 @@ private fun DockButton(
 
     Box(
         modifier = modifier
-            .size(width = 52.dp, height = 48.dp)
+            .size(width = 54.dp, height = 50.dp)
             .testTag(testTag)
             .semantics(mergeDescendants = true) {
                 this.contentDescription = contentDescription
@@ -416,7 +319,7 @@ private fun DockButton(
                 onClick = onClick,
                 onLongClick = onLongClick
             )
-            .padding(horizontal = 2.dp, vertical = 3.dp),
+            .padding(horizontal = 2.dp, vertical = 2.dp),
         contentAlignment = Alignment.Center
     ) {
         Column(
@@ -432,11 +335,13 @@ private fun DockButton(
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = label,
-                fontSize = 9.sp,
+                fontSize = 9.5.sp,
+                lineHeight = 14.sp,
                 fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
-                color = if (active) activeColor else Color.White.copy(alpha = 0.85f),
+                color = if (active) activeColor else Color.White.copy(alpha = 0.90f),
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+                softWrap = false,
+                overflow = TextOverflow.Visible,
                 textAlign = TextAlign.Center
             )
         }

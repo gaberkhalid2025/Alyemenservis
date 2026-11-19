@@ -51,28 +51,33 @@ object OnlineOsrmNavigator {
             )
         }
 
-        var connection: HttpURLConnection? = null
-        try {
-            // [إصلاح ملاحة نهائي] OSRM يتطلب الترتيب lon,lat
-            val coordsParam = allWaypoints.joinToString(";") { "${it.longitude},${it.latitude}" }
-            val urlString = "${NavConfig.OSRM_BASE_URL}$coordsParam?overview=full&geometries=geojson&steps=true&alternatives=false"
-            val url = URL(urlString)
+        val coordsParam = allWaypoints.joinToString(";") { "${it.longitude},${it.latitude}" }
+        val endpoints = listOf(
+            "https://routing.openstreetmap.de/routed-car/route/v1/driving/",
+            NavConfig.OSRM_BASE_URL
+        ).distinct()
 
-            connection = (url.openConnection() as HttpURLConnection).apply {
-                connectTimeout = 8000
-                readTimeout = 12000
-                requestMethod = "GET"
-                setRequestProperty("User-Agent", "AlYemenServicesApp/1.0 (Android; OpenStreetMap)")
-                instanceFollowRedirects = true
-            }
+        for (baseEndpoint in endpoints) {
+            var connection: HttpURLConnection? = null
+            try {
+                val urlString = "$baseEndpoint$coordsParam?overview=full&geometries=geojson&steps=true&alternatives=false"
+                val url = URL(urlString)
 
-            val responseCode = connection.responseCode
-            if (responseCode == 200) {
-                val response = connection.inputStream.bufferedReader().use { it.readText() }
-                val json = JSONObject(response)
+                connection = (url.openConnection() as HttpURLConnection).apply {
+                    connectTimeout = 7000
+                    readTimeout = 10000
+                    requestMethod = "GET"
+                    setRequestProperty("User-Agent", "AlYemenServicesApp/1.0 (Android; OpenStreetMap)")
+                    instanceFollowRedirects = true
+                }
 
-                if (json.optString("code") == "Ok") {
-                    val routes = json.optJSONArray("routes")
+                val responseCode = connection.responseCode
+                if (responseCode == 200) {
+                    val response = connection.inputStream.bufferedReader().use { it.readText() }
+                    val json = JSONObject(response)
+
+                    if (json.optString("code") == "Ok") {
+                        val routes = json.optJSONArray("routes")
                     if (routes != null && routes.length() > 0) {
                         val route = routes.getJSONObject(0)
                         val totalDistance = route.optDouble("distance", 0.0)
@@ -160,39 +165,29 @@ object OnlineOsrmNavigator {
                     }
                 }
             } else {
-                Log.w(TAG, "OSRM server returned HTTP $responseCode")
+                Log.w(TAG, "OSRM endpoint $baseEndpoint returned HTTP $responseCode")
             }
-
-            return@withContext NavRouteResult(
-                totalDistanceMeters = 0.0,
-                totalDurationSeconds = 0.0,
-                coordinates = emptyList(),
-                legs = emptyList(),
-                waypoints = allWaypoints,
-                isOffline = false,
-                engineSource = "OSRM 🌐",
-                error = NavError.RouteNotFound
-            )
-        } catch (e: kotlinx.coroutines.CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            Log.e(TAG, "OSRM calculateRoute exception: ${e.message}", e)
-            AppErrorLogManager.logApiError("OSRM", "فشل استعلام OSRM: ${e.javaClass.simpleName}", e)
-            return@withContext NavRouteResult(
-                totalDistanceMeters = 0.0,
-                totalDurationSeconds = 0.0,
-                coordinates = emptyList(),
-                legs = emptyList(),
-                waypoints = allWaypoints,
-                isOffline = false,
-                engineSource = "OSRM 🌐",
-                error = NavError.NoConnection
-            )
-        } finally {
-            try {
-                connection?.disconnect()
-            } catch (_: Exception) {}
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                Log.w(TAG, "OSRM endpoint $baseEndpoint failed: ${e.message}")
+            } finally {
+                try {
+                    connection?.disconnect()
+                } catch (_: Exception) {}
+            }
         }
+
+        return@withContext NavRouteResult(
+            totalDistanceMeters = 0.0,
+            totalDurationSeconds = 0.0,
+            coordinates = emptyList(),
+            legs = emptyList(),
+            waypoints = allWaypoints,
+            isOffline = false,
+            engineSource = "OSRM 🌐",
+            error = NavError.NoConnection
+        )
     }
 
     private fun mapManeuver(type: String, modifier: String): ManeuverType {

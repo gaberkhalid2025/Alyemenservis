@@ -13,13 +13,22 @@ import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Explore
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.example.data.AdminSettingsEntity
 import com.example.data.PropertyEntity
@@ -103,6 +112,8 @@ fun RealLeafletMapView(
     realTimeSatFeed: String = "globalvis",
     eumetEnabled: Boolean = false,
     eumetLayer: String = "",
+    bottomInsetDp: Int = 104,
+    topInsetDp: Int = 0,
     themeColors: VisualThemePalette = resolveThemePalette(AdminSettingsEntity()),
     modifier: Modifier = Modifier
 ) {
@@ -351,6 +362,12 @@ fun RealLeafletMapView(
     LaunchedEffect(isMapReady, nightMode) {
         if (isMapReady && webViewRef != null) {
             webViewRef?.evaluateJavascript("if (window.setNightMode) { window.setNightMode($nightMode); }", null)
+        }
+    }
+
+    LaunchedEffect(isMapReady, bottomInsetDp, topInsetDp) {
+        if (isMapReady && webViewRef != null) {
+            webViewRef?.evaluateJavascript("if (window.setMapInsets) { window.setMapInsets($bottomInsetDp, $topInsetDp); }", null)
         }
     }
 
@@ -615,6 +632,50 @@ fun RealLeafletMapView(
                 },
                 modifier = Modifier.fillMaxSize()
             )
+
+            if (!isMapReady) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color(0xFF0F172A)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(64.dp)
+                                .background(Color(0xFF10B981).copy(alpha = 0.15f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(54.dp),
+                                color = Color(0xFF10B981),
+                                strokeWidth = 3.dp
+                            )
+                            Icon(
+                                imageVector = Icons.Default.Explore,
+                                contentDescription = null,
+                                tint = Color(0xFF10B981),
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
+                        Text(
+                            text = "جاري تحميل خريطة اليمن... 🧭",
+                            color = Color.White,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "تجهيز الشوارع والخدمات والطبقات الجغرافية",
+                            color = Color(0xFF94A3B8),
+                            fontSize = 11.5.sp
+                        )
+                    }
+                }
+            }
         } else {
             // الخريطة التفاعلية المحلية البديلة في حالة الطوارئ (100% بدون شاشة سوداء)
             OfflineInteractiveMap(

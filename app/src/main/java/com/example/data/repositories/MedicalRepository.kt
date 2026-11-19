@@ -39,13 +39,19 @@ class MedicalRepository @Inject constructor(
     }
 
     fun getDoctors(ownerId: String): Flow<List<DoctorItem>> = callbackFlow {
-        val cached = getCachedDoctors(ownerId)
+        val cleanOwnerId = ownerId.trim()
+        if (cleanOwnerId.isBlank()) {
+            trySend(emptyList())
+            close()
+            return@callbackFlow
+        }
+        val cached = getCachedDoctors(cleanOwnerId)
         if (cached.isNotEmpty()) {
             trySend(cached)
         }
 
         val listener = firestore.collection("doctors")
-            .whereEqualTo("ownerId", ownerId)
+            .whereEqualTo("ownerId", cleanOwnerId)
             .addSnapshotListener { snapshot, error ->
                 if (error != null || snapshot == null) {
                     trySend(getCachedDoctors(ownerId))

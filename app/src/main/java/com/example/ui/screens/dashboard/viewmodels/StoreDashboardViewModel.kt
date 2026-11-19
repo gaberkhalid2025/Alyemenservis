@@ -67,7 +67,18 @@ class StoreDashboardViewModel(
         }
     }
 
-    fun addProduct(title: String, priceYer: Double, description: String = "", imageUrl: String = "") {
+    fun addProduct(
+        title: String,
+        priceYer: Double,
+        description: String = "",
+        imageUrl: String = "",
+        category: String = "STORE",
+        isAvailable: Boolean = true,
+        isOffer: Boolean = false,
+        discountPercent: Int = 0,
+        oldPriceYer: Double = 0.0,
+        unit: String = ""
+    ) {
         viewModelScope.launch {
             if (title.isBlank()) {
                 _eventFlow.emit(DashboardEvent.ShowToast("يرجى إدخال اسم المنتج"))
@@ -79,7 +90,12 @@ class StoreDashboardViewModel(
                 priceYer = priceYer,
                 description = description,
                 imageUrl = imageUrl,
-                category = "STORE"
+                category = category.ifBlank { "STORE" },
+                isAvailable = isAvailable,
+                isOffer = isOffer || discountPercent > 0,
+                discountPercent = discountPercent.coerceIn(0, 99),
+                oldPriceYer = oldPriceYer.coerceAtLeast(0.0),
+                unit = unit
             )
             val res = productsRepository.addProduct(newProduct)
             res.onSuccess {
@@ -154,5 +170,9 @@ class StoreDashboardViewModel(
                 .onSuccess { _eventFlow.emit(DashboardEvent.ShowToast("تم تحديث كلمة المرور بنجاح 🔑")) }
                 .onFailure { e -> _eventFlow.emit(DashboardEvent.ShowToast(e.localizedMessage ?: "فشل تحديث كلمة المرور")) }
         }
+    }
+
+    fun dispose() {
+        onCleared()
     }
 }

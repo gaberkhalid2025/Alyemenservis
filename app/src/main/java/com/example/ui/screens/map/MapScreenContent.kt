@@ -87,8 +87,6 @@ fun MapScreenContent(
     }
 
     var isDrivingMode by remember { mutableStateOf(true) }
-    var isHudMode by remember { mutableStateOf(false) }
-    var isHudMirrored by remember { mutableStateOf(false) }
     var companionFilter by remember { mutableStateOf<String?>(null) }
     var showSosDialog by remember { mutableStateOf(false) }
     var showDownloadDialog by remember { mutableStateOf(false) }
@@ -145,7 +143,6 @@ fun MapScreenContent(
 
     BackHandler(enabled = true) {
         when {
-            isHudMode -> isHudMode = false
             isPinPickMode -> isPinPickMode = false
             pinnedPoint != null -> pinnedPoint = null
             state.isNavigating -> state.stopNavigation()
@@ -200,14 +197,24 @@ fun MapScreenContent(
         wasSosPending = sosPending
     }
 
-    val speechLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { res ->
-        if (res.resultCode == android.app.Activity.RESULT_OK) {
-            val text = res.data?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
-            if (!text.isNullOrBlank()) {
+    var voiceState by remember { mutableStateOf(VoiceState()) }
+    var searchFocusTick by remember { mutableIntStateOf(0) }
+    val voiceHelper = remember(context) {
+        VoiceSearchHelper(
+            context = context,
+            onFinal = { text ->
                 state.searchQuery = text.trim()
                 searchPanelOpen = true
-            }
-        }
+            },
+            onState = { s -> voiceState = s }
+        )
+    }
+    DisposableEffect(Unit) {
+        onDispose { voiceHelper.destroy() }
+    }
+    val micLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) voiceHelper.start()
+        else coroutineScope.launch { snackbarHostState.showSnackbar("مطلوب إذن الميكروفون للبحث الصوتي") }
     }
 
     LaunchedEffect(state.searchQuery, searchRetryNonce) {
@@ -437,15 +444,6 @@ fun MapScreenContent(
                 onOpenSavedAddresses = { showSavedAddresses = true }
             )
 
-            if (isHudMode) {
-                MapHudOverlay(
-                    isDrivingMode = isDrivingMode,
-                    isHudMirrored = isHudMirrored,
-                    onToggleMirror = { isHudMirrored = !isHudMirrored },
-                    onExitHud = { isHudMode = false }
-                )
-            }
-
             MapScreenTopSearchAndResults(
                 coroutineScope = coroutineScope,
                 snackbarHostState = snackbarHostState,
@@ -453,7 +451,13 @@ fun MapScreenContent(
                 state = state,
                 themeColors = themeColors,
                 onBackClick = onBackClick,
-                speechLauncher = speechLauncher,
+                onVoiceSearchClick = {
+                    if (voiceHelper.hasMicPermission()) {
+                        voiceHelper.start()
+                    } else {
+                        micLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                    }
+                },
                 isTilesDownloaded = isTilesDownloaded,
                 onOpenDownloadDialog = { showDownloadDialog = true },
                 onOpenDiagnostics = { showDiagnostics = true },
@@ -467,7 +471,8 @@ fun MapScreenContent(
                 onSelectSearchResult = { res ->
                     searchedPlace = res
                     state.selectedEntity = null
-                }
+                },
+                focusTick = searchFocusTick
             )
 
             MapControlsDockHost(
@@ -589,7 +594,7 @@ fun MapScreenContent(
                                 .testTag("map_services_sheet_btn")
                         ) {
                             Row(
-                                modifier = Modifier.padding(horizontal = 10.dp),
+                                modifier = Modifier.padding(horizontal = 12.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
@@ -605,82 +610,6 @@ fun MapScreenContent(
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold
                                 )
-                            }
-                        }
-
-                        VerticalDivider(
-                            modifier = Modifier.height(26.dp),
-                            color = Color.White.copy(alpha = 0.10f)
-                        )
-
-                        // 3. 🏆 زر الكأس (مكافآت وتحديات الطريق / إنجازات الملاحة)
-                        Surface(
-                            onClick = {
-                                coroutineScope.launch {
-                                    snackbarHostState.showSnackbar("🏆 نقاط الملاحة والتحديات: 450 نقطة • مكتشف مسارات موثوق في اليمن ✓")
-                                }
-                            },
-                            shape = RoundedCornerShape(14.dp),
-                            color = Color(0xFFFBBF24).copy(alpha = 0.12f),
-                            border = BorderStroke(1.dp, Color(0xFFFBBF24).copy(alpha = 0.30f)),
-                            modifier = Modifier
-                                .height(42.dp)
-                                .testTag("map_trophy_rewards_btn")
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 10.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.EmojiEvents,
-                                    contentDescription = "المكافآت وتحديات الطريق",
-                                    tint = Color(0xFFFBBF24),
-                                    modifier = Modifier.size(20.dp)
-                                )
-                                Text(
-                                    text = "المكافآت",
-                                    color = Color(0xFFFDE68A),
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-
-                        // 4. 🌙 HUD ليلي (إذا كان وضع القيادة مفعلاً)
-                        if (isDrivingMode) {
-                            VerticalDivider(
-                                modifier = Modifier.height(26.dp),
-                                color = Color.White.copy(alpha = 0.10f)
-                            )
-
-                            Surface(
-                                onClick = { isHudMode = true },
-                                shape = RoundedCornerShape(14.dp),
-                                color = Color(0xFF38BDF8).copy(alpha = 0.12f),
-                                border = BorderStroke(1.dp, Color(0xFF38BDF8).copy(alpha = 0.30f)),
-                                modifier = Modifier
-                                    .height(42.dp)
-                                    .testTag("map_hud_toggle_btn")
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 10.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Nightlife,
-                                        contentDescription = "HUD ليلي",
-                                        tint = Color(0xFF38BDF8),
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                    Text(
-                                        text = "HUD",
-                                        color = Color(0xFFBAE6FD),
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
                             }
                         }
                     }
@@ -804,5 +733,20 @@ fun MapScreenContent(
             snackbarHostState.showSnackbar(it)
             map3dMessage = null
         }
+    }
+
+    if (voiceState.status != VoiceStatus.IDLE) {
+        VoiceSearchDialog(
+            state = voiceState,
+            onCancel = { voiceHelper.cancel() },
+            onRetry = { voiceHelper.start() },
+            onUseKeyboard = {
+                voiceHelper.cancel()
+                searchFocusTick++
+            },
+            onOpenSettings = {
+                VoiceSearchHelper.openVoiceSettings(context)
+            }
+        )
     }
 }

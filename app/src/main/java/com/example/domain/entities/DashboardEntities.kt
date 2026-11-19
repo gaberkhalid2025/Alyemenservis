@@ -29,7 +29,11 @@ data class ProductItemEntity(
     val priceYer: Double = 0.0,
     val imageUrl: String = "",
     val isAvailable: Boolean = true,
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = System.currentTimeMillis(),
+    val isOffer: Boolean = false,
+    val discountPercent: Int = 0,
+    val oldPriceYer: Double = 0.0,
+    val unit: String = ""
 )
 
 @Keep

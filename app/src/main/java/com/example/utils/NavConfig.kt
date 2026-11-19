@@ -12,6 +12,7 @@ object NavConfig {
     const val QUAKES_FEED_URL = "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_week.geojson"
     const val RAINVIEWER_FEED_URL = "https://api.rainviewer.com/public/weather-maps.json"
     const val ENABLE_RAINVIEWER = false // طبقة الرادار الجوي معطّلة افتراضياً (بدون مفاتيح API)
+    const val ENABLE_REALEARTH = false // طبقة UW RealEarth معطّلة افتراضياً حتى مراجعة شروط الاستخدام التجاري
     
     // Valhalla Local Config
     const val VALHALLA_DIR = "valhalla"
@@ -35,7 +36,7 @@ object NavConfig {
     // Default Yemen Location (Sana'a)
     const val DEFAULT_YEMEN_LAT = 15.3694
     const val DEFAULT_YEMEN_LNG = 44.1910
-    const val EMERGENCY_NUMBER = "" // الرقم الرسمي للطوارئ إن وجد
+    const val EMERGENCY_NUMBER = "199" // الرقم الرسمي لطوارئ العمليات والإنقاذ في اليمن
     
     // Yemen Cities Data
     data class CityCoords(val name: String, val lat: Double, val lng: Double)

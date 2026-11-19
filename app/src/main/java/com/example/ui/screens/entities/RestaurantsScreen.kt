@@ -63,7 +63,12 @@ fun RestaurantsScreen(
 
     val categories = remember { com.example.ui.categories.AppCategoryTaxonomy.restaurantsSubCategories.map { it.name } }
 
-    val isLoading = remember(stores) { stores.isEmpty() }
+    var initialLoadWaitDone by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(1800)
+        initialLoadWaitDone = true
+    }
+    val isLoading = remember(stores, initialLoadWaitDone) { stores.isEmpty() && !initialLoadWaitDone }
 
     val restaurantStores = remember(stores, searchQuery, selectedCategory, selectedCityId, selectedMinRating, currentUserId, adminRole) {
         stores.filter { store ->
@@ -359,7 +364,7 @@ fun RestaurantCard(
                             text = restaurant.name,
                             fontSize = 12.5.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White,
+                            color = themeColors.textPrimary,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -386,13 +391,13 @@ fun RestaurantCard(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.weight(1f)
                     ) {
-                        Icon(Icons.Default.LocationOn, contentDescription = null, tint = Color.LightGray, modifier = Modifier.size(11.dp))
+                        Icon(Icons.Default.LocationOn, contentDescription = null, tint = themeColors.textSecondary, modifier = Modifier.size(11.dp))
                         Spacer(modifier = Modifier.width(2.dp))
                         val locText = restaurant.localNeighborhood.ifBlank { "اليمن" }
                         Text(
                             text = locText,
                             fontSize = 9.sp,
-                            color = Color.LightGray,
+                            color = themeColors.textSecondary,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -416,30 +421,6 @@ fun RestaurantCard(
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Button 1: Details
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = themeColors.accent,
-                        shadowElevation = 3.dp,
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(29.dp)
-                            .clickable { onClick() }
-                    ) {
-                        Box(
-                            contentAlignment = Alignment.Center,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(
-                                    Brush.verticalGradient(
-                                        listOf(Color.White.copy(alpha = 0.25f), Color.Transparent)
-                                    )
-                                )
-                        ) {
-                            Text("التفاصيل 📋", fontSize = 9.5.sp, color = Color.Black, fontWeight = FontWeight.Bold)
-                        }
-                    }
-
                     // Button 1: Details
                     Surface(
                         shape = RoundedCornerShape(8.dp),

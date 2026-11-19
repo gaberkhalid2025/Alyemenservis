@@ -36,10 +36,12 @@ class MedicalDashboardViewModel @Inject constructor(
     val eventFlow: SharedFlow<DashboardEvent> = _eventFlow.asSharedFlow()
 
     private var doctorsJob: kotlinx.coroutines.Job? = null
+    private var loadJob: kotlinx.coroutines.Job? = null
 
     fun initialize(id: String) {
-        if (ownerId == id) return
-        ownerId = id
+        val cleanId = id.trim()
+        if (cleanId.isBlank() || ownerId == cleanId) return
+        ownerId = cleanId
         loadDashboardData()
         doctorsJob?.cancel()
         doctorsJob = viewModelScope.launch {
@@ -57,7 +59,8 @@ class MedicalDashboardViewModel @Inject constructor(
 
     fun loadDashboardData() {
         if (ownerId.isBlank()) return
-        viewModelScope.launch {
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
             
             supervisorScope {
@@ -90,10 +93,15 @@ class MedicalDashboardViewModel @Inject constructor(
     }
 
     fun addDoctor(name: String, specialty: String, workingHours: String) {
-        if (name.isBlank()) return
+        if (name.isBlank()) {
+            viewModelScope.launch {
+                _eventFlow.emit(DashboardEvent.ShowToast("يرجى إدخال اسم الطبيب"))
+            }
+            return
+        }
         
         val docId = java.util.UUID.randomUUID().toString()
-        val existing = _doctors.value.find { it.name == name && it.specialty == specialty }
+        val existing = _doctors.value.find { it.name.trim() == name.trim() && it.specialty.trim() == specialty.trim() }
         if (existing != null) {
             viewModelScope.launch {
                 _eventFlow.emit(DashboardEvent.ShowToast("الطبيب موجود مسبقاً ⚠️"))
@@ -126,16 +134,35 @@ class MedicalDashboardViewModel @Inject constructor(
         }
     }
 
-    fun addMedicalService(title: String, priceYer: Double, description: String = "", imageUrl: String = "") {
+    fun addMedicalService(
+        title: String,
+        priceYer: Double,
+        description: String = "",
+        imageUrl: String = "",
+        category: String = "MEDICAL",
+        isAvailable: Boolean = true,
+        isOffer: Boolean = false,
+        discountPercent: Int = 0,
+        oldPriceYer: Double = 0.0,
+        unit: String = ""
+    ) {
         viewModelScope.launch {
-            if (title.isBlank()) return@launch
+            if (title.isBlank()) {
+                _eventFlow.emit(DashboardEvent.ShowToast("يرجى إدخال اسم الخدمة الطبية"))
+                return@launch
+            }
             val service = ProductItemEntity(
                 ownerId = ownerId,
                 title = title,
                 priceYer = priceYer,
                 description = description,
                 imageUrl = imageUrl,
-                category = "MEDICAL"
+                category = category.ifBlank { "MEDICAL" },
+                isAvailable = isAvailable,
+                isOffer = isOffer || discountPercent > 0,
+                discountPercent = discountPercent.coerceIn(0, 99),
+                oldPriceYer = oldPriceYer.coerceAtLeast(0.0),
+                unit = unit
             )
             productsRepository.addProduct(service).onSuccess {
                 _eventFlow.emit(DashboardEvent.ShowToast("تمت إضافة الخدمة الطبية 💊"))
@@ -211,8 +238,14 @@ class MedicalDashboardViewModel @Inject constructor(
         }
     }
 
+    fun dispose() {
+        onCleared()
+    }
+
     override fun onCleared() {
         super.onCleared()
+        loadJob?.cancel()
+        loadJob = null
         doctorsJob?.cancel()
         doctorsJob = null
     }

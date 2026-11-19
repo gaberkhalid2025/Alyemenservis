@@ -64,8 +64,12 @@ fun PropertiesScreen(
 
     val categories = remember { com.example.ui.categories.AppCategoryTaxonomy.propertiesSubCategories.map { it.name } }
 
-    // Determine loading state from properties list presence
-    val isLoading = remember(properties) { properties.isEmpty() }
+    var initialLoadWaitDone by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(1800)
+        initialLoadWaitDone = true
+    }
+    val isLoading = remember(properties, initialLoadWaitDone) { properties.isEmpty() && !initialLoadWaitDone }
 
     val filteredProperties = remember(properties, searchQuery, selectedCategory, selectedCityId, selectedTypeFilter, selectedMinRating, currentUserId, adminRole) {
         properties.filter { prop ->
@@ -141,7 +145,7 @@ fun PropertiesScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                Text("🏷️ طبيعة العقد:", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.LightGray)
+                Text("🏷️ طبيعة العقد:", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = themeColors.textSecondary)
                 listOf(
                     "الكل" to "الكل",
                     "rent" to "للإيجار 🔑",
@@ -349,7 +353,7 @@ fun PropertyCard(
                         text = property.title,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White,
+                        color = themeColors.textPrimary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f)
@@ -384,13 +388,13 @@ fun PropertyCard(
                         maxLines = 1
                     )
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.LocationOn, contentDescription = null, tint = Color.LightGray, modifier = Modifier.size(10.dp))
+                        Icon(Icons.Default.LocationOn, contentDescription = null, tint = themeColors.textSecondary, modifier = Modifier.size(10.dp))
                         Spacer(modifier = Modifier.width(2.dp))
                         val locText = property.localNeighborhood.ifBlank { "اليمن" }
                         Text(
                             text = locText,
                             fontSize = 9.sp,
-                            color = Color.LightGray,
+                            color = themeColors.textSecondary,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )

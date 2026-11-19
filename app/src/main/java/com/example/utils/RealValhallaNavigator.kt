@@ -501,16 +501,12 @@ object RealValhallaNavigator {
 
         // 2) Nominatim أونلاين (فقط إذا كان الاتصال متاحاً؛ بدون تعليق عند عدم وجود إنترنت)
         val onlineAvailable = context == null || isNetworkAvailable(context)
-        val remote: List<SearchAddressResult> = if (onlineAvailable && clean.length >= 3) {
+        val remote: List<SearchAddressResult> = if (onlineAvailable && clean.length >= 3 && local.size < 6) {
             searchMutex.withLock {
                 searchCache[nq]?.let { return@withLock it }
-                val wait = 1_100L - (System.currentTimeMillis() - lastNominatimAt)
-                if (wait > 0) delay(wait)
-                var r = fetchNominatim(clean, userLat, userLng, hasUser)
-                if (r != null && r.isEmpty() && clean.contains("اي")) { // هايل ↔ هائل
-                    delay(1_100L)
-                    r = fetchNominatim(clean.replace("اي", "ائ"), userLat, userLng, hasUser)
-                }
+                val wait = 1_000L - (System.currentTimeMillis() - lastNominatimAt)
+                if (wait > 0 && local.isEmpty()) delay(wait)
+                val r = fetchNominatim(clean, userLat, userLng, hasUser)
                 lastNominatimAt = System.currentTimeMillis()
                 if (r != null && r.isNotEmpty()) {
                     searchCache[nq] = r
@@ -549,7 +545,7 @@ object RealValhallaNavigator {
             val viewbox = if (hasUser) "&viewbox=${lng - 1.0},${lat + 1.0},${lng + 1.0},${lat - 1.0}&bounded=0" else ""
             val url = URL("${NavConfig.NOMINATIM_BASE_URL}?format=jsonv2&q=$encoded&countrycodes=ye&accept-language=ar&limit=10$viewbox")
             c = (url.openConnection() as HttpURLConnection).apply {
-                connectTimeout = 8_000; readTimeout = 12_000; requestMethod = "GET"
+                connectTimeout = 2_500; readTimeout = 3_500; requestMethod = "GET"
                 setRequestProperty("User-Agent", "AlYemenServicesApp/1.0 (Android; Nominatim)")
             }
             when (val code = c.responseCode) {

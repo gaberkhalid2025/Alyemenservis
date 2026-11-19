@@ -42,7 +42,7 @@ fun UnifiedSettingsSection(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = themeColors.surface),
             shape = RoundedCornerShape(16.dp),
-            border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))
+            border = androidx.compose.foundation.BorderStroke(1.dp, themeColors.border)
         ) {
             Column(
                 modifier = Modifier.padding(16.dp),
@@ -53,9 +53,14 @@ fun UnifiedSettingsSection(
                 OutlinedTextField(
                     value = nameInput,
                     onValueChange = { nameInput = it },
-                    label = { Text("الاسم / اسم المنشأة") },
+                    label = { Text("الاسم / اسم المنشأة", color = themeColors.textSecondary) },
                     modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = themeColors.accent)
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = themeColors.accent,
+                        unfocusedBorderColor = themeColors.border,
+                        focusedTextColor = themeColors.textPrimary,
+                        unfocusedTextColor = themeColors.textPrimary
+                    )
                 )
 
                 OutlinedTextField(
@@ -66,38 +71,51 @@ fun UnifiedSettingsSection(
                     readOnly = true,
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
-                        disabledBorderColor = Color.Gray.copy(alpha = 0.5f),
-                        disabledTextColor = Color.LightGray,
-                        disabledLabelColor = Color.Gray
+                        disabledBorderColor = themeColors.border,
+                        disabledTextColor = themeColors.textSecondary,
+                        disabledLabelColor = themeColors.textSecondary
                     )
                 )
 
                 OutlinedTextField(
                     value = cityAreaInput,
                     onValueChange = { cityAreaInput = it },
-                    label = { Text("المدينة والحي") },
+                    label = { Text("المدينة والحي", color = themeColors.textSecondary) },
                     modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = themeColors.accent)
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = themeColors.accent,
+                        unfocusedBorderColor = themeColors.border,
+                        focusedTextColor = themeColors.textPrimary,
+                        unfocusedTextColor = themeColors.textPrimary
+                    )
                 )
 
                 OutlinedTextField(
                     value = descInput,
                     onValueChange = { descInput = it },
-                    label = { Text("الوصف التعريفي / التخصص") },
+                    label = { Text("الوصف التعريفي / التخصص", color = themeColors.textSecondary) },
                     minLines = 2,
                     modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = themeColors.accent)
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = themeColors.accent,
+                        unfocusedBorderColor = themeColors.border,
+                        focusedTextColor = themeColors.textPrimary,
+                        unfocusedTextColor = themeColors.textPrimary
+                    )
                 )
 
-                if (workingHours.isNotBlank() || true) {
-                    OutlinedTextField(
-                        value = hoursInput,
-                        onValueChange = { hoursInput = it },
-                        label = { Text("ساعات أوقات العمل (مثال: 8 ص - 10 م)") },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = themeColors.accent)
+                OutlinedTextField(
+                    value = hoursInput,
+                    onValueChange = { hoursInput = it },
+                    label = { Text("ساعات أوقات العمل (مثال: 8 ص - 10 م)", color = themeColors.textSecondary) },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = themeColors.accent,
+                        unfocusedBorderColor = themeColors.border,
+                        focusedTextColor = themeColors.textPrimary,
+                        unfocusedTextColor = themeColors.textPrimary
                     )
-                }
+                )
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -135,7 +153,7 @@ fun UnifiedSettingsSection(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = themeColors.surface),
             shape = RoundedCornerShape(16.dp),
-            border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))
+            border = androidx.compose.foundation.BorderStroke(1.dp, themeColors.border)
         ) {
             Column(
                 modifier = Modifier.padding(16.dp),
@@ -146,17 +164,29 @@ fun UnifiedSettingsSection(
                 OutlinedTextField(
                     value = oldPasswordInput,
                     onValueChange = { oldPasswordInput = it },
-                    label = { Text("كلمة المرور الحالية") },
+                    label = { Text("كلمة المرور الحالية", color = themeColors.textSecondary) },
                     visualTransformation = PasswordVisualTransformation(),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = themeColors.accent,
+                        unfocusedBorderColor = themeColors.border,
+                        focusedTextColor = themeColors.textPrimary,
+                        unfocusedTextColor = themeColors.textPrimary
+                    )
                 )
 
                 OutlinedTextField(
                     value = newPasswordInput,
                     onValueChange = { newPasswordInput = it },
-                    label = { Text("كلمة المرور الجديدة") },
+                    label = { Text("كلمة المرور الجديدة", color = themeColors.textSecondary) },
                     visualTransformation = PasswordVisualTransformation(),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = themeColors.accent,
+                        unfocusedBorderColor = themeColors.border,
+                        focusedTextColor = themeColors.textPrimary,
+                        unfocusedTextColor = themeColors.textPrimary
+                    )
                 )
 
                 Button(

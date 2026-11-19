@@ -490,17 +490,33 @@ fun MainViewModel.updateBusinessAccountStatus(accountId: String, isActive: Boole
 }
 
 fun MainViewModel.updateEntityImages(collection: String, id: String, profileImg: String, coverImg: String) {
+    if (id.isBlank() || collection.isBlank()) return
+    val cleanProfile = profileImg.trim()
+    val cleanCover = coverImg.trim()
     val updates = mutableMapOf<String, Any>()
-    if (profileImg.isNotBlank()) {
-        updates["profileImage"] = profileImg
-        updates["logoImage"] = profileImg
+    if (cleanProfile.isNotBlank()) {
+        updates["profileImage"] = cleanProfile
+        updates["logoImage"] = cleanProfile
     }
-    if (coverImg.isNotBlank()) {
-        updates["coverImage"] = coverImg
+    if (cleanCover.isNotBlank()) {
+        updates["coverImage"] = cleanCover
+    }
+    if (collection == "properties") {
+        val mergedImages = listOf(cleanCover, cleanProfile).filter { it.isNotBlank() }.distinct()
+        if (mergedImages.isNotEmpty()) {
+            updates["images"] = mergedImages
+        }
     }
     if (updates.isNotEmpty()) {
-        viewModelScope.launch { adminViewModel.crud.updateFields(collection, id, updates) }
-        triggerNotification("📸 تم تحديث الصور بنجاح")
+        viewModelScope.launch {
+            try {
+                adminViewModel.crud.updateFields(collection, id, updates)
+                triggerNotification("📸 تم تحديث الصور بنجاح")
+            } catch (e: Exception) {
+                android.util.Log.e("MainViewModel", "updateEntityImages failed: ", e)
+                triggerNotification("❌ تعذر تحديث الصور: ${e.localizedMessage ?: "خطأ في الاتصال"}")
+            }
+        }
     }
 }
 

@@ -28,7 +28,8 @@ fun PendingApprovalView(
     detailsList: List<Pair<String, String>>,
     onCancelRequest: () -> Unit,
     themeColors: VisualThemePalette,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onRefreshStatus: (() -> Unit)? = null
 ) {
     var showCancelConfirmDialog by remember { mutableStateOf(false) }
 
@@ -64,16 +65,16 @@ fun PendingApprovalView(
 
             Text(
                 text = message,
-                fontSize = 11.sp,
-                color = Color.White.copy(alpha = 0.85f),
+                fontSize = 11.5.sp,
+                color = themeColors.textSecondary,
                 textAlign = TextAlign.Center,
-                lineHeight = 16.sp
+                lineHeight = 17.sp
             )
 
-            HorizontalDivider(color = Color.White.copy(alpha = 0.1f), thickness = 1.dp)
+            HorizontalDivider(color = themeColors.border.copy(alpha = 0.3f), thickness = 1.dp)
 
             Card(
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF2D2214)),
+                colors = CardDefaults.cardColors(containerColor = themeColors.background.copy(alpha = 0.5f)),
                 border = BorderStroke(1.dp, Color(0xFFF59E0B).copy(alpha = 0.3f)),
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth()
@@ -81,20 +82,33 @@ fun PendingApprovalView(
                 Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(detailsTitle, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFFF59E0B))
                     detailsList.forEach { (key, value) ->
-                        Text("• $key: $value", fontSize = 11.sp, color = Color.White)
+                        Text("• $key: $value", fontSize = 11.sp, color = themeColors.textPrimary)
                     }
                 }
             }
 
             Spacer(modifier = Modifier.height(6.dp))
 
+            if (onRefreshStatus != null) {
+                Button(
+                    onClick = onRefreshStatus,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(46.dp)
+                ) {
+                    Text("🔄 تحديث حالة الطلب والتحقق", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                }
+            }
+
             Button(
                 onClick = { showCancelConfirmDialog = true },
-                colors = ButtonDefaults.buttonColors(containerColor = Color.Gray),
-                shape = RoundedCornerShape(8.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color.Gray.copy(alpha = 0.6f)),
+                shape = RoundedCornerShape(10.dp),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(48.dp)
+                    .height(44.dp)
             ) {
                 Text("❌ إلغاء والعودة لشاشة التسجيل", color = Color.White, fontSize = 11.sp)
             }

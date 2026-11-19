@@ -30,7 +30,11 @@
         #map {
             width: 100%;
             height: 100%;
-            background-color: #0B1120;
+            background-color: #0F172A;
+            background-image: 
+                linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+            background-size: 32px 32px;
             transition: transform 0.3s ease;
         }
 
@@ -124,23 +128,8 @@
             opacity: 0.25;
         }
 
-        .mode-indicator {
-            position: absolute;
-            top: 14px;
-            right: 14px;
-            z-index: 1000;
-            background: rgba(15, 23, 42, 0.90);
-            border: 1px solid rgba(0, 229, 255, 0.4);
-            border-radius: 20px;
-            padding: 4px 12px;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            color: #00E5FF;
-            font-size: 11px;
-            font-weight: 700;
-            box-shadow: 0 4px 14px rgba(0,0,0,0.5);
-            pointer-events: none;
+        .mode-indicator, #modeIndicator {
+            display: none !important;
         }
 
         .leaflet-control-zoom {
@@ -441,12 +430,12 @@
             if (!on) return;
             ensurePane('eoxPane', 240);
             var okCount = 0, errCount = 0, failedNotified = false;
-            var layer = L.tileLayer('https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2021_3857/default/GoogleMapsCompatible/{z}/{y}/{x}.jpg', {
+            var layer = L.tileLayer('https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless_3857/default/GoogleMapsCompatible/{z}/{y}/{x}.jpg', {
                 maxZoom: 24,
                 maxNativeZoom: 13,
                 opacity: 0.92,
                 pane: 'eoxPane',
-                attribution: 'Sentinel-2 cloudless © <a href="https://s2maps.eu">EOX IT Services</a> (<a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>)'
+                attribution: 'Sentinel-2 cloudless (2016) © <a href="https://s2maps.eu">EOX</a>, Copernicus Sentinel data 2016 &amp; 2017 (<a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>)'
             });
             layer.on('tileload', function() {
                 okCount++;
@@ -633,6 +622,9 @@
                     fadeAnimation: true,
                     zoomAnimation: true
                 }).setView([userLat, userLng], 15);
+                if (map.attributionControl) {
+                    map.attributionControl.setPrefix(false);
+                }
 
                 setLayer(activeMode);
 
@@ -1002,6 +994,23 @@
             } catch (e) { console.error('zones', e); }
         }
         window.setZonesBase64 = setZonesBase64;
+
+        function setMapInsets(bottomDp, topDp) {
+            try {
+                var s = document.getElementById('dyn-insets');
+                if (!s) {
+                    s = document.createElement('style');
+                    s.id = 'dyn-insets';
+                    document.head.appendChild(s);
+                }
+                s.textContent = '.leaflet-bottom{margin-bottom:' + Math.max(0, bottomDp | 0) + 'px!important}' +
+                                '.leaflet-top{margin-top:' + Math.max(0, topDp | 0) + 'px!important}';
+                if (map && map.invalidateSize) {
+                    map.invalidateSize();
+                }
+            } catch (e) {}
+        }
+        window.setMapInsets = setMapInsets;
 
         // Auto initialize on load if not called by Android view
         window.onload = function() {

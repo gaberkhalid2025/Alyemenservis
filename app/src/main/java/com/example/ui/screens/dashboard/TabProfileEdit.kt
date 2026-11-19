@@ -56,13 +56,17 @@ fun TabProfileEdit(
             reviewCount = reviewCount,
             isAvailable = isAvailable,
             themeColors = themeColors,
-            onChangePhoto = { newUrl ->
-                currentPhoto = newUrl
-                onChangePhoto?.invoke(newUrl)
+            onChangePhoto = onChangePhoto?.let { cb ->
+                { newUrl: String ->
+                    currentPhoto = newUrl
+                    cb(newUrl)
+                }
             },
-            onChangeCover = { newUrl ->
-                currentCover = newUrl
-                onChangeCover?.invoke(newUrl)
+            onChangeCover = onChangeCover?.let { cb ->
+                { newUrl: String ->
+                    currentCover = newUrl
+                    cb(newUrl)
+                }
             }
         )
 

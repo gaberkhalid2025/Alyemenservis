@@ -43,19 +43,19 @@ object JoinStatusRouter {
                         account = acc,
                         viewModel = viewModel,
                         themeColors = themeColors,
-                        onBackClick = { viewModel.navigateToScreen(AppScreens.USER_BROWSE) }
+                        onBackClick = { viewModel.goBack() }
                     )
                     "medical" -> MedicalDashboard(
                         account = acc,
                         viewModel = viewModel,
                         themeColors = themeColors,
-                        onBackClick = { viewModel.navigateToScreen(AppScreens.USER_BROWSE) }
+                        onBackClick = { viewModel.goBack() }
                     )
                     else -> StoreDashboard(
                         account = acc,
                         viewModel = viewModel,
                         themeColors = themeColors,
-                        onBackClick = { viewModel.navigateToScreen(AppScreens.USER_BROWSE) }
+                        onBackClick = { viewModel.goBack() }
                     )
                 }
             }
@@ -65,25 +65,42 @@ object JoinStatusRouter {
                     account = acc,
                     viewModel = viewModel,
                     themeColors = themeColors,
-                    onBackClick = { viewModel.navigateToScreen(AppScreens.USER_BROWSE) }
+                    onBackClick = { viewModel.goBack() }
                 )
             }
             is JoinStatus.ApprovedTechnician -> {
-                val acc = com.example.data.UnifiedBusinessAccount.fromProvider(status.provider)
-                TechnicianDashboard(
-                    account = acc,
-                    viewModel = viewModel,
-                    themeColors = themeColors,
-                    onBackClick = { viewModel.navigateToScreen(AppScreens.USER_BROWSE) }
-                )
+                val prov = status.provider
+                val acc = UnifiedBusinessAccount.fromProvider(prov)
+                val isMed = prov.providerType.contains("medical", ignoreCase = true) ||
+                    prov.categoryId.contains("medical", ignoreCase = true) ||
+                    prov.customCategoryName.contains("طبي") ||
+                    prov.customCategoryName.contains("عياد") ||
+                    prov.profession.contains("طبي") ||
+                    prov.profession.contains("عياد") ||
+                    prov.profession.contains("مستشفى")
+                if (isMed) {
+                    MedicalDashboard(
+                        account = acc,
+                        viewModel = viewModel,
+                        themeColors = themeColors,
+                        onBackClick = { viewModel.goBack() }
+                    )
+                } else {
+                    TechnicianDashboard(
+                        account = acc,
+                        viewModel = viewModel,
+                        themeColors = themeColors,
+                        onBackClick = { viewModel.goBack() }
+                    )
+                }
             }
             is JoinStatus.ActiveJobPoster -> {
-                val acc = com.example.data.UnifiedBusinessAccount.fromJob(status.job)
+                val acc = UnifiedBusinessAccount.fromJob(status.job)
                 JobPosterDashboard(
                     account = acc,
                     viewModel = viewModel,
                     themeColors = themeColors,
-                    onBackClick = { viewModel.navigateToScreen(AppScreens.USER_BROWSE) }
+                    onBackClick = { viewModel.goBack() }
                 )
             }
             is JoinStatus.ActiveClient -> {

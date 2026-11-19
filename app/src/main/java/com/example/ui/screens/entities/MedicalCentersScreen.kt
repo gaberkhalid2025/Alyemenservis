@@ -34,10 +34,17 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.ProviderEntity
+import com.example.data.StoreEntity
 import com.example.ui.MainViewModel
 import com.example.ui.components.GenericEntityReviewsDialog
 import com.example.ui.components.SmartAsyncImage
+import com.example.ui.helpers.AppPreferenceHelper
 import com.example.utils.VisualThemePalette
+
+private sealed class UnifiedMedicalItem {
+    data class FromProvider(val provider: ProviderEntity) : UnifiedMedicalItem()
+    data class FromStore(val store: StoreEntity, val asProvider: ProviderEntity) : UnifiedMedicalItem()
+}
 
 @Composable
 fun MedicalCentersScreen(
@@ -45,11 +52,20 @@ fun MedicalCentersScreen(
     themeColors: VisualThemePalette,
     onMedicalCenterClick: (ProviderEntity) -> Unit,
     onChatClick: (ProviderEntity) -> Unit,
-    onBookAppointmentClick: (ProviderEntity) -> Unit
+    onBookAppointmentClick: (ProviderEntity) -> Unit,
+    onMedicalStoreClick: ((StoreEntity) -> Unit)? = null,
+    onMedicalStoreChatClick: ((StoreEntity) -> Unit)? = null
 ) {
     val providers by viewModel.providers.collectAsState()
+    val stores by viewModel.stores.collectAsState()
     val isProvidersLoading by viewModel.isProvidersLoading.collectAsState()
     val cities by viewModel.cities.collectAsState()
+
+    var initialLoadWaitDone by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(1800)
+        initialLoadWaitDone = true
+    }
 
     var searchQuery by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf("الكل") }
@@ -65,10 +81,11 @@ fun MedicalCentersScreen(
 
     var showCreateMedicalDialog by remember { mutableStateOf(false) }
 
-    val medicalProviders = remember(providers, searchQuery, selectedCategory, selectedCityId, selectedMinRating, currentUserId, adminRole) {
-        providers.filter { provider ->
+    val unifiedMedicalItems = remember(providers, stores, searchQuery, selectedCategory, selectedCityId, selectedMinRating, currentUserId, adminRole) {
+        val provItems = providers.filter { provider ->
             val isApprovedOrOwner = provider.subscriptionStatus == "APPROVED" || provider.isVerified || provider.phone == currentUserId || isAdminUser
-            val isMedical = provider.categoryId == "medical" ||
+            val isMedical = provider.providerType.contains("medical", ignoreCase = true) ||
+                    provider.categoryId == "medical" ||
                     provider.categoryId == "health" ||
                     provider.categoryId.contains("med", ignoreCase = true) ||
                     provider.categoryId.contains("health", ignoreCase = true) ||
@@ -94,13 +111,67 @@ fun MedicalCentersScreen(
                     provider.specialization.contains(searchQuery, ignoreCase = true)
 
             val matchesCat = com.example.ui.categories.AppCategoryTaxonomy.matchesMedicalSubCategory(provider, selectedCategory)
-
             val matchesCity = selectedCityId == "الكل" || provider.cityId == selectedCityId
-
             val matchesRating = provider.rating >= selectedMinRating
 
-            isApprovedOrOwner && isMedical && matchesSearch && matchesCat && matchesCity && matchesRating
+            isApprovedOrOwner && !provider.isDeleted && isMedical && matchesSearch && matchesCat && matchesCity && matchesRating
+        }.map { UnifiedMedicalItem.FromProvider(it) }
+
+        val existingPhones = provItems.map { AppPreferenceHelper.normalizePhoneNumber(it.provider.phone) }.filter { it.isNotBlank() }.toSet()
+        val existingIds = provItems.map { it.provider.id }.toSet()
+
+        val storeItems = stores.filter { store ->
+            val sec = store.sectionId.lowercase()
+            val cat = store.categoryId.lowercase()
+            val isMedStore = (sec == "medical" || sec.startsWith("medical") ||
+                    store.medicalLicenseNo.isNotBlank() ||
+                    cat.contains("med") || cat.contains("health") ||
+                    cat.contains("طبي") || cat.contains("عياد") || cat.contains("صيدل") || cat.contains("مستشفى") ||
+                    store.name.contains("طبي", ignoreCase = true) || store.name.contains("عيادة", ignoreCase = true) ||
+                    store.name.contains("مستشفى", ignoreCase = true) || store.name.contains("صيدل", ignoreCase = true)) && !store.isDeleted
+            val isApprovedOrOwner = store.isApproved || store.ownerId == currentUserId || isAdminUser
+            val cleanPhone = AppPreferenceHelper.normalizePhoneNumber(store.phone)
+            val notDup = store.id !in existingIds && (cleanPhone.isBlank() || cleanPhone !in existingPhones)
+            val matchesSearch = searchQuery.isBlank() ||
+                    store.name.contains(searchQuery, ignoreCase = true) ||
+                    store.description.contains(searchQuery, ignoreCase = true) ||
+                    store.localNeighborhood.contains(searchQuery, ignoreCase = true)
+            val matchesCity = selectedCityId == "الكل" || store.cityId == selectedCityId
+            val matchesRating = store.rating >= selectedMinRating
+            val matchesCat = selectedCategory == "الكل" ||
+                    store.categoryId.contains(selectedCategory, ignoreCase = true) ||
+                    store.description.contains(selectedCategory, ignoreCase = true) ||
+                    store.name.contains(selectedCategory, ignoreCase = true)
+
+            isMedStore && isApprovedOrOwner && notDup && matchesSearch && matchesCity && matchesRating && matchesCat
+        }.map { store ->
+            val mappedProvider = ProviderEntity(
+                id = store.id,
+                name = store.name,
+                phone = store.phone,
+                categoryId = "medical",
+                customCategoryName = store.categoryId.ifBlank { "مركز طبي" },
+                profession = store.description.ifBlank { "مركز طبي / عيادة" },
+                specialization = store.description.ifBlank { "خدمات طبية متكاملة" },
+                cityId = store.cityId,
+                localNeighborhood = store.localNeighborhood,
+                area = store.localNeighborhood.ifBlank { store.cityId },
+                profileImage = store.logoImage,
+                coverImage = store.coverImage,
+                rating = store.rating,
+                numReviews = store.numReviews,
+                isVerified = store.isVerified || store.isApproved,
+                isVip = store.isVip,
+                isAvailable = store.isActive,
+                providerType = "medical",
+                subscriptionStatus = if (store.isApproved || store.isActive) "APPROVED" else "PENDING",
+                latitude = store.latitude,
+                longitude = store.longitude
+            )
+            UnifiedMedicalItem.FromStore(store, mappedProvider)
         }
+
+        storeItems + provItems
     }
 
     var showGuestDialog by remember { mutableStateOf(false) }
@@ -126,8 +197,8 @@ fun MedicalCentersScreen(
 
     GenericSectionView(
         themeColors = themeColors,
-        items = medicalProviders,
-        isLoading = isProvidersLoading,
+        items = unifiedMedicalItems,
+        isLoading = isProvidersLoading && unifiedMedicalItems.isEmpty() && !initialLoadWaitDone,
         title = "المراكز الطبية والعيادات التخصصية",
         titleIcon = "🏥",
         searchPlaceholder = "بحث عن مركز طبي، عيادة، أو طبيب... 🏥",
@@ -151,19 +222,47 @@ fun MedicalCentersScreen(
                 Text("➕ تسجيل وإضافة مركز طبي / صيدلية", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 11.5.sp)
             }
         },
-        itemContent = { provider ->
+        itemContent = { item ->
+            val cardProvider = when (item) {
+                is UnifiedMedicalItem.FromProvider -> item.provider
+                is UnifiedMedicalItem.FromStore -> item.asProvider
+            }
             MedicalCenterCard(
-                provider = provider,
+                provider = cardProvider,
                 themeColors = themeColors,
-                onClick = { onMedicalCenterClick(provider) },
+                onClick = {
+                    when (item) {
+                        is UnifiedMedicalItem.FromProvider -> onMedicalCenterClick(item.provider)
+                        is UnifiedMedicalItem.FromStore -> {
+                            if (onMedicalStoreClick != null) {
+                                onMedicalStoreClick(item.store)
+                            } else {
+                                viewModel.selectedStore = item.store
+                                viewModel.selectedProvider = null
+                                viewModel.selectedProperty = null
+                                viewModel.selectedJob = null
+                                viewModel.navigateToScreen(AppScreens.DYNAMIC_PROFILE)
+                            }
+                        }
+                    }
+                },
                 onChatClick = {
                     if (!isLoggedIn) {
                         showGuestDialog = true
                     } else {
-                        onChatClick(provider)
+                        when (item) {
+                            is UnifiedMedicalItem.FromProvider -> onChatClick(item.provider)
+                            is UnifiedMedicalItem.FromStore -> {
+                                if (onMedicalStoreChatClick != null) {
+                                    onMedicalStoreChatClick(item.store)
+                                } else {
+                                    onChatClick(item.asProvider)
+                                }
+                            }
+                        }
                     }
                 },
-                onBookAppointmentClick = { onBookAppointmentClick(provider) }
+                onBookAppointmentClick = { onBookAppointmentClick(cardProvider) }
             )
         }
     )
@@ -370,7 +469,7 @@ fun MedicalCenterCard(
                             text = provider.name,
                             fontSize = 12.5.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White,
+                            color = themeColors.textPrimary,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -397,13 +496,13 @@ fun MedicalCenterCard(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.weight(1f)
                     ) {
-                        Icon(Icons.Default.LocationOn, contentDescription = null, tint = Color.LightGray, modifier = Modifier.size(11.dp))
+                        Icon(Icons.Default.LocationOn, contentDescription = null, tint = themeColors.textSecondary, modifier = Modifier.size(11.dp))
                         Spacer(modifier = Modifier.width(2.dp))
                         val locText = provider.localNeighborhood.ifBlank { provider.area.ifBlank { "اليمن" } }
                         Text(
                             text = locText,
                             fontSize = 9.sp,
-                            color = Color.LightGray,
+                            color = themeColors.textSecondary,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -412,7 +511,7 @@ fun MedicalCenterCard(
                     Text(
                         text = if (provider.isAvailable) "🟢 متاح" else "⚪ مغلق",
                         fontSize = 8.5.sp,
-                        color = if (provider.isAvailable) Color(0xFF10B981) else Color.LightGray,
+                        color = if (provider.isAvailable) Color(0xFF10B981) else themeColors.textSecondary,
                         maxLines = 1
                     )
                 }

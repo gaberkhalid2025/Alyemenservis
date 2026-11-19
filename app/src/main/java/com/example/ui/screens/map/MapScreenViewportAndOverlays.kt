@@ -1,12 +1,11 @@
-@file:OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@file:OptIn(
+    androidx.compose.foundation.ExperimentalFoundationApi::class,
+    androidx.compose.foundation.layout.ExperimentalLayoutApi::class
+)
 
 package com.example.ui.screens.map
 
-import android.content.ActivityNotFoundException
 import android.content.Context
-import android.content.Intent
-import android.speech.RecognizerIntent
-import androidx.activity.result.ActivityResultLauncher
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -296,6 +295,8 @@ internal fun BoxScope.MapScreenViewport(
             valhallaSizeMb = valhallaSizeMb,
             realTimeSatEnabled = state.realTimeSatEnabled,
             realTimeSatFeed = state.realTimeSatFeed,
+            bottomInsetDp = 110,
+            topInsetDp = 0,
             modifier = Modifier.fillMaxSize()
         )
 
@@ -609,7 +610,7 @@ internal fun BoxScope.MapScreenTopSearchAndResults(
     state: MapScreenState,
     themeColors: VisualThemePalette,
     onBackClick: () -> Unit,
-    speechLauncher: ActivityResultLauncher<Intent>,
+    onVoiceSearchClick: () -> Unit,
     isTilesDownloaded: Boolean,
     onOpenDownloadDialog: () -> Unit,
     onOpenDiagnostics: () -> Unit,
@@ -620,7 +621,8 @@ internal fun BoxScope.MapScreenTopSearchAndResults(
     isSearching: Boolean,
     searchResults: List<RealValhallaNavigator.SearchAddressResult>,
     searchMessage: String?,
-    onSelectSearchResult: (RealValhallaNavigator.SearchAddressResult) -> Unit
+    onSelectSearchResult: (RealValhallaNavigator.SearchAddressResult) -> Unit,
+    focusTick: Int = 0
 ) {
     Box(
         modifier = Modifier
@@ -637,19 +639,11 @@ internal fun BoxScope.MapScreenTopSearchAndResults(
             onSearchQueryChange = { state.searchQuery = it },
             themeColors = themeColors,
             onBackClick = onBackClick,
-            onVoiceSearchClick = {
-                val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                    putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                    putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ar-YE")
-                    putExtra(RecognizerIntent.EXTRA_PROMPT, "تحدث باسم الشارع أو الخدمة")
-                    putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
-                }
-                try {
-                    speechLauncher.launch(intent)
-                } catch (e: ActivityNotFoundException) {
-                    coroutineScope.launch { snackbarHostState.showSnackbar("جهازك لا يدعم التعرف على الصوت") }
-                }
-            },
+            onVoiceSearchClick = onVoiceSearchClick,
+            focusTick = focusTick,
+            isTilesDownloaded = isTilesDownloaded,
+            onDownloadMapsClick = onOpenDownloadDialog,
+            onDiagnosticsClick = onOpenDiagnostics,
             onSearchExecute = { query ->
                 val q = query.trim()
                 if (q.length >= 2) {
@@ -658,10 +652,7 @@ internal fun BoxScope.MapScreenTopSearchAndResults(
                 }
                 OfflineMapManager.findCity(q)?.let { city -> state.selectedCity = city.nameAr }
                 keyboardController?.hide()
-            },
-            isTilesDownloaded = isTilesDownloaded,
-            onDownloadMapsClick = onOpenDownloadDialog,
-            onDiagnosticsClick = onOpenDiagnostics
+            }
         )
 
         // 📋 لوحة نتائج البحث
@@ -991,7 +982,7 @@ internal fun BoxScope.MapWaypointsAndBottomCards(
                         Column(Modifier.weight(1f)) {
                             Text("📌 نقطة محددة يدوياً", color = Color.White, fontSize = 14.5.sp, fontWeight = FontWeight.Bold)
                             Text(
-                                OfflineYemenGazetteer.formatCoordinates(pLat, pLng),
+                                text = "\u200E${OfflineYemenGazetteer.formatCoordinates(pLat, pLng)}\u200E",
                                 color = Color(0xFF00E5FF),
                                 fontSize = 11.5.sp,
                                 fontWeight = FontWeight.SemiBold
@@ -1040,41 +1031,37 @@ internal fun BoxScope.MapWaypointsAndBottomCards(
                             Text("➕ كمحطة", fontSize = 12.sp, color = Color.White)
                         }
                     }
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        item {
-                            AssistChip(
-                                onClick = {
-                                    viewModel.setManualUserLocation(pLat, pLng)
-                                    onDismissPinnedPoint()
-                                    coroutineScope.launch { snackbarHostState.showSnackbar("✓ تم اعتماد هذه النقطة كموقعك اليدوي للانطلاق والتوصيل") }
-                                },
-                                label = { Text("📍 اعتمد كموقعي", fontSize = 11.sp, color = Color(0xFF00E5FF)) }
-                            )
-                        }
-                        item {
-                            AssistChip(
-                                onClick = { onAddLandmarkForPin(pLat to pLng) },
-                                label = { Text("➕ احفظ كمعلم", fontSize = 11.sp, color = Color(0xFFFBBF24)) }
-                            )
-                        }
-                        item {
-                            AssistChip(
-                                onClick = {
-                                    onOpenLandmarkForPin(pLat to pLng)
-                                    onDismissPinnedPoint()
-                                },
-                                label = { Text("🏠 عنوان بالمعلم", fontSize = 11.sp, color = Color(0xFF10B981)) }
-                            )
-                        }
-                        item {
-                            AssistChip(
-                                onClick = {
-                                    val shareText = "موقعي المحدد:\n$refSummary\n${OfflineYemenGazetteer.formatCoordinates(pLat, pLng)}\n${SosDispatcher.mapLink(pLat, pLng)}"
-                                    SosDispatcher.safeStart(context, SosDispatcher.shareIntent(shareText))
-                                },
-                                label = { Text("📤 مشاركة", fontSize = 11.sp, color = Color.White) }
-                            )
-                        }
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        AssistChip(
+                            onClick = {
+                                viewModel.setManualUserLocation(pLat, pLng)
+                                onDismissPinnedPoint()
+                                coroutineScope.launch { snackbarHostState.showSnackbar("✓ تم اعتماد هذه النقطة كموقعك اليدوي للانطلاق والتوصيل") }
+                            },
+                            label = { Text("📍 اعتمد كموقعي", fontSize = 11.sp, color = Color(0xFF00E5FF)) }
+                        )
+                        AssistChip(
+                            onClick = { onAddLandmarkForPin(pLat to pLng) },
+                            label = { Text("➕ احفظ كمعلم", fontSize = 11.sp, color = Color(0xFFFBBF24)) }
+                        )
+                        AssistChip(
+                            onClick = {
+                                onOpenLandmarkForPin(pLat to pLng)
+                                onDismissPinnedPoint()
+                            },
+                            label = { Text("🏠 عنوان بالمعلم", fontSize = 11.sp, color = Color(0xFF10B981)) }
+                        )
+                        AssistChip(
+                            onClick = {
+                                val shareText = "موقعي المحدد:\n$refSummary\n${OfflineYemenGazetteer.formatCoordinates(pLat, pLng)}\n${SosDispatcher.mapLink(pLat, pLng)}"
+                                SosDispatcher.safeStart(context, SosDispatcher.shareIntent(shareText))
+                            },
+                            label = { Text("📤 مشاركة", fontSize = 11.sp, color = Color.White) }
+                        )
                     }
                 }
             }

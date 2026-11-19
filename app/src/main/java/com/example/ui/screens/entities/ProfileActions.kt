@@ -101,7 +101,7 @@ fun ProfileActions(
                     Text("تعديل الحساب 📝", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
                 }
 
-                if (entityType == ProfileEntityType.STORE || entityType == ProfileEntityType.RESTAURANT) {
+                if (entityType == ProfileEntityType.STORE || entityType == ProfileEntityType.RESTAURANT || entityType == ProfileEntityType.MEDICAL) {
                     Button(
                         onClick = onEditProducts,
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
@@ -110,7 +110,12 @@ fun ProfileActions(
                     ) {
                         Icon(Icons.Default.List, contentDescription = null, modifier = Modifier.size(14.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("إدارة المنتجات 📦", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        Text(
+                            text = if (entityType == ProfileEntityType.MEDICAL) "إدارة الخدمات 🩺" else "إدارة المنتجات 📦",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
                     }
                 } else if (entityType == ProfileEntityType.TECHNICIAN || entityType == ProfileEntityType.REAL_ESTATE) {
                     Button(
@@ -186,7 +191,7 @@ fun ProfileActions(
                             Text("حجز", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
                         }
 
-                        // 2. "التفاصيل" (soft indigo)
+                        // 2. "اتصال" (soft indigo)
                         Button(
                             onClick = {
                                 if (entityPhone.isNotBlank()) {
@@ -198,9 +203,9 @@ fun ProfileActions(
                             shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.weight(1f).height(46.dp)
                         ) {
-                            Icon(Icons.Default.Info, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                            Icon(Icons.Default.Phone, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("التفاصيل", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            Text("اتصال", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
                         }
 
                         // 3. "محادثة" (blue #2563EB)
@@ -262,8 +267,10 @@ fun ProfileActions(
                     ProfileEntityType.JOB -> {
                         Button(
                             onClick = {
-                                if (entityPhone.isNotBlank()) {
-                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/967$entityPhone?text=${Uri.encode("مرحباً، أود التقديم على فرصة العمل: $entityName")}"))
+                                val cleanPhone = com.example.ui.helpers.AppPreferenceHelper.normalizePhoneNumber(entityPhone)
+                                if (cleanPhone.isNotBlank()) {
+                                    val waNum = if (cleanPhone.startsWith("967")) cleanPhone else "967$cleanPhone"
+                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/$waNum?text=${Uri.encode("مرحباً، أود التقديم على فرصة العمل: $entityName")}"))
                                     context.startActivity(intent)
                                 }
                             },

@@ -22,6 +22,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.utils.ManeuverType
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.filled.Close
+
 /**
  * 🚘 وضع عارض الزجاج الأمامي HUD داخل شاشة الملاحة الحية.
  * يدعم قلب الصورة أفقياً (scaleX = -1f) لقراءتها كانعكاس على الزجاج الأمامي ليلاً.
@@ -37,6 +41,8 @@ fun HudMirrorOverlay(
     onClose: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    BackHandler { onClose() }
+
     val arrowIcon = when (maneuverType) {
         ManeuverType.LEFT, ManeuverType.SLIGHT_LEFT, ManeuverType.SHARP_LEFT -> Icons.AutoMirrored.Filled.ArrowBack
         ManeuverType.RIGHT, ManeuverType.SLIGHT_RIGHT, ManeuverType.SHARP_RIGHT -> Icons.AutoMirrored.Filled.ArrowForward
@@ -51,6 +57,23 @@ fun HudMirrorOverlay(
             .background(Color.Black)
             .padding(24.dp)
     ) {
+        // زر إغلاق علوي بارز للرجوع لشاشة الملاحة في أي وقت
+        Surface(
+            onClick = onClose,
+            shape = CircleShape,
+            color = Color(0xFFDC2626).copy(alpha = 0.9f),
+            shadowElevation = 8.dp,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .statusBarsPadding()
+                .padding(8.dp)
+                .size(46.dp)
+                .testTag("hud_top_close_btn")
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(Icons.Default.Close, contentDescription = "إغلاق HUD", tint = Color.White, modifier = Modifier.size(24.dp))
+            }
+        }
         Column(
             modifier = Modifier
                 .align(Alignment.Center)

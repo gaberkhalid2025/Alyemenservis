@@ -3,6 +3,7 @@
 package com.example.ui.screens.register
 import com.example.ui.*
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -11,7 +12,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.data.ChatChannelEntity
 import com.example.ui.MainViewModel
 import com.example.ui.screens.register.status.*
@@ -26,7 +29,8 @@ import kotlinx.coroutines.launch
 fun JoinRequestStatusScreen(
     viewModel: MainViewModel,
     themeColors: VisualThemePalette,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    preferredRole: String? = null
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -46,7 +50,16 @@ fun JoinRequestStatusScreen(
 
     var activeChatChannel by remember { mutableStateOf<ChatChannelEntity?>(null) }
 
-    val currentStatus = remember(joinPhone, pendingProviders, providers, stores, properties, categories, notifications, jobs, registeredUsersList) {
+    LaunchedEffect(activeChatChannel) {
+        val ch = activeChatChannel ?: return@LaunchedEffect
+        viewModel.targetChatChannelId = ch.id
+        viewModel.targetChatUserId = ch.targetPhone.ifBlank { ch.clientId }
+        viewModel.targetChatUserName = ch.title.ifBlank { ch.targetName.ifBlank { "المحادثة" } }
+        activeChatChannel = null
+        viewModel.navigateToScreen(AppScreens.CHAT_DIRECT)
+    }
+
+    val currentStatus = remember(joinPhone, pendingProviders, providers, stores, properties, categories, notifications, jobs, registeredUsersList, preferredRole) {
         useCase.determineStatus(
             joinPhone = joinPhone,
             pendingProviders = pendingProviders,
@@ -56,7 +69,8 @@ fun JoinRequestStatusScreen(
             categories = categories,
             notifications = notifications,
             jobs = jobs,
-            registeredUsersList = registeredUsersList
+            registeredUsersList = registeredUsersList,
+            preferredRole = preferredRole
         )
     }
 
@@ -79,10 +93,12 @@ fun JoinRequestStatusScreen(
         return
     }
 
+    BackHandler { viewModel.goBack() }
+
     // Pending & Rejected Views
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
-        containerColor = themeColors.surface
+        containerColor = themeColors.background
     ) { padding ->
         Column(
             modifier = modifier
@@ -249,7 +265,37 @@ fun JoinRequestStatusScreen(
                         themeColors = themeColors
                     )
                 }
-                else -> {}
+                else -> {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text("📋", fontSize = 42.sp)
+                        Text(
+                            text = "لا يوجد طلب انضمام مسجل حالياً",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = themeColors.textPrimary
+                        )
+                        Text(
+                            text = "يمكنك تقديم طلب انضمام جديد أو استعادة حسابك برقم الهاتف.",
+                            fontSize = 12.sp,
+                            color = themeColors.textSecondary
+                        )
+                        Button(
+                            onClick = { viewModel.cancelOrResetJoinRequest(context) },
+                            colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent)
+                        ) {
+                            Text("بدء التسجيل الآن", color = androidx.compose.ui.graphics.Color.Black, fontWeight = FontWeight.Bold)
+                        }
+                        TextButton(onClick = { viewModel.goBack() }) {
+                            Text("رجوع", color = themeColors.textSecondary)
+                        }
+                    }
+                }
             }
         }
     }

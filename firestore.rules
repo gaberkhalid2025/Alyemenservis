@@ -18,42 +18,92 @@ service cloud.firestore {
       );
     }
 
-    // 1. المتاجر ومزودي الخدمات والعقارات والمنتجات والعروض والأقسام والمدن والبانرات
+    function matchesOwner(data) {
+      return isSignedIn() && (
+        (('ownerId' in data) && data.ownerId == request.auth.uid) ||
+        (('ownerUid' in data) && data.ownerUid == request.auth.uid) ||
+        (('providerId' in data) && data.providerId == request.auth.uid) ||
+        (('storeId' in data) && data.storeId == request.auth.uid) ||
+        (('entityId' in data) && data.entityId == request.auth.uid) ||
+        (('userId' in data) && data.userId == request.auth.uid) ||
+        (('uid' in data) && data.uid == request.auth.uid) ||
+        (('id' in data) && data.id == request.auth.uid) ||
+        (('email' in request.auth.token) && request.auth.token.email is string && (
+          (('phone' in data) && data.phone is string && request.auth.token.email == (data.phone + '@yemen-services.app')) ||
+          (('ownerId' in data) && data.ownerId is string && request.auth.token.email == (data.ownerId + '@yemen-services.app')) ||
+          (('providerId' in data) && data.providerId is string && request.auth.token.email == (data.providerId + '@yemen-services.app')) ||
+          (('storeId' in data) && data.storeId is string && request.auth.token.email == (data.storeId + '@yemen-services.app'))
+        ))
+      );
+    }
+
+    // 1. المتاجر ومزودي الخدمات والعقارات والمنتجات والمعارض والأطباء والعروض والأقسام والمدن والبانرات
     match /stores/{d} {
       allow read: if true;
       allow create, delete: if isStaff();
-      allow update: if isSignedIn()
-                  && (resource.data.ownerId == request.auth.uid
-                      || isStaff());
+      allow update: if isStaff() || matchesOwner(resource.data);
     }
     match /providers/{d} {
       allow read: if true;
       allow create, delete: if isStaff();
-      allow update: if (isSignedIn()
-                  && (resource.data.phone == request.auth.uid
-                      || resource.data.id == request.auth.uid
-                      || (('ownerId' in resource.data) && resource.data.ownerId == request.auth.uid)
-                      || isStaff()))
+      allow update: if isStaff()
+                  || matchesOwner(resource.data)
                   || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rating', 'numReviews']);
     }
     match /properties/{d} {
       allow read: if true;
       allow create, delete: if isStaff();
-      allow update: if isSignedIn()
-                  && (resource.data.ownerId == request.auth.uid
-                      || isStaff());
+      allow update: if isStaff() || matchesOwner(resource.data);
     }
     match /products/{productId} {
       allow read: if true;
-      allow create: if isSignedIn() && (
-        isStaff() ||
-        request.resource.data.ownerId == request.auth.uid ||
-        request.resource.data.storeId == request.auth.uid
-      );
-      allow update, delete: if isSignedIn()
-                  && (resource.data.storeId == request.auth.uid
-                      || resource.data.ownerId == request.auth.uid
-                      || isStaff());
+      allow create: if isSignedIn() && (isStaff() || matchesOwner(request.resource.data));
+      allow update, delete: if isStaff() || matchesOwner(resource.data);
+    }
+    match /galleries/{itemId} {
+      allow read: if true;
+      allow create: if isSignedIn() && (isStaff() || matchesOwner(request.resource.data));
+      allow update, delete: if isStaff() || matchesOwner(resource.data);
+    }
+    match /doctors/{doctorId} {
+      allow read: if true;
+      allow create: if isSignedIn() && (isStaff() || matchesOwner(request.resource.data));
+      allow update, delete: if isStaff() || matchesOwner(resource.data);
+    }
+    match /special_offers/{offerId} {
+      allow read: if true;
+      allow create: if isSignedIn() && (isStaff() || matchesOwner(request.resource.data));
+      allow update, delete: if isStaff() || matchesOwner(resource.data);
+    }
+    match /offers/{d} {
+      allow read: if true;
+      allow create: if isSignedIn();
+      allow update, delete: if isStaff() || matchesOwner(resource.data);
+    }
+    match /{path=**}/offers/{offerId} {
+      allow read: if true;
+      allow create: if isSignedIn();
+      allow update, delete: if isStaff() || matchesOwner(resource.data);
+    }
+    match /coupons/{couponId} {
+      allow read: if true;
+      allow create: if isSignedIn() && (isStaff() || matchesOwner(request.resource.data));
+      allow update, delete: if isStaff() || matchesOwner(resource.data);
+    }
+    match /loyalty_programs/{programId} {
+      allow read: if true;
+      allow create: if isSignedIn() && (isStaff() || matchesOwner(request.resource.data));
+      allow update, delete: if isStaff() || matchesOwner(resource.data);
+    }
+    match /inventory/{itemId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && (isStaff() || matchesOwner(request.resource.data));
+      allow update, delete: if isStaff() || matchesOwner(resource.data);
+    }
+    match /staff/{staffId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && (isStaff() || matchesOwner(request.resource.data));
+      allow update, delete: if isStaff() || matchesOwner(resource.data);
     }
     match /categories/{d} {
       allow read: if true;
@@ -67,41 +117,72 @@ service cloud.firestore {
       allow read: if true;
       allow write: if isStaff();
     }
-    match /offers/{d} {
-      allow read: if true;
-      allow create: if isSignedIn();
-      allow update, delete: if isSignedIn()
-                  && (resource.data.entityId == request.auth.uid
-                      || isStaff());
-    }
     match /custom_profile_tabs/{d} {
       allow read: if true;
       allow write: if isStaff();
     }
+    match /color_themes/{d} {
+      allow read: if true;
+      allow write: if isStaff();
+    }
+    match /ai_guides/{d} {
+      allow read: if true;
+      allow write: if isStaff();
+    }
+    match /payment_wallets/{d} {
+      allow read: if true;
+      allow write: if isOwnerOrAdmin();
+    }
+    match /payment_gateways/{d} {
+      allow read: if true;
+      allow write: if isOwnerOrAdmin();
+    }
+    match /quick_service_settings/{d} {
+      allow read: if true;
+      allow write: if isOwnerOrAdmin();
+    }
+    match /app_settings/{d} {
+      allow read: if true;
+      allow write: if isOwnerOrAdmin();
+    }
 
     // 2. طلبات الانضمام المعلقة والوظائف
     match /join_requests/{d} {
-      allow read: if isStaff() || (isSignedIn() && (resource.data.uid == request.auth.uid || resource.data.userId == request.auth.uid));
+      allow read: if isStaff() || (isSignedIn() && (resource.data.uid == request.auth.uid || resource.data.userId == request.auth.uid || matchesOwner(resource.data)));
       allow create: if isSignedIn();
       allow update, delete: if isStaff();
     }
     match /pending_providers/{d} {
-      allow read: if isStaff() || (isSignedIn() && resource.data.ownerId == request.auth.uid);
+      allow read: if isStaff() || (isSignedIn() && (resource.data.ownerId == request.auth.uid || matchesOwner(resource.data)));
       allow create: if isSignedIn();
       allow update, delete: if isStaff();
     }
     match /jobs/{d} {
-      allow read: if isSignedIn();
+      allow read: if true;
       allow create: if isSignedIn();
-      allow update, delete: if isStaff() || (isSignedIn() && resource.data.ownerId == request.auth.uid);
+      allow update, delete: if isStaff() || matchesOwner(resource.data);
+    }
+    match /job_listings/{d} {
+      allow read: if true;
+      allow create: if isSignedIn();
+      allow update, delete: if isStaff() || matchesOwner(resource.data);
+    }
+    match /job_applications/{d} {
+      allow read, create: if isSignedIn();
+      allow update, delete: if isStaff() || matchesOwner(resource.data);
+    }
+    match /job_seekers/{d} {
+      allow read, create: if isSignedIn();
+      allow update, delete: if isStaff() || matchesOwner(resource.data);
     }
 
-    // 3. مستخدمي الإدارة والمالك والمشرفين (ممنوع القراءة والكتابة والوصول السحابي المباشر منعاً تاماً)
+    // 3. مستخدمي الإدارة والمالك والمشرفين والأسرار (ممنوع الوصول السحابي المباشر منعاً تاماً)
     match /admin_users/{d} { allow read, write: if false; }
     match /admins/{d} { allow read, write: if false; }
     match /supervisors/{d} { allow read, write: if false; }
+    match /admin_secrets/{d} { allow read, write: if false; }
 
-    // 4. المستخدمين المسجلين (حماية تصعيد الصلاحيات)
+    // 4. المستخدمين المسجلين والمفضلة (حماية تصعيد الصلاحيات)
     match /users/{userId} {
       allow read: if isSignedIn() && (request.auth.uid == userId || isStaff());
       allow create: if isSignedIn() && (
@@ -118,6 +199,18 @@ service cloud.firestore {
         )
       );
       allow delete: if isStaff();
+
+      match /favorites/{favId} {
+        allow read, write: if isSignedIn() && (
+          request.auth.uid == userId ||
+          (('email' in request.auth.token) && request.auth.token.email is string && request.auth.token.email == (userId + '@yemen-services.app')) ||
+          isStaff()
+        );
+      }
+    }
+    match /favorites/{favId} {
+      allow create: if isSignedIn();
+      allow read, update, delete: if isSignedIn() && (isStaff() || matchesOwner(resource.data));
     }
     match /registered_users/{userId} {
       allow read: if isSignedIn() && (request.auth.uid == userId || isStaff());
@@ -130,9 +223,9 @@ service cloud.firestore {
       allow update, delete: if isStaff();
     }
 
-    // 5. الإعدادات العامة (قراءة للمستخدمين المسجلين، وتعديل للإدارة والمالك فقط)
+    // 5. الإعدادات العامة (قراءة للمستخدمين المسجلين عدا الأسرار، وتعديل للإدارة والمالك فقط)
     match /settings/{d} {
-      allow read: if isSignedIn();
+      allow read: if d != 'admin_secrets' && isSignedIn();
       allow write: if isOwnerOrAdmin();
     }
 
@@ -157,13 +250,15 @@ service cloud.firestore {
         resource.data.clientId == request.auth.uid ||
         resource.data.providerId == request.auth.uid ||
         resource.data.customerPhone == request.auth.uid ||
-        resource.data.providerPhone == request.auth.uid
+        resource.data.providerPhone == request.auth.uid ||
+        matchesOwner(resource.data)
       );
       allow create: if isSignedIn();
       allow update, delete: if isSignedIn() && (
         isStaff() ||
         resource.data.clientId == request.auth.uid ||
-        resource.data.providerId == request.auth.uid
+        resource.data.providerId == request.auth.uid ||
+        matchesOwner(resource.data)
       );
     }
     match /instant_requests/{d} {
@@ -175,18 +270,24 @@ service cloud.firestore {
     match /service_requests/{d} {
       allow read, write: if isSignedIn();
     }
+    match /request_offers/{d} {
+      allow read, create: if isSignedIn();
+      allow update, delete: if isStaff() || matchesOwner(resource.data);
+    }
     match /orders/{orderId} {
       allow read: if isSignedIn() && (
         isStaff() ||
         resource.data.userId == request.auth.uid ||
         resource.data.customerPhone == request.auth.uid ||
-        resource.data.storeId == request.auth.uid
+        resource.data.storeId == request.auth.uid ||
+        matchesOwner(resource.data)
       );
       allow create: if isSignedIn();
       allow update, delete: if isSignedIn() && (
         isStaff() ||
         resource.data.userId == request.auth.uid ||
-        resource.data.storeId == request.auth.uid
+        resource.data.storeId == request.auth.uid ||
+        matchesOwner(resource.data)
       );
     }
     match /store_orders/{orderId} {
@@ -194,13 +295,15 @@ service cloud.firestore {
         isStaff() ||
         resource.data.userId == request.auth.uid ||
         resource.data.customerPhone == request.auth.uid ||
-        resource.data.storeId == request.auth.uid
+        resource.data.storeId == request.auth.uid ||
+        matchesOwner(resource.data)
       );
       allow create: if isSignedIn();
       allow update, delete: if isSignedIn() && (
         isStaff() ||
         resource.data.userId == request.auth.uid ||
-        resource.data.storeId == request.auth.uid
+        resource.data.storeId == request.auth.uid ||
+        matchesOwner(resource.data)
       );
     }
     match /appointments/{d} {
@@ -221,11 +324,21 @@ service cloud.firestore {
     }
     match /payments/{d} {
       allow read, create: if isSignedIn();
-      allow update, delete: if isStaff() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow update, delete: if isStaff() || matchesOwner(resource.data);
+    }
+    match /payment_transactions/{d} {
+      allow read: if isSignedIn() && (isStaff() || matchesOwner(resource.data));
+      allow create: if isSignedIn();
+      allow update, delete: if isStaff();
     }
     match /wallets/{d} {
       allow read: if isSignedIn();
       allow write: if isStaff() || (isSignedIn() && d == request.auth.uid);
+    }
+    match /internal_wallets/{d} {
+      allow read: if isSignedIn() && (isStaff() || d == request.auth.uid || matchesOwner(resource.data));
+      allow create: if isSignedIn();
+      allow update, delete: if isStaff();
     }
     match /wallet_transactions/{txId} {
       allow read: if isSignedIn() && (
@@ -241,7 +354,7 @@ service cloud.firestore {
       allow update, delete: if isStaff();
     }
 
-    // 8. المحادثات والرسائل والتواجد
+    // 8. المحادثات والرسائل والتواجد والإشعارات
     match /chat_channels/{channelId} {
       allow read: if isSignedIn() && (
         isStaff() || request.auth.uid in resource.data.participants
@@ -251,7 +364,7 @@ service cloud.firestore {
         isStaff() || request.auth.uid in resource.data.participants
       );
       allow delete: if isStaff();
-      
+
       match /messages/{msgId} {
         allow read: if isSignedIn() && (
           isStaff() ||
@@ -280,8 +393,17 @@ service cloud.firestore {
     match /presence/{d} {
       allow read, write: if isSignedIn();
     }
+    match /user_presence/{d} {
+      allow read, write: if isSignedIn();
+    }
+    match /fcm_tokens/{d} {
+      allow read, write: if isSignedIn();
+    }
+    match /devices/{d} {
+      allow read, write: if isSignedIn();
+    }
 
-    // 9. التقييمات والمراجعات وسجلات النظام
+    // 9. التقييمات والمراجعات والبلاغات والخدمات المساندة
     match /reviews/{d} {
       allow read: if true;
       allow write: if isSignedIn();
@@ -293,17 +415,42 @@ service cloud.firestore {
                 && (resource.data.userId == request.auth.uid
                     || isOwnerOrAdmin());
     }
-    match /audit_logs/{d} {
-      allow read, write: if isStaff();
+    match /reports/{d} {
+      allow create: if isSignedIn();
+      allow read, update, delete: if isStaff();
     }
-    match /admin_logs/{d} {
-      allow read, write: if isStaff();
+    match /review_reports/{d} {
+      allow create: if isSignedIn();
+      allow read, update, delete: if isStaff();
     }
-    match /system_logs/{d} {
-      allow read, write: if isStaff();
+    match /coming_soon_subscribers/{d} {
+      allow read, write: if isSignedIn();
+    }
+    match /ai_assistant_sessions/{d} {
+      allow read, write: if isSignedIn();
     }
 
-    // 10. الحظر والرفض الافتراضي العام لجميع المجموعات الأخرى (Deny by default)
+    // 10. سجلات الإدارة والتدقيق والنسخ الاحتياطي
+    match /audit_logs/{d} { allow read, write: if isStaff(); }
+    match /admin_logs/{d} { allow read, write: if isStaff(); }
+    match /system_logs/{d} { allow read, write: if isStaff(); }
+    match /admin_audit_logs/{d} { allow read, write: if isStaff(); }
+    match /security_audit_logs/{d} { allow read, write: if isStaff(); }
+    match /system_stats/{d} { allow read, write: if isStaff(); }
+    match /admin_notifications/{d} { allow read, write: if isStaff(); }
+    match /admin_settings/{d} { allow read, write: if isStaff(); }
+    match /database_backups/{d} { allow read, write: if isStaff(); }
+    match /settings_backups/{d} { allow read, write: if isStaff(); }
+    match /activity_logs/{d} {
+      allow create: if isSignedIn();
+      allow read, update, delete: if isStaff();
+    }
+    match /user_behavior_logs/{d} {
+      allow create: if isSignedIn();
+      allow read, update, delete: if isStaff();
+    }
+
+    // 11. الحظر والرفض الافتراضي العام لجميع المجموعات الأخرى (Deny by default)
     match /{document=**} {
       allow read, write: if false;
     }

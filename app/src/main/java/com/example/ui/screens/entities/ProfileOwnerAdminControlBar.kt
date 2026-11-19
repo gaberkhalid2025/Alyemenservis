@@ -99,7 +99,7 @@ fun ProfileOwnerAdminControlBar(
                         text = if (isAdmin) "👑 لوحة التحكم والإشراف الشامل للأدمن" else "🛠️ لوحة تحكم حسابك (${entityType.labelAr})",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
-                        color = if (isAdmin) Color(0xFFEAB308) else Color.White
+                        color = if (isAdmin) Color(0xFFEAB308) else themeColors.textPrimary
                     )
                 }
                 if (isAdmin) {
@@ -319,7 +319,7 @@ fun ProfileOwnerAdminControlBar(
                 ) {
                     Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(14.dp), tint = themeColors.accent)
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("الصورة والغلاف 🖼️", fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                    Text("الصورة والغلاف 🖼️", fontSize = 10.sp, color = themeColors.textPrimary, fontWeight = FontWeight.Bold)
                 }
 
                 OutlinedButton(
@@ -330,7 +330,7 @@ fun ProfileOwnerAdminControlBar(
                 ) {
                     Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color(0xFF3B82F6))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("تعديل البيانات 📝", fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                    Text("تعديل البيانات 📝", fontSize = 10.sp, color = themeColors.textPrimary, fontWeight = FontWeight.Bold)
                 }
 
                 if (isAdmin) {
@@ -420,7 +420,12 @@ fun ProfileOwnerAdminControlBar(
                             label = { Text("الصورة الشخصية / الشعار", fontSize = 11.sp) },
                             singleLine = true,
                             modifier = Modifier.weight(1f),
-                            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = themeColors.textPrimary,
+                                unfocusedTextColor = themeColors.textPrimary,
+                                focusedLabelColor = themeColors.accent,
+                                unfocusedLabelColor = themeColors.textSecondary
+                            )
                         )
                         Button(
                             onClick = { avatarPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
@@ -444,7 +449,12 @@ fun ProfileOwnerAdminControlBar(
                             label = { Text("صورة الغلاف (Banner)", fontSize = 11.sp) },
                             singleLine = true,
                             modifier = Modifier.weight(1f),
-                            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = themeColors.textPrimary,
+                                unfocusedTextColor = themeColors.textPrimary,
+                                focusedLabelColor = themeColors.accent,
+                                unfocusedLabelColor = themeColors.textSecondary
+                            )
                         )
                         Button(
                             onClick = { coverPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
@@ -464,20 +474,23 @@ fun ProfileOwnerAdminControlBar(
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(
                             onClick = {
-                                viewModel.updateEntityImages(collectionName, entityId, avatarUrl, coverUrl)
-                                Toast.makeText(context, "📸 تم حفظ وتحديث الصور بنجاح!", Toast.LENGTH_SHORT).show()
+                                if (isUploadingAvatar || isUploadingCover) {
+                                    Toast.makeText(context, "يرجى الانتظار حتى يكتمل رفع الصورة", Toast.LENGTH_SHORT).show()
+                                    return@Button
+                                }
+                                viewModel.updateEntityImages(collectionName, entityId, avatarUrl.trim(), coverUrl.trim())
                                 showChangePhotosDialog = false
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = themeColors.primary),
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f).height(48.dp)
                         ) {
-                            Text("حفظ التغييرات 💾", fontWeight = FontWeight.Bold)
+                            Text("حفظ التغييرات 💾", fontWeight = FontWeight.Bold, color = Color.White)
                         }
                         OutlinedButton(
                             onClick = { showChangePhotosDialog = false },
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f).height(48.dp)
                         ) {
-                            Text("إلغاء", color = Color.White)
+                            Text("إلغاء", color = themeColors.textPrimary)
                         }
                     }
                 }
@@ -519,7 +532,12 @@ fun ProfileOwnerAdminControlBar(
                         label = { Text("اسم النشاط / صاحب العمل") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = themeColors.textPrimary,
+                            unfocusedTextColor = themeColors.textPrimary,
+                            focusedLabelColor = themeColors.accent,
+                            unfocusedLabelColor = themeColors.textSecondary
+                        )
                     )
 
                     OutlinedTextField(
@@ -528,7 +546,12 @@ fun ProfileOwnerAdminControlBar(
                         label = { Text("رقم الهاتف") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = themeColors.textPrimary,
+                            unfocusedTextColor = themeColors.textPrimary,
+                            focusedLabelColor = themeColors.accent,
+                            unfocusedLabelColor = themeColors.textSecondary
+                        )
                     )
 
                     OutlinedTextField(
@@ -537,18 +560,23 @@ fun ProfileOwnerAdminControlBar(
                         label = { Text("المدينة / المحافظة / الحي أو أقرب معلم") },
                         maxLines = 2,
                         modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = themeColors.textPrimary,
+                            unfocusedTextColor = themeColors.textPrimary,
+                            focusedLabelColor = themeColors.accent,
+                            unfocusedLabelColor = themeColors.textSecondary
+                        )
                     )
 
                     Surface(
-                        color = Color(0xFF0F172A),
+                        color = themeColors.background,
                         shape = RoundedCornerShape(10.dp),
-                        border = BorderStroke(1.dp, Color(0xFF00E5FF).copy(alpha = 0.35f))
+                        border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.35f))
                     ) {
                         Column(Modifier.fillMaxWidth().padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text(
                                 "📍 إحداثيات الموقع: ${OfflineYemenGazetteer.formatCoordinates(editLat, editLng)}",
-                                color = Color(0xFF00E5FF),
+                                color = themeColors.accent,
                                 fontSize = 11.5.sp,
                                 fontWeight = FontWeight.Bold
                             )
@@ -565,7 +593,7 @@ fun ProfileOwnerAdminControlBar(
                                     contentPadding = PaddingValues(horizontal = 8.dp),
                                     modifier = Modifier.weight(1f).height(48.dp)
                                 ) {
-                                    Text("🔢 إحداثيات", fontSize = 10.5.sp, color = Color(0xFF00E5FF), maxLines = 1)
+                                    Text("🔢 إحداثيات", fontSize = 10.5.sp, color = themeColors.accent, maxLines = 1)
                                 }
                                 if (hasGps) {
                                     OutlinedButton(
@@ -589,56 +617,75 @@ fun ProfileOwnerAdminControlBar(
                         label = { Text("الوصف / التخصص / الخدمات") },
                         minLines = 2,
                         modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = themeColors.textPrimary,
+                            unfocusedTextColor = themeColors.textPrimary,
+                            focusedLabelColor = themeColors.accent,
+                            unfocusedLabelColor = themeColors.textSecondary
+                        )
                     )
 
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(
                             onClick = {
+                                val trimmedName = editName.trim()
+                                val trimmedPhone = editPhone.trim()
+                                val trimmedArea = editArea.trim()
+                                val trimmedDesc = editDesc.trim()
+                                if (trimmedName.isBlank()) {
+                                    Toast.makeText(context, "يرجى إدخال اسم النشاط أو صاحب العمل", Toast.LENGTH_SHORT).show()
+                                    return@Button
+                                }
+                                if (trimmedPhone.isBlank()) {
+                                    Toast.makeText(context, "يرجى إدخال رقم الهاتف", Toast.LENGTH_SHORT).show()
+                                    return@Button
+                                }
                                 if (provider != null) {
                                     val updated = provider.copy(
-                                        name = editName,
-                                        phone = editPhone,
-                                        area = editArea,
-                                        profession = editDesc,
+                                        name = trimmedName,
+                                        phone = trimmedPhone,
+                                        area = trimmedArea,
+                                        profession = trimmedDesc,
                                         latitude = editLat,
                                         longitude = editLng
                                     )
                                     viewModel.updateProviderEntity(updated)
                                 } else if (store != null) {
                                     val updated = store.copy(
-                                        name = editName,
-                                        phone = editPhone,
-                                        cityId = editArea,
-                                        description = editDesc,
+                                        name = trimmedName,
+                                        phone = trimmedPhone,
+                                        cityId = trimmedArea,
+                                        localNeighborhood = trimmedArea,
+                                        description = trimmedDesc,
                                         latitude = editLat,
                                         longitude = editLng
                                     )
                                     viewModel.updateStoreEntity(updated)
                                 } else if (property != null) {
                                     val updated = property.copy(
-                                        title = editName,
-                                        phone = editPhone,
-                                        cityId = editArea,
-                                        description = editDesc,
+                                        title = trimmedName,
+                                        phone = trimmedPhone,
+                                        cityId = trimmedArea,
+                                        localNeighborhood = trimmedArea,
+                                        description = trimmedDesc,
                                         latitude = editLat,
                                         longitude = editLng
                                     )
                                     viewModel.updatePropertyEntity(updated)
                                 }
-                                Toast.makeText(context, "✅ تم حفظ التعديلات والموقع بنجاح!", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "✅ تم إرسال التعديلات والموقع للحفظ!", Toast.LENGTH_SHORT).show()
                                 showEditDetailsDialog = false
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = themeColors.primary),
                             modifier = Modifier.weight(1f).height(48.dp)
                         ) {
-                            Text("حفظ التعديلات 💾", fontWeight = FontWeight.Bold)
+                            Text("حفظ التعديلات 💾", fontWeight = FontWeight.Bold, color = Color.White)
                         }
                         OutlinedButton(
                             onClick = { showEditDetailsDialog = false },
                             modifier = Modifier.weight(1f).height(48.dp)
                         ) {
-                            Text("إلغاء", color = Color.White)
+                            Text("إلغاء", color = themeColors.textPrimary)
                         }
                     }
                 }
@@ -710,7 +757,12 @@ fun ProfileOwnerAdminControlBar(
                         label = { Text("السعر الأساسي / رسوم المعاينة والكشفية (ريال يمني)") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = themeColors.textPrimary,
+                            unfocusedTextColor = themeColors.textPrimary,
+                            focusedLabelColor = themeColors.accent,
+                            unfocusedLabelColor = themeColors.textSecondary
+                        )
                     )
 
                     OutlinedTextField(
@@ -719,33 +771,65 @@ fun ProfileOwnerAdminControlBar(
                         label = { Text("تفاصيل العرض الترويجي والخصومات") },
                         minLines = 2,
                         modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = themeColors.textPrimary,
+                            unfocusedTextColor = themeColors.textPrimary,
+                            focusedLabelColor = themeColors.accent,
+                            unfocusedLabelColor = themeColors.textSecondary
+                        )
                     )
 
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(
                             onClick = {
-                                val pVal = editPrice.toDoubleOrNull() ?: 0.0
+                                val parsedPrice = editPrice.trim().toDoubleOrNull()
+                                if (editPrice.isNotBlank() && (parsedPrice == null || parsedPrice < 0.0)) {
+                                    Toast.makeText(context, "يرجى إدخال سعر صحيح", Toast.LENGTH_SHORT).show()
+                                    return@Button
+                                }
+                                val pVal = parsedPrice ?: 0.0
+                                val trimmedOffer = editOffer.trim()
                                 if (provider != null) {
-                                    val updated = provider.copy(previewPrice = pVal, specialOffersJson = editOffer)
+                                    val updated = provider.copy(previewPrice = pVal, specialOffersJson = trimmedOffer)
                                     viewModel.updateProviderEntity(updated)
-                                } else if (store != null) {
-                                    val updated = store.copy(description = "${store.description}\n🎁 عرض خاص: $editOffer")
-                                    viewModel.updateStoreEntity(updated)
                                 } else if (property != null) {
-                                    val updated = property.copy(price = pVal, description = "${property.description}\n🎁 العرض: $editOffer")
+                                    val updated = property.copy(price = pVal)
                                     viewModel.updatePropertyEntity(updated)
                                 }
-                                Toast.makeText(context, "🏷️ تم تحديث الأسعار والعروض!", Toast.LENGTH_SHORT).show()
+                                if (trimmedOffer.isNotBlank()) {
+                                    val offerId = "offer_${entityId}"
+                                    val offerPayload = hashMapOf(
+                                        "id" to offerId,
+                                        "ownerId" to entityId,
+                                        "title" to "عرض خاص - ${provider?.name ?: store?.name ?: property?.title ?: ""}".trim(),
+                                        "description" to trimmedOffer,
+                                        "discountPercent" to 15,
+                                        "isActive" to true,
+                                        "updatedAt" to System.currentTimeMillis()
+                                    )
+                                    viewModel.db.collection("special_offers").document(offerId)
+                                        .set(offerPayload)
+                                        .addOnSuccessListener {
+                                            Toast.makeText(context, "🏷️ تم تحديث الأسعار والعروض بنجاح!", Toast.LENGTH_SHORT).show()
+                                        }
+                                        .addOnFailureListener { e ->
+                                            Toast.makeText(context, "فشل حفظ العرض: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                                        }
+                                } else {
+                                    Toast.makeText(context, "🏷️ تم تحديث الأسعار!", Toast.LENGTH_SHORT).show()
+                                }
                                 showPriceOfferDialog = false
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f).height(48.dp)
                         ) {
                             Text("تحديث الأسعار 🏷️", fontWeight = FontWeight.Bold, color = Color.White)
                         }
-                        OutlinedButton(onClick = { showPriceOfferDialog = false }, modifier = Modifier.weight(1f)) {
-                            Text("إلغاء", color = Color.White)
+                        OutlinedButton(
+                            onClick = { showPriceOfferDialog = false },
+                            modifier = Modifier.weight(1f).height(48.dp)
+                        ) {
+                            Text("إلغاء", color = themeColors.textPrimary)
                         }
                     }
                 }
@@ -764,8 +848,33 @@ fun ProfileOwnerAdminControlBar(
                 var prodTitle by remember { mutableStateOf("") }
                 var prodPrice by remember { mutableStateOf("") }
                 var prodDesc by remember { mutableStateOf("") }
+                var prodImageUrl by remember { mutableStateOf("") }
+                var isUploadingProdImg by remember { mutableStateOf(false) }
+                val prodScope = rememberCoroutineScope()
 
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                val prodImagePicker = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.PickVisualMedia()
+                ) { uri: android.net.Uri? ->
+                    if (uri != null) {
+                        prodScope.launch {
+                            isUploadingProdImg = true
+                            val path = "products/${entityId}/${System.currentTimeMillis()}.webp"
+                            val result = com.example.utils.FirebaseStorageUploader.uploadImageToStorage(context, uri, path)
+                            isUploadingProdImg = false
+                            result.onSuccess { url ->
+                                prodImageUrl = url
+                                Toast.makeText(context, "تم رفع صورة الصنف بنجاح ✅", Toast.LENGTH_SHORT).show()
+                            }.onFailure { err ->
+                                Toast.makeText(context, "فشل رفع الصورة: ${err.message}", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    }
+                }
+
+                Column(
+                    modifier = Modifier.padding(16.dp).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
                     Text("➕ إضافة منتج / صنف / سلعة جديدة", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
 
                     OutlinedTextField(
@@ -774,7 +883,12 @@ fun ProfileOwnerAdminControlBar(
                         label = { Text("اسم الصنف أو السلعة") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = themeColors.textPrimary,
+                            unfocusedTextColor = themeColors.textPrimary,
+                            focusedLabelColor = themeColors.accent,
+                            unfocusedLabelColor = themeColors.textSecondary
+                        )
                     )
 
                     OutlinedTextField(
@@ -783,7 +897,12 @@ fun ProfileOwnerAdminControlBar(
                         label = { Text("السعر بالريال اليمني") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = themeColors.textPrimary,
+                            unfocusedTextColor = themeColors.textPrimary,
+                            focusedLabelColor = themeColors.accent,
+                            unfocusedLabelColor = themeColors.textSecondary
+                        )
                     )
 
                     OutlinedTextField(
@@ -792,44 +911,102 @@ fun ProfileOwnerAdminControlBar(
                         label = { Text("الوصف والمواصفات") },
                         minLines = 2,
                         modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = themeColors.textPrimary,
+                            unfocusedTextColor = themeColors.textPrimary,
+                            focusedLabelColor = themeColors.accent,
+                            unfocusedLabelColor = themeColors.textSecondary
+                        )
                     )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = prodImageUrl,
+                            onValueChange = { prodImageUrl = it },
+                            label = { Text("رابط الصورة (اختياري)", fontSize = 11.sp) },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = themeColors.textPrimary,
+                                unfocusedTextColor = themeColors.textPrimary,
+                                focusedLabelColor = themeColors.accent,
+                                unfocusedLabelColor = themeColors.textSecondary
+                            )
+                        )
+                        Button(
+                            onClick = { prodImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                            enabled = !isUploadingProdImg,
+                            colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.height(54.dp)
+                        ) {
+                            if (isUploadingProdImg) {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.Black)
+                            } else {
+                                Text("صورة 📷", fontSize = 11.sp, color = Color.Black, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
 
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(
                             onClick = {
-                                if (prodTitle.isNotBlank()) {
-                                    val newProduct = ProductEntity(
-                                        id = "prod_${System.currentTimeMillis()}",
-                                        storeId = entityId,
-                                        name = prodTitle,
-                                        price = prodPrice.toDoubleOrNull() ?: 0.0,
-                                        description = prodDesc,
-                                        imageUrl = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400"
-                                    )
-                                    try {
-                                        viewModel.db.collection("products").document(newProduct.id).set(newProduct)
-                                            .addOnSuccessListener {
-                                                Toast.makeText(context, "📦 تم إضافة الصنف بنجاح!", Toast.LENGTH_SHORT).show()
-                                            }
-                                            .addOnFailureListener { e ->
-                                                Toast.makeText(context, "فشل حفظ الصنف: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
-                                            }
-                                        showAddProductDialog = false
-                                    } catch (e: Exception) {
-                                        Toast.makeText(context, "حدث خطأ: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
-                                    }
-                                } else {
+                                if (isUploadingProdImg) {
+                                    Toast.makeText(context, "يرجى الانتظار حتى يكتمل رفع الصورة", Toast.LENGTH_SHORT).show()
+                                    return@Button
+                                }
+                                val cleanTitle = prodTitle.trim()
+                                val parsedPrice = prodPrice.trim().toDoubleOrNull()
+                                if (cleanTitle.isBlank()) {
                                     Toast.makeText(context, "يرجى كتابة اسم الصنف", Toast.LENGTH_SHORT).show()
+                                    return@Button
+                                }
+                                if (parsedPrice == null || parsedPrice < 0.0) {
+                                    Toast.makeText(context, "يرجى إدخال سعر صحيح بالريال", Toast.LENGTH_SHORT).show()
+                                    return@Button
+                                }
+                                val docId = "prod_${java.util.UUID.randomUUID().toString().take(8)}_${System.currentTimeMillis()}"
+                                val productPayload = hashMapOf(
+                                    "id" to docId,
+                                    "ownerId" to entityId,
+                                    "storeId" to entityId,
+                                    "name" to cleanTitle,
+                                    "title" to cleanTitle,
+                                    "price" to parsedPrice,
+                                    "priceYer" to parsedPrice.toInt(),
+                                    "description" to prodDesc.trim(),
+                                    "imageUrl" to prodImageUrl.trim(),
+                                    "isAvailable" to true,
+                                    "isDeleted" to false,
+                                    "createdAt" to System.currentTimeMillis()
+                                )
+                                try {
+                                    viewModel.db.collection("products").document(docId).set(productPayload)
+                                        .addOnSuccessListener {
+                                            Toast.makeText(context, "📦 تم إضافة الصنف بنجاح!", Toast.LENGTH_SHORT).show()
+                                        }
+                                        .addOnFailureListener { e ->
+                                            Toast.makeText(context, "فشل حفظ الصنف: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                                        }
+                                    showAddProductDialog = false
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "حدث خطأ: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
                                 }
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = themeColors.primary),
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f).height(48.dp)
                         ) {
-                            Text("إضافة الصنف ➕", fontWeight = FontWeight.Bold)
+                            Text("إضافة الصنف ➕", fontWeight = FontWeight.Bold, color = Color.White)
                         }
-                        OutlinedButton(onClick = { showAddProductDialog = false }, modifier = Modifier.weight(1f)) {
-                            Text("إلغاء", color = Color.White)
+                        OutlinedButton(
+                            onClick = { showAddProductDialog = false },
+                            modifier = Modifier.weight(1f).height(48.dp)
+                        ) {
+                            Text("إلغاء", color = themeColors.textPrimary)
                         }
                     }
                 }

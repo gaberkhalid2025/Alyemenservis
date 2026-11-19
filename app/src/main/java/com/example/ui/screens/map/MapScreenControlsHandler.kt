@@ -29,6 +29,7 @@ import com.example.ui.MainViewModel
 import com.example.ui.screens.map.components.MapControls
 import com.example.ui.screens.map.components.PrimaryLayersBottomSheet
 import com.example.ui.screens.map.components.SecondaryLayersBottomSheet
+import com.example.ui.screens.map.components.UnifiedLayersSheet
 import com.example.utils.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -302,8 +303,10 @@ internal fun MapLayersAndServicesSheetsHost(
         }
     }
 
-    if (state.showLayerDialog) {
-        PrimaryLayersBottomSheet(
+    val isAnySheetOpen = state.showLayerDialog || showMoreLayersSheet
+    if (isAnySheetOpen) {
+        val initialTab = if (showMoreLayersSheet && !state.showLayerDialog) 1 else 0
+        UnifiedLayersSheet(
             mapLayer = state.mapLayer,
             onToggleMapLayer = { next ->
                 state.mapLayer = next
@@ -349,12 +352,6 @@ internal fun MapLayersAndServicesSheetsHost(
                     )
                 }
             },
-            onDismiss = { state.showLayerDialog = false }
-        )
-    }
-
-    if (showMoreLayersSheet) {
-        SecondaryLayersBottomSheet(
             gibsEnabled = state.gibsEnabled,
             gibsProduct = state.gibsProduct,
             onToggleGibs = { enabled ->
@@ -433,7 +430,11 @@ internal fun MapLayersAndServicesSheetsHost(
                 onCoverageCleared()
                 coroutineScope.launch { snackbarHostState.showSnackbar("✓ تم مسح سجل التغطية المحلي") }
             },
-            onDismiss = onDismissMoreLayersSheet
+            initialTab = initialTab,
+            onDismiss = {
+                state.showLayerDialog = false
+                onDismissMoreLayersSheet()
+            }
         )
     }
 }

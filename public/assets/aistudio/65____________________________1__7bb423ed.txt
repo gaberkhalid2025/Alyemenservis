@@ -1,0 +1,209 @@
+# 65 – إصلاح البحث الصوتي (شاشة «تنزيل اللغات» وغياب العربية)
+
+## 1) السبب
+- الكود الحالي يفتح شاشة نظام Google للتعرف عبر `RecognizerIntent` ويفرض `ar-YE`. حين يكون الجهاز **بلا إنترنت** ولا تتوفر حزمة اللغة محلياً، تعرض خدمة Google شاشة «تنزيل لغات الكلام». هذه الشاشة **خارج تطبيقك** ولا تتحكم بها: قائمة اللغات فيها تأتي من تطبيق Google على جهازك، وزر «تثبيت» يفشل غالباً لأنه يحتاج إنترنت أو خدمات Google (أو لأن الحزمة العربية للاستخدام بلا اتصال غير متاحة على ذلك الجهاز).
+- **حقيقة يجب أن تعرفها:** التعرف الصوتي العربي بلا إنترنت **غير مضمون** على أي جهاز (يعتمد على حزمة Google). حلٌّ بلا إنترنت كامل داخل التطبيق (مثل Vosk) ممكن مجاناً لكن نموذجه العربي يبلغ مئات الميجابايت وبدقة متوسطة؛ لا أنصح به الآن.
+- لذلك الحل الاحترافي: (1) تعرّف **داخل التطبيق** بلا شاشات نظام، (2) سلسلة لغات احتياطية عربية، (3) رسائل واضحة بدل الطرق المسدودة، (4) بديل مضمون: **ميكروفون لوحة المفاتيح** والكتابة (البحث بلا إنترنت من المستند 64).
+
+## 2) ملف جديد: `com/example/utils/VoiceSearchHelper.kt`
+```kotlin
+package com.example.utils
+
+import android.Manifest
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.provider.Settings
+import android.speech.RecognitionListener
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
+import androidx.core.content.ContextCompat
+
+enum class VoiceStatus { IDLE, LISTENING, ERROR }
+
+data class VoiceState(
+    val status: VoiceStatus = VoiceStatus.IDLE,
+    val partial: String = "",
+    val message: String? = null,
+    val canOpenSettings: Boolean = false,
+    val canUseKeyboard: Boolean = false
+)
+
+/** تعرّف صوتي داخل التطبيق (SpeechRecognizer). يُستعمل من الخيط الرئيسي فقط. */
+class VoiceSearchHelper(
+    private val context: Context,
+    private val onFinal: (String) -> Unit,
+    private val onState: (VoiceState) -> Unit
+) {
+    private val main = Handler(Looper.getMainLooper())
+    private var recognizer: SpeechRecognizer? = null
+    private val tags = listOf("ar-YE", "ar-SA", "ar-EG", "ar")          // سلسلة احتياطية؛ لا نفرض لهجة واحدة
+    private var tagIndex = 0
+    private var delivered = false
+
+    fun hasMicPermission() = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+    fun isAvailable() = SpeechRecognizer.isRecognitionAvailable(context)
+
+    fun start() {
+        if (!isAvailable()) {
+            onState(VoiceState(VoiceStatus.ERROR, message = "جهازك لا يحتوي خدمة تعرّف صوتي (تطبيق Google). استعمل ميكروفون لوحة المفاتيح أو اكتب.", canUseKeyboard = true)); return
+        }
+        if (!hasMicPermission()) { onState(VoiceState(VoiceStatus.ERROR, message = "امنح إذن الميكروفون لاستعمال البحث الصوتي.")); return }
+        tagIndex = 0; delivered = false
+        listen()
+    }
+
+    private fun listen() {
+        destroy()
+        val r = try { SpeechRecognizer.createSpeechRecognizer(context) } catch (e: Exception) {
+            onState(VoiceState(VoiceStatus.ERROR, message = "تعذر تشغيل التعرف الصوتي.", canUseKeyboard = true)); return
+        }
+        recognizer = r
+        r.setRecognitionListener(object : RecognitionListener {
+            override fun onReadyForSpeech(params: Bundle?) { onState(VoiceState(VoiceStatus.LISTENING)) }
+            override fun onPartialResults(partialResults: Bundle?) {
+                val t = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull().orEmpty()
+                if (t.isNotBlank()) onState(VoiceState(VoiceStatus.LISTENING, partial = t))
+            }
+            override fun onResults(results: Bundle?) {
+                val t = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull().orEmpty().trim()
+                if (t.isBlank()) { handleError(SpeechRecognizer.ERROR_NO_MATCH); return }
+                delivered = true; onState(VoiceState()); onFinal(t); destroy()
+            }
+            override fun onError(error: Int) { handleError(error) }
+            override fun onBeginningOfSpeech() {}
+            override fun onRmsChanged(rmsdB: Float) {}
+            override fun onBufferReceived(buffer: ByteArray?) {}
+            override fun onEndOfSpeech() {}
+            override fun onEvent(eventType: Int, params: Bundle?) {}
+        })
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, tags[tagIndex])
+            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
+            putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, context.packageName)
+        }
+        try { r.startListening(intent) } catch (e: Exception) { handleError(SpeechRecognizer.ERROR_CLIENT) }
+    }
+
+    private fun handleError(code: Int) {
+        if (delivered) return
+        // 12/13 = ERROR_LANGUAGE_NOT_SUPPORTED / ERROR_LANGUAGE_UNAVAILABLE (أندرويد 12+): جرّب صيغة عربية أخرى
+        if ((code == 12 || code == 13) && tagIndex < tags.lastIndex) { tagIndex++; main.post { listen() }; return }
+        val (msg, settings, keyboard) = when (code) {
+            SpeechRecognizer.ERROR_NO_MATCH, SpeechRecognizer.ERROR_SPEECH_TIMEOUT ->
+                Triple("لم أسمع كلاماً واضحاً. حاول مجدداً وتحدث بقرب الميكروفون.", false, false)
+            SpeechRecognizer.ERROR_NETWORK, SpeechRecognizer.ERROR_NETWORK_TIMEOUT, SpeechRecognizer.ERROR_SERVER ->
+                Triple("التعرف الصوتي العربي يحتاج إنترنت (أو حزمة لغة منزّلة من إعدادات Google). يمكنك استعمال ميكروفون لوحة المفاتيح أو الكتابة.", true, true)
+            SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> Triple("امنح إذن الميكروفون من إعدادات التطبيق.", false, false)
+            SpeechRecognizer.ERROR_AUDIO -> Triple("تعذر استعمال الميكروفون.", false, true)
+            SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> Triple("خدمة التعرف مشغولة؛ أعد المحاولة بعد لحظة.", false, false)
+            12, 13 -> Triple("العربية غير متاحة في خدمة التعرف على جهازك. حدّث تطبيق Google أو استعمل ميكروفون لوحة المفاتيح.", true, true)
+            else -> Triple("تعذر التعرف الصوتي (رمز $code).", false, true)
+        }
+        onState(VoiceState(VoiceStatus.ERROR, message = msg, canOpenSettings = settings, canUseKeyboard = keyboard))
+        destroy()
+    }
+
+    fun stop() { try { recognizer?.stopListening() } catch (_: Exception) {} }
+    fun cancel() { destroy(); onState(VoiceState()) }
+    fun destroy() { try { recognizer?.destroy() } catch (_: Exception) {}; recognizer = null }
+
+    companion object {
+        /** يفتح إعدادات الإدخال الصوتي؛ وإن لم تتوفر يفتح الإعدادات العامة. */
+        fun openVoiceSettings(context: Context) {
+            val intents = listOf(Intent(Settings.ACTION_VOICE_INPUT_SETTINGS), Intent(Settings.ACTION_LOCALE_SETTINGS), Intent(Settings.ACTION_SETTINGS))
+            for (i in intents) { try { context.startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); return } catch (_: Exception) {} }
+        }
+    }
+}
+```
+## 3) نافذة الاستماع: `VoiceSearchDialog.kt`
+```kotlin
+package com.example.ui.screens.map
+
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.example.utils.VoiceState
+import com.example.utils.VoiceStatus
+
+@Composable
+fun VoiceSearchDialog(
+    state: VoiceState, onCancel: () -> Unit, onRetry: () -> Unit,
+    onUseKeyboard: () -> Unit, onOpenSettings: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onCancel,
+        containerColor = Color(0xFF0F172A),
+        title = { Text(if (state.status == VoiceStatus.LISTENING) "🎙️ تحدث الآن…" else "البحث الصوتي", color = Color.White, fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                if (state.status == VoiceStatus.LISTENING) {
+                    LinearProgressIndicator(Modifier.fillMaxWidth(), color = Color(0xFF00E5FF))
+                    Text(state.partial.ifBlank { "أستمع إليك…" }, color = Color(0xFFCBD5E1), fontSize = 15.sp)
+                }
+                state.message?.let { Text(it, color = Color(0xFFF59E0B), fontSize = 13.sp) }
+                if (state.status == VoiceStatus.ERROR) {
+                    if (state.canUseKeyboard) OutlinedButton(onClick = onUseKeyboard, modifier = Modifier.fillMaxWidth()) { Text("⌨️ استعمل ميكروفون لوحة المفاتيح") }
+                    if (state.canOpenSettings) OutlinedButton(onClick = onOpenSettings, modifier = Modifier.fillMaxWidth()) { Text("⚙️ إعدادات الإدخال الصوتي") }
+                }
+            }
+        },
+        confirmButton = { if (state.status == VoiceStatus.ERROR) TextButton(onClick = onRetry) { Text("إعادة المحاولة", color = Color(0xFF10B981)) } },
+        dismissButton = { TextButton(onClick = onCancel) { Text("إغلاق", color = Color(0xFF94A3B8)) } }
+    )
+}
+```
+## 4) الربط في `MapScreenContent.kt` (استبدل مسار `speechLauncher` القديم)
+```kotlin
+var voiceState by remember { mutableStateOf(VoiceState()) }
+var searchFocusTick by remember { mutableIntStateOf(0) }
+val voiceHelper = remember {
+    VoiceSearchHelper(context, onFinal = { text -> state.searchQuery = text.trim(); searchPanelOpen = true }, onState = { voiceState = it })
+}
+DisposableEffect(Unit) { onDispose { voiceHelper.destroy() } }
+val micPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+    if (granted) voiceHelper.start()
+    else voiceState = VoiceState(VoiceStatus.ERROR, message = "لا يمكن استعمال البحث الصوتي بلا إذن الميكروفون.", canUseKeyboard = true)
+}
+// في MapFilterBar(...):
+onVoiceSearchClick = { if (voiceHelper.hasMicPermission()) voiceHelper.start() else micPermission.launch(Manifest.permission.RECORD_AUDIO) },
+focusTick = searchFocusTick,
+
+if (voiceState.status != VoiceStatus.IDLE) VoiceSearchDialog(
+    state = voiceState,
+    onCancel = { voiceHelper.cancel() },
+    onRetry = { voiceHelper.start() },
+    onUseKeyboard = { voiceHelper.cancel(); searchFocusTick++ },
+    onOpenSettings = { VoiceSearchHelper.openVoiceSettings(context) }
+)
+```
+**`MapFilterBar`:** أضف معاملاً اختيارياً `focusTick: Int = 0` وداخل الدالة:
+```kotlin
+val focusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
+val keyboard = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+LaunchedEffect(focusTick) { if (focusTick > 0) { focusRequester.requestFocus(); keyboard?.show() } }
+// وللحقل النصي: Modifier.focusRequester(focusRequester) (أضفه إلى modifier الحالي)
+```
+**`AndroidManifest.xml`** (داخل `<queries>`؛ مطلوب من أندرويد 11 كي يرى التطبيق خدمة التعرف):
+```xml
+<intent><action android:name="android.speech.RecognitionService" /></intent>
+```
+(أبقِ فلتر `RECOGNIZE_SPEECH` الموجود.) وإذن `RECORD_AUDIO` موجود في المانيفست.
+## 5) اللهجة اليمنية
+خدمات Google تعرض `ar-YE` عند توفرها؛ وإن لم تتوفر ينتقل الكود تلقائياً إلى `ar-SA` ثم `ar-EG` ثم `ar` (يتفهّم اللهجة جزئياً). ما يتعرّف عليه المحرك يمرّ بعدها على `DialectSynonyms` (المستند 60) فتُفهم «ماطور ماء» و«بنشر» وغيرها. لا يوجد محرك مجاني يضمن لهجة يمنية خالصة.
+## 6) اختبار
+1. بإنترنت: اضغط الميكروفون ← تظهر نافذة «تحدث الآن» (لا شاشة نظام) ← «شارع الزبيري» ← يُملأ حقل البحث.
+2. بلا إنترنت (وحزمة غير منزّلة): رسالة واضحة + زر «ميكروفون لوحة المفاتيح» يفتح لوحة المفاتيح على حقل البحث + «إعدادات الإدخال الصوتي».
+3. رفض إذن الميكروفون: رسالة بلا انهيار.
+4. اختبر على جهازين على الأقل (أحدهما بلا تطبيق Google): رسالة «لا خدمة تعرّف» والبديل الكتابي.

@@ -1,6 +1,7 @@
 package com.example.ui.screens.dashboard
 
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import com.example.ui.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -19,10 +20,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.UnifiedBusinessAccount
 import com.example.data.repositories.*
+import com.example.domain.entities.DashboardStatsEntity
 import com.example.ui.MainViewModel
+import com.example.ui.helpers.AppPreferenceHelper
 import com.example.ui.screens.dashboard.components.UnifiedEmptyState
 import com.example.ui.screens.dashboard.components.UnifiedLoadingIndicator
 import com.example.ui.screens.dashboard.viewmodels.MedicalDashboardViewModel
+import com.example.utils.BookingStatus
 import com.example.utils.VisualThemePalette
 import androidx.hilt.navigation.compose.hiltViewModel
 
@@ -33,21 +37,103 @@ fun MedicalDashboard(
     viewModel: MainViewModel,
     themeColors: VisualThemePalette,
     onBackClick: () -> Unit,
+    initialTab: Int = 0,
     medicalViewModel: MedicalDashboardViewModel = hiltViewModel()
 ) {
-    val context = LocalContext.current
-    var activeTab by remember { mutableIntStateOf(0) }
+    BackHandler { onBackClick() }
 
-    LaunchedEffect(account.id) {
-        medicalViewModel.initialize(account.id)
+    val context = LocalContext.current
+    var activeTab by remember(initialTab) { mutableIntStateOf(initialTab.coerceIn(0, 5)) }
+
+    val stores by viewModel.stores.collectAsState()
+    val providers by viewModel.providers.collectAsState()
+    val liveAccount = remember(stores, providers, account) {
+        stores.find { it.id == account.id }
+            ?.let { UnifiedBusinessAccount.fromStore(it, "stores") }
+            ?: providers.find { it.id == account.id }
+                ?.let { UnifiedBusinessAccount.fromProvider(it) }
+            ?: account
+    }
+
+    LaunchedEffect(liveAccount.id) {
+        medicalViewModel.initialize(liveAccount.id)
     }
 
     val uiState by medicalViewModel.uiState.collectAsState()
     val doctors by medicalViewModel.doctors.collectAsState()
     val allBookings by viewModel.bookings.collectAsState()
 
-    val medicalBookings = remember(allBookings, account) {
-        allBookings.filter { b -> b.providerId == account.id || b.providerPhone == account.phone }
+    val cleanAccPhone = remember(liveAccount.phone) {
+        AppPreferenceHelper.normalizePhoneNumber(liveAccount.phone)
+    }
+    val medicalBookings = remember(allBookings, liveAccount.id, cleanAccPhone) {
+        allBookings.filter { b ->
+            b.providerId == liveAccount.id ||
+                (cleanAccPhone.isNotBlank() &&
+                    AppPreferenceHelper.normalizePhoneNumber(b.providerPhone) == cleanAccPhone)
+        }
+    }
+
+    val openClientChat: (String) -> Unit = { clientIdOrPhone ->
+        val matchedBooking = medicalBookings.find {
+            it.clientId == clientIdOrPhone ||
+                it.customerPhone == clientIdOrPhone ||
+                it.clientPhone == clientIdOrPhone
+        }
+        val targetName = matchedBooking?.customerName?.ifBlank { matchedBooking.clientName }
+            ?.ifBlank { "المريض" } ?: "المريض"
+        val targetPhone = matchedBooking?.customerPhone?.ifBlank { matchedBooking.clientPhone }
+            ?.ifBlank { clientIdOrPhone } ?: clientIdOrPhone
+        viewModel.openOrCreateChatChannel(
+            targetId = clientIdOrPhone.ifBlank { targetPhone },
+            targetType = "CLIENT",
+            targetName = targetName,
+            targetPhone = targetPhone,
+            relatedEntityId = liveAccount.id,
+            relatedEntityType = "MEDICAL",
+            onCreated = { channel ->
+                if (channel != null) {
+                    viewModel.targetChatChannelId = channel.id
+                    viewModel.targetChatUserId = clientIdOrPhone.ifBlank { targetPhone }
+                    viewModel.targetChatUserName = targetName
+                    viewModel.targetChatRelatedEntityId = liveAccount.id
+                    viewModel.targetChatRelatedEntityType = "MEDICAL"
+                    viewModel.navigateToScreen(AppScreens.CHAT_DIRECT)
+                }
+            }
+        )
+    }
+
+    val computedStats = remember(uiState.stats, medicalBookings, uiState.reviews, uiState.products, liveAccount, doctors) {
+        val activeCount = medicalBookings.count {
+            it.status.uppercase() in listOf(
+                BookingStatus.PENDING.code,
+                BookingStatus.ACCEPTED.code,
+                BookingStatus.IN_PROGRESS.code,
+                "APPROVED"
+            )
+        }
+        val completedCount = medicalBookings.count {
+            it.status.uppercase() in listOf(BookingStatus.COMPLETED.code, BookingStatus.PAID.code, BookingStatus.CLOSED.code)
+        }
+        val revenue = medicalBookings.filter {
+            it.status.uppercase() in listOf(BookingStatus.COMPLETED.code, BookingStatus.PAID.code, BookingStatus.CLOSED.code)
+        }.sumOf { if (it.totalAmount > 0.0) it.totalAmount else it.price }
+        val avgRating = if (uiState.reviews.isNotEmpty()) {
+            uiState.reviews.map { it.rating }.average()
+        } else {
+            liveAccount.rating.toDouble()
+        }
+        DashboardStatsEntity(
+            totalViews = uiState.stats.totalViews,
+            activeBookingsCount = maxOf(uiState.stats.activeBookingsCount, activeCount),
+            completedBookingsCount = maxOf(uiState.stats.completedBookingsCount, completedCount),
+            averageRating = avgRating,
+            totalReviewsCount = maxOf(uiState.stats.totalReviewsCount, maxOf(uiState.reviews.size, liveAccount.numReviews)),
+            totalRevenueYer = maxOf(uiState.stats.totalRevenueYer, revenue),
+            totalProductsCount = maxOf(uiState.stats.totalProductsCount, uiState.products.size + doctors.size),
+            pendingRequestsCount = medicalBookings.count { it.status.equals(BookingStatus.PENDING.code, ignoreCase = true) }
+        )
     }
 
     var showAddDoctorDialog by remember { mutableStateOf(false) }
@@ -60,6 +146,7 @@ fun MedicalDashboard(
         "الحجوزات الطبية 📅",
         "الخدمات الطبية 💊",
         "تقييمات المرضى ⭐",
+        "الإحصائيات 📊",
         "الملف التعريفي 📝"
     )
 
@@ -78,12 +165,12 @@ fun MedicalDashboard(
                 title = {
                     Column {
                         Text(text = "لوحة تحكم المركز الطبي 🩺", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = themeColors.textPrimary)
-                        Text(text = account.name, fontSize = 11.sp, color = themeColors.textSecondary)
+                        Text(text = liveAccount.name, fontSize = 11.sp, color = themeColors.textSecondary)
                     }
                 },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
-                        Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = themeColors.textPrimary)
+                        Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "رجوع", tint = themeColors.textPrimary)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = themeColors.surface)
@@ -190,19 +277,11 @@ fun MedicalDashboard(
                         TabBookingsOrders(
                             bookings = medicalBookings,
                             themeColors = themeColors,
-                            onAcceptBooking = { bId -> viewModel.updateBookingStatus(bId, com.example.utils.BookingStatus.ACCEPTED.code) },
-                            onRejectBooking = { bId, _ -> viewModel.updateBookingStatus(bId, com.example.utils.BookingStatus.REJECTED.code) },
-                            onStartProgress = { bId -> viewModel.updateBookingStatus(bId, com.example.utils.BookingStatus.IN_PROGRESS.code) },
-                            onCompleteBooking = { bId -> viewModel.updateBookingStatus(bId, com.example.utils.BookingStatus.COMPLETED.code) },
-                            onChatWithClient = { phone ->
-                                viewModel.openOrCreateChatChannel(
-                                    targetId = account.id,
-                                    targetType = "MEDICAL",
-                                    targetName = account.name,
-                                    targetPhone = phone,
-                                    onCreated = {}
-                                )
-                            }
+                            onAcceptBooking = { bId -> viewModel.updateBookingStatus(bId, BookingStatus.ACCEPTED.code) },
+                            onRejectBooking = { bId, reason -> viewModel.updateBookingStatus(bId, BookingStatus.REJECTED.code, reason) },
+                            onStartProgress = { bId -> viewModel.updateBookingStatus(bId, BookingStatus.IN_PROGRESS.code) },
+                            onCompleteBooking = { bId -> viewModel.updateBookingStatus(bId, BookingStatus.COMPLETED.code) },
+                            onChatWithClient = openClientChat
                         )
                     }
                     2 -> {
@@ -213,6 +292,18 @@ fun MedicalDashboard(
                             themeColors = themeColors,
                             onAddProduct = { title, price, desc, img ->
                                 medicalViewModel.addMedicalService(title, price, desc, img)
+                            },
+                            onAddProductRich = { title, price, desc, img, category, isAvail, isOffer, discount ->
+                                medicalViewModel.addMedicalService(
+                                    title = title,
+                                    priceYer = price,
+                                    description = desc,
+                                    imageUrl = img,
+                                    category = category.ifBlank { "MEDICAL" },
+                                    isAvailable = isAvail,
+                                    isOffer = isOffer,
+                                    discountPercent = discount
+                                )
                             },
                             onDeleteProduct = { id ->
                                 medicalViewModel.deleteMedicalService(id)
@@ -232,35 +323,41 @@ fun MedicalDashboard(
                         )
                     }
                     4 -> {
+                        TabStatisticsGrowth(
+                            stats = computedStats,
+                            themeColors = themeColors
+                        )
+                    }
+                    5 -> {
                         TabProfileEdit(
-                            name = account.name,
-                            phone = account.phone,
-                            cityArea = account.neighborhood.ifBlank { account.cityId },
-                            description = account.description,
-                            workingHours = account.workingHours,
-                            photoUrl = account.logoImage,
-                            coverUrl = account.coverImage,
-                            isAvailable = account.rawStore?.isActive ?: true,
-                            rating = account.rating.toDouble(),
-                            reviewCount = account.numReviews,
+                            name = liveAccount.name,
+                            phone = liveAccount.phone,
+                            cityArea = liveAccount.neighborhood.ifBlank { liveAccount.cityId },
+                            description = liveAccount.description,
+                            workingHours = liveAccount.workingHours,
+                            photoUrl = liveAccount.logoImage,
+                            coverUrl = liveAccount.coverImage,
+                            isAvailable = liveAccount.rawStore?.isActive ?: liveAccount.isActive,
+                            rating = liveAccount.rating.toDouble(),
+                            reviewCount = liveAccount.numReviews,
                             themeColors = themeColors,
                             onChangePhoto = { url ->
                                 medicalViewModel.updateProfile(
-                                    name = account.name,
-                                    cityArea = account.neighborhood.ifBlank { account.cityId },
-                                    description = account.description,
-                                    workingHours = account.workingHours,
-                                    isAvailable = account.rawStore?.isActive ?: true,
+                                    name = liveAccount.name,
+                                    cityArea = liveAccount.neighborhood.ifBlank { liveAccount.cityId },
+                                    description = liveAccount.description,
+                                    workingHours = liveAccount.workingHours,
+                                    isAvailable = liveAccount.rawStore?.isActive ?: liveAccount.isActive,
                                     photoUrl = url
                                 )
                             },
                             onChangeCover = { url ->
                                 medicalViewModel.updateProfile(
-                                    name = account.name,
-                                    cityArea = account.neighborhood.ifBlank { account.cityId },
-                                    description = account.description,
-                                    workingHours = account.workingHours,
-                                    isAvailable = account.rawStore?.isActive ?: true,
+                                    name = liveAccount.name,
+                                    cityArea = liveAccount.neighborhood.ifBlank { liveAccount.cityId },
+                                    description = liveAccount.description,
+                                    workingHours = liveAccount.workingHours,
+                                    isAvailable = liveAccount.rawStore?.isActive ?: liveAccount.isActive,
                                     coverUrl = url
                                 )
                             },
@@ -280,25 +377,28 @@ fun MedicalDashboard(
     if (showAddDoctorDialog) {
         AlertDialog(
             onDismissRequest = { showAddDoctorDialog = false },
-            title = { Text("إضافة طبيب جديد للمركز", fontSize = 14.sp, fontWeight = FontWeight.Bold) },
+            containerColor = themeColors.surface,
+            titleContentColor = themeColors.textPrimary,
+            textContentColor = themeColors.textPrimary,
+            title = { Text("إضافة طبيب جديد للمركز", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.textPrimary) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     OutlinedTextField(
                         value = docNameInput,
                         onValueChange = { docNameInput = it },
-                        label = { Text("اسم الطبيب") },
+                        label = { Text("اسم الطبيب", color = themeColors.textSecondary) },
                         modifier = Modifier.fillMaxWidth()
                     )
                     OutlinedTextField(
                         value = docSpecInput,
                         onValueChange = { docSpecInput = it },
-                        label = { Text("التخصص الطبي") },
+                        label = { Text("التخصص الطبي", color = themeColors.textSecondary) },
                         modifier = Modifier.fillMaxWidth()
                     )
                     OutlinedTextField(
                         value = docHoursInput,
                         onValueChange = { docHoursInput = it },
-                        label = { Text("ساعات الدوام (مثال: 4 م - 8 م)") },
+                        label = { Text("ساعات الدوام (مثال: 4 م - 8 م)", color = themeColors.textSecondary) },
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -312,6 +412,8 @@ fun MedicalDashboard(
                             docSpecInput = ""
                             docHoursInput = ""
                             showAddDoctorDialog = false
+                        } else {
+                            Toast.makeText(context, "يرجى إدخال اسم الطبيب", Toast.LENGTH_SHORT).show()
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent)
@@ -321,9 +423,10 @@ fun MedicalDashboard(
             },
             dismissButton = {
                 TextButton(onClick = { showAddDoctorDialog = false }) {
-                    Text("إلغاء")
+                    Text("إلغاء", color = themeColors.textSecondary)
                 }
             }
         )
     }
 }
+

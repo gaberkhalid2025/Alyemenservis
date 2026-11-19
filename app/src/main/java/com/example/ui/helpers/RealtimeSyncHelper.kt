@@ -78,9 +78,13 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
             }
             if (snapshot != null && snapshot.exists()) {
                 try {
-                    // Security migration: Cleanup legacy adminPassword from Firestore if present
-                    if (snapshot.contains("adminPassword")) {
+                    // Security migration: Cleanup legacy adminPassword from Firestore ONLY for signed-in staff/admin
+                    val fbUser = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser
+                    if (fbUser != null && !fbUser.isAnonymous && snapshot.contains("adminPassword")) {
                         snapshot.reference.update("adminPassword", com.google.firebase.firestore.FieldValue.delete())
+                            .addOnFailureListener { e ->
+                                android.util.Log.w("RealtimeSyncHelper", "Skipped adminPassword cleanup: ${e.message}")
+                            }
                     }
                     snapshot.toObject(AdminSettingsEntity::class.java)?.let {
                         appState._settings.value = it.copy(ownerPassword = "")
@@ -95,14 +99,21 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
         }
 
         // 1.1 Navigation Settings (Sync download URL without modifying AdminSettingsEntity)
-        db.collection("settings").document("navigation_settings").addSnapshotListenerReg { snapshot, _ ->
+        db.collection("settings").document("navigation_settings").addSnapshotListenerReg { snapshot, error ->
+            if (error != null) {
+                return@addSnapshotListenerReg
+            }
             if (snapshot != null && snapshot.exists()) {
-                val url = snapshot.getString("valhallaTilesDownloadUrl")
-                if (!url.isNullOrBlank()) {
-                    val ctx = com.example.MyApplication.instance
-                    if (ctx != null) {
-                        com.example.ui.helpers.AppPreferenceHelper().setValhallaTilesUrl(ctx, url)
+                try {
+                    val url = snapshot.getString("valhallaTilesDownloadUrl")
+                    if (!url.isNullOrBlank()) {
+                        val ctx = com.example.MyApplication.instance
+                        if (ctx != null) {
+                            com.example.ui.helpers.AppPreferenceHelper().setValhallaTilesUrl(ctx, url)
+                        }
                     }
+                } catch (e: Exception) {
+                    android.util.Log.w("RealtimeSyncHelper", "navigation_settings sync warning: ${e.message}")
                 }
             }
         }

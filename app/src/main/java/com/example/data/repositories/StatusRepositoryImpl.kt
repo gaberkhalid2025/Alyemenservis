@@ -280,7 +280,8 @@ class StatusRepositoryImpl(
                         "localNeighborhood" to resolvedNeighborhood,
                         "isAvailable" to true,
                         "subscriptionStatus" to "APPROVED",
-                        "rating" to 5.0f,
+                        "rating" to 0.0f,
+                        "numReviews" to 0,
                         "isBlocked" to false,
                         "createdAt" to now
                     )
@@ -310,6 +311,8 @@ class StatusRepositoryImpl(
                         "isActive" to true,
                         "isApproved" to true,
                         "type" to resolvedRole,
+                        "logoImage" to (requestDoc.getString("profileImage") ?: ""),
+                        "coverImage" to (requestDoc.getString("profileImage") ?: ""),
                         "createdAt" to now
                     )
                     batch.set(storeRef, storeData, com.google.firebase.firestore.SetOptions.merge())
@@ -331,6 +334,8 @@ class StatusRepositoryImpl(
                         "localNeighborhood" to resolvedNeighborhood,
                         "isActive" to true,
                         "isApproved" to true,
+                        "images" to ((requestDoc.get("workImages") as? List<*>)?.filterIsInstance<String>()
+                            ?: listOfNotNull(requestDoc.getString("profileImage")?.takeIf { it.isNotBlank() })),
                         "createdAt" to now
                     )
                     batch.set(propRef, propData, com.google.firebase.firestore.SetOptions.merge())

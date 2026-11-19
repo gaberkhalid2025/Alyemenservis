@@ -63,11 +63,14 @@ fun StoreListItemCard(
         AppCategoryTaxonomy.formatArabicWorkingHours(store.workingHours)
     }
 
+    val userLat by viewModel.userLatitude.collectAsState()
+    val userLon by viewModel.userLongitude.collectAsState()
+
     // حساب المسافة
-    val distanceLabel = remember(store.latitude, store.longitude) {
+    val distanceLabel = remember(store.latitude, store.longitude, userLat, userLon) {
         try {
             if (store.latitude != 0.0 && store.longitude != 0.0) {
-                val meters = com.example.utils.calculateDistanceInMeters(15.3694, 44.1910, store.latitude, store.longitude)
+                val meters = com.example.utils.calculateDistanceInMeters(userLat, userLon, store.latitude, store.longitude)
                 val km = meters / 1000.0
                 String.format(Locale.US, "%.1f كم", km)
             } else {
@@ -287,7 +290,11 @@ fun StoreListItemCard(
                         }
 
                         val subCategoryOrDesc = store.description.ifBlank {
-                            if (store.sectionId == "restaurants") "مطعم وكافيه معتمد" else "متجر تجاري معتمد"
+                            when (store.sectionId.lowercase()) {
+                                "restaurants" -> "مطعم وكافيه معتمد"
+                                "medical" -> "مركز طبي / عيادة معتمدة"
+                                else -> "متجر تجاري معتمد"
+                            }
                         }
                         Text(
                             text = subCategoryOrDesc,
@@ -462,7 +469,11 @@ fun StoreListItemCard(
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = if (store.sectionId == "restaurants") "قائمة الطعام" else "تصفح والطلب",
+                                text = when (store.sectionId.lowercase()) {
+                                    "restaurants" -> "قائمة الطعام"
+                                    "medical" -> "المركز والمواعيد"
+                                    else -> "تصفح والطلب"
+                                },
                                 fontSize = 10.5.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color.White,

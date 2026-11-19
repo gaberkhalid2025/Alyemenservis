@@ -10,12 +10,18 @@ class DashboardExtensionsRepositoryImpl : IDashboardExtensionsRepository {
     private val firestore = FirebaseFirestore.getInstance()
 
     override fun getSpecialOffers(ownerId: String): Flow<List<SpecialOfferEntity>> = callbackFlow {
-        val query = if (ownerId.isNotBlank()) {
-            firestore.collection("special_offers").whereEqualTo("providerId", ownerId)
+        val cleanId = ownerId.trim()
+        val query = if (cleanId.isNotBlank()) {
+            firestore.collection("special_offers").whereEqualTo("providerId", cleanId)
         } else {
             firestore.collection("special_offers")
         }
-        val listener = query.addSnapshotListener { snap, _ ->
+        val listener = query.addSnapshotListener { snap, err ->
+            if (err != null) {
+                android.util.Log.w("DashboardExtRepo", "getSpecialOffers error: ${err.message}")
+                trySend(emptyList())
+                return@addSnapshotListener
+            }
             if (snap != null) {
                 trySend(snap.documents.mapNotNull { it.toObject(SpecialOfferEntity::class.java)?.copy(id = it.id) })
             } else {
@@ -25,13 +31,15 @@ class DashboardExtensionsRepositoryImpl : IDashboardExtensionsRepository {
         awaitClose { listener.remove() }
     }
 
-    // ✨ م2-ج2: دوال العروض الخاصة عبر الـ Repository
     override fun updateSpecialOfferStatus(offerId: String, isEnabled: Boolean) {
         if (offerId.isBlank()) return
         try {
             firestore.collection("special_offers")
                 .document(offerId)
                 .update("isEnabled", isEnabled)
+                .addOnFailureListener { e ->
+                    android.util.Log.e("DashboardExtRepo", "Failed to update offer status", e)
+                }
         } catch (e: Exception) {
             android.util.Log.e("DashboardExtRepo", "Failed to update offer status", e)
         }
@@ -43,6 +51,9 @@ class DashboardExtensionsRepositoryImpl : IDashboardExtensionsRepository {
             firestore.collection("special_offers")
                 .document(offerId)
                 .delete()
+                .addOnFailureListener { e ->
+                    android.util.Log.e("DashboardExtRepo", "Failed to delete offer", e)
+                }
         } catch (e: Exception) {
             android.util.Log.e("DashboardExtRepo", "Failed to delete offer", e)
         }
@@ -54,18 +65,27 @@ class DashboardExtensionsRepositoryImpl : IDashboardExtensionsRepository {
             firestore.collection("special_offers")
                 .document(docId)
                 .set(offer.copy(id = docId))
+                .addOnFailureListener { e ->
+                    android.util.Log.e("DashboardExtRepo", "Failed to add offer", e)
+                }
         } catch (e: Exception) {
             android.util.Log.e("DashboardExtRepo", "Failed to add offer", e)
         }
     }
 
     override fun getCoupons(ownerId: String): Flow<List<SpecialOfferEntity>> = callbackFlow {
-        val query = if (ownerId.isNotBlank()) {
-            firestore.collection("coupons").whereEqualTo("providerId", ownerId)
+        val cleanId = ownerId.trim()
+        val query = if (cleanId.isNotBlank()) {
+            firestore.collection("coupons").whereEqualTo("providerId", cleanId)
         } else {
             firestore.collection("coupons")
         }
-        val listener = query.addSnapshotListener { snap, _ ->
+        val listener = query.addSnapshotListener { snap, err ->
+            if (err != null) {
+                android.util.Log.w("DashboardExtRepo", "getCoupons error: ${err.message}")
+                trySend(emptyList())
+                return@addSnapshotListener
+            }
             if (snap != null) {
                 val list = snap.documents.mapNotNull { doc ->
                     val base = doc.toObject(SpecialOfferEntity::class.java)
@@ -89,13 +109,15 @@ class DashboardExtensionsRepositoryImpl : IDashboardExtensionsRepository {
         awaitClose { listener.remove() }
     }
 
-    // ✨ م2-ج2: دوال الكوبونات عبر الـ Repository
     override fun updateCouponStatus(couponId: String, isEnabled: Boolean) {
         if (couponId.isBlank()) return
         try {
             firestore.collection("coupons")
                 .document(couponId)
                 .update(mapOf("isEnabled" to isEnabled, "isActive" to isEnabled))
+                .addOnFailureListener { e ->
+                    android.util.Log.e("DashboardExtRepo", "Failed to update coupon status", e)
+                }
         } catch (e: Exception) {
             android.util.Log.e("DashboardExtRepo", "Failed to update coupon status", e)
         }
@@ -107,6 +129,9 @@ class DashboardExtensionsRepositoryImpl : IDashboardExtensionsRepository {
             firestore.collection("coupons")
                 .document(couponId)
                 .delete()
+                .addOnFailureListener { e ->
+                    android.util.Log.e("DashboardExtRepo", "Failed to delete coupon", e)
+                }
         } catch (e: Exception) {
             android.util.Log.e("DashboardExtRepo", "Failed to delete coupon", e)
         }
@@ -118,34 +143,47 @@ class DashboardExtensionsRepositoryImpl : IDashboardExtensionsRepository {
             firestore.collection("coupons")
                 .document(docId)
                 .set(coupon.copy(id = docId))
+                .addOnFailureListener { e ->
+                    android.util.Log.e("DashboardExtRepo", "Failed to add coupon", e)
+                }
         } catch (e: Exception) {
             android.util.Log.e("DashboardExtRepo", "Failed to add coupon", e)
         }
     }
 
     override fun getInventory(ownerId: String): Flow<List<InventoryItem>> = callbackFlow {
-        val query = if (ownerId.isNotBlank()) {
-            firestore.collection("inventory").whereEqualTo("ownerId", ownerId)
-        } else {
-            firestore.collection("inventory")
+        val cleanId = ownerId.trim()
+        if (cleanId.isBlank()) {
+            trySend(emptyList())
+            close()
+            return@callbackFlow
         }
-        val listener = query.addSnapshotListener { snap, _ ->
-            if (snap != null) {
-                trySend(snap.documents.mapNotNull { it.toObject(InventoryItem::class.java)?.copy(id = it.id) })
-            } else {
-                trySend(emptyList())
+        val listener = firestore.collection("inventory")
+            .whereEqualTo("ownerId", cleanId)
+            .addSnapshotListener { snap, err ->
+                if (err != null) {
+                    android.util.Log.w("DashboardExtRepo", "getInventory error: ${err.message}")
+                    trySend(emptyList())
+                    return@addSnapshotListener
+                }
+                if (snap != null) {
+                    trySend(snap.documents.mapNotNull { it.toObject(InventoryItem::class.java)?.copy(id = it.id) })
+                } else {
+                    trySend(emptyList())
+                }
             }
-        }
         awaitClose { listener.remove() }
     }
 
-    // ✨ م2-ج2: نقل منطق Firestore لحفظ وإعادة تعديل المخزون
     override fun updateInventoryQuantity(itemId: String, newQty: Int, inStock: Boolean) {
         if (itemId.isBlank()) return
         try {
             firestore.collection("inventory")
                 .document(itemId)
                 .update("quantity", newQty, "inStock", inStock)
+                .addOnFailureListener { e ->
+                    android.util.Log.e("DashboardExtRepo", "Failed to update inventory", e)
+                }
         } catch (e: Exception) {
             android.util.Log.e("DashboardExtRepo", "Failed to update inventory", e)
         }
@@ -157,6 +195,9 @@ class DashboardExtensionsRepositoryImpl : IDashboardExtensionsRepository {
             firestore.collection("inventory")
                 .document(itemId)
                 .delete()
+                .addOnFailureListener { e ->
+                    android.util.Log.e("DashboardExtRepo", "Failed to delete inventory", e)
+                }
         } catch (e: Exception) {
             android.util.Log.e("DashboardExtRepo", "Failed to delete inventory", e)
         }
@@ -168,34 +209,47 @@ class DashboardExtensionsRepositoryImpl : IDashboardExtensionsRepository {
             firestore.collection("inventory")
                 .document(docId)
                 .set(item.copy(id = docId))
+                .addOnFailureListener { e ->
+                    android.util.Log.e("DashboardExtRepo", "Failed to add inventory", e)
+                }
         } catch (e: Exception) {
             android.util.Log.e("DashboardExtRepo", "Failed to add inventory", e)
         }
     }
 
     override fun getLoyaltyPrograms(ownerId: String): Flow<List<LoyaltyProgram>> = callbackFlow {
-        val query = if (ownerId.isNotBlank()) {
-            firestore.collection("loyalty_programs").whereEqualTo("ownerId", ownerId)
-        } else {
-            firestore.collection("loyalty_programs")
+        val cleanId = ownerId.trim()
+        if (cleanId.isBlank()) {
+            trySend(emptyList())
+            close()
+            return@callbackFlow
         }
-        val listener = query.addSnapshotListener { snap, _ ->
-            if (snap != null) {
-                trySend(snap.documents.mapNotNull { it.toObject(LoyaltyProgram::class.java)?.copy(id = it.id) })
-            } else {
-                trySend(emptyList())
+        val listener = firestore.collection("loyalty_programs")
+            .whereEqualTo("ownerId", cleanId)
+            .addSnapshotListener { snap, err ->
+                if (err != null) {
+                    android.util.Log.w("DashboardExtRepo", "getLoyaltyPrograms error: ${err.message}")
+                    trySend(emptyList())
+                    return@addSnapshotListener
+                }
+                if (snap != null) {
+                    trySend(snap.documents.mapNotNull { it.toObject(LoyaltyProgram::class.java)?.copy(id = it.id) })
+                } else {
+                    trySend(emptyList())
+                }
             }
-        }
         awaitClose { listener.remove() }
     }
 
-    // ✨ م2-ج2: دوال برامج الولاء عبر الـ Repository
     override fun updateLoyaltyProgramStatus(programId: String, isEnabled: Boolean) {
         if (programId.isBlank()) return
         try {
             firestore.collection("loyalty_programs")
                 .document(programId)
                 .update("isEnabled", isEnabled)
+                .addOnFailureListener { e ->
+                    android.util.Log.e("DashboardExtRepo", "Failed to update loyalty program", e)
+                }
         } catch (e: Exception) {
             android.util.Log.e("DashboardExtRepo", "Failed to update loyalty program", e)
         }
@@ -207,6 +261,9 @@ class DashboardExtensionsRepositoryImpl : IDashboardExtensionsRepository {
             firestore.collection("loyalty_programs")
                 .document(programId)
                 .delete()
+                .addOnFailureListener { e ->
+                    android.util.Log.e("DashboardExtRepo", "Failed to delete loyalty program", e)
+                }
         } catch (e: Exception) {
             android.util.Log.e("DashboardExtRepo", "Failed to delete loyalty program", e)
         }
@@ -218,34 +275,47 @@ class DashboardExtensionsRepositoryImpl : IDashboardExtensionsRepository {
             firestore.collection("loyalty_programs")
                 .document(docId)
                 .set(program.copy(id = docId))
+                .addOnFailureListener { e ->
+                    android.util.Log.e("DashboardExtRepo", "Failed to add loyalty program", e)
+                }
         } catch (e: Exception) {
             android.util.Log.e("DashboardExtRepo", "Failed to add loyalty program", e)
         }
     }
 
     override fun getStaff(ownerId: String): Flow<List<StaffMember>> = callbackFlow {
-        val query = if (ownerId.isNotBlank()) {
-            firestore.collection("staff").whereEqualTo("ownerId", ownerId)
-        } else {
-            firestore.collection("staff")
+        val cleanId = ownerId.trim()
+        if (cleanId.isBlank()) {
+            trySend(emptyList())
+            close()
+            return@callbackFlow
         }
-        val listener = query.addSnapshotListener { snap, _ ->
-            if (snap != null) {
-                trySend(snap.documents.mapNotNull { it.toObject(StaffMember::class.java)?.copy(id = it.id) })
-            } else {
-                trySend(emptyList())
+        val listener = firestore.collection("staff")
+            .whereEqualTo("ownerId", cleanId)
+            .addSnapshotListener { snap, err ->
+                if (err != null) {
+                    android.util.Log.w("DashboardExtRepo", "getStaff error: ${err.message}")
+                    trySend(emptyList())
+                    return@addSnapshotListener
+                }
+                if (snap != null) {
+                    trySend(snap.documents.mapNotNull { it.toObject(StaffMember::class.java)?.copy(id = it.id) })
+                } else {
+                    trySend(emptyList())
+                }
             }
-        }
         awaitClose { listener.remove() }
     }
 
-    // ✨ م2-ج2: دوال الموظفين عبر الـ Repository
     override fun deleteStaff(staffId: String) {
         if (staffId.isBlank()) return
         try {
             firestore.collection("staff")
                 .document(staffId)
                 .delete()
+                .addOnFailureListener { e ->
+                    android.util.Log.e("DashboardExtRepo", "Failed to delete staff", e)
+                }
         } catch (e: Exception) {
             android.util.Log.e("DashboardExtRepo", "Failed to delete staff", e)
         }
@@ -257,8 +327,12 @@ class DashboardExtensionsRepositoryImpl : IDashboardExtensionsRepository {
             firestore.collection("staff")
                 .document(docId)
                 .set(staffMember.copy(id = docId))
+                .addOnFailureListener { e ->
+                    android.util.Log.e("DashboardExtRepo", "Failed to add staff", e)
+                }
         } catch (e: Exception) {
             android.util.Log.e("DashboardExtRepo", "Failed to add staff", e)
         }
     }
 }
+

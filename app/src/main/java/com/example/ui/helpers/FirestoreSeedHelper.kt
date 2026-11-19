@@ -13,85 +13,60 @@ class FirestoreSeedHelper(private val db: FirebaseFirestore) {
     private var isSeeded = false
 
     fun seedFirestoreIfEmpty() {
+        val currentUser = try {
+            com.google.firebase.auth.FirebaseAuth.getInstance().currentUser
+        } catch (_: Exception) {
+            null
+        }
+        // Only authenticated staff/admin sessions should attempt initial catalog seeding;
+        // regular & anonymous users read cached/live collections without failing startup writes.
+        if (currentUser == null || currentUser.isAnonymous) return
         if (isSeeded) return
         isSeeded = true
 
         // Check and seed default configurations ONLY if the document genuinely does not exist in Firestore
         db.collection("settings").document("main_settings").get().addOnSuccessListener { doc ->
-            if (doc == null || !doc.exists()) {
+            if (doc != null && !doc.exists()) {
                 db.collection("settings").document("main_settings").set(AdminSettingsEntity())
+                    .addOnFailureListener { e -> android.util.Log.w("FirestoreSeedHelper", "Settings seed skipped: ${e.message}") }
             }
         }
         db.collection("categories").limit(20).get().addOnCompleteListener { task ->
             if (task.isSuccessful) {
                 val sn = task.result
-                if (sn == null || sn.isEmpty) {
+                if (sn != null && sn.isEmpty) {
                     writeDefaultCategories()
                 }
-            } else {
-                try { writeDefaultCategories() } catch (e: Exception) {}
             }
         }
         db.collection("cities").limit(20).get().addOnCompleteListener { task ->
             if (task.isSuccessful) {
                 val sn = task.result
-                if (sn == null || sn.isEmpty) {
+                if (sn != null && sn.isEmpty) {
                     writeDefaultCities()
                 }
-            } else {
-                try { writeDefaultCities() } catch (e: Exception) {}
-            }
-        }
-        db.collection("banners").limit(20).get().addOnCompleteListener { task ->
-            if (task.isSuccessful) {
-                val sn = task.result
-                if (sn == null || sn.isEmpty) {
-                    writeDefaultBanners()
-                }
-            } else {
-                try { writeDefaultBanners() } catch (e: Exception) {}
-            }
-        }
-        db.collection("supervisors").limit(20).get().addOnCompleteListener { task ->
-            if (task.isSuccessful) {
-                val sn = task.result
-                if (sn == null || sn.isEmpty) {
-                    writeDefaultSupervisors()
-                }
-            } else {
-                try { writeDefaultSupervisors() } catch (e: Exception) {}
             }
         }
         db.collection("color_themes").limit(20).get().addOnCompleteListener { task ->
             if (task.isSuccessful) {
                 val sn = task.result
-                if (sn == null || sn.isEmpty) {
+                if (sn != null && sn.isEmpty) {
                     writeDefaultColorPalettes()
                 }
-            } else {
-                try { writeDefaultColorPalettes() } catch (e: Exception) {}
             }
         }
         db.collection("providers").limit(20).get().addOnCompleteListener { task ->
             if (task.isSuccessful) {
                 val sn = task.result
-                if (sn == null || sn.isEmpty) {
+                if (sn != null && sn.isEmpty && com.example.BuildConfig.DEBUG) {
                     writeDefaultProviders()
                 }
-            } else {
-                try { if (com.example.BuildConfig.DEBUG) writeDefaultProviders() } catch (e: Exception) {}
             }
         }
-        try { writeDefaultStores() } catch (e: Exception) { e.printStackTrace() }
-        try { writeDefaultProperties() } catch (e: Exception) { e.printStackTrace() }
-        try { writeDefaultJobs() } catch (e: Exception) { e.printStackTrace() }
     }
 
     fun writeDefaultSupervisors() {
-        // Delete dummy supervisors
-        listOf("2", "3", "4").forEach { id ->
-            db.collection("supervisors").document(id).delete()
-        }
+        // Supervisors are provisioned via secure admin setup only.
     }
 
     fun writeDefaultColorPalettes() {
@@ -105,6 +80,7 @@ class FirestoreSeedHelper(private val db: FirebaseFirestore) {
         )
         fbPalettes.forEach { pal ->
             db.collection("color_themes").document(pal.id).set(pal)
+                .addOnFailureListener { e -> android.util.Log.w("FirestoreSeedHelper", "Palette seed skipped: ${e.message}") }
         }
     }
 
@@ -114,7 +90,7 @@ class FirestoreSeedHelper(private val db: FirebaseFirestore) {
             CategoryEntity("sub_1_1", "سباكة وأنابيب", "🚰", 2, parentId = "1", isMainCategory = false),
             CategoryEntity("sub_1_2", "كهرباء ومولدات", "⚡", 3, parentId = "1", isMainCategory = false),
             CategoryEntity("sub_1_3", "تكييف وتبريد", "❄️", 4, parentId = "1", isMainCategory = false),
-            CategoryEntity("sub_1_4", "نجارة وأثاث", "و", 5, parentId = "1", isMainCategory = false),
+            CategoryEntity("sub_1_4", "نجارة وأثاث", "🪚", 5, parentId = "1", isMainCategory = false),
             CategoryEntity("sub_1_5", "صيانة أجهزة منزلية", "🧺", 6, parentId = "1", isMainCategory = false),
             CategoryEntity("2", "طب ورعاية صحية", "🏥", 7, isMainCategory = true),
             CategoryEntity("sub_2_1", "عيادات وأطباء", "🩺", 8, parentId = "2", isMainCategory = false),
@@ -159,6 +135,7 @@ class FirestoreSeedHelper(private val db: FirebaseFirestore) {
         )
         fbCategories.forEach { cat ->
             db.collection("categories").document(cat.id).set(cat)
+                .addOnFailureListener { e -> android.util.Log.w("FirestoreSeedHelper", "Category seed skipped: ${e.message}") }
         }
     }
 
@@ -189,6 +166,7 @@ class FirestoreSeedHelper(private val db: FirebaseFirestore) {
         )
         defaultCities.forEach { city ->
             db.collection("cities").document(city.id).set(city)
+                .addOnFailureListener { e -> android.util.Log.w("FirestoreSeedHelper", "City seed skipped: ${e.message}") }
         }
     }
 
@@ -214,6 +192,7 @@ class FirestoreSeedHelper(private val db: FirebaseFirestore) {
             rating = 5.0f
         )
         db.collection("providers").document("p_amin").set(aminProvider)
+            .addOnFailureListener { e -> android.util.Log.w("FirestoreSeedHelper", "Provider seed skipped: ${e.message}") }
     }
 
     fun writeDefaultStores() {

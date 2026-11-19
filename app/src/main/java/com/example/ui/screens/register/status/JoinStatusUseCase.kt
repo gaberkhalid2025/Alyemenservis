@@ -48,60 +48,131 @@ class JoinStatusUseCase {
         categories: List<CategoryEntity>,
         notifications: List<NotificationEntity>,
         jobs: List<JobEntity> = emptyList(),
-        registeredUsersList: List<Map<String, Any>> = emptyList()
+        registeredUsersList: List<Map<String, Any>> = emptyList(),
+        preferredRole: String? = null
     ): JoinStatus {
         val cleanPhone = AppPreferenceHelper.normalizePhoneNumber(joinPhone)
         if (cleanPhone.isEmpty()) {
             return JoinStatus.NoRequest
         }
 
-        // 1. Check Active Store / Restaurant / Medical
         val matchingStore = stores.find {
             (AppPreferenceHelper.normalizePhoneNumber(it.ownerId) == cleanPhone ||
                     AppPreferenceHelper.normalizePhoneNumber(it.phone) == cleanPhone) && !it.isDeleted
         }
-        if (matchingStore != null && (matchingStore.isActive || matchingStore.isApproved)) {
-            val sec = matchingStore.sectionId.lowercase()
-            val name = matchingStore.name
-            val isRest = sec == "restaurants" || sec.startsWith("restaurant") || name.contains("مطعم") || name.contains("كافيه")
-            val isMed = sec == "medical" || sec.startsWith("medical") || name.contains("عيادة") || name.contains("مركز") || name.contains("طبي")
-            val businessType = if (isRest) "restaurants" else if (isMed) "medical" else "stores"
-            return JoinStatus.ActiveStore(matchingStore, businessType)
-        }
-
-        // 2. Check Active Property
         val matchingProperty = properties.find {
             (AppPreferenceHelper.normalizePhoneNumber(it.ownerId) == cleanPhone ||
                     AppPreferenceHelper.normalizePhoneNumber(it.phone) == cleanPhone) && !it.isDeleted
         }
+        val matchingApproved = providers.find {
+            AppPreferenceHelper.normalizePhoneNumber(it.phone) == cleanPhone && !it.isDeleted
+        }
+        val matchingJob = jobs.find {
+            AppPreferenceHelper.normalizePhoneNumber(it.phone) == cleanPhone && (it.isActive || it.isApproved) && !it.isDeleted
+        }
+        val matchingClient = registeredUsersList.find {
+            val p = (it["phone"] as? String) ?: ""
+            val st = (it["status"] as? String)?.uppercase() ?: ""
+            val appSt = (it["approvalStatus"] as? String)?.uppercase() ?: ""
+            AppPreferenceHelper.normalizePhoneNumber(p) == cleanPhone &&
+                (it["isApproved"] == true || st == "APPROVED" || st == "ACCEPTED" || appSt == "APPROVED" || appSt == "ACCEPTED")
+        }
+
+        fun resolveActiveStoreBusinessType(store: StoreEntity): String {
+            val sec = store.sectionId.lowercase()
+            val name = store.name
+            val isRest = sec == "restaurants" || sec.startsWith("restaurant") || name.contains("مطعم") || name.contains("كافيه")
+            val isMed = sec == "medical" || sec.startsWith("medical") ||
+                    store.medicalLicenseNo.isNotBlank() ||
+                    name.contains("طبي") || name.contains("عيادة") || name.contains("مستشفى") || name.contains("صيدل")
+            return when {
+                isRest -> "restaurants"
+                isMed -> "medical"
+                else -> "stores"
+            }
+        }
+
+        // Preferred role routing for users who own multiple entities under the same phone
+        val pref = preferredRole?.trim()?.uppercase()
+        if (!pref.isNullOrBlank()) {
+            when (pref) {
+                "PROPERTY", "PROPERTY_OWNER", "REAL_ESTATE", "PROPERTY_DASHBOARD" -> {
+                    if (matchingProperty != null && (matchingProperty.isActive || matchingProperty.isApproved)) {
+                        return JoinStatus.ActiveProperty(matchingProperty)
+                    }
+                }
+                "RESTAURANT", "RESTAURANT_OWNER", "RESTAURANT_DASHBOARD" -> {
+                    if (matchingStore != null && (matchingStore.isActive || matchingStore.isApproved) &&
+                        resolveActiveStoreBusinessType(matchingStore) == "restaurants"
+                    ) {
+                        return JoinStatus.ActiveStore(matchingStore, "restaurants")
+                    }
+                }
+                "MEDICAL", "MEDICAL_CENTER", "MEDICAL_DASHBOARD" -> {
+                    if (matchingStore != null && (matchingStore.isActive || matchingStore.isApproved) &&
+                        resolveActiveStoreBusinessType(matchingStore) == "medical"
+                    ) {
+                        return JoinStatus.ActiveStore(matchingStore, "medical")
+                    }
+                    if (matchingApproved != null && (
+                            matchingApproved.providerType.contains("medical", ignoreCase = true) ||
+                            matchingApproved.categoryId.contains("medical", ignoreCase = true) ||
+                            matchingApproved.profession.contains("طبي", ignoreCase = true) ||
+                            matchingApproved.profession.contains("دكتور", ignoreCase = true) ||
+                            matchingApproved.profession.contains("عياد", ignoreCase = true) ||
+                            matchingApproved.profession.contains("مستشفى", ignoreCase = true)
+                        )
+                    ) {
+                        val catName = categories.find { it.id == matchingApproved.categoryId }?.name
+                            ?: matchingApproved.customCategoryName.ifBlank { "الخدمات الطبية" }
+                        return JoinStatus.ApprovedTechnician(matchingApproved, catName)
+                    }
+                }
+                "STORE", "STORE_OWNER", "STORE_DASHBOARD" -> {
+                    if (matchingStore != null && (matchingStore.isActive || matchingStore.isApproved) &&
+                        resolveActiveStoreBusinessType(matchingStore) == "stores"
+                    ) {
+                        return JoinStatus.ActiveStore(matchingStore, "stores")
+                    }
+                }
+                "TECHNICIAN", "PROVIDER", "TECHNICIAN_DASHBOARD" -> {
+                    if (matchingApproved != null) {
+                        val catName = categories.find { it.id == matchingApproved.categoryId }?.name
+                            ?: matchingApproved.customCategoryName.ifBlank { "صيانة فنية" }
+                        return JoinStatus.ApprovedTechnician(matchingApproved, catName)
+                    }
+                }
+                "JOB", "JOB_POSTER", "JOB_POSTER_DASHBOARD" -> {
+                    if (matchingJob != null) return JoinStatus.ActiveJobPoster(matchingJob)
+                }
+                "CLIENT", "CLIENT_DASHBOARD" -> {
+                    if (matchingClient != null) return JoinStatus.ActiveClient(matchingClient)
+                }
+            }
+        }
+
+        // 1. Check Active Store / Restaurant / Medical
+        if (matchingStore != null && (matchingStore.isActive || matchingStore.isApproved)) {
+            return JoinStatus.ActiveStore(matchingStore, resolveActiveStoreBusinessType(matchingStore))
+        }
+
+        // 2. Check Active Property
         if (matchingProperty != null && (matchingProperty.isActive || matchingProperty.isApproved)) {
             return JoinStatus.ActiveProperty(matchingProperty)
         }
 
         // 3. Check Approved Provider / Technician
-        val matchingApproved = providers.find { 
-            AppPreferenceHelper.normalizePhoneNumber(it.phone) == cleanPhone && !it.isDeleted
-        }
         if (matchingApproved != null) {
             val catName = categories.find { it.id == matchingApproved.categoryId }?.name ?: matchingApproved.customCategoryName.ifBlank { "صيانة فنية" }
             return JoinStatus.ApprovedTechnician(matchingApproved, catName)
         }
 
         // 4. Check Active Job Poster
-        val matchingJob = jobs.find {
-            AppPreferenceHelper.normalizePhoneNumber(it.phone) == cleanPhone && (it.isActive || it.isApproved) && !it.isDeleted
-        }
         if (matchingJob != null) {
             return JoinStatus.ActiveJobPoster(matchingJob)
         }
 
         // 5. Check Active Client
-        val matchingClient = registeredUsersList.find {
-            val p = (it["phone"] as? String) ?: ""
-            val st = (it["status"] as? String)?.uppercase() ?: ""
-            val appSt = (it["approvalStatus"] as? String)?.uppercase() ?: ""
-            AppPreferenceHelper.normalizePhoneNumber(p) == cleanPhone && (it["isApproved"] == true || st == "APPROVED" || st == "ACCEPTED" || appSt == "APPROVED" || appSt == "ACCEPTED")
-        }
         if (matchingClient != null) {
             return JoinStatus.ActiveClient(matchingClient)
         }
@@ -117,7 +188,7 @@ class JoinStatusUseCase {
             val pName = matchingPending.name
 
             val isRestaurant = cat == "RESTAURANT" || cat.startsWith("RESTAURANT_") || custom.contains("مطعم") || pName.contains("مطعم")
-            val isMedical = cat == "MEDICAL" || cat.startsWith("MEDICAL_") || custom.contains("طبي") || pName.contains("عيادة")
+            val isMedical = cat == "MEDICAL" || cat.startsWith("MEDICAL_") || custom.contains("طبي") || pName.contains("عيادة") || pName.contains("مستشفى") || pName.contains("صيدل")
             val isProperty = cat == "PROPERTY" || cat.startsWith("PROPERTY_") || prof == "PROPERTY_OWNER"
             val isJob = (cat == "JOB" || cat.startsWith("JOB_")) && cat != "JOB_SEEKER" || prof == "JOB_POSTER"
             val isStore = cat == "STORE" || cat.startsWith("STORE_") || prof == "STORE_OWNER"

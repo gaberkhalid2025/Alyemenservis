@@ -192,7 +192,7 @@ internal fun MapScreenDialogsHost(
                                 if (result.isSuccess) {
                                     onTilesDownloaded()
                                     onDismissDownloadDialog()
-                                    snackbarHostState.showSnackbar("✅ تم تثبيت خرائط اليمن (~${ValhallaTileDownloader.EXPECTED_INSTALLED_MB} MB) بنجاح! استمتع بالملاحة أوفلاين.")
+                                    snackbarHostState.showSnackbar("✅ تم تثبيت خرائط اليمن (~${ValhallaTileDownloader.EXPECTED_INSTALLED_MB} ميجابايت) بنجاح! استمتع بالملاحة أوفلاين.")
                                 } else {
                                     isDownloading = false
                                     snackbarHostState.showSnackbar("❌ فشل التحميل: ${result.exceptionOrNull()?.message ?: "يرجى التحقق من الاتصال."}")
@@ -202,7 +202,7 @@ internal fun MapScreenDialogsHost(
                         modifier = Modifier.heightIn(min = 48.dp).testTag("map_download_offline_confirm_button"),
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981))
                     ) {
-                        Text("تحميل الآن (~${ValhallaTileDownloader.EXPECTED_DOWNLOAD_MB} MB)", color = Color.White, fontWeight = FontWeight.Bold)
+                        Text("تحميل الآن (~${ValhallaTileDownloader.EXPECTED_DOWNLOAD_MB} ميجابايت)", color = Color.White, fontWeight = FontWeight.Bold)
                     }
                 }
             },
@@ -303,7 +303,15 @@ internal fun MapScreenDialogsHost(
                     }
                 }
             },
-            confirmButton = {},
+            confirmButton = {
+                if (NavConfig.EMERGENCY_NUMBER.isNotBlank()) {
+                    TextButton(
+                        onClick = { SosDispatcher.safeStart(context, SosDispatcher.dialIntent(NavConfig.EMERGENCY_NUMBER)) }
+                    ) {
+                        Text("📞 اتصال بالطوارئ ${NavConfig.EMERGENCY_NUMBER}", color = Color(0xFFEF4444), fontWeight = FontWeight.Bold)
+                    }
+                }
+            },
             dismissButton = {
                 TextButton(onClick = onDismissSosDialog) {
                     Text("إغلاق", color = Color(0xFF94A3B8))

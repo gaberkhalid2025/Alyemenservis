@@ -46,9 +46,14 @@ class MainViewModel @Inject constructor(
     val registrationHelper by lazy { com.example.ui.helpers.RegistrationHelper(db, auth, preferenceHelper) }
     val accountRecoveryHelper by lazy { com.example.ui.helpers.AccountRecoveryHelper(db, preferenceHelper) }
 
+    private var lastSyncedAuthUid: String? = null
+    private var authStateListener: com.google.firebase.auth.FirebaseAuth.AuthStateListener? = null
+
     override fun onCleared() {
         super.onCleared()
         try {
+            authStateListener?.let { auth.removeAuthStateListener(it) }
+            authStateListener = null
             realtimeSyncHelper.clearListeners()
             stopLocationUpdates()
             stopNavigationTracking()
@@ -664,6 +669,19 @@ class MainViewModel @Inject constructor(
             android.util.Log.e("MainViewModel", "❌ Error in AuthViewModel initialization", e)
         }
         try {
+            if (authStateListener == null) {
+                val listener = com.google.firebase.auth.FirebaseAuth.AuthStateListener { firebaseAuth ->
+                    val newUid = firebaseAuth.currentUser?.uid
+                    if (newUid != null && newUid != lastSyncedAuthUid) {
+                        lastSyncedAuthUid = newUid
+                        setupRealtimeFirestoreListeners()
+                        seedFirestoreIfEmpty()
+                    }
+                }
+                authStateListener = listener
+                auth.addAuthStateListener(listener)
+            }
+            lastSyncedAuthUid = auth.currentUser?.uid
             setupRealtimeFirestoreListeners()
         } catch (e: Exception) {
             android.util.Log.e("MainViewModel", "❌ Error in setting up realtime listeners", e)

@@ -67,16 +67,35 @@ class PropertyDashboardViewModel(
         }
     }
 
-    fun addProperty(title: String, priceYer: Double, description: String = "", imageUrl: String = "") {
+    fun addProperty(
+        title: String,
+        priceYer: Double,
+        description: String = "",
+        imageUrl: String = "",
+        category: String = "PROPERTY",
+        isAvailable: Boolean = true,
+        isOffer: Boolean = false,
+        discountPercent: Int = 0,
+        oldPriceYer: Double = 0.0,
+        unit: String = ""
+    ) {
         viewModelScope.launch {
-            if (title.isBlank()) return@launch
+            if (title.isBlank()) {
+                _eventFlow.emit(DashboardEvent.ShowToast("يرجى إدخال عنوان العقار"))
+                return@launch
+            }
             val prop = ProductItemEntity(
                 ownerId = ownerId,
                 title = title,
                 priceYer = priceYer,
                 description = description,
                 imageUrl = imageUrl,
-                category = "PROPERTY"
+                category = category.ifBlank { "PROPERTY" },
+                isAvailable = isAvailable,
+                isOffer = isOffer || discountPercent > 0,
+                discountPercent = discountPercent.coerceIn(0, 99),
+                oldPriceYer = oldPriceYer.coerceAtLeast(0.0),
+                unit = unit
             )
             productsRepository.addProduct(prop).onSuccess {
                 _eventFlow.emit(DashboardEvent.ShowToast("تم إدراج العقار بنجاح 🏠"))
@@ -150,5 +169,9 @@ class PropertyDashboardViewModel(
                 .onSuccess { _eventFlow.emit(DashboardEvent.ShowToast("تم تغيير كلمة المرور بنجاح 🔑")) }
                 .onFailure { e -> _eventFlow.emit(DashboardEvent.ShowToast(e.localizedMessage ?: "فشل تغيير كلمة المرور")) }
         }
+    }
+
+    fun dispose() {
+        onCleared()
     }
 }

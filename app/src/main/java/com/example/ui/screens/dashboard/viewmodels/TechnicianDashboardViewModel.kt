@@ -76,7 +76,18 @@ class TechnicianDashboardViewModel(
         }
     }
 
-    fun addNewProductService(title: String, priceYer: Double, description: String = "", imageUrl: String = "") {
+    fun addNewProductService(
+        title: String,
+        priceYer: Double,
+        description: String = "",
+        imageUrl: String = "",
+        category: String = "TECHNICIAN",
+        isAvailable: Boolean = true,
+        isOffer: Boolean = false,
+        discountPercent: Int = 0,
+        oldPriceYer: Double = 0.0,
+        unit: String = ""
+    ) {
         viewModelScope.launch {
             if (title.isBlank()) {
                 _eventFlow.emit(DashboardEvent.ShowToast("يرجى إدخال اسم الخدمة"))
@@ -88,7 +99,12 @@ class TechnicianDashboardViewModel(
                 priceYer = priceYer,
                 description = description,
                 imageUrl = imageUrl,
-                category = "TECHNICIAN"
+                category = category.ifBlank { "TECHNICIAN" },
+                isAvailable = isAvailable,
+                isOffer = isOffer || discountPercent > 0,
+                discountPercent = discountPercent.coerceIn(0, 99),
+                oldPriceYer = oldPriceYer.coerceAtLeast(0.0),
+                unit = unit
             )
             val res = productsRepository.addProduct(newProduct)
             res.onSuccess {
@@ -157,24 +173,39 @@ class TechnicianDashboardViewModel(
 
     fun saveGalleryAlbum(context: android.content.Context, localUriStr: String) {
         val appContext = context.applicationContext
+        val cleanUri = localUriStr.trim()
+        if (cleanUri.isBlank()) return
         viewModelScope.launch {
-            _eventFlow.emit(DashboardEvent.ShowToast("جاري رفع الصورة... ⏳"))
-            val uri = android.net.Uri.parse(localUriStr)
-            val uploadResult = com.example.utils.FirebaseStorageUploader.uploadImageToStorage(appContext, uri, "galleries/${ownerId}")
-            
-            uploadResult.onSuccess { remoteUrl ->
+            if (cleanUri.startsWith("http://") || cleanUri.startsWith("https://")) {
                 val album = com.example.domain.entities.GalleryAlbumEntity(
                     ownerId = ownerId,
                     title = "أعمال سابقة",
-                    imageUrls = listOf(remoteUrl)
+                    imageUrls = listOf(cleanUri)
                 )
                 galleryRepository.saveGalleryAlbum(album).onSuccess {
-                    _eventFlow.emit(DashboardEvent.ShowToast("تم حفظ الصورة بنجاح ✅"))
+                    _eventFlow.emit(DashboardEvent.ShowToast("تم حفظ الصورة في المعرض بنجاح ✅"))
                 }.onFailure {
                     _eventFlow.emit(DashboardEvent.ShowToast("حدث خطأ أثناء حفظ الصورة"))
                 }
-            }.onFailure {
-                _eventFlow.emit(DashboardEvent.ShowToast("فشل رفع الصورة ❌"))
+            } else {
+                _eventFlow.emit(DashboardEvent.ShowToast("جاري رفع الصورة... ⏳"))
+                val uri = android.net.Uri.parse(cleanUri)
+                val uploadResult = com.example.utils.FirebaseStorageUploader.uploadImageToStorage(appContext, uri, "galleries/${ownerId}")
+                
+                uploadResult.onSuccess { remoteUrl ->
+                    val album = com.example.domain.entities.GalleryAlbumEntity(
+                        ownerId = ownerId,
+                        title = "أعمال سابقة",
+                        imageUrls = listOf(remoteUrl)
+                    )
+                    galleryRepository.saveGalleryAlbum(album).onSuccess {
+                        _eventFlow.emit(DashboardEvent.ShowToast("تم حفظ الصورة في المعرض بنجاح ✅"))
+                    }.onFailure {
+                        _eventFlow.emit(DashboardEvent.ShowToast("حدث خطأ أثناء حفظ الصورة"))
+                    }
+                }.onFailure {
+                    _eventFlow.emit(DashboardEvent.ShowToast("فشل رفع الصورة ❌"))
+                }
             }
         }
     }
@@ -187,5 +218,9 @@ class TechnicianDashboardViewModel(
                 _eventFlow.emit(DashboardEvent.ShowToast("حدث خطأ أثناء الحذف"))
             }
         }
+    }
+
+    fun dispose() {
+        onCleared()
     }
 }

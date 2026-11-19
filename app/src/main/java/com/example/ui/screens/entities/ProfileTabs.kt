@@ -47,7 +47,7 @@ fun ProfileTabs(
                         title,
                         fontSize = 11.sp,
                         fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal,
-                        color = if (selectedTab == index) themeColors.accent else Color.LightGray
+                        color = if (selectedTab == index) themeColors.accent else themeColors.textSecondary
                     )
                 }
             )

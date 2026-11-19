@@ -1,0 +1,158 @@
+# 71 – تنظيف واجهة الخرائط والملاحة (من لقطات شاشتك الـ18)
+
+## 0) ما رأيته في الصور (العيوب مرقّمة)
+| # | العيب | السبب |
+|---|---|---|
+| 1 | نصوص أزرار الشريط مقصوصة («حرارى»، «موقعي»، «تكبير»، «تصغير») | `lineHeight = 10.sp` أصغر من ارتفاع الخط العربي مع `overflow = Clip`: النص يُقصّ بحدود سطر الـ10sp |
+| 2 | الشريط الجانبي طويل (12 زراً) ويحتاج تمريراً وآخر عنصر مقصوص | ازدحام: كل الطبقات والأدوات على الشريط |
+| 3 | شارة «أقمار صناعية» تتراكب على الساعة/شريط الحالة | عنصر HTML (`#mode-indicator`) داخل الخريطة بلا احتساب شريط الحالة، ومكرر مع حالة الزر |
+| 4 | الإسناد (Esri/Leaflet/EUMETSAT) مختبئ خلف أزرار النظام | الخريطة تمتد خلف شريط التنقل ولا هامش للإسناد |
+| 5 | بطاقة «نقطة محددة»: صف الأزرار الثانوي مقطوع («عنوان با…») وإحداثيات معكوسة | تمرير أفقي بلا تمثيل واضح، و`Text` في اتجاه RTL يعكس «15.35312, 44.18763» |
+| 6 | حوار الفزعة بلا زر اتصال (زر «إغلاق» فقط) | شرط يخفي كل الأزرار عند غياب الموقع الحقيقي |
+| 7 | أوراق الطبقات طويلة ومزدحمة: بطاقات داخل بطاقات، وأوصاف دعائية («بدون مفاتيح مدفوعة») | تصميم بلا هرمية |
+| 8 | «بلاطات خريطة Valhalla» و«حزمة Valhalla (MB 26)» | تسمية خاطئة (Valhalla محرك توجيه لا بلاطات) والأرقام معكوسة بصرياً |
+| 9 | **EOX Sentinel‑2 (2021) مع «CC‑BY‑4.0»** | النسخة 2021 غير تجارية (CC BY‑NC‑SA). **وسم الترخيص خاطئ** |
+| 10 | «UW RealEarth»: ادعاء «بلا أي مفتاح» | لم أتحقق من شروطها للاستخدام التجاري؛ أُضيفت من AI Studio لا من مستنداتي |
+| 11 | خط أبيض رفيع أفقي في عدة لقطات (y≈403 في صورة 3) | لا أستطيع تحديد مصدره من الصور؛ طريقة التتبع في القسم 8 |
+| 12 | مفاتيح التبديل كلها متشابهة الشكل | ألوان `Switch` الافتراضية بلا تمييز واضح للحالة المفعّلة في الثيم الداكن |
+
+---
+## 1) إصلاح قصّ النصوص (`DockButton` في `MapControls.kt`)
+```kotlin
+Column(
+    modifier = modifier.size(width = 56.dp, height = 56.dp)              // ارتفاع أكبر قليلاً
+        .clip(shape).background(bg)
+        .then(if (active) Modifier.border(1.dp, activeColor.copy(alpha = 0.55f), shape) else Modifier)
+        .combinedClickable(onClick = onClick, onLongClick = onLongClick, role = if (isToggle) Role.Switch else Role.Button)
+        .semantics { contentDescription = description; if (isToggle) stateDescription = if (active) "مفعّل" else "متوقف" },
+    horizontalAlignment = Alignment.CenterHorizontally,
+    verticalArrangement = Arrangement.Center
+) {
+    Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(22.dp))
+    Spacer(Modifier.height(2.dp))
+    Text(
+        label, color = tint, fontSize = 10.sp,
+        lineHeight = 14.sp,                                              // أكبر من حجم الخط: لا قصّ
+        maxLines = 1, softWrap = false, overflow = TextOverflow.Visible, // لا Clip
+        textAlign = TextAlign.Center, fontWeight = if (active) FontWeight.Bold else FontWeight.Medium
+    )
+}
+```
+> كل تسميات الأزرار ≤ 6 أحرف (ملاحة، موقعي، تكبير، تصغير، طبقات، أدوات) فتتسع في 56dp.
+
+## 2) تبسيط الشريط الجانبي إلى 6 أزرار ثابتة (بلا تمرير)
+| يبقى في الشريط | ينتقل إلى |
+|---|---|
+| ملاحة، موقعي، تكبير، تصغير، **طبقات**، **أدوات** | — |
+| أقمار / شوارع / قياسي / تضاريس / الوضع الليلي | **ورقة «طبقات»** (قسم الخريطة) |
+| NASA / EOX / Meteosat / زلازل | ورقة «طبقات» (قسم الأقمار الحية) |
+| حرارية / توفر / ازدحام / انقطاع / صعوبة | ورقة «طبقات» (قسم التحليل) |
+| رادار / VELA / GNSS / تتبع المجموعة / وضع توفير البطارية | قائمة «أدوات» |
+في `MapControls` أبقِ `DockButton`ات الستة فقط؛ واحذف `verticalScroll` من العمود (6×56dp + تباعد 2dp ≈ 350dp تتسع في كل الشاشات). لا تحذف الدوال: فقط انقل استدعاءها إلى الأوراق بالأسفل.
+
+## 3) شارة HTML العلوية والإسناد
+**`map.html`:**
+```css
+#mode-indicator { display: none !important; }      /* الحالة معروضة أصلاً في الشريط والورقة */
+```
+```javascript
+function setMapInsets(bottomDp, topDp) {
+    var s = document.getElementById('dyn-insets');
+    if (!s) { s = document.createElement('style'); s.id = 'dyn-insets'; document.head.appendChild(s); }
+    s.textContent = '.leaflet-bottom{margin-bottom:' + Math.max(0, bottomDp | 0) + 'px!important}' +
+                    '.leaflet-top{margin-top:' + Math.max(0, topDp | 0) + 'px!important}';
+}
+window.setMapInsets = setMapInsets;
+// عند تهيئة الخريطة (بعد إنشاء map):  map.attributionControl.setPrefix(false);   // يزيل بادئة «Leaflet» ويقلل الازدحام
+```
+**`RealLeafletMapView.kt`:** معاملان اختياريان `bottomInsetDp: Int = 0` و`topInsetDp: Int = 0` وتأثير:
+```kotlin
+LaunchedEffect(isMapReady, bottomInsetDp, topInsetDp) {
+    if (isMapReady) webViewRef?.evaluateJavascript("if (window.setMapInsets) { window.setMapInsets($bottomInsetDp, $topInsetDp); }", null)
+}
+```
+**`MapScreenContent.kt`:** اجعل الإسناد يظهر **يميناً فوق الشريط السفلي** (الشريط الجانبي يساراً فلا تعارض):
+```kotlin
+val density = androidx.compose.ui.platform.LocalDensity.current
+val rootHeightPx = androidx.compose.ui.platform.LocalView.current.height
+var bottomBarTopPx by remember { mutableFloatStateOf(0f) }
+// على صف «المكافآت/خدمات الطريق/فزعة»:  Modifier.onGloballyPositioned { bottomBarTopPx = it.positionInRoot().y }
+val attributionBottomDp = with(density) { ((rootHeightPx - bottomBarTopPx).coerceAtLeast(0f) / this.density).toInt() } + 4
+// RealLeafletMapView(..., bottomInsetDp = attributionBottomDp, topInsetDp = 0)
+```
+(إن لم تقس الشريط، استعمل قيمة ثابتة 110.)
+
+## 4) بطاقة «نقطة محددة»: ترتيب واضح وإحداثيات صحيحة
+```kotlin
+@Composable fun LtrText(text: String, color: Color, fontSize: TextUnit, modifier: Modifier = Modifier) {
+    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) { Text(text, color = color, fontSize = fontSize, modifier = modifier) }
+}
+// الإحداثيات (lat, lng) بترتيب صحيح:
+LtrText("${"%.5f".format(Locale.US, la)}, ${"%.5f".format(Locale.US, lo)}", Color(0xFF38BDF8), 13.sp)
+
+// الأزرار: أساسيان كبيران + الباقي شرائح تلتف تلقائياً (لا تمرير ولا قصّ)
+Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Button(onClick = onStartNavigation, modifier = Modifier.weight(1f)) { Text("ابدأ الملاحة") }
+    OutlinedButton(onClick = onAddStop, modifier = Modifier.weight(1f)) { Text("كمحطة") }
+}
+@OptIn(ExperimentalLayoutApi::class)
+FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    AssistChip(onClick = onSetAsMyLocation, label = { Text("موقعي", fontSize = 12.sp) })
+    AssistChip(onClick = onSaveLandmark, label = { Text("معلم", fontSize = 12.sp) })
+    AssistChip(onClick = onLandmarkAddress, label = { Text("عنوان", fontSize = 12.sp) })
+    AssistChip(onClick = onShare, label = { Text("مشاركة", fontSize = 12.sp) })
+}
+```
+وفي أي نص يحوي أرقاماً وحروفاً لاتينية (مثل «(MB 26)») استعمل صياغة عربية كاملة: `"تحميل حزمة التوجيه (26 ميجابايت)"` بدل «(MB 26)».
+
+## 5) حوار الفزعة: زر اتصال دائم
+```kotlin
+// داخل AlertDialog الفزعة: confirmButton/ dismissButton يجب أن يحويا هذه الأزرار دائماً، بصرف النظر عن hasRealLocation
+TextButton(onClick = { SosDispatcher.safeStart(context, SosDispatcher.dialIntent(NavConfig.EMERGENCY_NUMBER)) }) {
+    Text("📞 اتصال بالطوارئ", color = Color(0xFFEF4444), fontWeight = FontWeight.Bold)
+}
+// أزرار الإرسال (SMS/مشاركة/النداء) تظهر فقط عند وجود موقع حقيقي؛ وإلا يبقى النص التوضيحي + زر الاتصال + إغلاق.
+```
+## 6) ورقة «طبقات» الموحّدة (بدل ثلاث أوراق مزدحمة)
+```kotlin
+@Composable
+fun LayerRow(title: String, subtitle: String, checked: Boolean, enabled: Boolean = true, onChange: (Boolean) -> Unit) {
+    Row(Modifier.fillMaxWidth().heightIn(min = 52.dp).padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(title, color = if (enabled) Color.White else Color(0xFF64748B), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(subtitle, color = Color(0xFF94A3B8), fontSize = 11.sp, lineHeight = 15.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        }
+        Spacer(Modifier.width(12.dp))
+        Switch(
+            checked = checked, onCheckedChange = onChange, enabled = enabled,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = Color.White, checkedTrackColor = Color(0xFF10B981),
+                uncheckedThumbColor = Color(0xFF94A3B8), uncheckedTrackColor = Color(0xFF1E293B), uncheckedBorderColor = Color(0xFF475569)
+            )
+        )
+    }
+    HorizontalDivider(color = Color.White.copy(alpha = 0.06f))
+}
+// الهيكل: ModalBottomSheet + TabRow بثلاث تبويبات: «الخريطة» / «أقمار حية» / «تحليل»، وكل صف LayerRow (بلا بطاقات متداخلة).
+// تبويب «الخريطة»: صف شرائح للأساس [قياسي • أقمار • شوارع • تضاريس] + مفتاح «الوضع الليلي» + «خرائط بلا إنترنت (حزم المناطق)».
+// تبويب «أقمار حية»: NASA (VIIRS/MODIS) • EOX • Meteosat • زلازل.   تبويب «تحليل»: توفر • ازدحام • انقطاع • صعوبة الطرق.
+```
+**نصوص صادقة وقصيرة (وصف سطر واحد):**
+- «خرائط بلا إنترنت»: «استعمل الخريطة المحفوظة على الجهاز (حزم المناطق)». وليس «بلاطات Valhalla».
+- «حزمة التوجيه بلا إنترنت (26 ميجابايت)»: «لحساب المسارات بلا إنترنت».
+- احذف عبارات «بدون مفاتيح مدفوعة» و«مجاناً تماماً»: ليست معلومة للمستخدم ولا تُرضي المراجعين.
+
+## 7) التراخيص (مهم قبل النشر)
+1. **EOX:** غيّر الطبقة إلى **نسخة 2016** (CC BY 4.0، تجاري مسموح): معرّفها في خدمة EOX `s2cloudless_3857` (تحقق من `WMTSCapabilities.xml` لديهم) وعدّل الوسم إلى «Sentinel‑2 cloudless (2016) © EOX، Copernicus Sentinel data 2016 & 2017، CC BY 4.0». **النسخة 2021 وما بعدها غير تجارية**؛ لا تستعملها في تطبيق تجاري ولا تصفها بـCC‑BY.
+2. **UW RealEarth:** لم أتحقق من شروطها. اجعلها **معطّلة افتراضياً** خلف ثابت `ENABLE_REALEARTH = false` حتى تراجع شروط SSEC الرسمية للاستخدام التجاري وتؤكد الإسناد المطلوب.
+3. **Esri Clarity وEsri القياسية:** تخضعان لشروط Esri نفسها؛ أبقِ الإسناد ظاهراً وراجع الشروط قبل التوزيع التجاري.
+4. **RainViewer:** معطّلة (صحيح)؛ ابقِها كذلك ما لم تؤكد ترخيصهم.
+
+## 8) الخط الأبيض الرفيع (مجهول المصدر)
+افحصه بإحدى طريقتين (5 دقائق):
+1. **Layout Inspector** في Android Studio أثناء تشغيل التطبيق: انقر الخط ← يُظهر العنصر وملفه.
+2. بحث نصي: `grep -rn "HorizontalDivider\|Divider(\|height(1.dp)\|height(0.5.dp)" app/src --include=MapScreenContent.kt --include=MapControls.kt --include=MapFilterBar.kt --include=MapBottomSheet.kt`، وراجع أيضاً في `map.html` أي عنصر بـ`border-bottom` أو `height:1px`.
+3. إخفاء مؤقت: علّق `RealLeafletMapView` ثم شغّل؛ إن بقي الخط فهو من Compose، وإن اختفى فهو من HTML/JS.
+
+## 9) قائمة قبول بصرية (على هاتف 5.5″ و6.7″)
+1. كل تسميات الشريط كاملة بلا قصّ. 2. لا شيء فوق الساعة وشريط الحالة. 3. الإسناد ظاهر يميناً فوق الشريط السفلي وغير مغطى. 4. بطاقة النقطة: كل الأزرار ظاهرة والإحداثيات «lat, lng» مقروءة. 5. الفزعة: زر الاتصال ظاهر دائماً. 6. ورقة الطبقات: لا بطاقات متداخلة، أوصاف سطر/سطران، والمفاتيح المفعّلة خضراء. 7. لا ذكر لـ«EOX 2021 CC‑BY» ولا «بلاطات Valhalla».

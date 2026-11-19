@@ -17,6 +17,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -46,10 +47,19 @@ fun MapFilterBar(
     onSearchExecute: (String) -> Unit = {},
     isTilesDownloaded: Boolean = false,
     onDownloadMapsClick: () -> Unit = {},
-    onDiagnosticsClick: () -> Unit = {}
+    onDiagnosticsClick: () -> Unit = {},
+    focusTick: Int = 0
 ) {
     var showFilterDialog by remember { mutableStateOf(false) }
     val keyboardController = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+    val focusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
+
+    LaunchedEffect(focusTick) {
+        if (focusTick > 0) {
+            focusRequester.requestFocus()
+            keyboardController?.show()
+        }
+    }
 
     val categories = remember {
         listOf(
@@ -150,6 +160,7 @@ fun MapFilterBar(
                     ),
                     modifier = Modifier
                         .weight(1f)
+                        .focusRequester(focusRequester)
                         .testTag("map_search_input")
                 )
 

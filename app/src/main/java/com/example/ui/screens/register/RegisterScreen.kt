@@ -46,7 +46,8 @@ fun RegisterScreen(
     onBackClick: () -> Unit = {},
     onSelectRegistrationType: (RegistrationType) -> Unit = {},
     onOpenRestoreDialog: () -> Unit = {},
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    preferredRole: String? = null
 ) {
     val context = LocalContext.current
     var showRestoreDialog by remember { mutableStateOf(false) }
@@ -69,7 +70,7 @@ fun RegisterScreen(
     val registeredUsersList by viewModel.registeredUsersList.collectAsState()
 
     val useCase = remember { JoinStatusUseCase() }
-    val currentStatus = remember(joinPhone, pendingProviders, providers, stores, properties, categories, notifications, jobs, registeredUsersList) {
+    val currentStatus = remember(joinPhone, pendingProviders, providers, stores, properties, categories, notifications, jobs, registeredUsersList, preferredRole) {
         useCase.determineStatus(
             joinPhone = joinPhone,
             pendingProviders = pendingProviders,
@@ -79,7 +80,8 @@ fun RegisterScreen(
             categories = categories,
             notifications = notifications,
             jobs = jobs,
-            registeredUsersList = registeredUsersList
+            registeredUsersList = registeredUsersList,
+            preferredRole = preferredRole
         )
     }
 
@@ -88,7 +90,8 @@ fun RegisterScreen(
         JoinRequestStatusScreen(
             viewModel = viewModel,
             themeColors = themeColors,
-            modifier = modifier
+            modifier = modifier,
+            preferredRole = preferredRole
         )
         return
     }

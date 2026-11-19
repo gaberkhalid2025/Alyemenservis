@@ -120,7 +120,6 @@ fun TabGalleryAlbums(
                     onClick = {
                         if (newPhotoUrl.isNotBlank()) {
                             onAddPhoto(newPhotoUrl)
-                            android.widget.Toast.makeText(context, "✅ تم إضافة الصورة إلى المعرض بنجاح!", android.widget.Toast.LENGTH_SHORT).show()
                             newPhotoUrl = ""
                             showAddDialog = false
                         } else {
@@ -144,15 +143,12 @@ fun TabGalleryAlbums(
     if (itemToDelete != null) {
         AlertDialog(
             onDismissRequest = { itemToDelete = null },
-            title = { Text("تأكيد الحذف", fontSize = 16.sp, fontWeight = FontWeight.Bold) },
-            text = { Text("هل أنت متأكد من رغبتك في حذف هذه الصورة من معرض الأعمال؟ لا يمكن التراجع عن هذا الإجراء.") },
+            title = { Text("تأكيد الحذف", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = themeColors.textPrimary) },
+            text = { Text("هل أنت متأكد من رغبتك في حذف هذه الصورة من معرض الأعمال؟ لا يمكن التراجع عن هذا الإجراء.", color = themeColors.textSecondary) },
             confirmButton = {
                 Button(
                     onClick = {
-                        itemToDelete?.let {
-                            onDeletePhoto(it.id)
-                            android.widget.Toast.makeText(context, "🗑️ تم حذف الصورة من المعرض بنجاح", android.widget.Toast.LENGTH_SHORT).show()
-                        }
+                        itemToDelete?.let { onDeletePhoto(it.id) }
                         itemToDelete = null
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
@@ -162,9 +158,10 @@ fun TabGalleryAlbums(
             },
             dismissButton = {
                 TextButton(onClick = { itemToDelete = null }) {
-                    Text("إلغاء")
+                    Text("إلغاء", color = themeColors.textSecondary)
                 }
-            }
+            },
+            containerColor = themeColors.surface
         )
     }
 }
