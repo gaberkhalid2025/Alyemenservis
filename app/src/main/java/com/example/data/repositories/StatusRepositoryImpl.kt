@@ -264,6 +264,13 @@ class StatusRepositoryImpl(
                 com.google.firebase.firestore.SetOptions.merge()
             )
 
+            val resolvedLat = requestDoc.getDouble("latitude")?.takeIf { it != 0.0 } ?: 15.3694
+            val resolvedLng = requestDoc.getDouble("longitude")?.takeIf { it != 0.0 } ?: 44.1910
+            val resolvedGps = requestDoc.getString("gpsCoords") ?: ""
+            val resolvedCustomCat = requestDoc.getString("categoryName")?.takeIf { it.isNotBlank() } ?: resolvedCategory
+            val resolvedProfileImg = requestDoc.getString("profileImage") ?: ""
+            val resolvedMedLicense = requestDoc.getString("medicalLicenseNo") ?: ""
+
             // Create Entity in appropriate collection
             when (resolvedRole) {
                 "PROVIDER" -> {
@@ -276,8 +283,13 @@ class StatusRepositoryImpl(
                         "password" to "",
                         "passwordHash" to passwordHash,
                         "categoryId" to resolvedCategory,
+                        "customCategoryName" to resolvedCustomCat,
                         "area" to resolvedArea,
                         "localNeighborhood" to resolvedNeighborhood,
+                        "gpsCoords" to resolvedGps,
+                        "latitude" to resolvedLat,
+                        "longitude" to resolvedLng,
+                        "profileImage" to resolvedProfileImg,
                         "isAvailable" to true,
                         "subscriptionStatus" to "APPROVED",
                         "rating" to 0.0f,
@@ -308,11 +320,14 @@ class StatusRepositoryImpl(
                         "city" to resolvedArea,
                         "cityId" to resolvedArea,
                         "localNeighborhood" to resolvedNeighborhood,
+                        "latitude" to resolvedLat,
+                        "longitude" to resolvedLng,
+                        "medicalLicenseNo" to resolvedMedLicense,
                         "isActive" to true,
                         "isApproved" to true,
                         "type" to resolvedRole,
-                        "logoImage" to (requestDoc.getString("profileImage") ?: ""),
-                        "coverImage" to (requestDoc.getString("profileImage") ?: ""),
+                        "logoImage" to resolvedProfileImg,
+                        "coverImage" to resolvedProfileImg,
                         "createdAt" to now
                     )
                     batch.set(storeRef, storeData, com.google.firebase.firestore.SetOptions.merge())
@@ -332,10 +347,12 @@ class StatusRepositoryImpl(
                         "city" to resolvedArea,
                         "cityId" to resolvedArea,
                         "localNeighborhood" to resolvedNeighborhood,
+                        "latitude" to resolvedLat,
+                        "longitude" to resolvedLng,
                         "isActive" to true,
                         "isApproved" to true,
                         "images" to ((requestDoc.get("workImages") as? List<*>)?.filterIsInstance<String>()
-                            ?: listOfNotNull(requestDoc.getString("profileImage")?.takeIf { it.isNotBlank() })),
+                            ?: listOfNotNull(resolvedProfileImg.takeIf { it.isNotBlank() })),
                         "createdAt" to now
                     )
                     batch.set(propRef, propData, com.google.firebase.firestore.SetOptions.merge())

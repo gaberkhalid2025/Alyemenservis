@@ -91,12 +91,18 @@ class RegistrationHelper(
 
         scope.launch {
             try {
-                // Synchronous check in join_requests
-                val qs = com.google.android.gms.tasks.Tasks.await(
-                    db.collection("join_requests").whereEqualTo("phone", cleanPhone).get()
-                )
-                if (!qs.isEmpty) {
-                    triggerNotification("❌ يوجد طلب انضمام مسجل بالفعل قيد المراجعة لرقم الهاتف هذا")
+                // Background check in join_requests (allowing re-application after REJECTED/CANCELLED)
+                val hasActiveJoinReq = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    val qs = com.google.android.gms.tasks.Tasks.await(
+                        db.collection("join_requests").whereEqualTo("phone", cleanPhone).get()
+                    )
+                    qs.documents.any {
+                        val st = (it.getString("status") ?: "PENDING").uppercase()
+                        st !in listOf("REJECTED", "CANCELLED")
+                    }
+                }
+                if (hasActiveJoinReq) {
+                    triggerNotification("❌ يوجد طلب انضمام مسجل بالفعل قيد المراجعة أو مفعل لرقم الهاتف هذا")
                     return@launch
                 }
             } catch (e: Exception) {
@@ -105,22 +111,28 @@ class RegistrationHelper(
 
             try {
                 triggerNotification("⏳ جاري ضغط الصور وحفظ الملفات في سحابة التخزين...")
-            val finalSelfie = uploadImageStringOrUri(
-                context, photoPath,
-                FirebaseStorageUploader.getProviderProfilePath(cleanPhone),
-                maxSizeBytes = 150 * 1024L
-            )
-            val finalIdCard = uploadImageStringOrUri(
-                context, idCardPath,
-                FirebaseStorageUploader.getProviderIdCardPath(cleanPhone),
-                maxSizeBytes = 150 * 1024L
-            )
-            val finalWorkPhotos = workPhotos.mapIndexed { idx, p ->
+            val finalSelfie = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                 uploadImageStringOrUri(
-                    context, p,
-                    FirebaseStorageUploader.getProviderWorkPhotoPath(cleanPhone, idx),
-                    maxSizeBytes = 300 * 1024L
+                    context, photoPath,
+                    FirebaseStorageUploader.getProviderProfilePath(cleanPhone),
+                    maxSizeBytes = 150 * 1024L
                 )
+            }
+            val finalIdCard = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                uploadImageStringOrUri(
+                    context, idCardPath,
+                    FirebaseStorageUploader.getProviderIdCardPath(cleanPhone),
+                    maxSizeBytes = 150 * 1024L
+                )
+            }
+            val finalWorkPhotos = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                workPhotos.mapIndexed { idx, p ->
+                    uploadImageStringOrUri(
+                        context, p,
+                        FirebaseStorageUploader.getProviderWorkPhotoPath(cleanPhone, idx),
+                        maxSizeBytes = 300 * 1024L
+                    )
+                }
             }
             val encSelfie = if (finalSelfie.isNotEmpty()) SecurityCryptoUtils.encrypt(finalSelfie) else ""
             val encIdCard = if (finalIdCard.isNotEmpty()) SecurityCryptoUtils.encrypt(finalIdCard) else ""
@@ -128,8 +140,13 @@ class RegistrationHelper(
                 val valResult = SecurityCryptoUtils.validatePasswordPolicy(password)
                 if (valResult.first) {
                     val authEmail = "$cleanPhone@yemen-services.app"
-                    auth.createUserWithEmailAndPassword(authEmail, password.trim())
-                        .addOnFailureListener { /* Account might already exist */ }
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        runCatching {
+                            com.google.android.gms.tasks.Tasks.await(
+                                auth.createUserWithEmailAndPassword(authEmail, password.trim())
+                            )
+                        }
+                    }
                 }
             }
             val requestType = when (catId.uppercase()) {
@@ -191,7 +208,7 @@ class RegistrationHelper(
                 "idPhotoBase64" to encIdCard,
                 "workPhotosBase64" to finalWorkPhotos,
                 "customCategoryName" to customCategoryName,
-                "password" to securedPasswordHash,
+                "password" to "",
                 "passwordHash" to securedPasswordHash,
                 "productAttachmentsJson" to productAttachmentsJson,
                 "profession" to requestProfession,
@@ -207,7 +224,7 @@ class RegistrationHelper(
                 "approvalStatus" to "PENDING",
                 "fullName" to name,
                 "phone" to cleanPhone,
-                "password" to securedPasswordHash,
+                "password" to "",
                 "passwordHash" to securedPasswordHash,
                 "city" to area,
                 "area" to neighborhood,
@@ -264,35 +281,35 @@ class RegistrationHelper(
                     try {
                         if (adminNotif.isValid()) db.collection("notifications").document(adminNotif.id).set(adminNotif)
                     } catch (e: Exception) {}
+
+                    onPendingAdded(newRequest)
+                    preferenceHelper.setJoinRequestPhone(context, cleanPhone)
+                    onJoinRequestPhoneUpdated(cleanPhone)
+
+                    val userEntityLabel = when (requestType) {
+                        "STORE" -> "متجر / محل تجاري"
+                        "RESTAURANT" -> "مطعم / كافيه"
+                        "MEDICAL" -> "مركز طبي / عيادة"
+                        "PROPERTY" -> "عقار"
+                        "JOB" -> "إعلان وظيفة"
+                        "JOB_SEEKER" -> "متقدم للوظيفة"
+                        "CLIENT" -> "حساب عميل"
+                        else -> "فني / مهني"
+                    }
+                    addApplicantNotification(
+                        "📨 تم استلام طلب انضمامك بنجاح",
+                        "مرحباً $name، تم استلام طلب تسجيلك كـ ($userEntityLabel) وجاري مراجعته والتحقق من البيانات من قِبل إدارة التطبيق. نسعد بانضمامك وسنبلغك بإشعار فور التفعيل والاعتماد!",
+                        "USER",
+                        cleanPhone
+                    )
+
+                    triggerNotification("📨 تم إرسال طلب انضمامك بنجاح، وهو قيد المراجعة لدى الإدارة")
+                    onNavigateToScreen("JOIN_REQUEST_STATUS")
                 }
                 .addOnFailureListener { e ->
                     val errorMsg = e.localizedMessage ?: "تأكد من صغر حجم الصور واتصالك بالإنترنت"
                     triggerNotification("❌ فشل تقديم الطلب: $errorMsg")
                 }
-
-            onPendingAdded(newRequest)
-            preferenceHelper.setJoinRequestPhone(context, cleanPhone)
-            onJoinRequestPhoneUpdated(cleanPhone)
-
-            val userEntityLabel = when (requestType) {
-                "STORE" -> "متجر / محل تجاري"
-                "RESTAURANT" -> "مطعم / كافيه"
-                "MEDICAL" -> "مركز طبي / عيادة"
-                "PROPERTY" -> "عقار"
-                "JOB" -> "إعلان وظيفة"
-                "JOB_SEEKER" -> "متقدم للوظيفة"
-                "CLIENT" -> "حساب عميل"
-                else -> "فني / مهني"
-            }
-            addApplicantNotification(
-                "📨 تم استلام طلب انضمامك بنجاح",
-                "مرحباً $name، تم استلام طلب تسجيلك كـ ($userEntityLabel) وجاري مراجعته والتحقق من البيانات من قِبل إدارة التطبيق. نسعد بانضمامك وسنبلغك بإشعار فور التفعيل والاعتماد!",
-                "USER",
-                cleanPhone
-            )
-
-            triggerNotification("📨 تم إرسال طلب انضمامك بنجاح، وهو قيد المراجعة لدى الإدارة")
-            onNavigateToScreen("JOIN_REQUEST_STATUS")
             } catch (e: Exception) {
                 e.printStackTrace()
                 com.example.utils.AppErrorLogManager.logFirestoreError("RegistrationHelper", "Error in submitJoinForm", e)
@@ -318,7 +335,7 @@ class RegistrationHelper(
             "name" to name,
             "phone" to cleanPhone,
             "residence" to residence,
-            "password" to hashedPassword,
+            "password" to "",
             "passwordHash" to hashedPassword,
             "isApproved" to false,
             "createdAt" to System.currentTimeMillis()

@@ -135,10 +135,10 @@ object RealValhallaNavigator {
                 return nativeResult
             }
         }
-        // 2) أونلاين (OSRM) مع مهلة 20 ثانية (يدعم القيادة فقط)
-        if (driving && isNetworkAvailable(context)) {
+        // 2) أونلاين (OSRM) مع مهلة 20 ثانية (يدعم القيادة والمشي)
+        if (isNetworkAvailable(context)) {
             val online = try {
-                withTimeoutOrNull(20_000L) { OnlineOsrmNavigator.calculateRoute(origin, waypoints) }
+                withTimeoutOrNull(20_000L) { OnlineOsrmNavigator.calculateRoute(origin, waypoints, driving) }
             } catch (e: CancellationException) {
                 throw e
             } catch (t: Throwable) {

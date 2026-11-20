@@ -180,8 +180,9 @@ fun ForgotPasswordRecoveryDialog(
 
                     Button(
                         onClick = {
-                            if (phoneInput.trim().length >= 7) {
-                                val cleanPhone = phoneInput.trim()
+                            val normalizedRecoveryPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(phoneInput).filter { it.isDigit() }
+                            if (normalizedRecoveryPhone.length >= 7) {
+                                val cleanPhone = normalizedRecoveryPhone
                                 val currentTime = System.currentTimeMillis()
 
                                 viewModel.authViewModel.submitPasswordRecoveryRequest(
@@ -215,8 +216,7 @@ fun ForgotPasswordRecoveryDialog(
                                         isSubmitted = true
                                     }
                                     else -> {
-                                        // Open unified in-app support chat channel for password recovery
-                                        viewModel.sendMessageInChat("مرحباً، أطلب استعادة كلمة المرور لرقم الحساب المسجل: $cleanPhone. $noteInput")
+                                        // Open unified in-app support chat channel first, then dispatch message
                                         viewModel.openDirectChat(
                                             targetUserId = com.example.data.repositories.ChatRepository.SUPPORT_ADMIN_ID,
                                             targetUserName = com.example.data.repositories.ChatRepository.SUPPORT_ADMIN_NAME,
@@ -224,6 +224,7 @@ fun ForgotPasswordRecoveryDialog(
                                             relatedEntityId = cleanPhone,
                                             relatedEntityType = "PASSWORD_RECOVERY"
                                         )
+                                        viewModel.sendMessageInChat("مرحباً، أطلب استعادة كلمة المرور لرقم الحساب المسجل: $cleanPhone. ${noteInput.trim()}")
                                         onDismiss()
                                         isSubmitted = true
                                     }

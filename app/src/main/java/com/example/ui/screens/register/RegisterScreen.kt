@@ -254,7 +254,10 @@ fun RegisterScreen(
         viewModel.setJoinRequestPhone(context, cleanPhone)
         forceShowForm = false
         selectedType = null
-        viewModel.triggerNotification("✅ تم إرسال طلب التسجيل للأدمن بنجاح، جاري المراجعة والاعتماد")
+    }
+
+    androidx.activity.compose.BackHandler(enabled = selectedType != null) {
+        selectedType = null
     }
 
     // واجهة التسجيل (اختيار النوع أو تعبئة الاستمارة)
@@ -331,7 +334,7 @@ fun RegisterScreen(
                                 color = themeColors.accent
                             )
                             Text(
-                                text = "7 خيارات معتمدة",
+                                text = "${RegistrationType.values().size} خيارات معتمدة",
                                 fontSize = 10.5.sp,
                                 color = Color.Gray
                             )

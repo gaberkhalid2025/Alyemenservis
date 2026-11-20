@@ -22,18 +22,20 @@ object OnlineOsrmNavigator {
 
     suspend fun calculateRoute(
         origin: Pair<Double, Double>,
-        waypoints: List<Pair<Double, Double>>
+        waypoints: List<Pair<Double, Double>>,
+        driving: Boolean = true
     ): NavRouteResult {
         val originWp = NavWaypoint(name = "موقعي", latitude = origin.first, longitude = origin.second, type = WaypointType.START)
         val listWps = waypoints.mapIndexed { idx, pt ->
             NavWaypoint(name = "نقطة ${idx + 1}", latitude = pt.first, longitude = pt.second, type = WaypointType.BREAK)
         }
-        return calculateRoute(originWp, listWps)
+        return calculateRoute(originWp, listWps, driving)
     }
 
     suspend fun calculateRoute(
         origin: NavWaypoint,
-        waypoints: List<NavWaypoint>
+        waypoints: List<NavWaypoint>,
+        driving: Boolean = true
     ): NavRouteResult = withContext(Dispatchers.IO) {
         val validWaypoints = waypoints.filter { !it.latitude.isNaN() && !it.longitude.isNaN() && it.latitude != 0.0 && it.longitude != 0.0 }
         val allWaypoints = listOf(origin) + validWaypoints
@@ -52,10 +54,18 @@ object OnlineOsrmNavigator {
         }
 
         val coordsParam = allWaypoints.joinToString(";") { "${it.longitude},${it.latitude}" }
-        val endpoints = listOf(
-            "https://routing.openstreetmap.de/routed-car/route/v1/driving/",
-            NavConfig.OSRM_BASE_URL
-        ).distinct()
+        val endpoints = if (driving) {
+            listOf(
+                "https://routing.openstreetmap.de/routed-car/route/v1/driving/",
+                NavConfig.OSRM_BASE_URL
+            )
+        } else {
+            listOf(
+                "https://routing.openstreetmap.de/routed-foot/route/v1/foot/",
+                "https://routing.openstreetmap.de/routed-car/route/v1/driving/",
+                NavConfig.OSRM_BASE_URL
+            )
+        }.distinct()
 
         for (baseEndpoint in endpoints) {
             var connection: HttpURLConnection? = null

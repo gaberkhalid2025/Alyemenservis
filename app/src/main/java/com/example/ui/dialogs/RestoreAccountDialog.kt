@@ -219,7 +219,11 @@ fun RestoreAccountDialog(
                                             ?: currentMatch.store?.cityId?.takeIf { it.isNotBlank() }
                                             ?: currentMatch.property?.cityId?.takeIf { it.isNotBlank() }
                                             ?: "اليمن"
-                                        viewModel.setUserSessionDetails(context, provName, cleanPhone, provArea)
+                                        val unmaskedName = currentMatch.provider?.name?.takeIf { it.isNotBlank() }
+                                            ?: currentMatch.store?.name?.takeIf { it.isNotBlank() }
+                                            ?: currentMatch.property?.title?.takeIf { it.isNotBlank() }
+                                            ?: provName
+                                        viewModel.setUserSessionDetails(context, unmaskedName, cleanPhone, provArea)
 
                                         val resolvedAccountType = currentMatch.type.ifBlank { "CLIENT" }
                                         val resolvedAccountId = currentMatch.provider?.id
@@ -241,9 +245,12 @@ fun RestoreAccountDialog(
 
                                         viewModel.setJoinRequestPhone(context, cleanPhone)
                                         if (viewModel.adminRole.value !in listOf("OWNER", "ADMIN", "SUPERVISOR")) {
-                                            viewModel.authViewModel._adminRole.value = when (resolvedAccountType) {
-                                                "PROVIDER" -> "PROVIDER"
+                                            viewModel.authViewModel._adminRole.value = when (resolvedAccountType.uppercase()) {
+                                                "PROVIDER", "TECHNICIAN" -> "PROVIDER"
                                                 "STORE", "RESTAURANT", "MEDICAL" -> "STORE_OWNER"
+                                                "PROPERTY" -> "PROPERTY_OWNER"
+                                                "JOB", "JOB_POSTER" -> "JOB_POSTER"
+                                                "CLIENT" -> "CLIENT"
                                                 else -> "GUEST"
                                             }
                                         }
@@ -278,7 +285,10 @@ fun RestoreAccountDialog(
                                         }
 
                                         restorePasswordInput = ""
-                                        successUserName = provName
+                                        successUserName = currentMatch.provider?.name?.takeIf { it.isNotBlank() }
+                                            ?: currentMatch.store?.name?.takeIf { it.isNotBlank() }
+                                            ?: currentMatch.property?.title?.takeIf { it.isNotBlank() }
+                                            ?: provName
                                         showSuccessState = true
                                     }
                                 }
@@ -311,7 +321,11 @@ fun RestoreAccountDialog(
                                 return@Button
                             }
                             isRequestingReset = true
-                            viewModel.requestPasswordReset(context, cleanPhone, provName, match?.type ?: "USER") { success ->
+                            val reqRawName = match?.provider?.name?.takeIf { it.isNotBlank() }
+                                ?: match?.store?.name?.takeIf { it.isNotBlank() }
+                                ?: match?.property?.title?.takeIf { it.isNotBlank() }
+                                ?: provName
+                            viewModel.requestPasswordReset(context, cleanPhone, reqRawName, match?.type ?: "USER") { success ->
                                 isRequestingReset = false
                                 if (success) {
                                     Toast.makeText(context, "⏳ تم إرسال طلب استعادة كلمة المرور للإدارة بنجاح!", Toast.LENGTH_LONG).show()

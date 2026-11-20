@@ -167,25 +167,25 @@ class DashboardsAndSectorRoutingTest {
 
     @Test
     fun productItemEntitySupportsOfferDiscountOldPriceAndUnitFields() {
-        val defaultProduct = ProductItemEntity(id = "p1", ownerId = "o1", title = "سخان شمسي", priceYer = 85000)
+        val defaultProduct = ProductItemEntity(id = "p1", ownerId = "o1", title = "سخان شمسي", priceYer = 85000.0)
         assertFalse(defaultProduct.isOffer)
         assertEquals(0, defaultProduct.discountPercent)
-        assertEquals(0, defaultProduct.oldPriceYer)
+        assertEquals(0.0, defaultProduct.oldPriceYer, 0.01)
         assertEquals("", defaultProduct.unit)
 
         val offerProduct = ProductItemEntity(
             id = "p2",
             ownerId = "o1",
             title = "لوح طاقة 550 واط",
-            priceYer = 60000,
+            priceYer = 60000.0,
             isOffer = true,
             discountPercent = 20,
-            oldPriceYer = 75000,
+            oldPriceYer = 75000.0,
             unit = "قطعة"
         )
         assertTrue(offerProduct.isOffer)
         assertEquals(20, offerProduct.discountPercent)
-        assertEquals(75000, offerProduct.oldPriceYer)
+        assertEquals(75000.0, offerProduct.oldPriceYer, 0.01)
         assertEquals("قطعة", offerProduct.unit)
     }
 

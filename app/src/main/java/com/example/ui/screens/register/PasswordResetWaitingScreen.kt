@@ -342,7 +342,12 @@ fun PasswordResetWaitingScreen(
                                             passwordError = "❌ كلمة المرور غير صحيحة أو لم تكتمل مزامنة التعيين بعد"
                                             return@verifyRestorePassword
                                         }
-                                        val resolvedName = match?.name?.takeIf { it.isNotBlank() } ?: accountName
+                                        val resolvedName = match?.provider?.name?.takeIf { it.isNotBlank() }
+                                            ?: match?.store?.name?.takeIf { it.isNotBlank() }
+                                            ?: match?.property?.title?.takeIf { it.isNotBlank() }
+                                            ?: accountName.takeIf { it.isNotBlank() }
+                                            ?: match?.name?.takeIf { it.isNotBlank() }
+                                            ?: "مستخدم"
                                         val provArea = match?.provider?.area?.takeIf { it.isNotBlank() }
                                             ?: match?.store?.cityId?.takeIf { it.isNotBlank() }
                                             ?: match?.property?.cityId?.takeIf { it.isNotBlank() }
@@ -367,9 +372,12 @@ fun PasswordResetWaitingScreen(
                                         viewModel.setPasswordRecoveryWaitingPhone("")
 
                                         if (viewModel.adminRole.value !in listOf("OWNER", "ADMIN", "SUPERVISOR")) {
-                                            viewModel.authViewModel.setAdminRole(when (resolvedType) {
-                                                "PROVIDER" -> "PROVIDER"
+                                            viewModel.authViewModel.setAdminRole(when (resolvedType.uppercase()) {
+                                                "PROVIDER", "TECHNICIAN" -> "PROVIDER"
                                                 "STORE", "RESTAURANT", "MEDICAL" -> "STORE_OWNER"
+                                                "PROPERTY" -> "PROPERTY_OWNER"
+                                                "JOB", "JOB_POSTER" -> "JOB_POSTER"
+                                                "CLIENT" -> "CLIENT"
                                                 else -> "GUEST"
                                             })
                                         }
