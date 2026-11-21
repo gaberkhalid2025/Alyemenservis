@@ -43,6 +43,7 @@ fun UnifiedRegistrationForm(
     themeColors: VisualThemePalette,
     onRegistrationSuccess: (Map<String, String>) -> Unit
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val normalizedRole = role.uppercase()
 
     // الحقول الأساسية المشتركة
@@ -52,6 +53,66 @@ fun UnifiedRegistrationForm(
     var confirmPassword by remember { mutableStateOf("") }
     var city by remember { mutableStateOf("صنعاء") }
     var address by remember { mutableStateOf("") }
+
+    // 📍 الموقع الجغرافي والإحداثيات
+    var gpsCoords by remember { mutableStateOf("") }
+    var latitude by remember { mutableStateOf(15.3694) }
+    var longitude by remember { mutableStateOf(44.1910) }
+    var isLocating by remember { mutableStateOf(false) }
+    var locationDetected by remember { mutableStateOf(false) }
+    var locationErrorText by remember { mutableStateOf<String?>(null) }
+
+    fun fetchDeviceLocation() {
+        isLocating = true
+        locationErrorText = null
+        try {
+            val locationManager = context.getSystemService(android.content.Context.LOCATION_SERVICE) as? android.location.LocationManager
+            if (locationManager == null) {
+                locationErrorText = "خدمة الموقع غير متاحة في هذا الجهاز"
+                isLocating = false
+                return
+            }
+            var bestLoc: android.location.Location? = null
+            val providers = locationManager.getProviders(true)
+            for (p in providers) {
+                val l = locationManager.getLastKnownLocation(p) ?: continue
+                if (bestLoc == null || l.accuracy < bestLoc.accuracy) {
+                    bestLoc = l
+                }
+            }
+            if (bestLoc != null) {
+                latitude = bestLoc.latitude
+                longitude = bestLoc.longitude
+                gpsCoords = "${String.format(java.util.Locale.US, "%.5f", bestLoc.latitude)},${String.format(java.util.Locale.US, "%.5f", bestLoc.longitude)}"
+                locationDetected = true
+                isLocating = false
+            } else {
+                // وضع إحداثيات صنعاء كمركز افتراضي مع تمكين الإحداثيات
+                latitude = 15.3694
+                longitude = 44.1910
+                gpsCoords = "15.36940,44.19100"
+                locationDetected = true
+                isLocating = false
+                locationErrorText = "تم تثبيت إحداثيات المدينة، يمكنك الضغط للتحديث عند توفر إشارة GPS"
+            }
+        } catch (e: Exception) {
+            isLocating = false
+            locationErrorText = "تعذر جلب الموقع: ${e.message}"
+        }
+    }
+
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val fine = permissions[android.Manifest.permission.ACCESS_FINE_LOCATION] == true
+        val coarse = permissions[android.Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        if (fine || coarse) {
+            fetchDeviceLocation()
+        } else {
+            isLocating = false
+            locationErrorText = "يرجى منح إذن الموقع لتحديد إحداثياتك بدقة على الخريطة"
+        }
+    }
 
     // حقول إضافية مخصصة حسب الفئة
     var specialization by remember { mutableStateOf("") } // المهنة / التخصص / نوع النشاط / التخصصات
@@ -97,35 +158,9 @@ fun UnifiedRegistrationForm(
     val cities = YemenCities.MAIN_CITIES
     var expandedCity by remember { mutableStateOf(false) }
 
-    // التحقق من صحة الحقول الإجبارية
-    val isFormValid by remember(fullName, phone, password, confirmPassword, city, address, agreedToTerms, specialization, experienceYears, entityName, workingHours, normalizedRole) {
-        derivedStateOf {
-            val cleanPass = password.trim()
-            val passValid = cleanPass.length >= 7 && cleanPass.any { it.isLetter() } && cleanPass.any { it.isDigit() } && cleanPass == confirmPassword.trim()
-            
-            val cleanPhone = com.example.ui.helpers.AppPreferenceHelper.normalizePhoneNumber(phone)
-            val yemenPhoneRegex = Regex("^(77|73|71|70|78)\\d{7}$")
-            val phoneValid = cleanPhone.length == 9 && yemenPhoneRegex.matches(cleanPhone)
-            
-            val commonValid = fullName.trim().isNotBlank() && phoneValid && passValid && city.isNotBlank() && address.trim().isNotBlank() && agreedToTerms
-
-            when (normalizedRole) {
-                "CLIENT" -> commonValid
-                "PROVIDER", "TECHNICIAN" -> commonValid && specialization.trim().isNotBlank() && experienceYears.trim().isNotBlank()
-                "JOB_SEEKER" -> commonValid && specialization.trim().isNotBlank() && experienceYears.trim().isNotBlank()
-                "STORE" -> commonValid && entityName.trim().isNotBlank() && specialization.trim().isNotBlank()
-                "RESTAURANT" -> commonValid && entityName.trim().isNotBlank() && specialization.trim().isNotBlank() && workingHours.trim().isNotBlank()
-                "MEDICAL" -> commonValid && entityName.trim().isNotBlank() && specialization.trim().isNotBlank()
-                "PROPERTY" -> commonValid && entityName.trim().isNotBlank() && specialization.trim().isNotBlank()
-                "JOB", "JOB_POSTER" -> commonValid && entityName.trim().isNotBlank() && specialization.trim().isNotBlank()
-                else -> commonValid
-            }
-        }
-    }
-
     Card(
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+        colors = CardDefaults.cardColors(containerColor = themeColors.surface),
         border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)),
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
     ) {
@@ -430,6 +465,110 @@ fun UnifiedRegistrationForm(
                 modifier = Modifier.fillMaxWidth()
             )
 
+            // 📍 منتقي وتحديد الموقع الجغرافي التفاعلي (GPS Picker)
+            Card(
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = themeColors.background),
+                border = BorderStroke(1.dp, if (locationDetected) Color(0xFF10B981) else themeColors.accent.copy(alpha = 0.35f)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(
+                                Icons.Default.LocationOn,
+                                contentDescription = null,
+                                tint = if (locationDetected) Color(0xFF10B981) else themeColors.accent,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Column {
+                                Text(
+                                    "تحديد الموقع الجغرافي (GPS) *",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                                Text(
+                                    if (locationDetected) "تم تثبيت الإحداثيات بنجاح ✅" else "انقر لتحديد موقعك بدقة على الخريطة",
+                                    fontSize = 10.sp,
+                                    color = if (locationDetected) Color(0xFF10B981) else Color.LightGray
+                                )
+                            }
+                        }
+
+                        Button(
+                            onClick = {
+                                val hasFine = androidx.core.content.ContextCompat.checkSelfPermission(
+                                    context,
+                                    android.Manifest.permission.ACCESS_FINE_LOCATION
+                                ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                                val hasCoarse = androidx.core.content.ContextCompat.checkSelfPermission(
+                                    context,
+                                    android.Manifest.permission.ACCESS_COARSE_LOCATION
+                                ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                                if (hasFine || hasCoarse) {
+                                    fetchDeviceLocation()
+                                } else {
+                                    locationPermissionLauncher.launch(
+                                        arrayOf(
+                                            android.Manifest.permission.ACCESS_FINE_LOCATION,
+                                            android.Manifest.permission.ACCESS_COARSE_LOCATION
+                                        )
+                                    )
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (locationDetected) Color(0xFF10B981) else themeColors.accent,
+                                contentColor = Color.Black
+                            ),
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                            enabled = !isLocating
+                        ) {
+                            if (isLocating) {
+                                CircularProgressIndicator(color = Color.Black, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                            } else {
+                                Text(
+                                    if (locationDetected) "تحديث الموقع 🔄" else "تحديد موقعي الآن 📍",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+
+                    if (locationDetected && gpsCoords.isNotBlank()) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color(0xFF10B981).copy(alpha = 0.15f))
+                                .padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text("📍 الإحداثيات:", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF10B981))
+                            Text(gpsCoords, fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Medium)
+                        }
+                    }
+
+                    if (locationErrorText != null) {
+                        Text("⚠️ $locationErrorText", fontSize = 10.5.sp, color = Color(0xFFFBBF24))
+                    }
+                }
+            }
+
             // 1️⃣1️⃣ خيارات إضافية خاصة (توصيل / طوارئ)
             if (normalizedRole == "RESTAURANT") {
                 Row(
@@ -485,7 +624,7 @@ fun UnifiedRegistrationForm(
             if (normalizedRole in listOf("PROVIDER", "TECHNICIAN")) {
                 Card(
                     shape = RoundedCornerShape(10.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A)),
+                    colors = CardDefaults.cardColors(containerColor = themeColors.background),
                     border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.3f)),
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -524,12 +663,16 @@ fun UnifiedRegistrationForm(
                     val yemenPhoneRegex = Regex("^(77|73|71|70|78)\\d{7}$")
                     val cleanPass = password.trim()
                     
-                    if (fullName.isBlank()) {
-                        errorMessage = "يرجى تعبئة الاسم الرباعي"
+                    if (fullName.trim().isBlank()) {
+                        errorMessage = "يرجى تعبئة الاسم الثلاثي كاملاً"
+                        return@Button
+                    }
+                    if (normalizedRole in listOf("STORE", "RESTAURANT", "MEDICAL", "PROPERTY", "JOB", "JOB_POSTER") && entityName.trim().isBlank()) {
+                        errorMessage = "يرجى إدخال اسم المنشأة أو المحل"
                         return@Button
                     }
                     if (cleanPhone.length != 9 || !yemenPhoneRegex.matches(cleanPhone)) {
-                        errorMessage = "رقم الهاتف غير صحيح. يجب أن يتكون من 9 أرقام ويبدأ بـ (77, 73, 71, 70)"
+                        errorMessage = "رقم الهاتف غير صحيح. يجب أن يتكون من 9 أرقام ويبدأ بـ (77, 78, 73, 71, 70)"
                         return@Button
                     }
                     if (cleanPass.length < 7 || !cleanPass.any { it.isLetter() } || !cleanPass.any { it.isDigit() }) {
@@ -540,6 +683,24 @@ fun UnifiedRegistrationForm(
                         errorMessage = "كلمتا المرور غير متطابقتين"
                         return@Button
                     }
+                    if (city.isBlank()) {
+                        errorMessage = "يرجى تحديد المدينة أو المحافظة"
+                        return@Button
+                    }
+                    if (address.trim().isBlank()) {
+                        errorMessage = "يرجى إدخال الحي والعنوان التفصيلي"
+                        return@Button
+                    }
+                    if (normalizedRole in listOf("PROVIDER", "TECHNICIAN", "JOB_SEEKER") && specialization.trim().isBlank()) {
+                        errorMessage = "يرجى إدخال المهنة أو التخصص المطلوب"
+                        return@Button
+                    }
+                    if (!agreedToTerms) {
+                        errorMessage = "يرجى قراءة الشروط والأحكام والموافقة عليها للمتابعة"
+                        return@Button
+                    }
+
+                    val resolvedGps = if (gpsCoords.isNotBlank()) gpsCoords else "$latitude,$longitude"
 
                     isSubmitting = true
                     errorMessage = null
@@ -552,11 +713,15 @@ fun UnifiedRegistrationForm(
                         "password" to cleanPass,
                         "city" to city.trim(),
                         "address" to address.trim(),
+                        "gpsCoords" to resolvedGps,
+                        "latitude" to latitude.toString(),
+                        "longitude" to longitude.toString(),
                         "craftType" to specialization.trim(),
                         "specialization" to specialization.trim(),
                         "experienceYears" to experienceYears.trim(),
                         "workingHours" to workingHours.trim(),
                         "description" to notesOrDescription.trim(),
+                        "cvUrlOrQualification" to cvUrlOrQualification.trim(),
                         "hasDelivery" to extraOption1.toString(),
                         "hasEmergency" to extraOption1.toString(),
                         "imageUri" to imageUri,
@@ -564,9 +729,8 @@ fun UnifiedRegistrationForm(
                     )
 
                     onRegistrationSuccess(resultData)
-                    // لا نضع isSubmitting = false مباشرة لتجنب الوميض، الشاشة ستختفي بسبب تغيير الحالة في الأب
                 },
-                enabled = isFormValid && !isSubmitting,
+                enabled = !isSubmitting,
                 shape = RoundedCornerShape(10.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent, contentColor = Color.Black),
                 modifier = Modifier.fillMaxWidth().height(48.dp)

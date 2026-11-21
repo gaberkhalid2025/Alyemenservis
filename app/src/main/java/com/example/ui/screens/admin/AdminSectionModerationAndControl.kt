@@ -215,8 +215,8 @@ internal fun LazyListScope.adminModerationAndControlSection(
 
                         val mapProviders = listOf(
                             "MAPLIBRE" to "الخريطة المدمجة 🗺️",
-                            "GOOGLE" to "خرائط جوجل 📍",
-                            "MAPBOX" to "خريطة شوارع اليمن 🌐"
+                            "MAPBOX" to "خريطة شوارع اليمن 🌐",
+                            "SATELLITE" to "الأقمار الصناعية 🛰️"
                         )
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -244,6 +244,26 @@ internal fun LazyListScope.adminModerationAndControlSection(
                                     )
                                 }
                             }
+                        }
+
+                        // ⚡ وضع توفير بيانات الإنترنت للخرائط
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("وضع التوفير الفائق لبيانات الإنترنت ⚡", fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                Text("تخفيض استهلاك البيانات بنسبة 60%+ عبر منع تحميل البلاطات الإضافية", fontSize = 10.sp, color = Color(0xFF10B981))
+                            }
+                            Switch(
+                                checked = com.example.utils.MapPowerDataPrefs.isEcoMode(context),
+                                onCheckedChange = { eco ->
+                                    com.example.utils.MapPowerDataPrefs.setEcoMode(context, eco)
+                                    Toast.makeText(context, if (eco) "تم تفعيل توفير البيانات الفائق ⚡ (توفير 60%+)" else "تم إيقاف وضع توفير البيانات", Toast.LENGTH_SHORT).show()
+                                },
+                                colors = SwitchDefaults.colors(checkedThumbColor = Color(0xFF10B981))
+                            )
                         }
 
                         Row(

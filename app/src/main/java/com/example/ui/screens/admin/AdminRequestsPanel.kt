@@ -154,6 +154,43 @@ fun AdminRequestsPanel(
                                     Text(text = "الاسم: ${req.name}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
                                     Text(text = "المهنة / الخدمة: ${req.customCategoryName.ifBlank { req.categoryId }}", fontSize = 11.5.sp, color = themeColors.accent, fontWeight = FontWeight.Bold)
                                     Text(text = "الهاتف: ${req.phone} | المنطقة: ${req.area} - ${req.localNeighborhood}", fontSize = 11.sp, color = themeColors.textSecondary)
+                                    if (req.specialization.isNotBlank()) {
+                                        Text(text = "التخصص: ${req.specialization}", fontSize = 11.sp, color = themeColors.accent)
+                                    }
+                                    if (req.experienceYears.isNotBlank() || req.qualification.isNotBlank()) {
+                                        val expQual = listOfNotNull(
+                                            req.qualification.takeIf { it.isNotBlank() }?.let { "المؤهل: $it" },
+                                            req.experienceYears.takeIf { it.isNotBlank() }?.let { "الخبرة: $it" }
+                                        ).joinToString(" | ")
+                                        Text(text = "🎓 $expQual", fontSize = 11.sp, color = Color.White)
+                                    }
+                                    if (req.description.isNotBlank()) {
+                                        Text(text = "📝 نبذة: ${req.description}", fontSize = 10.5.sp, color = Color.LightGray)
+                                    }
+                                    if (req.gpsCoords.isNotBlank() || req.latitude != 0.0) {
+                                        val coordsStr = if (req.gpsCoords.isNotBlank()) req.gpsCoords else "${req.latitude}, ${req.longitude}"
+                                        Text(text = "📍 إحداثيات الموقع: $coordsStr", fontSize = 10.5.sp, color = Color(0xFF10B981), fontWeight = FontWeight.Medium)
+                                    }
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 4.dp)) {
+                                        if (req.selfiePhotoBase64.isNotBlank()) {
+                                            Surface(
+                                                shape = RoundedCornerShape(6.dp),
+                                                color = Color.Black.copy(alpha = 0.3f),
+                                                border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.4f))
+                                            ) {
+                                                Text("📷 تم إرفاق الصورة / الشعار", fontSize = 10.sp, color = Color.White, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                                            }
+                                        }
+                                        if (req.idPhotoBase64.isNotBlank()) {
+                                            Surface(
+                                                shape = RoundedCornerShape(6.dp),
+                                                color = Color.Black.copy(alpha = 0.3f),
+                                                border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.4f))
+                                            ) {
+                                                Text("📄 تم إرفاق بطاقة الهوية / الترخيص", fontSize = 10.sp, color = Color(0xFF10B981), modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                                            }
+                                        }
+                                    }
                                     if (req.password.isNotBlank() || req.passwordHash.isNotBlank()) {
                                         Text(text = "🔒 كلمة المرور: محمية ومشفرة", fontSize = 11.sp, color = Color(0xFF10B981), fontWeight = FontWeight.Bold)
                                     }

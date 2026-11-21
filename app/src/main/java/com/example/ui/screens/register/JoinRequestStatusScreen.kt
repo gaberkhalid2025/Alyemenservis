@@ -239,6 +239,29 @@ fun JoinRequestStatusScreen(
                         themeColors = themeColors
                     )
                 }
+                is JoinStatus.PendingJobSeeker -> {
+                    val pending = currentStatus.provider
+                    val name = pending.name.ifBlank { "متقدم للوظيفة" }
+                    val phone = pending.phone.ifBlank { "غير محدد" }
+                    val area = pending.area.ifBlank { "صنعاء" }
+                    val neighborhood = pending.localNeighborhood
+                    val customCat = pending.customCategoryName.ifBlank { pending.specialization }.ifBlank { "باحث عن عمل" }
+                    val qual = pending.qualification.ifBlank { "مؤهل مهني" }
+                    val exp = pending.experienceYears.takeIf { it.isNotBlank() } ?: "غير محدد"
+                    PendingApprovalView(
+                        title = "👨‍💼 طلب التقديم للوظائف قيد المراجعة والاعتماد",
+                        message = "تم استلام ملفك المهني بنجاح وجاري مراجعة مؤهلاتك من قِبل إدارة المنصة لربطك بالفرص المناسبة.",
+                        detailsList = listOf(
+                            "اسم المتقدم" to name,
+                            "المجال والتخصص" to customCat,
+                            "المؤهل وسنوات الخبرة" to "$qual ($exp)",
+                            "رقم التواصل" to phone,
+                            "المدينة والحي" to "$area - $neighborhood"
+                        ),
+                        onCancelRequest = { viewModel.cancelOrResetJoinRequest(context) },
+                        themeColors = themeColors
+                    )
+                }
                 is JoinStatus.PendingClient -> {
                     val userMap = currentStatus.userMap
                     val name = (userMap["name"] as? String)?.ifBlank { "عميل جديد" } ?: "عميل جديد"

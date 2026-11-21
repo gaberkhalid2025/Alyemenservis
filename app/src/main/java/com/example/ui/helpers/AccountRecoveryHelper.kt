@@ -40,10 +40,10 @@ class AccountRecoveryHelper(
         }
     }
 
-    fun searchAccountForRestore(cleanPhone: String, onResult: (RestoreAccountMatch?) -> Unit) {
+    fun searchAllAccountsForRestore(cleanPhone: String, onResult: (List<RestoreAccountMatch>) -> Unit) {
         val normalizedPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(cleanPhone).filter { it.isDigit() }
         if (normalizedPhone.isBlank() || normalizedPhone.length < 7) {
-            onResult(null)
+            onResult(emptyList())
             return
         }
         val phoneVariants = listOf(
@@ -57,7 +57,7 @@ class AccountRecoveryHelper(
 
         recoveryScope.launch {
             try {
-                val match = supervisorScope {
+                val matches = supervisorScope {
                     val providerDef = async(Dispatchers.IO) {
                         runCatching {
                             for (ph in phoneVariants) {
@@ -197,13 +197,19 @@ class AccountRecoveryHelper(
                         }.getOrNull()
                     }
 
-                    val results = awaitAll(providerDef, storeDef, propDef, jobDef, userDef, joinReqDef)
-                    results.firstOrNull { it != null }
+                    val results = awaitAll(providerDef, storeDef, propDef, jobDef, userDef, joinReqDef).filterNotNull()
+                    results.distinctBy { "${it.type}_${it.provider?.id}_${it.store?.id}_${it.property?.id}_${it.name}" }
                 }
-                onResult(match)
+                onResult(matches)
             } catch (e: Exception) {
-                onResult(null)
+                onResult(emptyList())
             }
+        }
+    }
+
+    fun searchAccountForRestore(cleanPhone: String, onResult: (RestoreAccountMatch?) -> Unit) {
+        searchAllAccountsForRestore(cleanPhone) { list ->
+            onResult(list.firstOrNull())
         }
     }
 

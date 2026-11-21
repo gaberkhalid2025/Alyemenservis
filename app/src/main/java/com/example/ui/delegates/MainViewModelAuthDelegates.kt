@@ -339,6 +339,9 @@ fun MainViewModel.resetRegistrationState() = authViewModel.resetRegistrationStat
 fun MainViewModel.searchAccountForRestore(cleanPhone: String, onResult: (MainViewModel.RestoreAccountMatch?) -> Unit) {
     accountRecoveryHelper.searchAccountForRestore(cleanPhone, onResult)
 }
+fun MainViewModel.searchAllAccountsForRestore(cleanPhone: String, onResult: (List<MainViewModel.RestoreAccountMatch>) -> Unit) {
+    accountRecoveryHelper.searchAllAccountsForRestore(cleanPhone, onResult)
+}
 
 fun MainViewModel.verifyRestorePassword(cleanPhone: String, accountType: String, passwordInput: String, onResult: (Boolean) -> Unit) {
     accountRecoveryHelper.verifyRestorePassword(cleanPhone, accountType, passwordInput, onResult)

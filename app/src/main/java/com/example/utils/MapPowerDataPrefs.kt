@@ -17,7 +17,7 @@ object MapPowerDataPrefs {
     private const val PREFS = "map_power_data_prefs"
     private const val KEY_ECO_MODE = "eco_mode_enabled"
 
-    private val _ecoMode = MutableStateFlow(false)
+    private val _ecoMode = MutableStateFlow(true)
     val ecoMode: StateFlow<Boolean> = _ecoMode.asStateFlow()
 
     @Volatile
@@ -28,7 +28,7 @@ object MapPowerDataPrefs {
         synchronized(this) {
             if (loaded) return
             val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            _ecoMode.value = prefs.getBoolean(KEY_ECO_MODE, false)
+            _ecoMode.value = prefs.getBoolean(KEY_ECO_MODE, true)
             loaded = true
         }
     }

@@ -170,6 +170,26 @@ class RegistrationHelper(
             val requestDocId = cleanPhone
             val currentAuthUid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid ?: ""
             val securedPasswordHash = if (password.isNotBlank()) com.example.utils.PasswordHasher.hash(password.trim()) else ""
+            val coordParts = gpsCoords.split(",")
+            val parsedLat = coordParts.getOrNull(0)?.trim()?.toDoubleOrNull() ?: 15.3694
+            val parsedLng = coordParts.getOrNull(1)?.trim()?.toDoubleOrNull() ?: 44.1910
+
+            val parsedDesc = runCatching {
+                if (productAttachmentsJson.contains("\"description\":")) {
+                    Regex("\"description\":\"(.*?)\"").find(productAttachmentsJson)?.groupValues?.getOrNull(1) ?: ""
+                } else ""
+            }.getOrDefault("")
+            val parsedQual = runCatching {
+                if (productAttachmentsJson.contains("\"qualification\":")) {
+                    Regex("\"qualification\":\"(.*?)\"").find(productAttachmentsJson)?.groupValues?.getOrNull(1) ?: ""
+                } else ""
+            }.getOrDefault("")
+            val parsedExp = runCatching {
+                if (productAttachmentsJson.contains("\"experienceYears\":")) {
+                    Regex("\"experienceYears\":\"(.*?)\"").find(productAttachmentsJson)?.groupValues?.getOrNull(1) ?: ""
+                } else ""
+            }.getOrDefault("")
+
             val newRequest = PendingProviderEntity(
                 id = requestDocId,
                 name = name,
@@ -185,11 +205,14 @@ class RegistrationHelper(
                 passwordHash = securedPasswordHash,
                 productAttachmentsJson = productAttachmentsJson,
                 profession = requestProfession,
-                providerType = requestProfession
+                providerType = requestProfession,
+                gpsCoords = gpsCoords,
+                latitude = parsedLat,
+                longitude = parsedLng,
+                experienceYears = parsedExp,
+                qualification = parsedQual,
+                description = parsedDesc
             )
-            val coordParts = gpsCoords.split(",")
-            val parsedLat = coordParts.getOrNull(0)?.trim()?.toDoubleOrNull() ?: 15.3694
-            val parsedLng = coordParts.getOrNull(1)?.trim()?.toDoubleOrNull() ?: 44.1910
 
             // Push to Cloud
             val pendingDataMap = mapOf(
@@ -212,7 +235,10 @@ class RegistrationHelper(
                 "passwordHash" to securedPasswordHash,
                 "productAttachmentsJson" to productAttachmentsJson,
                 "profession" to requestProfession,
-                "providerType" to requestProfession
+                "providerType" to requestProfession,
+                "experienceYears" to parsedExp,
+                "qualification" to parsedQual,
+                "description" to parsedDesc
             )
             db.collection("pending_providers").document(requestDocId).set(pendingDataMap)
             val joinRequestMap = mapOf(
@@ -242,6 +268,9 @@ class RegistrationHelper(
                 "profileImage" to finalSelfie,
                 "idCardImage" to finalIdCard,
                 "workImages" to finalWorkPhotos,
+                "experienceYears" to parsedExp,
+                "qualification" to parsedQual,
+                "description" to parsedDesc,
                 "submittedAt" to System.currentTimeMillis(),
                 "createdAt" to System.currentTimeMillis(),
                 "updatedAt" to System.currentTimeMillis()

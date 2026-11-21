@@ -30,9 +30,21 @@ fun JobSeekerForm(
             val password = (data["password"] as? String) ?: ""
             val city = (data["city"] as? String) ?: "صنعاء"
             val address = (data["address"] as? String) ?: ""
-            val craftType = (data["craftType"] as? String) ?: "باحث عن عمل"
+            val craftType = (data["craftType"] as? String)?.takeIf { it.isNotBlank() } ?: "باحث عن عمل"
+            val resolvedGps = (data["gpsCoords"] as? String)?.takeIf { it.isNotBlank() } ?: "15.36940,44.19100"
+            val qualification = (data["cvUrlOrQualification"] as? String) ?: ""
+            val experience = (data["experienceYears"] as? String) ?: ""
+            val notes = (data["description"] as? String) ?: ""
 
             val cleanPhone = phone.trim().replace(" ", "").replace("+", "")
+
+            val metadataJson = buildString {
+                append("{")
+                append("\"qualification\":\"").append(qualification.replace("\"", "\\\"")).append("\",")
+                append("\"experienceYears\":\"").append(experience.replace("\"", "\\\"")).append("\",")
+                append("\"description\":\"").append(notes.replace("\"", "\\\"")).append("\"")
+                append("}")
+            }
 
             viewModel.submitJoinForm(
                 context = context,
@@ -43,9 +55,10 @@ fun JobSeekerForm(
                 neighborhood = address,
                 photoPath = (data["imageUri"] as? String) ?: "",
                 idCardPath = (data["idCardUri"] as? String) ?: "",
-                gpsCoords = "",
+                gpsCoords = resolvedGps,
                 customCategoryName = craftType,
-                password = password
+                password = password,
+                productAttachmentsJson = metadataJson
             )
 
             viewModel.setJoinRequestPhone(context, cleanPhone)

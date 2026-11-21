@@ -215,30 +215,30 @@
         }
         window.setNightMode = setNightMode;
 
-        var ecoModeEnabled = false;
+        var ecoModeEnabled = true;
         var ATTR_OSM = '© <a href="https://www.openstreetmap.org/copyright">مساهمو OpenStreetMap</a>';
         var providers = {
             'osm': L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                maxZoom: 24, maxNativeZoom: 19, updateWhenIdle: true, updateWhenZooming: false, keepBuffer: 1, attribution: ATTR_OSM
+                maxZoom: 24, maxNativeZoom: 18, updateWhenIdle: true, updateWhenZooming: false, keepBuffer: 0, attribution: ATTR_OSM
             }),
             'hot': L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
-                maxZoom: 24, maxNativeZoom: 19, subdomains: ['a', 'b', 'c'], updateWhenIdle: true, updateWhenZooming: false, keepBuffer: 1,
+                maxZoom: 24, maxNativeZoom: 18, subdomains: ['a', 'b', 'c'], updateWhenIdle: true, updateWhenZooming: false, keepBuffer: 0,
                 attribution: ATTR_OSM + ' — نمط <a href="https://www.hotosm.org/">HOT</a>'
             }),
             'topo': L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
-                maxZoom: 24, maxNativeZoom: 17, subdomains: ['a', 'b', 'c'], updateWhenIdle: true, updateWhenZooming: false, keepBuffer: 1,
+                maxZoom: 24, maxNativeZoom: 17, subdomains: ['a', 'b', 'c'], updateWhenIdle: true, updateWhenZooming: false, keepBuffer: 0,
                 attribution: ATTR_OSM + ' — SRTM | نمط © <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA)'
             }),
             'vela': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
-                maxZoom: 24, maxNativeZoom: 19, updateWhenIdle: true, updateWhenZooming: false, keepBuffer: 1,
+                maxZoom: 24, maxNativeZoom: 18, updateWhenIdle: true, updateWhenZooming: false, keepBuffer: 0,
                 attribution: 'خرائط VELA — ' + ATTR_OSM + ' • © Esri Street'
             }),
             'satellite': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-                maxZoom: 24, maxNativeZoom: 19, updateWhenIdle: true, updateWhenZooming: false, keepBuffer: 1,
+                maxZoom: 24, maxNativeZoom: 18, updateWhenIdle: true, updateWhenZooming: false, keepBuffer: 0,
                 attribution: 'صور © <a href="https://www.esri.com">Esri</a> — Maxar, Earthstar Geographics'
             }),
             'satellite_clarity': L.tileLayer('https://clarity.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-                maxZoom: 24, maxNativeZoom: 19, updateWhenIdle: true, updateWhenZooming: false, keepBuffer: 1,
+                maxZoom: 24, maxNativeZoom: 18, updateWhenIdle: true, updateWhenZooming: false, keepBuffer: 0,
                 attribution: 'صور Clarity © <a href="https://www.esri.com">Esri</a> — High-Res Clarity'
             })
         };

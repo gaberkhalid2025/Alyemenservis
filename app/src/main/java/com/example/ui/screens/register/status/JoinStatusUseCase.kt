@@ -21,6 +21,7 @@ sealed class JoinStatus {
     data class PendingProperty(val property: PropertyEntity) : JoinStatus()
     data class PendingJob(val job: JobEntity) : JoinStatus()
     data class PendingTechnician(val provider: PendingProviderEntity) : JoinStatus()
+    data class PendingJobSeeker(val provider: PendingProviderEntity) : JoinStatus()
     data class PendingClient(val userMap: Map<String, Any>) : JoinStatus()
     data class PendingGeneric(val phone: String) : JoinStatus()
 }
@@ -285,9 +286,13 @@ class JoinStatusUseCase {
                     custom.contains("متجر") || custom.contains("محل") || custom.contains("معرض") || custom.contains("سوق") ||
                     pName.contains("متجر") || pName.contains("محل")
 
+            val isJobSeeker = cat == "JOB_SEEKER" || cat.startsWith("JOB_SEEKER") || prof == "JOB_SEEKER" ||
+                    custom.contains("باحث عن عمل") || pName.contains("باحث عن عمل")
+
             val isClient = cat == "CLIENT" || cat.startsWith("CLIENT_") || prof == "CLIENT" || custom.contains("عميل")
 
             return when {
+                isJobSeeker -> JoinStatus.PendingJobSeeker(matchingPending)
                 isClient -> {
                     val userMap = mapOf(
                         "name" to matchingPending.name,

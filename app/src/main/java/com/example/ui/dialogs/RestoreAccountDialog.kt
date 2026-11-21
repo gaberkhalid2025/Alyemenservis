@@ -2,6 +2,8 @@ package com.example.ui.dialogs
 
 import android.widget.Toast
 import com.example.ui.*
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -10,6 +12,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -36,6 +39,7 @@ fun RestoreAccountDialog(
     var isVerifyingPassword by remember { mutableStateOf(false) }
     var isRequestingReset by remember { mutableStateOf(false) }
     var matchResult by remember { mutableStateOf<MainViewModel.RestoreAccountMatch?>(null) }
+    var foundAccounts by remember { mutableStateOf<List<MainViewModel.RestoreAccountMatch>>(emptyList()) }
     var showSuccessState by rememberSaveable { mutableStateOf(false) }
     var successUserName by rememberSaveable { mutableStateOf("") }
     var targetSuccessScreen by rememberSaveable { mutableStateOf(AppScreens.USER_BROWSE) }
@@ -150,13 +154,16 @@ fun RestoreAccountDialog(
                                 val cleanPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(restorePhoneInput).filter { it.isDigit() }
                                 if (cleanPhone.length >= 7) {
                                     isSearchingAccount = true
-                                    viewModel.searchAccountForRestore(cleanPhone) { match ->
+                                    viewModel.searchAllAccountsForRestore(cleanPhone) { matches ->
                                         isSearchingAccount = false
-                                        if (match != null) {
-                                            matchResult = match
+                                        if (matches.isEmpty()) {
+                                            Toast.makeText(context, "❌ لا يوجد حساب مسجل بهذا الرقم!", Toast.LENGTH_LONG).show()
+                                        } else if (matches.size == 1) {
+                                            matchResult = matches.first()
                                             restoreStep = 2
                                         } else {
-                                            Toast.makeText(context, "❌ لا يوجد حساب مسجل بهذا الرقم!", Toast.LENGTH_LONG).show()
+                                            foundAccounts = matches
+                                            restoreStep = 3
                                         }
                                     }
                                 } else {
@@ -172,6 +179,57 @@ fun RestoreAccountDialog(
                         Button(onClick = onDismiss, colors = ButtonDefaults.buttonColors(containerColor = Color.Gray), modifier = Modifier.weight(1f)) {
                             Text("إلغاء", color = Color.White, fontSize = 11.sp)
                         }
+                    }
+                } else if (restoreStep == 3) {
+                    Text(
+                        "📌 تم العثور على (${foundAccounts.size}) حسابات مسجلة بهذا الرقم. اختر الحساب المطلوب:",
+                        color = Color.White,
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        foundAccounts.forEach { acc ->
+                            val (icon, typeLabel) = when (acc.type.uppercase()) {
+                                "PROVIDER", "TECHNICIAN" -> "🔧" to "حساب فني / مهني"
+                                "STORE" -> "🏪" to "حساب متجر / محل"
+                                "RESTAURANT" -> "🍔" to "حساب مطعم / كافيه"
+                                "MEDICAL" -> "🏥" to "حساب مركز طبي / عيادة"
+                                "PROPERTY" -> "🏠" to "حساب مكتب عقاري"
+                                "JOB" -> "💼" to "حساب معلن وظائف"
+                                else -> "👤" to "حساب مواطن / عميل"
+                            }
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = themeColors.accent.copy(alpha = 0.15f),
+                                border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.4f)),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        matchResult = acc
+                                        restoreStep = 2
+                                    }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(12.dp).fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Text(icon, fontSize = 22.sp)
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(typeLabel, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                                        Text(acc.name, fontSize = 11.sp, color = Color.White)
+                                    }
+                                    Text("اختيار ➡️", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                                }
+                            }
+                        }
+                    }
+                    Button(
+                        onClick = { restoreStep = 1 },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.Gray),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("رجوع ⬅️", color = Color.White, fontSize = 11.sp)
                     }
                 } else {
                     val match = matchResult

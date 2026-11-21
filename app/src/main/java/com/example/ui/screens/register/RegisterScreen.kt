@@ -104,6 +104,7 @@ fun RegisterScreen(
         val address = (data["address"] as? String) ?: ""
         val photoPath = (data["imageUri"] as? String) ?: ""
         val idCardPath = (data["idCardUri"] as? String) ?: ""
+        val gpsCoords = (data["gpsCoords"] as? String)?.takeIf { it.isNotBlank() } ?: "15.36940,44.19100"
 
         when (type) {
             RegistrationType.PROVIDER -> {
@@ -118,7 +119,7 @@ fun RegisterScreen(
                     neighborhood = address,
                     photoPath = photoPath,
                     idCardPath = idCardPath,
-                    gpsCoords = "",
+                    gpsCoords = gpsCoords,
                     customCategoryName = craftType,
                     password = password
                 )
@@ -135,7 +136,7 @@ fun RegisterScreen(
                     neighborhood = address,
                     photoPath = photoPath,
                     idCardPath = idCardPath,
-                    gpsCoords = "",
+                    gpsCoords = gpsCoords,
                     customCategoryName = category,
                     password = password
                 )
@@ -152,7 +153,7 @@ fun RegisterScreen(
                     neighborhood = address,
                     photoPath = photoPath,
                     idCardPath = idCardPath,
-                    gpsCoords = "",
+                    gpsCoords = gpsCoords,
                     customCategoryName = cuisine,
                     password = password
                 )
@@ -169,7 +170,7 @@ fun RegisterScreen(
                     neighborhood = address,
                     photoPath = photoPath,
                     idCardPath = idCardPath,
-                    gpsCoords = "",
+                    gpsCoords = gpsCoords,
                     customCategoryName = specialty,
                     password = password
                 )
@@ -186,7 +187,7 @@ fun RegisterScreen(
                     neighborhood = address,
                     photoPath = photoPath,
                     idCardPath = idCardPath,
-                    gpsCoords = "",
+                    gpsCoords = gpsCoords,
                     customCategoryName = propType,
                     password = password
                 )
@@ -203,7 +204,7 @@ fun RegisterScreen(
                     neighborhood = address,
                     photoPath = photoPath,
                     idCardPath = idCardPath,
-                    gpsCoords = "",
+                    gpsCoords = gpsCoords,
                     customCategoryName = title,
                     password = password
                 )
@@ -220,7 +221,7 @@ fun RegisterScreen(
                     neighborhood = address,
                     photoPath = photoPath,
                     idCardPath = idCardPath,
-                    gpsCoords = "",
+                    gpsCoords = gpsCoords,
                     customCategoryName = cat,
                     password = password
                 )
@@ -236,7 +237,7 @@ fun RegisterScreen(
                     neighborhood = address,
                     photoPath = photoPath,
                     idCardPath = idCardPath,
-                    gpsCoords = "",
+                    gpsCoords = gpsCoords,
                     customCategoryName = "حساب عميل",
                     password = password
                 )
