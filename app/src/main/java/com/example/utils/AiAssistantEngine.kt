@@ -22,21 +22,27 @@ data class AiResponse(
     val referralAction: String? = null, // "CREATE_SERVICE_ORDER", "CHECK_BOOKINGS", "REQUEST_TECHNICIAN", "EXPLORE_STORES", "EXPLORE_MAP"
     val deepLinkRoute: String? = null,
     val isOfflineMode: Boolean = true,
-    val estimatedCost: String? = null
+    val estimatedCost: String? = null,
+    val safetyLevel: String = "LOW",
+    val safetyWarning: String? = null,
+    val immediateActions: List<String> = emptyList()
 )
 
 @Keep
 data class TroubleshootingGuide(
-    val id: String,
-    val category: String,
-    val keywords: List<String>,
-    val title: String,
-    val diySteps: List<String>,
+    val id: String = "",
+    val category: String = "",
+    val keywords: List<String> = emptyList(),
+    val title: String = "",
+    val diySteps: List<String> = emptyList(),
     val preventiveTips: String = "",
-    val referralAction: String,
-    val suggestedCategory: String,
-    val chipLabel: String,
-    val estimatedCost: String = ""
+    val referralAction: String = "REQUEST_TECHNICIAN",
+    val suggestedCategory: String = "",
+    val chipLabel: String = "طلب فني متخصص",
+    val estimatedCost: String = "",
+    val safetyLevel: String = "LOW",
+    val safetyWarning: String? = null,
+    val immediateActions: List<String> = emptyList()
 )
 
 /**
@@ -91,6 +97,12 @@ class AiAssistantEngine(private val context: Context) {
                     val stepsList = mutableListOf<String>()
                     for (s in 0 until stepsArr.length()) stepsList.add(stepsArr.getString(s))
 
+                    val immArr = obj.optJSONArray("immediate_actions")
+                    val immList = mutableListOf<String>()
+                    if (immArr != null) {
+                        for (a in 0 until immArr.length()) immList.add(immArr.getString(a))
+                    }
+
                     guidesList.add(
                         TroubleshootingGuide(
                             id = obj.getString("id"),
@@ -102,7 +114,10 @@ class AiAssistantEngine(private val context: Context) {
                             referralAction = obj.optString("referral_action", "REQUEST_TECHNICIAN"),
                             suggestedCategory = obj.optString("suggested_category", ""),
                             chipLabel = obj.optString("chip_label", "طلب فني متخصص"),
-                            estimatedCost = obj.optString("estimated_cost", "")
+                            estimatedCost = obj.optString("estimated_cost", ""),
+                            safetyLevel = obj.optString("safety_level", "LOW"),
+                            safetyWarning = obj.optString("safety_warning", "").takeIf { it.isNotBlank() },
+                            immediateActions = immList
                         )
                     )
                 }
@@ -169,17 +184,22 @@ class AiAssistantEngine(private val context: Context) {
                 id = "electricity_solar",
                 category = "كهرباء وطاقة شمسية",
                 keywords = listOf("كهرباء", "طاقة شمسية", "الواح", "انفرتر", "انفيرتر", "بطارية", "القاطع نزل", "التماس", "كنداكتر", "كهربائي", "مافيش كهرباء", "شورت"),
-                title = "⚡ تشخيص منظومة الطاقة الشمسية والكهرباء",
+                title = "⚡ تحذير سلامة: منظومة الطاقة الشمسية والكهرباء",
                 diySteps = listOf(
-                    "افحص شاشة الانفرتر وشاهد كود الخطأ (Fault Code) الظاهر.",
-                    "تأكد من مستوى فولتية البطاريات وعدم وجود أسلاك مفكوكة أو متأكسدة.",
-                    "في حال نزول القاطع الرئيسي، افصل الأجهزة الثقيلة ثم ارفع القاطع بالتدريج لمعرفة الجهاز المسبب للالتماس.",
-                    "تحذير: لا تلمس الأسلاك المكشوفة وتأكد من ارتداء حذاء عازل للأمان."
+                    "لا تفتح غطاء الانفرتر أو لوحة التوزيع بنفسك لوجود جهد تيار مستمر ومتردد عالٍ.",
+                    "اطلب فني كهرباء وطاقة شمسية معتمد للفحص الآمن بأجهزة العزل والقياس."
                 ),
                 referralAction = "CREATE_SERVICE_ORDER",
                 suggestedCategory = "كهرباء",
                 chipLabel = "⚡ طلب فني طاقة وكهرباء",
-                estimatedCost = "4,000 - 8,000 ريال يمني"
+                estimatedCost = "4,000 - 8,000 ريال يمني",
+                safetyLevel = "HIGH",
+                safetyWarning = "تحذير: أعطال الكهرباء والإنفرتر والبطاريات تحمل خطر الصعق الكهربائي أو اشتعال الشرر. لا تفك الأسلاك أو المكثفات بيدك.",
+                immediateActions = listOf(
+                    "افصل القاطع الرئيسي فوراً إذا سمعت طقطقة أو شممت رائحة احتراق.",
+                    "أبعد الأطفال والماء عن الطبلون والبطاريات والأسلاك المكشوفة.",
+                    "أطفئ الأجهزة الثقيلة ثم تواصل مع فني كهرباء معتمد."
+                )
             )
         )
 
@@ -331,17 +351,26 @@ class AiAssistantEngine(private val context: Context) {
 
         if (bestGuideMatch != null && maxScore >= 2) {
             val costText = if (bestGuideMatch.estimatedCost.isNotBlank()) " | التكلفة التقديرية: ${bestGuideMatch.estimatedCost}" else ""
+            val isHighRisk = bestGuideMatch.safetyLevel.equals("HIGH", ignoreCase = true)
             val resp = AiResponse(
                 title = bestGuideMatch.title,
-                message = "إليك خطوات فحص وصيانة سريعة ومجربة (DIY)$costText:",
-                diySteps = bestGuideMatch.diySteps,
+                message = if (isHighRisk) {
+                    bestGuideMatch.safetyWarning
+                        ?: "⚠️ هذا العطل ينطوي على خطورة عالية. اتبع خطوات الأمان الفورية واطلب فنياً مختصاً بدلاً من الصيانة اليدوية."
+                } else {
+                    "إليك خطوات فحص وصيانة سريعة ومجربة (DIY)$costText:"
+                },
+                diySteps = if (isHighRisk) emptyList() else bestGuideMatch.diySteps,
                 preventiveTips = bestGuideMatch.preventiveTips.ifEmpty { null },
                 chipLabel = bestGuideMatch.chipLabel,
                 suggestedCategory = bestGuideMatch.suggestedCategory,
                 referralAction = bestGuideMatch.referralAction,
                 deepLinkRoute = "urgent_request/${bestGuideMatch.suggestedCategory}",
                 isOfflineMode = true,
-                estimatedCost = bestGuideMatch.estimatedCost
+                estimatedCost = bestGuideMatch.estimatedCost,
+                safetyLevel = bestGuideMatch.safetyLevel,
+                safetyWarning = bestGuideMatch.safetyWarning,
+                immediateActions = bestGuideMatch.immediateActions
             )
             queryCache[queryLower] = resp
             onResult(resp)

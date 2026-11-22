@@ -47,6 +47,10 @@ service firebase.storage {
       return request.resource.size <= 5 * 1024 * 1024; // 5MB كحد أقصى للصوتيات والمستندات
     }
 
+    function isValidChatMediaSize() {
+      return request.resource.size <= 15 * 1024 * 1024; // 15MB للوسائط والفيديو في الشات
+    }
+
     // التحقق من نوع الملف المسموح به
     function isAllowedImageType() {
       return request.resource.contentType.matches('image/(jpeg|jpg|png|webp|gif)');
@@ -54,6 +58,10 @@ service firebase.storage {
 
     function isAllowedAudioType() {
       return request.resource.contentType.matches('audio/(mpeg|mp4|aac|wav|m4a|ogg)');
+    }
+
+    function isAllowedVideoType() {
+      return request.resource.contentType.matches('video/(mp4|3gpp|webm|quicktime)');
     }
 
     function isAllowedDocType() {
@@ -90,18 +98,20 @@ service firebase.storage {
     match /chat/{channelId}/{allPaths=**} {
       allow read: if true;
       allow write: if isAuthenticated() &&
-                      isValidMediaSize() &&
-                      (request.resource.contentType.matches('image/.*') || 
-                       request.resource.contentType.matches('audio/.*') || 
+                      isValidChatMediaSize() &&
+                      (request.resource.contentType.matches('image/.*') ||
+                       request.resource.contentType.matches('audio/.*') ||
+                       isAllowedVideoType() ||
                        request.resource.contentType.matches('application/.*'));
     }
 
     match /chats/{channelId}/{allPaths=**} {
       allow read: if true;
       allow write: if isAuthenticated() &&
-                      isValidMediaSize() &&
-                      (request.resource.contentType.matches('image/.*') || 
-                       request.resource.contentType.matches('audio/.*') || 
+                      isValidChatMediaSize() &&
+                      (request.resource.contentType.matches('image/.*') ||
+                       request.resource.contentType.matches('audio/.*') ||
+                       isAllowedVideoType() ||
                        request.resource.contentType.matches('application/.*'));
     }
 
@@ -132,7 +142,14 @@ service firebase.storage {
                       isAllowedImageType();
     }
 
-    // 6. مرفقات وبلاغات النظام العامة (/reports/{reportId}/{fileName})
+    // 6. مرفقات وبلاغات النظام العامة والطلبات العاجلة (/reports/{reportId}/{fileName} و /urgent_requests/{allPaths=**})
+    match /urgent_requests/{allPaths=**} {
+      allow read: if true;
+      allow write: if isAuthenticated() &&
+                      isValidImageSize() &&
+                      isAllowedImageType();
+    }
+
     match /reports/{reportId}/{fileName} {
       allow read: if isAuthenticated();
       allow write: if isAuthenticated() &&

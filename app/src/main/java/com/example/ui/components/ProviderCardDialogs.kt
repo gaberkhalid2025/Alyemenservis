@@ -659,7 +659,7 @@ private fun AddReviewForm(
                     }
                     isSending = true
                     val r = RatingEntity(
-                        id = "rev_" + System.currentTimeMillis(),
+                        id = com.example.utils.EntityIdGenerator.generateReviewId(),
                         targetId = providerId,
                         targetType = "PROVIDER",
                         rating = ratingStars.toFloat(),
@@ -801,7 +801,7 @@ fun ProviderReviewsListDialog(
                         }
                         isSubmitting = true
                         val newRating = RatingEntity(
-                            id = "rev_" + System.currentTimeMillis(),
+                            id = com.example.utils.EntityIdGenerator.generateReviewId(),
                             targetId = provider.id,
                             targetType = "PROVIDER",
                             rating = selectedRating.toFloat(),

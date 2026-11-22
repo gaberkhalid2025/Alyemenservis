@@ -12,6 +12,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -36,33 +37,38 @@ fun AdminPermissionsMatrixListSection(
     selectedCategoryFilter: String?,
     modifier: Modifier = Modifier
 ) {
-    val filteredCategories = PermissionCategory.values().filter { cat ->
-        selectedCategoryFilter == null || selectedCategoryFilter == cat.name
+    val categorizedPerms = remember(selectedCategoryFilter, selectedLevelFilter, searchQuery) {
+        val cats = PermissionCategory.values().filter { cat ->
+            selectedCategoryFilter == null || selectedCategoryFilter == cat.name
+        }
+        val q = searchQuery.trim().lowercase()
+        cats.mapNotNull { category ->
+            var categoryPerms = AdminPermissionsRegistry.getByCategory(category)
+            if (selectedLevelFilter != null) {
+                categoryPerms = categoryPerms.filter { it.level.name == selectedLevelFilter }
+            }
+            if (q.isNotBlank()) {
+                categoryPerms = categoryPerms.filter {
+                    it.name.lowercase().contains(q) ||
+                        it.key.lowercase().contains(q) ||
+                        it.description.lowercase().contains(q) ||
+                        it.targetGroup.lowercase().contains(q)
+                }
+            }
+            if (categoryPerms.isNotEmpty()) category to categoryPerms else null
+        }
     }
 
-    var totalDisplayedPermsCount = 0
+    val totalDisplayedPermsCount = remember(categorizedPerms) {
+        categorizedPerms.sumOf { it.second.size }
+    }
 
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        filteredCategories.forEach { category ->
-            var categoryPerms = AdminPermissionsRegistry.getByCategory(category)
-            if (selectedLevelFilter != null) {
-                categoryPerms = categoryPerms.filter { it.level.name == selectedLevelFilter }
-            }
-            if (searchQuery.isNotBlank()) {
-                val q = searchQuery.trim().lowercase()
-                categoryPerms = categoryPerms.filter {
-                    it.name.lowercase().contains(q) ||
-                    it.key.lowercase().contains(q) ||
-                    it.description.lowercase().contains(q) ||
-                    it.targetGroup.lowercase().contains(q)
-                }
-            }
-
-            if (categoryPerms.isNotEmpty()) {
-                totalDisplayedPermsCount += categoryPerms.size
+        categorizedPerms.forEach { (category, categoryPerms) ->
+            run {
                 val isExpanded = expandedCategories.contains(category) || searchQuery.isNotBlank()
                 val catKeys = categoryPerms.map { it.key }
                 val activeInCat = catKeys.count { activePermissions.contains(it) }

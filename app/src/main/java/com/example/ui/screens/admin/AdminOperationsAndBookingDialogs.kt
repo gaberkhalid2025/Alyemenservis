@@ -251,7 +251,7 @@ internal fun AdminOperationsAndBookingDialogs(
         var editCustTime by rememberSaveable(booking.id) { mutableStateOf(booking.timeString) }
         var editCustStatus by rememberSaveable(booking.id) { mutableStateOf(booking.status) }
         var editCustPassword by rememberSaveable(booking.id) {
-            mutableStateOf(if (booking.pinCode.isNotBlank()) "••••" else "1234")
+            mutableStateOf(if (booking.pinCode.isNotBlank()) "••••" else "")
         }
 
         Dialog(onDismissRequest = { state.editingBookingObj = null }) {
@@ -318,6 +318,7 @@ internal fun AdminOperationsAndBookingDialogs(
                         value = editCustPassword,
                         onValueChange = { editCustPassword = it },
                         label = { Text("🔑 رمز المرور السري (تغيير/إعادة تعيين)") },
+                        placeholder = { Text("اتركه فارغاً للإبقاء على الرمز الحالي", color = Color.Gray, fontSize = 11.sp) },
                         modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
                     )

@@ -433,7 +433,7 @@ fun AdminStoresPropertiesPanel(
                             return@Button
                         }
                         val newStore = StoreEntity(
-                            id = "store_${System.currentTimeMillis()}",
+                            id = com.example.utils.EntityIdGenerator.generateStoreId(),
                             name = sName.trim(),
                             phone = sPhone.trim(),
                             cityId = sCity.trim(),
@@ -514,7 +514,7 @@ fun AdminStoresPropertiesPanel(
                             return@Button
                         }
                         val newProp = PropertyEntity(
-                            id = "prop_${System.currentTimeMillis()}",
+                            id = com.example.utils.EntityIdGenerator.generatePropertyId(),
                             title = pTitle.trim(),
                             phone = pPhone.trim(),
                             cityId = pCity.trim(),

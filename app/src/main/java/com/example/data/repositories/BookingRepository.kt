@@ -204,7 +204,7 @@ class BookingRepository(
         onError: (String) -> Unit
     ) {
         try {
-            // Check technician schedule conflict
+            // Check local technician schedule conflict first
             val targetDate = booking.date.ifBlank { booking.dateString }
             val targetTime = booking.time.ifBlank { booking.timeString }
             if (booking.technicianId.isNotBlank() && BookingUtils.hasTechnicianConflict(booking.technicianId, targetDate, targetTime, _cachedBookings.value)) {
@@ -212,9 +212,10 @@ class BookingRepository(
                 return
             }
 
-            val docId = if (booking.id.isNotBlank()) booking.id else firestore.collection(AppConstants.COL_BOOKINGS).document().id
-            val finalCode = if (booking.bookingNumber.isNotBlank()) booking.bookingNumber else BookingUtils.generateBookingNumber()
-            val rawPin = if (rawPasswordPin.isNotBlank()) rawPasswordPin else BookingUtils.generateBookingPassword()
+            fun persistBooking() {
+                val docId = if (booking.id.isNotBlank()) booking.id else firestore.collection(AppConstants.COL_BOOKINGS).document().id
+                val finalCode = if (booking.bookingNumber.isNotBlank()) booking.bookingNumber else BookingUtils.generateBookingNumber()
+                val rawPin = if (rawPasswordPin.isNotBlank()) rawPasswordPin else BookingUtils.generateBookingPassword()
             val hashedPin = BookingSecurityHelper.hashPin(rawPin)
 
             val scheduledTs = if (booking.scheduledAt > 0) booking.scheduledAt
@@ -326,6 +327,41 @@ class BookingRepository(
                         onError(ex.localizedMessage ?: "فشل إنشاء الحجز في الخادم، يرجى المحاولة مرة أخرى.")
                     }
                 }
+            }
+
+            val checkField = when {
+                booking.technicianId.isNotBlank() -> "technicianId" to booking.technicianId
+                booking.providerId.isNotBlank() -> "providerId" to booking.providerId
+                else -> null
+            }
+            if (checkField != null && targetDate.isNotBlank()) {
+                firestore.collection(AppConstants.COL_BOOKINGS)
+                    .whereEqualTo(checkField.first, checkField.second)
+                    .whereEqualTo("date", targetDate)
+                    .limit(25)
+                    .get()
+                    .addOnSuccessListener { snap ->
+                        val remoteBookings = snap.documents.mapNotNull {
+                            runCatching { it.toObject(BookingEntity::class.java)?.copy(id = it.id) }.getOrNull()
+                        }
+                        val techConflict = booking.technicianId.isNotBlank() &&
+                            BookingUtils.hasTechnicianConflict(booking.technicianId, targetDate, targetTime, remoteBookings)
+                        val exactSlotConflict = remoteBookings.any {
+                            it.effectiveTime.trim() == targetTime.trim() &&
+                                com.example.utils.BookingStateMachine.isSlotOccupiedStatus(it.status)
+                        }
+                        if (techConflict || exactSlotConflict) {
+                            onError("عذراً، هذا الموعد ($targetDate - $targetTime) محجوز مسبقاً. يرجى اختيار توقيت آخر.")
+                        } else {
+                            persistBooking()
+                        }
+                    }
+                    .addOnFailureListener {
+                        persistBooking()
+                    }
+            } else {
+                persistBooking()
+            }
         } catch (e: Exception) {
             onError(e.localizedMessage ?: "فشل إنشاء الحجز")
         }

@@ -1,0 +1,187 @@
+# 73 – مراجعة المساعد الذكي والإشعارات والدفع (حرجة / متوسطة / بسيطة / تحسينات)
+> فحصت 17 ملفاً (قراءة وبحث نصي؛ لم أشغّل التطبيق). **لا أستطيع أن أعدك بنسبة 100%** لملفات لم أرَ كل ما تتصل به (`AssistantViewModel`, `WalletManager`, مصدر `MainViewModel.notifications`, قواعد Firestore)، لكني فحصت كل ما هو أمامي وأحدد بصراحة ما يحتاج التحقق.
+
+## الملخص
+| الدرجة | العدد | أهمها |
+|---|---|---|
+| 🔴 حرجة | 6 | شحن رصيد فوري من العميل مع نجاح مزيف • أموال بـDouble • إشعارات حساسة تُنزَّل لكل الأجهزة • خطوات كهرباء/غاز بلا تحذير • حذف إشعارات مشروعة • استعلام المحفظة من العميل |
+| 🟠 متوسطة | 9 | صوت المساعد، ادعاء «الذكي»، أسعار قديمة، ViewModel بلا دورة حياة... |
+| 🟡 بسيطة | 6 | اتجاه أيقونة الإرسال، أزرار IME، عملة ثابتة... |
+| 🔵 تحسينات | — | لتصبح «عالمية»: القسم 6 |
+
+---
+## 🔴 أولاً: الأخطاء الحرجة
+### C1) شحن المحفظة «الفوري» من العميل + رسالة نجاح مزيفة (`TransactionHistoryScreen` ≈ سطر 435)
+المستخدم يكتب أي مبلغ ثم `viewModel.deposit(amount, "شحن رصيد محفظة فوري")` ثم **يظهر Toast «تم إيداع X ريال بنجاح!» قبل أن تُعرف النتيجة**، والـVM يتجاهل الفشل. أي مستخدم عملياً **يخلق مالاً** (إن كانت `WalletManager` تكتب الرصيد من العميل)، ويرى نجاحاً حتى لو فشلت العملية.
+**الإصلاح (يعمل على خطة Spark المجانية): الشحن «طلب» يعتمده المشرف.**
+```kotlin
+// ملف جديد: com/example/utils/WalletRequests.kt
+package com.example.utils
+
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
+import kotlinx.coroutines.tasks.await
+
+object WalletRequests {
+    private val db get() = FirebaseFirestore.getInstance()
+    const val MAX_TOPUP_YER = 5_000_000L
+    const val MIN_TOPUP_YER = 1_000L
+
+    /** يُنشئ طلب شحن بحالة PENDING. لا يغيّر الرصيد أبداً. */
+    suspend fun requestTopUp(uid: String, amountYer: Long, method: String, reference: String): Result<String> {
+        if (uid.isBlank()) return Result.failure(IllegalStateException("سجّل الدخول أولاً"))
+        if (amountYer !in MIN_TOPUP_YER..MAX_TOPUP_YER) return Result.failure(IllegalArgumentException("المبلغ بين 1,000 و5,000,000 ريال"))
+        val ref = reference.trim().take(60)
+        if (ref.length < 4) return Result.failure(IllegalArgumentException("أدخل رقم الحوالة أو مرجع الدفع"))
+        return try {
+            val doc = db.collection("wallet_topups").document()
+            doc.set(mapOf("uid" to uid, "amount" to amountYer, "currency" to "YER", "method" to method.take(30),
+                "reference" to ref, "status" to "PENDING", "createdAt" to System.currentTimeMillis())).await()
+            Result.success(doc.id)
+        } catch (e: Exception) { Result.failure(e) }
+    }
+
+    /** يعتمده المشرف فقط (قاعدة Firestore تتحقق من claim): معاملة ذرّية + معرّف حركة ثابت = لا ازدواج. */
+    suspend fun approveTopUp(topUpId: String, adminUid: String): Result<Unit> = try {
+        db.runTransaction { tx ->
+            val tRef = db.collection("wallet_topups").document(topUpId)
+            val t = tx.get(tRef)
+            if (t.getString("status") != "PENDING") throw IllegalStateException("الطلب عولج سابقاً")
+            val uid = t.getString("uid") ?: throw IllegalStateException("طلب غير صالح")
+            val amount = t.getLong("amount") ?: throw IllegalStateException("مبلغ غير صالح")
+            val wRef = db.collection("wallets").document("wallet_$uid")
+            val bal = tx.get(wRef).getLong("balance") ?: 0L
+            val now = System.currentTimeMillis()
+            tx.set(wRef, mapOf("balance" to bal + amount, "updatedAt" to now), SetOptions.merge())
+            tx.set(wRef.collection("transactions").document("tu_$topUpId"), mapOf(
+                "type" to "DEPOSIT", "amount" to amount, "status" to "COMPLETED", "createdAt" to now,
+                "note" to "شحن معتمد (مرجع ${t.getString("reference")})", "approvedBy" to adminUid))
+            tx.update(tRef, mapOf("status" to "APPROVED", "approvedBy" to adminUid, "approvedAt" to now))
+            null
+        }.await()
+        Result.success(Unit)
+    } catch (e: Exception) { Result.failure(e) }
+
+    suspend fun rejectTopUp(topUpId: String, adminUid: String, reason: String): Result<Unit> = try {
+        db.collection("wallet_topups").document(topUpId).update(mapOf("status" to "REJECTED", "rejectedBy" to adminUid, "reason" to reason.take(120))).await()
+        Result.success(Unit)
+    } catch (e: Exception) { Result.failure(e) }
+}
+```
+**قواعد Firestore (إلزامية):**
+```
+function isAdmin() { return request.auth != null && request.auth.token.admin == true; }
+match /wallets/{wid} {
+  allow read: if request.auth != null && wid == 'wallet_' + request.auth.uid || isAdmin();
+  allow write: if isAdmin();                                  // لا كتابة من العملاء إطلاقاً
+  match /transactions/{tid} {
+    allow read: if request.auth != null && wid == 'wallet_' + request.auth.uid || isAdmin();
+    allow write: if isAdmin();
+  }
+}
+match /wallet_topups/{id} {
+  allow create: if request.auth != null && request.resource.data.uid == request.auth.uid
+      && request.resource.data.status == 'PENDING' && request.resource.data.amount is int
+      && request.resource.data.amount >= 1000 && request.resource.data.amount <= 5000000
+      && request.resource.data.keys().hasOnly(['uid','amount','currency','method','reference','status','createdAt']);
+  allow read: if request.auth != null && resource.data.uid == request.auth.uid || isAdmin();
+  allow update: if isAdmin();
+  allow delete: if false;
+}
+```
+**`admin` claim:** يُضبط مرة واحدة بسكربت Admin SDK على حاسوبك (مجاني): `admin.auth().setCustomUserClaims(uid, {admin: true})`.
+**الواجهة:** غيّر الحوار إلى «طلب شحن»: المبلغ + طريقة الدفع + رقم المرجع، وعند النجاح: «تم إرسال طلبك؛ يُضاف الرصيد بعد تأكيد المشرف»، وعند الفشل أعرض رسالة الخطأ **من النتيجة** لا Toast نجاح مسبق. وأعطِ الـVM حالة:
+```kotlin
+sealed class TopUpUi { object Idle : TopUpUi(); object Sending : TopUpUi(); data class Done(val id: String) : TopUpUi(); data class Failed(val msg: String) : TopUpUi() }
+private val _topUp = MutableStateFlow<TopUpUi>(TopUpUi.Idle); val topUp: StateFlow<TopUpUi> = _topUp
+fun requestTopUp(uid: String, amount: Long, method: String, ref: String) {
+    if (_topUp.value is TopUpUi.Sending) return                      // يمنع الضغط المزدوج
+    _topUp.value = TopUpUi.Sending
+    viewModelScope.launch { _topUp.value = WalletRequests.requestTopUp(uid, amount, method, ref).fold({ TopUpUi.Done(it) }, { TopUpUi.Failed(it.message ?: "تعذر إرسال الطلب") }) }
+}
+```
+**السحب (`withdraw`)** بنفس النمط: `wallet_withdrawals` بحالة PENDING؛ يُخصم الرصيد عند اعتماد المشرف وليس عند الطلب، ويُحدَّد سقف يومي.
+> **حقيقة يجب أن تعرفها:** دفع «لحظي» بين المستخدمين داخل التطبيق (عميل→فني) **لا يمكن تأمينه بلا خادم موثوق** (Cloud Functions تتطلب خطة Blaze المدفوعة). لذلك أنصح الآن بأن تقتصر المحفظة على: شحن/سحب بموافقة المشرف + دفع الخدمات نقداً أو بحوالة خارجية تُسجَّل. لا تُفعّل تحويلات فورية قبل وجود خادم.
+
+### C2) المال كـ`Double` (`TransactionHistoryViewModel`)
+`balance`, `amount`, `sumOf { it.amount }` بـDouble ⇒ أخطاء تقريب (0.1+0.2). الريال بلا كسور عملياً.
+**الإصلاح:** خزّن واقرأ **`Long`** (أصغر وحدة = ريال): `val amount: Long`, `sumOf { it.amount }` يبقى صحيحاً، ولعرض الأرقام استعمل `NumberFormat.getIntegerInstance(Locale.US)`. وعند القراءة من Firestore: `d.getLong("amount") ?: d.getDouble("amount")?.roundToLong() ?: 0L` (تحمّل البيانات القديمة).
+### C3) إشعارات حساسة تُنزَّل لكل الأجهزة ويُخفيها الكود فقط (`NotificationAudienceFilter`)
+التصفية بالجمهور تتم **على جهاز العميل بعد تنزيل كل الإشعارات**؛ أي مستخدم مهتم يستطيع قراءة إشعارات الآخرين (ومنها «استعادة كلمة المرور» و«رمز التحقق» التي يكتشفها الكود بمطابقة كلمات عربية!). هذا تسريب خصوصية وأمان.
+**الإصلاح:**
+1. **لا تضع رموزاً ولا بيانات حساسة داخل الإشعارات أبداً** (OTP، استعادة كلمة المرور) — استعمل مصادقة Firebase/قنوات مباشرة.
+2. افصل البيانات: `users/{uid}/inbox/{id}` (خاصة بالمستخدم) + `broadcast_notifications/{id}` (عامة بلا بيانات شخصية). القاعدة:
+```
+match /users/{uid}/inbox/{id} { allow read, update: if request.auth != null && request.auth.uid == uid; allow create: if isAdmin(); allow delete: if request.auth.uid == uid; }
+match /broadcast_notifications/{id} { allow read: if request.auth != null; allow write: if isAdmin(); }
+```
+3. في العميل: استعلام واحد لصندوق المستخدم + استعلام للعامة بحد 50 (يخفض التكلفة والبيانات المنزّلة أيضاً).
+4. تُحذف منطق `isSensitive` المعتمد على الكلمات؛ فمصدر الحماية هو القواعد لا النص.
+### C4) الإزالة التكرارية تحذف إشعارات مشروعة
+(أ) `NotificationViewModel.addNotification`: مفتاح التكرار = النوع+العنوان+الهدف+**نافذة 90 ثانية**؛ فإشعاران مختلفان بالعنوان نفسه («حجز جديد») خلال 90 ث لفنيين/حجزين مختلفين ⇒ الثاني **يُهمَل صامتاً**. (ب) `filterAudienceNotifications`: مفتاح بنافذة 30 ث بالعنوان فقط ⇒ **يُخفي** الثاني من القائمة.
+```kotlin
+// addNotification: المفتاح يشمل الرسالة والمستهدفين، والنافذة 10 ثوانٍ فقط (ضغطة مزدوجة)
+val dedupKey = listOf(notificationType, title, message, targetType, targetValue, targetUserIds.sorted().joinToString(","), System.currentTimeMillis() / 10_000).joinToString("|")
+// filterAudienceNotifications: اعتمد المعرّف فقط
+val key = notif.id.ifBlank { "${notif.notificationType}|${notif.title}|${notif.message}|${notif.timestamp}" }
+if (!seenKeys.add(key)) return@filter false
+```
+### C5) خطوات إصلاح كهرباء/غاز/سخانات للمستخدم بلا تحذير (`ai_assistant_data.json`)
+32 دليل استكشاف، **كلها** `referral_action = CREATE_SERVICE_ORDER`، **و16 منها** تتعلق بالكهرباء/الطاقة الشمسية/السخانات وفيها خطوات «افحص/افصل/ارفع القاطع/اختبر السلك» **بلا حقل تحذير** (لا `safety_warning`). هذا **خطر على السلامة ومسؤولية قانونية** (صعق، حريق، تسرب غاز).
+**الإصلاح:** حقلا `safety_level` (LOW/MEDIUM/HIGH) و`safety_warning`؛ في HIGH **تُخفى خطوات «افعلها بنفسك» وتُعرض إجراءات أمان فورية فقط (افصل التيار من القاطع الرئيسي، ابتعد، لا تلمس الماء)** مع زر «اطلب فنياً الآن». سكربت يضيف الحقول للمراجعة اليدوية (ثم يراجعها فني كهرباء مرخّص):
+```python
+# patch_safety.py:  python patch_safety.py ai_assistant_data.json
+import json, sys
+p = sys.argv[1]; d = json.load(open(p, encoding='utf-8'))
+HIGH_CATS = ('كهرب', 'شمس', 'طاقة', 'غاز', 'سخان', 'بطاري')
+HIGH_WORDS = ('قاطع', 'تيار', 'صعق', 'سلك', 'لوحة', 'مولد', 'إنفرتر', 'غاز', 'ماس', 'شرر', 'احتراق', 'سخان')
+for g in d.get('troubleshooting_guides', []):
+    text = ' '.join([g.get('title', ''), ' '.join(g.get('diy_steps', []))])
+    cat = g.get('category', '')
+    high = any(c in cat for c in HIGH_CATS) or any(w in text for w in HIGH_WORDS)
+    g['safety_level'] = 'HIGH' if high else 'LOW'
+    if high:
+        g['safety_warning'] = 'خطر: لا تحاول الإصلاح بنفسك. افصل التيار من القاطع الرئيسي، ابتعد عن الماء والأسلاك، واطلب فنياً مرخّصاً.'
+        g['immediate_actions'] = ['افصل التيار من القاطع الرئيسي إن كان الوصول إليه آمناً', 'ابتعد عن الجهاز ولا تلمسه وأنت مبلّل', 'اطلب فنياً مختصاً']
+json.dump(d, open(p, 'w', encoding='utf-8'), ensure_ascii=False, indent=2)
+print('done')
+```
+في Kotlin اجعل الحقول اختيارية بقيم افتراضية (`val safetyLevel: String = "LOW"`, `val safetyWarning: String? = null`, `val immediateActions: List<String> = emptyList()`) كي لا ينكسر التحليل، وفي بطاقة الدليل: `if (g.safetyLevel == "HIGH")` أظهر لافتة حمراء وعرّض الإجراءات الفورية بدل `diy_steps`.
+### C6) `WalletManager(context)` يُنشأ داخل الشاشة ويستقبل `walletId = "wallet_$currentUserId"` من الواجهة
+معرّف المحفظة قابل للتخمين والتعديل في الذاكرة. **القاعدة الوحيدة الآمنة هي قواعد Firestore أعلاه** (قراءة محفظتك فقط، لا كتابة من العميل)، ومعها لا يهم ما يرسله العميل.
+
+---
+## 🟠 ثانياً: متوسطة
+| # | المشكلة | الإصلاح |
+|---|---|---|
+| M1 | **البحث الصوتي في المساعد** ما زال `RecognizerIntent` بـ`ar-YE` في موضعين: نفس سبب شاشة اللغات | استبدل بـ`VoiceSearchHelper` (المستند 65) |
+| M2 | رسالة «جاري توليد الإجابة الذكية» وعنوان «ذكي» بينما ما رأيته **مطابقة كلمات في JSON محلي** (32 دليل + 5 أسئلة) | سمِّه «مساعد الأعطال» ما لم يكن خلفه نموذج؛ وإن كان `AssistantViewModel` يستدعي نموذجاً بمفتاح داخل التطبيق فالمفتاح مكشوف (احذفه، المستند 46) |
+| M3 | تكاليف مكتوبة بالريال ثابتة («2,500–5,000 ريال») في كل الأدلة: الأسعار والصرف متغيرة (وسعرا صرف) | احذفها أو اجعلها من Firestore بتاريخ تحديث، واعرض «تقدير يختلف حسب المنطقة والسوق» |
+| M4 | `TransactionHistoryViewModel` يُنشأ بـ`remember { TransactionHistoryViewModel(...) }`: ليس ViewModel حقيقياً (لا `onCleared` فتتسرّب الكوروتينات) | استعمل `viewModel(key = walletId, factory = ...)` (الكود بالأسفل) |
+| M5 | `deposit/withdraw` تتجاهل الفشل ولا حالة خطأ ولا حارس ضغط مزدوج | تُحل مع C1 (`Sending/Failed`) |
+| M6 | السجل غير مُقسَّم لصفحات (يحمّل كل المعاملات) والإجماليات تتجاهل REFUND/TRANSFER | حد 50 + `startAfter`، وأضف REFUND للإيداعات وTRANSFER حسب الاتجاه |
+| M7 | `collectAsState` بدل `collectAsStateWithLifecycle` في شاشات الإشعارات والدفع (تستمر الإذاعة في الخلفية) | استبدل (تبعية `lifecycle-runtime-compose`) |
+| M8 | مخزنان للإشعارات: صندوق Firestore (`NotificationEntity`) و`PushNotificationHandler` المحلي (المستند 70) ⇒ عدّادات غير متسقة | اجعل Firestore هو الصندوق والمحلي كاش فقط، وحدّث العدّاد من مصدر واحد |
+| M9 | `NotificationViewModel(mainViewModel)` يحمل مرجع ViewModel آخر | مرّر `StateFlow`ات/مستودع بدل المرجع، وتأكد من المصنع عند الإنشاء |
+### الكود (M4):
+```kotlin
+class TransactionHistoryViewModelFactory(private val wm: WalletManager, private val walletId: String) : ViewModelProvider.Factory {
+    @Suppress("UNCHECKED_CAST") override fun <T : ViewModel> create(modelClass: Class<T>): T = TransactionHistoryViewModel(wm, walletId) as T
+}
+val viewModel: TransactionHistoryViewModel = viewModel(key = walletId, factory = TransactionHistoryViewModelFactory(walletManager, walletId))
+```
+## 🟡 ثالثاً: بسيطة
+1. `Icons.Default.Send` لا ينعكس في RTL ⇒ `Icons.AutoMirrored.Filled.Send`.
+2. حقل المساعد `singleLine = true` بلا `ImeAction.Send`/`KeyboardActions(onSend=...)` ⇒ أضفهما، واسمح بسطرين.
+3. العملة نص ثابت «ريال يمني/YER» ⇒ نموذج عملة (`YER/SAR/USD`) ورمز + أرقام LTR.
+4. استهداف `REGION` بـ`contains` و`CATEGORY -> true` (الكل) ⇒ مطابقة دقيقة بالمعرّف.
+5. `targetValue.contains(cleanPhone)` قد يطابق أرقاماً أطول ⇒ مطابقة تامة بعد التطبيع.
+6. اقتراحات المساعد مكتوبة بالكود ⇒ من JSON ليسهل تحديثها دون إصدار.
+## 🔵 رابعاً: تحسينات لتصبح عالمية
+**المساعد:** (1) مسار فرز: عَرَض ← خطورة ← «ذاتي آمن» أو «اطلب فنياً»؛ (2) أسئلة توضيحية قصيرة؛ (3) بطاقات أقرب فنيين متاحين مع زمن الوصول وزر حجز بنقرة (بياناتك موجودة)؛ (4) إرفاق صورة العطل إلى الحجز؛ (5) تلخيص المحادثة داخل طلب الخدمة؛ (6) ذاكرة آخر مشكلة؛ (7) وضع بلا إنترنت (JSON محلي) صريح.
+**الإشعارات:** قنوات منفصلة (طلبات/دردشة/عروض) وساعات هدوء، تجميع، أزرار إجراء («قبول/رفض»)، روابط عميقة بقائمة مسموحة، ترجمة، وعدّاد واحد متسق، وتفضيلات لكل نوع.
+**الدفع:** إيصال PDF لكل حركة، تفاصيل الحركة وحالتها وتتبعها، حدود يومية وPIN أو بصمة للسحب، تنبيه فوري لكل حركة، سجل تدقيق للمشرف، تسوية يومية، ونظام اعتراض/نزاع، ودعم عملات متعددة، وتصدير آمن (CSV مهرّب وبـBOM، المستند 57).
+## ما لم أستطع فحصه (يحتاج منك)
+`AssistantViewModel`, `WalletManager`, مصدر `notifications` في `MainViewModel`, قواعد Firestore الحالية، `FCMService`. أرسلها وأكمل لك الفحص 100%.
+## الترتيب
+C1/C6 (قواعد المحفظة وطلب الشحن) ← C3 (فصل الإشعارات + قواعد) ← C5 (سلامة المساعد) ← C4 (التكرار) ← C2 ← المتوسطة ← التحسينات.

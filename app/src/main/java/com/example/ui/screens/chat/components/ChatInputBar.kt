@@ -50,9 +50,11 @@ import androidx.core.content.FileProvider
 import coil.compose.AsyncImage
 import com.example.data.models.ChatMessage
 import com.example.data.models.MediaType
+import com.example.ui.components.InteractiveMapLocationPickerDialog
 import com.example.ui.screens.chat.ChatAttachmentManager
 import com.example.utils.ChatIcons
 import com.example.utils.ChatValidationUtils
+import com.example.utils.OfflineYemenGazetteer
 import com.example.utils.VisualThemePalette
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -87,6 +89,7 @@ fun ChatInputBar(
     var uploadProgress by remember { mutableStateOf<Float?>(null) }
     var showAttachmentMenu by remember { mutableStateOf(false) }
     var showEmojiPicker by remember { mutableStateOf(false) }
+    var showMapLocationPicker by remember { mutableStateOf(false) }
 
     // Live audio amplitudes for real-time waveform
     val liveAmplitudes = remember { mutableStateListOf<Int>() }
@@ -241,9 +244,12 @@ fun ChatInputBar(
         val fineGranted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] ?: false
         val coarseGranted = permissions[Manifest.permission.ACCESS_COARSE_LOCATION] ?: false
         if (fineGranted || coarseGranted) {
-            sendCurrentLocation(context, onSendMessage)
+            sendCurrentLocation(context, onSendMessage) {
+                showMapLocationPicker = true
+            }
         } else {
-            Toast.makeText(context, "⚠️ يلزم منح إذن الموقع لمشاركة موقعك الحالي", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "⚠️ يمكنك تحديد موقعك مباشرة على خريطة التطبيق", Toast.LENGTH_SHORT).show()
+            showMapLocationPicker = true
         }
     }
 
@@ -696,13 +702,15 @@ fun ChatInputBar(
                             leadingIcon = { Icon(Icons.Default.PhotoCamera, contentDescription = null, tint = accentColor) }
                         )
                         DropdownMenuItem(
-                            text = { Text("📍 مشاركة موقعي الحالي", color = accentColor, fontSize = 13.sp, fontWeight = FontWeight.Bold) },
+                            text = { Text("📍 إرسال موقعي الحالي (خريطة التطبيق)", color = accentColor, fontSize = 13.sp, fontWeight = FontWeight.Bold) },
                             onClick = {
                                 showAttachmentMenu = false
                                 val hasFine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
                                 val hasCoarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
                                 if (hasFine || hasCoarse) {
-                                    sendCurrentLocation(context, onSendMessage)
+                                    sendCurrentLocation(context, onSendMessage) {
+                                        showMapLocationPicker = true
+                                    }
                                 } else {
                                     locationPermissionLauncher.launch(
                                         arrayOf(
@@ -713,6 +721,14 @@ fun ChatInputBar(
                                 }
                             },
                             leadingIcon = { Icon(Icons.Default.LocationOn, contentDescription = null, tint = Color(0xFFEF4444)) }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("🗺️ تحديد موقع من خريطة التطبيق", color = Color(0xFF10B981), fontSize = 13.sp, fontWeight = FontWeight.Bold) },
+                            onClick = {
+                                showAttachmentMenu = false
+                                showMapLocationPicker = true
+                            },
+                            leadingIcon = { Icon(Icons.Default.Map, contentDescription = null, tint = Color(0xFF10B981)) }
                         )
                     }
                 }
@@ -1106,45 +1122,77 @@ fun ChatInputBar(
             containerColor = surfaceColor
         )
     }
+
+    if (showMapLocationPicker) {
+        val currentLoc = getBestLastKnownLocation(context)
+        InteractiveMapLocationPickerDialog(
+            initialLat = currentLoc?.latitude ?: 15.3694,
+            initialLng = currentLoc?.longitude ?: 44.1910,
+            hasGps = currentLoc != null,
+            gpsLat = currentLoc?.latitude ?: 0.0,
+            gpsLng = currentLoc?.longitude ?: 0.0,
+            title = "🗺️ تحديد وإرسال موقع على خريطة التطبيق",
+            onDismiss = { showMapLocationPicker = false },
+            onLocationPicked = { picked ->
+                val summary = picked.landmarkName.ifBlank { picked.label.ifBlank { picked.formattedAddress.ifBlank { "موقع محدد على الخريطة" } } }
+                val appUri = OfflineYemenGazetteer.buildAppLocationUri(picked.latitude, picked.longitude, summary)
+                val displayText = buildString {
+                    append("📍 موقع جغرافي: ")
+                    append(summary)
+                    if (picked.note.isNotBlank()) {
+                        append(" — ")
+                        append(picked.note)
+                    }
+                }
+                onSendMessage(displayText, MediaType.LOCATION, appUri)
+                Toast.makeText(context, "✅ تم إرسال الموقع عبر خريطة التطبيق", Toast.LENGTH_SHORT).show()
+                showMapLocationPicker = false
+            }
+        )
+    }
+}
+
+private fun getBestLastKnownLocation(context: Context): Location? {
+    return try {
+        val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager ?: return null
+        val hasPerm = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        if (!hasPerm) return null
+
+        var best: Location? = null
+        for (provider in locationManager.getProviders(true)) {
+            val l = locationManager.getLastKnownLocation(provider) ?: continue
+            if (best == null || l.accuracy < best.accuracy) {
+                best = l
+            }
+        }
+        best
+    } catch (_: Exception) {
+        null
+    }
 }
 
 private fun sendCurrentLocation(
     context: Context,
-    onSendMessage: (text: String, mediaType: MediaType, mediaUrl: String) -> Unit
+    onSendMessage: (text: String, mediaType: MediaType, mediaUrl: String) -> Unit,
+    onFallbackToPicker: () -> Unit
 ) {
     try {
-        val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
-        if (locationManager == null) {
-            Toast.makeText(context, "خدمة تحديد الموقع غير متوفرة", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        var location: Location? = null
-        if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
-            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
-        ) {
-            val providers = locationManager.getProviders(true)
-            for (provider in providers) {
-                val l = locationManager.getLastKnownLocation(provider) ?: continue
-                if (location == null || l.accuracy < location.accuracy) {
-                    location = l
-                }
-            }
-        }
-
+        val location = getBestLastKnownLocation(context)
         if (location != null) {
             val lat = location.latitude
             val lng = location.longitude
-            onSendMessage("📍 موقعي الجغرافي", MediaType.LOCATION, "https://maps.google.com/?q=$lat,$lng")
-            Toast.makeText(context, "تم إرسال موقعك بنجاح", Toast.LENGTH_SHORT).show()
+            val summary = OfflineYemenGazetteer.nearestReferenceSummary(context, lat, lng).ifBlank { "موقعي الجغرافي المباشر" }
+            val appUri = OfflineYemenGazetteer.buildAppLocationUri(lat, lng, summary)
+            onSendMessage("📍 موقعي: $summary", MediaType.LOCATION, appUri)
+            Toast.makeText(context, "✅ تم إرسال موقعك عبر خريطة التطبيق", Toast.LENGTH_SHORT).show()
         } else {
-            val lat = 15.3694
-            val lng = 44.1910
-            onSendMessage("📍 موقعي الجغرافي", MediaType.LOCATION, "https://maps.google.com/?q=$lat,$lng")
-            Toast.makeText(context, "تم إرسال الموقع الجغرافي", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "📍 تعذر التقاط إشارة GPS حالياً، حدد موقعك يدوياً على خريطة التطبيق", Toast.LENGTH_LONG).show()
+            onFallbackToPicker()
         }
     } catch (e: Exception) {
         e.printStackTrace()
-        Toast.makeText(context, "تعذر مشاركة الموقع: ${e.message}", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, "تعذر تحديد الموقع تلقائياً، اختره من الخريطة", Toast.LENGTH_SHORT).show()
+        onFallbackToPicker()
     }
 }

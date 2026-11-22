@@ -7,6 +7,8 @@ import androidx.lifecycle.viewModelScope
 import com.example.data.ProviderEntity
 import com.example.data.BookingEntity
 import com.example.data.NotificationEntity
+import com.example.data.PropertyEntity
+import com.example.data.StoreEntity
 import com.example.data.models.ChannelType
 import com.example.data.models.ChatChannel
 import com.example.data.models.InstantRequestEntity
@@ -16,7 +18,10 @@ import com.example.data.models.RequestOfferEntity
 import com.example.data.repositories.ChatRepository
 import com.example.data.repositories.InstantRequestRepository
 import com.example.security.BookingSecurityHelper
+import com.example.utils.AppConstants
 import com.example.utils.AppResult
+import com.example.utils.HaversinePrecisionNavigator
+import com.example.utils.LandmarkAddress
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
@@ -105,7 +110,6 @@ class InstantRequestViewModel @Inject constructor(
 
         requestsListener = query.addSnapshotListener { snapshot, error ->
             if (error != null || snapshot == null) {
-                _instantRequests.value = emptyList()
                 return@addSnapshotListener
             }
 
@@ -154,6 +158,19 @@ class InstantRequestViewModel @Inject constructor(
             }
     }
 
+    private fun normalizeSectionCode(raw: String): String {
+        val v = raw.trim().uppercase()
+        return when {
+            v == "SERVICES" || v.contains("خدم") || v.contains("فني") -> "SERVICES"
+            v == "STORES" || v.contains("متجر") || v.contains("متاجر") || v.contains("محل") || v.contains("تجار") || v.contains("سلع") -> "STORES"
+            v == "RESTAURANTS" || v.contains("مطعم") || v.contains("مطاعم") || v.contains("كافيه") -> "RESTAURANTS"
+            v == "MEDICAL" || v.contains("طب") || v.contains("صيدل") || v.contains("عياد") -> "MEDICAL"
+            v == "PROPERTIES" || v.contains("عقار") || v.contains("شقق") -> "PROPERTIES"
+            v == "GENERAL" || v.contains("عام") -> "GENERAL"
+            else -> v.ifBlank { "GENERAL" }
+        }
+    }
+
     fun createInstantRequest(
         userId: String,
         userName: String,
@@ -168,12 +185,18 @@ class InstantRequestViewModel @Inject constructor(
         urgencyTime: String = "فوراً (خلال 30 دقيقة)",
         deliveryMethod: String = "",
         customPin: String = "",
+        latitude: Double = 0.0,
+        longitude: Double = 0.0,
+        sectionType: String = "",
         onResult: (Boolean, String, String) -> Unit = { _, _, _ -> }
     ) {
         _uiState.value = InstantUiState.Loading
         val reqId = UUID.randomUUID().toString()
-        val code = "URG-${(1000..9999).random()}"
-        val safePin = customPin.trim().ifBlank { (1000..9999).random().toString() }
+        val secureRandom = java.security.SecureRandom()
+        val code = "URG-${100000 + secureRandom.nextInt(900000)}"
+        val safePin = customPin.trim().ifBlank { (1000 + secureRandom.nextInt(9000)).toString() }
+        val resolvedSection = normalizeSectionCode(sectionType.ifBlank { categoryId })
+        val now = System.currentTimeMillis()
         val req = InstantRequestEntity(
             id = reqId,
             requestCode = code,
@@ -192,7 +215,11 @@ class InstantRequestViewModel @Inject constructor(
             urgencyTime = urgencyTime,
             deliveryMethod = deliveryMethod,
             status = "WAITING_FOR_OFFERS",
-            createdAt = System.currentTimeMillis()
+            createdAt = now,
+            latitude = latitude,
+            longitude = longitude,
+            sectionType = resolvedSection,
+            updatedAt = now
         )
         repository.createInstantRequest(
             request = req,
@@ -205,7 +232,8 @@ class InstantRequestViewModel @Inject constructor(
                 }
                 _instantRequests.value = (_instantRequests.value.filter { it.id != createdReq.id } + createdReq)
                 _uiState.value = InstantUiState.Success("تم تقديم الطلب الفوري بنجاح بنظام الكود: ${createdReq.requestCode}")
-                sendUrgentRequestNotificationToNearbyProviders(createdReq, 10)
+                val configuredRadius = appState._maxKmRadius.value.coerceIn(5, 200)
+                sendUrgentRequestNotificationToNearbyProviders(createdReq, configuredRadius)
                 onResult(true, createdReq.requestCode, resolvedPin)
             },
             onError = { err ->
@@ -235,65 +263,174 @@ class InstantRequestViewModel @Inject constructor(
             urgencyTime = params.urgencyTime,
             deliveryMethod = params.deliveryMethod,
             customPin = params.customPin,
+            latitude = params.latitude,
+            longitude = params.longitude,
+            sectionType = params.sectionType,
             onResult = onResult
         )
     }
 
+    private fun isWithinEffectiveRadius(
+        requestLat: Double,
+        requestLng: Double,
+        targetLat: Double,
+        targetLng: Double,
+        radiusKm: Int,
+        cityMatched: Boolean
+    ): Boolean {
+        if (!LandmarkAddress.isValid(requestLat, requestLng)) return true
+        if (!LandmarkAddress.isValid(targetLat, targetLng)) return cityMatched
+        // إذا كانت الإحداثيات الافتراضية لصنعاء على كيان في مدينة أخرى متطابقة بالمدينة لا نسقطه
+        val isDefaultSanaa = kotlin.math.abs(targetLat - 15.3694) < 0.0005 && kotlin.math.abs(targetLng - 44.1910) < 0.0005
+        val isRequestNearSanaa = HaversinePrecisionNavigator.calculateDistance(requestLat, requestLng, 15.3694, 44.1910) <= radiusKm * 1000.0
+        if (isDefaultSanaa && !isRequestNearSanaa && cityMatched) return true
+        return HaversinePrecisionNavigator.calculateDistance(requestLat, requestLng, targetLat, targetLng) <= radiusKm * 1000.0
+    }
+
     private fun sendUrgentRequestNotificationToNearbyProviders(
         request: InstantRequestEntity,
-        @Suppress("UNUSED_PARAMETER") radiusKm: Int
+        radiusKm: Int
     ) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                // 1. الحصول على الفنيين القريبين من الفايرستور
-                val snapshot = firestore.collection("providers")
-                    .whereEqualTo("cityId", request.userCity)
-                    .limit(100)
-                    .get()
-                    .await()
-                
-                val nearbyProviders = snapshot.documents.mapNotNull { doc ->
-                    try {
-                        doc.toObject(ProviderEntity::class.java)?.copy(id = doc.id)
-                    } catch (e: Exception) {
-                        null
+                val section = normalizeSectionCode(request.sectionType.ifBlank { request.categoryId })
+                val cityQuery = request.userCity.trim()
+                val matchedCity = appState._cities.value.find {
+                    it.nameAr.equals(cityQuery, ignoreCase = true) ||
+                        it.nameEn.equals(cityQuery, ignoreCase = true) ||
+                        it.id.equals(cityQuery, ignoreCase = true)
+                }
+                val cityKeys = listOfNotNull(
+                    cityQuery.takeIf { it.isNotBlank() },
+                    matchedCity?.id?.trim()?.takeIf { it.isNotBlank() },
+                    matchedCity?.nameAr?.trim()?.takeIf { it.isNotBlank() },
+                    matchedCity?.nameEn?.trim()?.takeIf { it.isNotBlank() }
+                ).distinct().take(10)
+
+                val targets = linkedMapOf<String, String>() // targetValue -> customerPhone
+
+                // 1) الفنيون والخدمات (SERVICES أو GENERAL)
+                if (section == "SERVICES" || section == "GENERAL") {
+                    val provQuery: Query = if (cityKeys.isNotEmpty()) {
+                        firestore.collection(AppConstants.COL_PROVIDERS).whereIn("cityId", cityKeys).limit(120)
+                    } else {
+                        firestore.collection(AppConstants.COL_PROVIDERS).limit(120)
                     }
-                }.filter { provider ->
-                    provider.isAvailable && provider.subscriptionStatus.uppercase() in listOf("APPROVED", "ACCEPTED", "ACTIVE")
+                    val provSnap = runCatching { provQuery.get().await() }.getOrNull()
+                    provSnap?.documents?.mapNotNull { doc ->
+                        runCatching { doc.toObject(ProviderEntity::class.java)?.copy(id = doc.id) }.getOrNull()
+                    }?.filter { provider ->
+                        provider.isAvailable &&
+                            !provider.isDeleted &&
+                            !provider.isBlocked &&
+                            !provider.isNotificationsDisabled &&
+                            provider.subscriptionStatus.uppercase() in listOf("APPROVED", "ACCEPTED", "ACTIVE") &&
+                            isWithinEffectiveRadius(
+                                request.latitude, request.longitude,
+                                provider.latitude, provider.longitude,
+                                radiusKm,
+                                cityKeys.isEmpty() || cityKeys.any { it.equals(provider.cityId, ignoreCase = true) }
+                            )
+                    }?.forEach { provider ->
+                        val key = provider.phone.ifBlank { provider.id }
+                        if (key.isNotBlank()) targets.putIfAbsent(key, provider.phone)
+                    }
                 }
-                
-                // 2. إرسال إشعارات FCM ووثائق إشعار حقيقية لكل فني قريب
+
+                // 2) المتاجر والسلع، المطاعم، والمراكز الطبية (STORES / RESTAURANTS / MEDICAL / GENERAL)
+                if (section in listOf("STORES", "RESTAURANTS", "MEDICAL", "GENERAL")) {
+                    val storeQuery: Query = if (cityKeys.isNotEmpty()) {
+                        firestore.collection(AppConstants.COL_STORES).whereIn("cityId", cityKeys).limit(120)
+                    } else {
+                        firestore.collection(AppConstants.COL_STORES).limit(120)
+                    }
+                    val storeSnap = runCatching { storeQuery.get().await() }.getOrNull()
+                    storeSnap?.documents?.mapNotNull { doc ->
+                        runCatching { doc.toObject(StoreEntity::class.java)?.copy(id = doc.id) }.getOrNull()
+                    }?.filter { store ->
+                        val storeSection = normalizeSectionCode(store.sectionId.ifBlank { store.providerType.ifBlank { "STORES" } })
+                        val sectionMatches = section == "GENERAL" ||
+                            storeSection == section ||
+                            (section == "STORES" && store.sectionId.isBlank())
+                        store.isActive &&
+                            store.isApproved &&
+                            !store.isDeleted &&
+                            !store.isBlocked &&
+                            !store.isNotificationsDisabled &&
+                            sectionMatches &&
+                            isWithinEffectiveRadius(
+                                request.latitude, request.longitude,
+                                store.latitude, store.longitude,
+                                radiusKm,
+                                cityKeys.isEmpty() || cityKeys.any { it.equals(store.cityId, ignoreCase = true) }
+                            )
+                    }?.forEach { store ->
+                        val key = store.phone.ifBlank { store.ownerId.ifBlank { store.id } }
+                        if (key.isNotBlank()) targets.putIfAbsent(key, store.phone)
+                    }
+                }
+
+                // 3) العقارات والشقق والأراضي (PROPERTIES / GENERAL)
+                if (section == "PROPERTIES" || section == "GENERAL") {
+                    val propQuery: Query = if (cityKeys.isNotEmpty()) {
+                        firestore.collection(AppConstants.COL_PROPERTIES).whereIn("cityId", cityKeys).limit(120)
+                    } else {
+                        firestore.collection(AppConstants.COL_PROPERTIES).limit(120)
+                    }
+                    val propSnap = runCatching { propQuery.get().await() }.getOrNull()
+                    propSnap?.documents?.mapNotNull { doc ->
+                        runCatching { doc.toObject(PropertyEntity::class.java)?.copy(id = doc.id) }.getOrNull()
+                    }?.filter { prop ->
+                        prop.isActive &&
+                            prop.isApproved &&
+                            !prop.isDeleted &&
+                            !prop.isBlocked &&
+                            !prop.isNotificationsDisabled &&
+                            isWithinEffectiveRadius(
+                                request.latitude, request.longitude,
+                                prop.latitude, prop.longitude,
+                                radiusKm,
+                                cityKeys.isEmpty() || cityKeys.any { it.equals(prop.cityId, ignoreCase = true) }
+                            )
+                    }?.forEach { prop ->
+                        val key = prop.phone.ifBlank { prop.ownerId.ifBlank { prop.id } }
+                        if (key.isNotBlank()) targets.putIfAbsent(key, prop.phone)
+                    }
+                }
+
+                // 4) إرسال إشعارات مجمعة مع احترام حد الـ Batch في Firestore
                 val now = System.currentTimeMillis()
-                val batch = firestore.batch()
-                nearbyProviders.forEach { provider ->
-                    val targetPhoneOrId = provider.phone.ifBlank { provider.id }
-                    val notifId = "URG_PROV_${request.id}_${provider.id}"
-                    val notif = NotificationEntity(
-                        id = notifId,
-                        title = "🚨 طلب طوارئ عاجل في ${request.userCity}",
-                        message = "طلب عاجل (${request.requestCode}): ${request.serviceTitle} في ${request.userNeighborhood.ifBlank { request.userCity }}. قدّم عرضك الآن!",
-                        customerPhone = provider.phone,
-                        targetType = "PROVIDER",
-                        targetValue = targetPhoneOrId,
-                        notificationType = "URGENT_REQUEST",
-                        relatedRequestId = request.id,
-                        fcmSent = false,
-                        timestamp = now,
-                        createdAt = now,
-                        dedupKey = notifId
-                    )
-                    batch.set(firestore.collection("notifications").document(notifId), notif)
-                }
-                if (nearbyProviders.isNotEmpty()) {
+                val entries = targets.entries.toList()
+                entries.chunked(400).forEach { chunk ->
+                    val batch = firestore.batch()
+                    chunk.forEach { (targetPhoneOrId, phone) ->
+                        val safeKey = targetPhoneOrId.replace(Regex("[^A-Za-z0-9_-]"), "_")
+                        val notifId = "URG_PROV_${request.id}_$safeKey"
+                        val notif = NotificationEntity(
+                            id = notifId,
+                            title = "🚨 طلب عاجل في ${request.userCity}",
+                            message = "طلب (${request.requestCode}) - ${request.categoryName.ifBlank { section }}: ${request.serviceTitle} في ${request.userNeighborhood.ifBlank { request.userCity }}. قدّم عرضك الآن!",
+                            customerPhone = phone,
+                            targetType = "PROVIDER",
+                            targetValue = targetPhoneOrId,
+                            notificationType = "URGENT_REQUEST",
+                            relatedRequestId = request.id,
+                            fcmSent = false,
+                            timestamp = now,
+                            createdAt = now,
+                            dedupKey = notifId
+                        )
+                        batch.set(firestore.collection("notifications").document(notifId), notif)
+                    }
                     runCatching { batch.commit().await() }
                 }
-                
-                // 3. تسجيل الإشعار العام للفئة في Firestore
+
+                // 5) تسجيل الإشعار العام للقسم في Firestore
                 addNotification?.invoke(
                     "🚨 طلب عاجل جديد",
-                    "تم إرسال طلب عاجل في ${request.userCity} - الفئة: ${request.categoryName}",
+                    "تم إرسال طلب عاجل في ${request.userCity} - القسم: ${request.categoryName.ifBlank { section }}",
                     "PROVIDER",
-                    request.categoryId
+                    section
                 )
             } catch (e: Exception) {
                 android.util.Log.e("InstantRequestVM", "Failed to notify nearby providers", e)
@@ -312,12 +449,22 @@ class InstantRequestViewModel @Inject constructor(
         price: Double,
         estimatedArrivalTime: String = "خلال 30 دقيقة",
         estimatedDuration: String = "ساعتان",
-        notes: String = ""
+        notes: String = "",
+        onResult: (Boolean, String) -> Unit = { _, _ -> }
     ) {
+        if (price <= 0.0 || price.isNaN() || price.isInfinite()) {
+            val errMsg = "⚠️ السعر المقترح يجب أن يكون أكبر من صفر"
+            _uiState.value = InstantUiState.Error(errMsg)
+            triggerNotification?.invoke(errMsg)
+            onResult(false, errMsg)
+            return
+        }
         val existingOffers = _requestOffers.value.filter { it.requestId == requestId }
         if (existingOffers.any { it.technicianId == technicianId }) {
-            _uiState.value = InstantUiState.Error("⚠️ قمت بتقديم عرض سابق لهذا الطلب ولا يمكن تقديم عرض مكرر!")
-            triggerNotification?.invoke("⚠️ قمت بتقديم عرض سابق لهذا الطلب!")
+            val dupMsg = "⚠️ قمت بتقديم عرض سابق لهذا الطلب ولا يمكن تقديم عرض مكرر!"
+            _uiState.value = InstantUiState.Error(dupMsg)
+            triggerNotification?.invoke(dupMsg)
+            onResult(false, dupMsg)
             return
         }
 
@@ -328,7 +475,7 @@ class InstantRequestViewModel @Inject constructor(
             requestId = requestId,
             requestCode = requestCode,
             technicianId = technicianId,
-            technicianName = technicianName.ifBlank { "فني طوارئ معتمد" },
+            technicianName = technicianName.ifBlank { "مقدم خدمة معتمد" },
             technicianPhone = technicianPhone,
             technicianAvatar = technicianAvatar,
             technicianRating = technicianRating,
@@ -350,15 +497,19 @@ class InstantRequestViewModel @Inject constructor(
                 if (targetReq != null && targetReq.userPhone.isNotBlank()) {
                     addNotification?.invoke(
                         "💰 عرض جديد من $technicianName على طلبك $requestCode",
-                        "قدم الفني $technicianName عرض سعر قدره $price ر.ي بوقت وصول $estimatedArrivalTime. افتح العروض لمقارنة الخيارات والاختيار.",
+                        "قدم $technicianName عرض سعر قدره $price ر.ي بوقت وصول $estimatedArrivalTime. افتح العروض لمقارنة الخيارات والاختيار.",
                         "USER",
                         targetReq.userPhone
                     )
                 }
+                onResult(true, "تم تقديم عرض السعر بنجاح")
             },
             onError = { err ->
-                _uiState.value = InstantUiState.Success("تم تقديم عرض السعر محلياً")
-                triggerNotification?.invoke("⚠️ تم حفظ عرض السعر محلياً، سيتم المزامنة تلقائياً عند توفر الاتصال")
+                _requestOffers.value = _requestOffers.value.filterNot { it.id == offerId }
+                val failMsg = "تعذر إرسال العرض: $err"
+                _uiState.value = InstantUiState.Error(failMsg)
+                triggerNotification?.invoke("❌ $failMsg")
+                onResult(false, failMsg)
             }
         )
     }
@@ -412,9 +563,9 @@ class InstantRequestViewModel @Inject constructor(
                                 if (chatResult is AppResult.Success) {
                                     chatRepo.sendMessage(
                                         channelId = chatResult.data.id,
-                                        senderId = "system",
-                                        senderName = "النظام",
-                                        messageText = "مرحباً! تم قبول عرضك للطلب العاجل رقم ${requestId.take(6)}. تم فتح هذه المحادثة لتنسيق العمل.",
+                                        senderId = customerId,
+                                        senderName = "إشعار النظام ($customerName)",
+                                        messageText = "[نظام] تم قبول عرضك للطلب العاجل رقم ${requestId.take(6)}. تم فتح هذه المحادثة لتنسيق العمل.",
                                         mediaType = MediaType.TEXT
                                     )
                                 }
@@ -595,13 +746,25 @@ class InstantRequestViewModel @Inject constructor(
             }
 
             try {
+                val now = System.currentTimeMillis()
                 firestore.collection("bookings").document(booking.id).set(booking).await()
                 firestore.collection("instant_requests").document(curReq.id)
                     .collection("offers").document(curOffer.id).update("status", "ACCEPTED").await()
+                runCatching {
+                    firestore.collection("request_offers").document(curOffer.id).update("status", "ACCEPTED").await()
+                }
                 firestore.collection("instant_requests").document(curReq.id).update(
                     mapOf(
-                        "status" to "COMPLETED",
-                        "selectedOfferId" to curOffer.id
+                        "status" to "ACCEPTED",
+                        "selectedOfferId" to curOffer.id,
+                        "acceptedOfferId" to curOffer.id,
+                        "acceptedBookingId" to booking.id,
+                        "acceptedTechnicianId" to curOffer.technicianId,
+                        "acceptedTechnicianName" to curOffer.technicianName,
+                        "acceptedTechnicianPhone" to curOffer.technicianPhone,
+                        "acceptedPrice" to curOffer.price,
+                        "acceptedAt" to now,
+                        "updatedAt" to now
                     )
                 ).await()
 

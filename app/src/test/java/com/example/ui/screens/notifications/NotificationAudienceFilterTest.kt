@@ -145,4 +145,152 @@ class NotificationAudienceFilterTest {
             )
         )
     }
+
+    @Test
+    fun testPhoneSubstringDoesNotMatchAndNormalizedPhoneMatches() {
+        val notif = NotificationEntity(
+            id = "n5",
+            title = "تنبيه خاص",
+            message = "مرحباً بك",
+            targetAudience = "SPECIFIC_USERS",
+            targetValue = "00967771234567"
+        )
+
+        // Exact normalized 9-digit Yemeni number should match
+        assertTrue(
+            NotificationAudienceFilter.isAudienceMatched(
+                notif = notif,
+                cleanPhone = "771234567",
+                cleanUserId = "u_exact",
+                isAdmin = false,
+                isRegistered = true,
+                isProvider = false
+            )
+        )
+
+        // Partial substring must NOT match
+        assertFalse(
+            NotificationAudienceFilter.isAudienceMatched(
+                notif = notif,
+                cleanPhone = "77123456",
+                cleanUserId = "u_partial",
+                isAdmin = false,
+                isRegistered = true,
+                isProvider = false
+            )
+        )
+    }
+
+    @Test
+    fun testStrictRegionAndCategoryMatchingAndExpiration() {
+        val regionNotif = NotificationEntity(
+            id = "n6",
+            title = "تنبيه منطقة",
+            message = "صيانة مجدولة",
+            targetAudience = "REGION",
+            targetValue = "صنعاء"
+        )
+        assertTrue(
+            NotificationAudienceFilter.isAudienceMatched(
+                notif = regionNotif,
+                cleanPhone = "777000111",
+                cleanUserId = "u1",
+                isAdmin = false,
+                isRegistered = true,
+                isProvider = false,
+                currentResidence = "صنعاء - حدة"
+            )
+        )
+        assertFalse(
+            NotificationAudienceFilter.isAudienceMatched(
+                notif = regionNotif,
+                cleanPhone = "777000111",
+                cleanUserId = "u1",
+                isAdmin = false,
+                isRegistered = true,
+                isProvider = false,
+                currentResidence = "تعز"
+            )
+        )
+
+        val categoryNotif = NotificationEntity(
+            id = "n7",
+            title = "تحديث قسم",
+            message = "تنبيه لقطاع الكهرباء",
+            targetAudience = "CATEGORY",
+            targetValue = "كهرباء"
+        )
+        assertTrue(
+            NotificationAudienceFilter.isAudienceMatched(
+                notif = categoryNotif,
+                cleanPhone = "777000111",
+                cleanUserId = "u1",
+                isAdmin = false,
+                isRegistered = true,
+                isProvider = true,
+                userCategory = "كهرباء"
+            )
+        )
+        assertFalse(
+            NotificationAudienceFilter.isAudienceMatched(
+                notif = categoryNotif,
+                cleanPhone = "777000111",
+                cleanUserId = "u1",
+                isAdmin = false,
+                isRegistered = true,
+                isProvider = true,
+                userCategory = "سباكة"
+            )
+        )
+
+        val expiredNotif = NotificationEntity(
+            id = "n8",
+            title = "عرض منتهي",
+            message = "انتهى العرض",
+            targetAudience = "ALL",
+            expiryTimestamp = System.currentTimeMillis() - 60_000L
+        )
+        assertFalse(
+            NotificationAudienceFilter.isAudienceMatched(
+                notif = expiredNotif,
+                cleanPhone = "777000111",
+                cleanUserId = "u1",
+                isAdmin = false,
+                isRegistered = true,
+                isProvider = false
+            )
+        )
+    }
+
+    @Test
+    fun testStructuredSensitiveNotificationTypeBlocksUnmatchedUser() {
+        val otpNotif = NotificationEntity(
+            id = "n9",
+            title = "تنبيه أمني",
+            message = "تم إصدار رمز دخول",
+            targetAudience = "SPECIFIC_USERS",
+            targetValue = "777111222",
+            notificationType = "OTP"
+        )
+        assertFalse(
+            NotificationAudienceFilter.isAudienceMatched(
+                notif = otpNotif,
+                cleanPhone = "77711122",
+                cleanUserId = "u_other",
+                isAdmin = false,
+                isRegistered = true,
+                isProvider = false
+            )
+        )
+        assertTrue(
+            NotificationAudienceFilter.isAudienceMatched(
+                notif = otpNotif,
+                cleanPhone = "777111222",
+                cleanUserId = "u_target",
+                isAdmin = false,
+                isRegistered = true,
+                isProvider = false
+            )
+        )
+    }
 }

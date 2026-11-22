@@ -31,7 +31,11 @@ data class InstantRequestEntity(
     val offersCount: Int = 0,
     val deliveryMethod: String = "",
     val urgencyTime: String = "فوراً (خلال 30 دقيقة)",
-    val cancelReason: String = ""
+    val cancelReason: String = "",
+    val latitude: Double = 0.0,
+    val longitude: Double = 0.0,
+    val sectionType: String = "",
+    val updatedAt: Long = 0L
 ) {
     val effectivePinHash: String
         get() = pinHash.ifBlank { cancellationPassword }

@@ -4,8 +4,12 @@ package com.example.ui.dialogs
 import com.example.ui.*
 
 import android.content.Context
+import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
@@ -28,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -38,17 +43,23 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import coil.compose.AsyncImage
 import com.example.ui.MainViewModel
 import com.example.ui.components.InteractiveMapLocationPickerDialog
 import com.example.ui.components.ManualCoordinateDialog
 import com.example.ui.components.buildFormattedLocationAddress
+import com.example.ui.helpers.AppPreferenceHelper
 import com.example.ui.screens.map.LandmarkAddressScreen
+import com.example.utils.FirebaseStorageUploader
 import com.example.utils.LandmarkAddress
 import com.example.utils.LandmarkAddressStore
 import com.example.utils.OfflineYemenGazetteer
 import com.example.utils.VisualThemePalette
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.UUID
 
 /**
  * 🌟 3-Step Wizard for "اطلب خدمتك الآن" (Reverse Auction & Instant Requests)
@@ -64,10 +75,11 @@ fun QuickServiceRequestScreen(
     onRequestCreated: () -> Unit
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val currentUserPhone by viewModel.currentUserPhone.collectAsState()
     val currentUserName by viewModel.currentUserName.collectAsState()
     val currentUserId by viewModel.currentUserId.collectAsState()
-    val settingsState by viewModel.settings.collectAsState()
+    val dynamicCategories by viewModel.categories.collectAsState()
     val userLat by viewModel.userLatitude.collectAsState()
     val userLng by viewModel.userLongitude.collectAsState()
     val isRealLoc by viewModel.isUserLocationReal.collectAsState()
@@ -83,26 +95,36 @@ fun QuickServiceRequestScreen(
     var phoneInput by remember(currentUserPhone) { mutableStateOf(currentUserPhone) }
     var selectedCity by remember { mutableStateOf("صنعاء") }
     var neighborhoodInput by remember { mutableStateOf("") }
-    
-    // 4 Main Categories
-    var selectedSection by remember { mutableStateOf("SERVICES") } // "SERVICES", "RESTAURANTS", "STORES", "MEDICAL"
+    var pickedLat by remember { mutableDoubleStateOf(0.0) }
+    var pickedLng by remember { mutableDoubleStateOf(0.0) }
+    var attachedImageUri by remember { mutableStateOf<Uri?>(null) }
+
+    // 5 Main Sections + Dynamic Admin Categories
+    var selectedSection by remember { mutableStateOf("SERVICES") } // "SERVICES", "STORES", "RESTAURANTS", "MEDICAL", "PROPERTIES"
     var selectedSpecialty by remember { mutableStateOf("كهرباء وصيانة") }
     var serviceTitleInput by remember { mutableStateOf("") }
     var orderDetailsInput by remember { mutableStateOf("") }
     var pinCodeInput by remember { mutableStateOf("") }
     var urgencyTime by remember { mutableStateOf("فوراً (خلال 30 دقيقة)") }
-    var deliveryMethod by remember { mutableStateOf("توصيل") }
+    var deliveryMethod by remember { mutableStateOf("توصيل للموقع") }
 
     var isSubmitting by remember { mutableStateOf(false) }
     var generatedRequestCode by remember { mutableStateOf<String?>(null) }
     var generatedSecretPin by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(isSubmitting) {
+        if (isSubmitting) {
+            delay(35_000L)
+            isSubmitting = false
+        }
+    }
 
     val yemeniCities = listOf(
         "صنعاء", "عدن", "تعز", "الحديدة", "إب", "حضرموت", 
         "ذمار", "مأرب", "عمران", "صعدة", "شبوة", "لحج", "أبين", "المهرة", "البيضاء"
     )
 
-    // Category options mapping
+    // Category options mapping covering all app sectors
     val servicesOptions = listOf(
         "كهرباء وصيانة", "سباكة وتمديدات", "تكييف وتبريد", "طاقة شمسية وبطاريات",
         "دهان وديكور", "نجارة وألمنيوم", "صيانة سيارات", "إلكترونيات وهواتف", "تنظيف ونقل أثاث", "أخرى"
@@ -112,25 +134,50 @@ fun QuickServiceRequestScreen(
         "أطباق شعبية يمنية", "كافيه ومشروبات", "حلويات ومخبوزات", "بوفية وعصائر", "أخرى"
     )
     val storesOptions = listOf(
-        "إلكترونيات وأجهزة", "مواد بناء وسيراميك", "سوبرماركت ومواد غذائية", 
+        "إلكترونيات وأجهزة", "سوبرماركت ومواد غذائية", "مواد بناء وسيراميك",
         "أثاث ومفروشات منزلية", "طاقة شمسية وبطاريات", "ملابس ومستلزمات", "قطع غيار وزيوت", "أخرى"
     )
     val medicalOptions = listOf(
         "أدوية وصيدليات", "استشارات وعيادات تخصصية", "مختبرات وتحاليل طبية",
         "مستلزمات وأجهزة طبية", "رعاية منزلية وتمريض", "بصريات ونظارات", "أخرى"
     )
+    val propertiesOptions = listOf(
+        "شقة للإيجار", "شقة أو بيت للتمليك", "شقق مفروشة وفندقية",
+        "محل أو مكتب تجاري", "أرض أو فيلا", "استراحة أو سكن شبابي", "أخرى"
+    )
 
-    val currentSpecialties = when (selectedSection) {
-        "SERVICES" -> servicesOptions
-        "RESTAURANTS" -> restaurantsOptions
-        "STORES" -> storesOptions
-        "MEDICAL" -> medicalOptions
-        else -> servicesOptions
+    val adminCustomForSection = remember(dynamicCategories, selectedSection) {
+        dynamicCategories
+            .filter { cat ->
+                cat.name.isNotBlank() && (
+                    cat.parentId.equals(selectedSection, ignoreCase = true) ||
+                        (selectedSection == "SERVICES" && cat.parentId.isBlank())
+                    )
+            }
+            .map { it.name.trim() }
+            .distinct()
+    }
+
+    val currentSpecialties = remember(selectedSection, adminCustomForSection) {
+        val base = when (selectedSection) {
+            "SERVICES" -> servicesOptions
+            "RESTAURANTS" -> restaurantsOptions
+            "STORES" -> storesOptions
+            "MEDICAL" -> medicalOptions
+            "PROPERTIES" -> propertiesOptions
+            else -> servicesOptions
+        }
+        (adminCustomForSection + base).distinct()
     }
 
     LaunchedEffect(selectedSection) {
         if (!currentSpecialties.contains(selectedSpecialty)) {
             selectedSpecialty = currentSpecialties.first()
+        }
+        deliveryMethod = when (selectedSection) {
+            "PROPERTIES" -> "معاينة ميدانية"
+            "SERVICES" -> "زيارة فنية للموقع"
+            else -> "توصيل للموقع"
         }
     }
 
@@ -247,13 +294,21 @@ fun QuickServiceRequestScreen(
                         )
                     }
                     2 -> {
-                        // Step 2: Location & Details
+                        // Step 2: Location, GPS, Photo & Details
                         Step2LocationAndDetails(
                             citiesList = yemeniCities,
                             selectedCity = selectedCity,
                             onCitySelect = { selectedCity = it },
                             neighborhood = neighborhoodInput,
                             onNeighborhoodChange = { neighborhoodInput = it },
+                            pickedLat = pickedLat,
+                            pickedLng = pickedLng,
+                            onCoordsPicked = { lat, lng ->
+                                pickedLat = lat
+                                pickedLng = lng
+                            },
+                            attachedImageUri = attachedImageUri,
+                            onImageSelected = { attachedImageUri = it },
                             serviceTitle = serviceTitleInput,
                             onServiceTitleChange = { serviceTitleInput = it },
                             orderDetails = orderDetailsInput,
@@ -282,6 +337,9 @@ fun QuickServiceRequestScreen(
                             selectedSpecialty = selectedSpecialty,
                             selectedCity = selectedCity,
                             neighborhood = neighborhoodInput,
+                            hasExactCoords = LandmarkAddress.isValid(pickedLat, pickedLng) || hasGps,
+                            hasAttachment = attachedImageUri != null,
+                            deliveryMethod = deliveryMethod,
                             serviceTitle = serviceTitleInput,
                             urgencyTime = urgencyTime,
                             themeColors = themeColors
@@ -330,55 +388,89 @@ fun QuickServiceRequestScreen(
                                     }
                                 }
                                 3 -> {
-                                    val cleanP = phoneInput.trim().replace(" ", "").replace("+967", "").replace("00967", "")
-                                    if (cleanP.length != 9 || !(cleanP.startsWith("77") || cleanP.startsWith("73") || cleanP.startsWith("71") || cleanP.startsWith("70") || cleanP.startsWith("78"))) {
+                                    val cleanP = AppPreferenceHelper.normalizePhoneNumber(phoneInput).trim()
+                                    if (cleanP.length != 9 || !cleanP.all { it.isDigit() } || !(cleanP.startsWith("77") || cleanP.startsWith("73") || cleanP.startsWith("71") || cleanP.startsWith("70") || cleanP.startsWith("78"))) {
                                         Toast.makeText(context, "⚠️ يرجى إدخال رقم هاتف يمني صحيح مكون من 9 أرقام (77/73/71/70/78)", Toast.LENGTH_LONG).show()
                                         return@Button
                                     }
 
-                                    val pinToUse = if (pinCodeInput.isNotBlank()) pinCodeInput.trim() else (1000..9999).random().toString()
+                                    val secureRandom = java.security.SecureRandom()
+                                    val pinToUse = if (pinCodeInput.isNotBlank()) pinCodeInput.trim() else (1000 + secureRandom.nextInt(9000)).toString()
                                     val sectionLabel = when (selectedSection) {
                                         "SERVICES" -> "الخدمات والفنيين"
                                         "RESTAURANTS" -> "المطاعم والكافيهات"
-                                        "STORES" -> "المراكز والمتاجر"
-                                        "MEDICAL" -> "المراكز الطبية"
+                                        "STORES" -> "المتاجر والسلع والمحلات"
+                                        "MEDICAL" -> "المراكز الطبية والصيدليات"
+                                        "PROPERTIES" -> "العقارات والشقق والأراضي"
                                         else -> "الخدمات العامة"
                                     }
 
                                     val fullDesc = if (orderDetailsInput.isNotBlank()) {
-                                        "$orderDetailsInput | [تخصص: $selectedSpecialty] | [المهلة: $urgencyTime] ${if(selectedSection != "SERVICES") "| التسليم: $deliveryMethod" else ""}"
+                                        "$orderDetailsInput | [تخصص: $selectedSpecialty] | [المهلة: $urgencyTime] ${if (selectedSection != "SERVICES") "| التسليم/المعاينة: $deliveryMethod" else ""}"
                                     } else {
                                         "طلب عاجل [$selectedSpecialty] في $selectedCity (${neighborhoodInput.ifBlank { "المدينة" }}) | المهلة: $urgencyTime"
                                     }
 
-                                    isSubmitting = true
-                                    viewModel.setCurrentUserPhone(cleanP)
+                                    val finalLat = when {
+                                        LandmarkAddress.isValid(pickedLat, pickedLng) -> pickedLat
+                                        hasGps -> userLat
+                                        else -> 0.0
+                                    }
+                                    val finalLng = when {
+                                        LandmarkAddress.isValid(pickedLat, pickedLng) -> pickedLng
+                                        hasGps -> userLng
+                                        else -> 0.0
+                                    }
 
-                                    viewModel.createInstantRequest(
-                                        userId = currentUserId.ifBlank { "user_${cleanP}" },
-                                        userName = nameInput.ifBlank { "عميل ($cleanP)" },
-                                        userPhone = cleanP,
-                                        userCity = selectedCity,
-                                        userNeighborhood = neighborhoodInput.ifBlank { "وسط المدينة" },
-                                        categoryId = selectedSection,
-                                        categoryName = "$sectionLabel - ${if (currentSpecialties.contains(selectedSpecialty)) selectedSpecialty else currentSpecialties.first()}",
-                                        serviceTitle = serviceTitleInput.trim(),
-                                        description = fullDesc,
-                                        images = emptyList(),
-                                        urgencyTime = urgencyTime,
-                                        deliveryMethod = if (selectedSection != "SERVICES") deliveryMethod else "",
-                                        customPin = pinToUse,
-                                        onResult = { success, reqCode, secretPin ->
-                                            isSubmitting = false
-                                            if (success) {
-                                                generatedRequestCode = reqCode
-                                                generatedSecretPin = secretPin
-                                                Toast.makeText(context, "🔔 تم إطلاق طلبك العاجل بنجاح برقم ($reqCode)!\nتمت إضافته لشاشة 'طلباتي' وتنبيه الفنيين.", Toast.LENGTH_LONG).show()
-                                            } else {
-                                                Toast.makeText(context, "❌ حدث خطأ أثناء إرسال الطلب، يرجى المحاولة ثانية", Toast.LENGTH_SHORT).show()
-                                            }
+                                    isSubmitting = true
+                                    scope.launch {
+                                        val uploadedImages = if (attachedImageUri != null) {
+                                            val path = "urgent_requests/req_${System.currentTimeMillis()}_${UUID.randomUUID().toString().take(6)}.webp"
+                                            val uploadRes = runCatching {
+                                                FirebaseStorageUploader.uploadImageUri(
+                                                    context = context,
+                                                    uri = attachedImageUri!!,
+                                                    storagePath = path,
+                                                    maxDimension = 900,
+                                                    maxSizeBytes = 350 * 1024L
+                                                )
+                                            }.getOrNull()
+                                            val url = uploadRes?.getOrDefault("").orEmpty()
+                                            if (url.isNotBlank()) listOf(url) else emptyList()
+                                        } else {
+                                            emptyList()
                                         }
-                                    )
+
+                                        viewModel.createInstantRequest(
+                                            userId = currentUserId.ifBlank { "user_${cleanP}" },
+                                            userName = nameInput.ifBlank { "عميل ($cleanP)" },
+                                            userPhone = cleanP,
+                                            userCity = selectedCity,
+                                            userNeighborhood = neighborhoodInput.ifBlank { "وسط المدينة" },
+                                            categoryId = selectedSection,
+                                            categoryName = "$sectionLabel - ${if (currentSpecialties.contains(selectedSpecialty)) selectedSpecialty else currentSpecialties.first()}",
+                                            serviceTitle = serviceTitleInput.trim(),
+                                            description = fullDesc,
+                                            images = uploadedImages,
+                                            urgencyTime = urgencyTime,
+                                            deliveryMethod = if (selectedSection != "SERVICES") deliveryMethod else "",
+                                            customPin = pinToUse,
+                                            latitude = finalLat,
+                                            longitude = finalLng,
+                                            sectionType = selectedSection,
+                                            onResult = { success, reqCode, secretPin ->
+                                                isSubmitting = false
+                                                if (success) {
+                                                    viewModel.setCurrentUserPhone(cleanP)
+                                                    generatedRequestCode = reqCode
+                                                    generatedSecretPin = secretPin
+                                                    Toast.makeText(context, "🔔 تم إطلاق طلبك العاجل بنجاح برقم ($reqCode)!\nتمت إضافته لشاشة 'طلباتي' وتنبيه المختصين.", Toast.LENGTH_LONG).show()
+                                                } else {
+                                                    Toast.makeText(context, "❌ حدث خطأ أثناء إرسال الطلب، يرجى المحاولة ثانية", Toast.LENGTH_SHORT).show()
+                                                }
+                                            }
+                                        )
+                                    }
                                 }
                             }
                         },
@@ -513,12 +605,13 @@ private fun Step1CategorySection(
             color = Color.White
         )
 
-        // 4 Big distinct visual cards
+        // 5 Big distinct visual cards covering ALL app sectors
         val categoriesData = listOf(
-            Triple("SERVICES", "🔧 الخدمات والفنيين", "صيانة منازل، سباكة، كهرباء، تكييف، دهان وورش"),
-            Triple("RESTAURANTS", "🍽️ المطاعم والكافيهات", "وجبات سريعة، مشويات ومندي، معجنات وكافيهات"),
-            Triple("STORES", "🏬 المتاجر والمراكز", "أجهزة، مواد بناء، سوبرماركت، مستلزمات وأثاث"),
-            Triple("MEDICAL", "🏥 المراكز والعيادات", "أدوية وصيدليات، عيادات واستشارات ورعاية طبية")
+            Triple("SERVICES", "🔧 الخدمات والفنيين والصيانة", "صيانة منازل، سباكة، كهرباء، طاقة شمسية، تكييف وورش"),
+            Triple("STORES", "🏬 المتاجر والسلع والمحلات", "أجهزة، سوبرماركت، مواد بناء، أثاث، ملابس، قطع غيار"),
+            Triple("RESTAURANTS", "🍽️ المطاعم والكافيهات والوجبات", "وجبات سريعة، مشويات ومندي، أطباق شعبية وكافيهات"),
+            Triple("MEDICAL", "🏥 المراكز الطبية والصيدليات", "أدوية وصيدليات، عيادات، تحاليل ورعاية منزلية"),
+            Triple("PROPERTIES", "🏢 العقارات والشقق والأراضي", "شقق إيجار أو تمليك، فلل، أراضي، محلات ومكاتب، استراحات")
         )
 
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -642,6 +735,11 @@ private fun Step2LocationAndDetails(
     onCitySelect: (String) -> Unit,
     neighborhood: String,
     onNeighborhoodChange: (String) -> Unit,
+    pickedLat: Double,
+    pickedLng: Double,
+    onCoordsPicked: (Double, Double) -> Unit,
+    attachedImageUri: Uri?,
+    onImageSelected: (Uri?) -> Unit,
     serviceTitle: String,
     onServiceTitleChange: (String) -> Unit,
     orderDetails: String,
@@ -662,9 +760,18 @@ private fun Step2LocationAndDetails(
     var showMapPicker by remember { mutableStateOf(false) }
     var showCoordDialog by remember { mutableStateOf(false) }
     var showLandmarkWizard by remember { mutableStateOf(false) }
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        if (uri != null) onImageSelected(uri)
+    }
     LaunchedEffect(showLandmarkWizard) {
         savedAddresses = withContext(Dispatchers.IO) { landmarkStore.getAll() }
     }
+    val hasPickedCoords = LandmarkAddress.isValid(pickedLat, pickedLng)
+    val effectiveLat = if (hasPickedCoords) pickedLat else gpsLat
+    val effectiveLng = if (hasPickedCoords) pickedLng else gpsLng
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -751,11 +858,33 @@ private fun Step2LocationAndDetails(
             }
         }
 
+        if (hasPickedCoords || hasGps) {
+            Surface(
+                color = Color(0xFF064E3B).copy(alpha = 0.7f),
+                shape = RoundedCornerShape(8.dp),
+                border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.6f)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = if (hasPickedCoords) {
+                        "✅ تم تثبيت إحداثيات الطلب: ${OfflineYemenGazetteer.formatCoordinates(pickedLat, pickedLng)}"
+                    } else {
+                        "📡 سيتم إرفاق إحداثيات GPS الحالية تلقائياً (${OfflineYemenGazetteer.formatCoordinates(gpsLat, gpsLng)})"
+                    },
+                    color = Color(0xFFA7F3D0),
+                    fontSize = 10.5.sp,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                )
+            }
+        }
+
         if (savedAddresses.isNotEmpty()) {
             LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 items(savedAddresses) { addr ->
                     SuggestionChip(
                         onClick = {
+                            onCoordsPicked(addr.pointLat, addr.pointLng)
                             onNeighborhoodChange("${addr.describe()} (${OfflineYemenGazetteer.formatCoordinates(addr.pointLat, addr.pointLng)})")
                         },
                         label = { Text("🏠 ${addr.label} (${addr.landmarkName})", fontSize = 10.sp) }
@@ -777,8 +906,8 @@ private fun Step2LocationAndDetails(
         OutlinedTextField(
             value = serviceTitle,
             onValueChange = onServiceTitleChange,
-            label = { Text("عنوان الطلب / المشكلة (مطلوب) *") },
-            placeholder = { Text("مثال: صيانة تسريب مياه في المطبخ / وجبة غداء لـ 4 أفراد") },
+            label = { Text("عنوان الطلب / السلعة / الخدمة (مطلوب) *") },
+            placeholder = { Text("مثال: صيانة تسريب مياه / طلب مواد غذائية / شقة للإيجار") },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             shape = RoundedCornerShape(10.dp),
@@ -797,7 +926,7 @@ private fun Step2LocationAndDetails(
             value = orderDetails,
             onValueChange = onOrderDetailsChange,
             label = { Text("شرح إضافي / ملاحظات ومواصفات") },
-            placeholder = { Text("اكتب أي تفاصيل أخرى أو مستلزمات مطلوبة لتصلك عروض أسعار دقيقة...") },
+            placeholder = { Text("اكتب الكميات أو المواصفات أو التفاصيل المطلوبة لتصلك عروض أسعار دقيقة...") },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(100.dp),
@@ -811,6 +940,100 @@ private fun Step2LocationAndDetails(
                 unfocusedContainerColor = Color(0xFF1E293B)
             )
         )
+
+        // Optional Photo Attachment
+        Surface(
+            color = Color(0xFF1E293B),
+            shape = RoundedCornerShape(10.dp),
+            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.12f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("📷 إرفاق صورة توضيحية (اختياري)", fontSize = 11.5.sp, color = Color.White, fontWeight = FontWeight.Medium)
+                    OutlinedButton(
+                        onClick = {
+                            photoPickerLauncher.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                            )
+                        },
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                        modifier = Modifier.height(36.dp)
+                    ) {
+                        Text(if (attachedImageUri != null) "تغيير الصورة" else "اختيار صورة", fontSize = 11.sp, color = themeColors.accent)
+                    }
+                }
+                if (attachedImageUri != null) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(120.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                    ) {
+                        AsyncImage(
+                            model = attachedImageUri,
+                            contentDescription = "معاينة الصورة المرفقة",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                        IconButton(
+                            onClick = { onImageSelected(null) },
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(4.dp)
+                                .size(32.dp)
+                                .background(Color.Black.copy(alpha = 0.65f), CircleShape)
+                        ) {
+                            Icon(Icons.Default.Close, contentDescription = "إزالة الصورة", tint = Color.White, modifier = Modifier.size(16.dp))
+                        }
+                    }
+                }
+            }
+        }
+
+        // Delivery / Inspection Method for Stores, Restaurants, Medical, Real Estate
+        if (selectedSection != "SERVICES") {
+            val deliveryOptions = if (selectedSection == "PROPERTIES") {
+                listOf("معاينة ميدانية", "تواصل واتفاق مباشر")
+            } else {
+                listOf("توصيل للموقع", "استلام من المحل")
+            }
+            Text(
+                text = if (selectedSection == "PROPERTIES") "🏠 طريقة المتابعة والمعاينة:" else "🛵 طريقة التوصيل والاستلام:",
+                fontSize = 11.5.sp,
+                fontWeight = FontWeight.Bold,
+                color = themeColors.accent
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                deliveryOptions.forEach { method ->
+                    val isSel = deliveryMethod == method
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (isSel) Color(0xFF10B981) else Color(0xFF1E293B))
+                            .border(1.dp, if (isSel) Color(0xFF10B981) else Color.DarkGray, RoundedCornerShape(8.dp))
+                            .clickable { onDeliveryMethodChange(method) }
+                            .padding(vertical = 10.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = method,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+                }
+            }
+        }
 
         // Urgency selector
         Text(
@@ -849,14 +1072,15 @@ private fun Step2LocationAndDetails(
 
     if (showMapPicker) {
         InteractiveMapLocationPickerDialog(
-            initialLat = if (hasGps) gpsLat else 15.3694,
-            initialLng = if (hasGps) gpsLng else 44.1910,
+            initialLat = if (LandmarkAddress.isValid(effectiveLat, effectiveLng)) effectiveLat else 15.3694,
+            initialLng = if (LandmarkAddress.isValid(effectiveLat, effectiveLng)) effectiveLng else 44.1910,
             hasGps = hasGps,
             gpsLat = gpsLat,
             gpsLng = gpsLng,
             title = "📍 حدد موقع التوصيل / الخدمة على الخريطة",
             onDismiss = { showMapPicker = false },
             onLocationPicked = { res ->
+                onCoordsPicked(res.latitude, res.longitude)
                 onNeighborhoodChange(res.formattedAddress)
                 if (res.note.isNotBlank() && orderDetails.isBlank()) onOrderDetailsChange(res.note)
                 showMapPicker = false
@@ -866,14 +1090,15 @@ private fun Step2LocationAndDetails(
 
     if (showCoordDialog) {
         ManualCoordinateDialog(
-            initialLat = if (hasGps) gpsLat else 15.3694,
-            initialLng = if (hasGps) gpsLng else 44.1910,
+            initialLat = if (LandmarkAddress.isValid(effectiveLat, effectiveLng)) effectiveLat else 15.3694,
+            initialLng = if (LandmarkAddress.isValid(effectiveLat, effectiveLng)) effectiveLng else 44.1910,
             gpsLat = gpsLat,
             gpsLng = gpsLng,
             hasGps = hasGps,
             title = "🔢 إحداثيات موقع الطلب",
             onDismiss = { showCoordDialog = false },
             onConfirm = { lat, lng, summary ->
+                onCoordsPicked(lat, lng)
                 onNeighborhoodChange(buildFormattedLocationAddress(lat, lng, nearestSummary = summary))
                 showCoordDialog = false
             }
@@ -886,11 +1111,12 @@ private fun Step2LocationAndDetails(
             properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
         ) {
             LandmarkAddressScreen(
-                centerLat = if (hasGps) gpsLat else 15.3694,
-                centerLng = if (hasGps) gpsLng else 44.1910,
+                centerLat = if (LandmarkAddress.isValid(effectiveLat, effectiveLng)) effectiveLat else 15.3694,
+                centerLng = if (LandmarkAddress.isValid(effectiveLat, effectiveLng)) effectiveLng else 44.1910,
                 hasRealLocation = hasGps,
                 selectedCity = selectedCity,
                 onSaved = { addr ->
+                    onCoordsPicked(addr.pointLat, addr.pointLng)
                     onNeighborhoodChange("${addr.describe()} (${OfflineYemenGazetteer.formatCoordinates(addr.pointLat, addr.pointLng)})")
                 },
                 onClose = { showLandmarkWizard = false }
@@ -914,10 +1140,21 @@ private fun Step3ContactAndSubmit(
     selectedSpecialty: String,
     selectedCity: String,
     neighborhood: String,
+    hasExactCoords: Boolean,
+    hasAttachment: Boolean,
+    deliveryMethod: String,
     serviceTitle: String,
     urgencyTime: String,
     themeColors: VisualThemePalette
 ) {
+    val sectionArabic = when (selectedSection) {
+        "SERVICES" -> "الخدمات والفنيين"
+        "STORES" -> "المتاجر والسلع والمحلات"
+        "RESTAURANTS" -> "المطاعم والكافيهات"
+        "MEDICAL" -> "المراكز الطبية والصيدليات"
+        "PROPERTIES" -> "العقارات والشقق والأراضي"
+        else -> "عام"
+    }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -1014,9 +1251,18 @@ private fun Step3ContactAndSubmit(
                     Text("ملخص طلبك قبل الإطلاق:", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
                 }
                 HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
-                Text("🏷️ القسم: $selectedSpecialty", fontSize = 11.sp, color = Color.White)
+                Text("🏷️ القسم والتخصص: $sectionArabic — $selectedSpecialty", fontSize = 11.sp, color = Color.White)
                 Text("📍 الموقع: $selectedCity ${if (neighborhood.isNotBlank()) "($neighborhood)" else ""}", fontSize = 11.sp, color = Color.White)
+                if (hasExactCoords) {
+                    Text("🛰️ الإحداثيات الدقيقة: مرفقة لتحديد أقرب مقدمي الخدمة", fontSize = 10.5.sp, color = Color(0xFF34D399))
+                }
                 Text("📝 عنوان الطلب: ${serviceTitle.ifBlank { "طلب خدمة" }}", fontSize = 11.sp, color = Color.White)
+                if (selectedSection != "SERVICES" && deliveryMethod.isNotBlank()) {
+                    Text("🛵 طريقة الاستلام/المعاينة: $deliveryMethod", fontSize = 11.sp, color = Color.LightGray)
+                }
+                if (hasAttachment) {
+                    Text("📷 المرفقات: صورة توضيحية جاهزة للرفع", fontSize = 10.5.sp, color = Color(0xFF38BDF8))
+                }
                 Text("⏱️ وقت التنفيذ: $urgencyTime", fontSize = 11.sp, color = Color(0xFF10B981), fontWeight = FontWeight.Bold)
             }
         }

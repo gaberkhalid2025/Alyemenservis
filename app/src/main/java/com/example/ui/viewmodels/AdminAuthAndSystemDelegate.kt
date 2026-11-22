@@ -95,7 +95,7 @@ internal class AdminAuthAndSystemDelegate(
                     if (rememberMe) {
                         vm.secureStorage.saveAdminSession(
                             AdminSession(
-                                uid = "admin_${System.currentTimeMillis()}",
+                                uid = com.example.utils.EntityIdGenerator.generate("ADM"),
                                 email = trimmedEmail,
                                 loginTime = System.currentTimeMillis(),
                                 refreshToken = "ADMIN_SESSION",
@@ -153,7 +153,7 @@ internal class AdminAuthAndSystemDelegate(
                     if (rememberMe) {
                         vm.secureStorage.saveAdminSession(
                             AdminSession(
-                                uid = "owner_${System.currentTimeMillis()}",
+                                uid = com.example.utils.EntityIdGenerator.generate("OWN"),
                                 email = trimmedEmail,
                                 loginTime = System.currentTimeMillis(),
                                 refreshToken = "OWNER_SESSION",
@@ -213,7 +213,7 @@ internal class AdminAuthAndSystemDelegate(
                     if (rememberMe) {
                         vm.secureStorage.saveAdminSession(
                             AdminSession(
-                                uid = matchingSup?.id ?: "sup_${System.currentTimeMillis()}",
+                                uid = matchingSup?.id ?: com.example.utils.EntityIdGenerator.generate("SUP"),
                                 email = trimmedUser,
                                 loginTime = System.currentTimeMillis(),
                                 refreshToken = "SUPERVISOR_SESSION",

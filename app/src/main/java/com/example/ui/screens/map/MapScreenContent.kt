@@ -295,6 +295,27 @@ fun MapScreenContent(
         }
     }
 
+    LaunchedEffect(viewModel.pendingMapFocusPoint, viewModel.pendingMapAutoNavigate) {
+        val wp = viewModel.pendingMapFocusPoint ?: return@LaunchedEffect
+        val autoNav = viewModel.pendingMapAutoNavigate
+        viewModel.pendingMapFocusPoint = null
+        viewModel.pendingMapAutoNavigate = false
+        state.isRadarMode = false
+        state.selectedEntity = null
+        pinnedPoint = wp.latitude to wp.longitude
+        searchedPlace = RealValhallaNavigator.SearchAddressResult(
+            displayName = wp.name,
+            shortName = wp.name,
+            latitude = wp.latitude,
+            longitude = wp.longitude,
+            type = "chat_shared",
+            icon = "📍"
+        )
+        if (autoNav) {
+            state.startNavigation(wp)
+        }
+    }
+
     DisposableEffect(Unit) {
         onDispose {
             state.clearOffsets()

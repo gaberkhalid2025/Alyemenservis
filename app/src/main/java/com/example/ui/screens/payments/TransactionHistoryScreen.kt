@@ -23,6 +23,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.data.models.Transaction
 import com.example.utils.DateFormatter
 import com.example.utils.WalletManager
@@ -46,22 +48,55 @@ fun TransactionHistoryScreen(
     if (currentUserId.isBlank()) return
 
     val context = LocalContext.current
-    val walletManager = remember { WalletManager(context) }
-    val numberFormat = remember { DecimalFormat("#,###.##", DecimalFormatSymbols(Locale.US)) }
+    val appContext = context.applicationContext
+    val walletManager = remember(appContext) { WalletManager(appContext) }
+    val numberFormat = remember { DecimalFormat("#,###", DecimalFormatSymbols(Locale.US)) }
 
     val walletId = remember(currentUserId) { "wallet_$currentUserId" }
-    val viewModel = remember(currentUserId) {
-        TransactionHistoryViewModel(walletManager, walletId)
-    }
+    val viewModel: TransactionHistoryViewModel = viewModel(
+        key = walletId,
+        factory = remember(walletManager, walletId) {
+            TransactionHistoryViewModelFactory(walletManager, walletId)
+        }
+    )
 
-    val searchQuery by viewModel.searchQuery.collectAsState()
-    val selectedTypeFilter by viewModel.typeFilter.collectAsState()
-    val selectedStatusFilter by viewModel.statusFilter.collectAsState()
-    val filteredTransactions by viewModel.filteredTransactions.collectAsState()
-    val uiState by viewModel.uiState.collectAsState()
+    val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
+    val selectedTypeFilter by viewModel.typeFilter.collectAsStateWithLifecycle()
+    val selectedStatusFilter by viewModel.statusFilter.collectAsStateWithLifecycle()
+    val filteredTransactions by viewModel.filteredTransactions.collectAsStateWithLifecycle()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val topUpUi by viewModel.topUpUi.collectAsStateWithLifecycle()
+    val operationError by viewModel.operationError.collectAsStateWithLifecycle()
 
     var showDepositDialog by remember { mutableStateOf(false) }
     var depositAmountText by remember { mutableStateOf("") }
+    var topUpReferenceText by remember { mutableStateOf("") }
+    var topUpNoteText by remember { mutableStateOf("") }
+
+    LaunchedEffect(topUpUi) {
+        when (val status = topUpUi) {
+            is TopUpUi.Done -> {
+                showDepositDialog = false
+                depositAmountText = ""
+                topUpReferenceText = ""
+                topUpNoteText = ""
+                Toast.makeText(
+                    context,
+                    "تم إرسال طلب شحن بمبلغ ${numberFormat.format(status.amount)} ريال (${status.requestId}) للمراجعة",
+                    Toast.LENGTH_LONG
+                ).show()
+                viewModel.resetTopUpUi()
+            }
+            else -> {}
+        }
+    }
+
+    LaunchedEffect(operationError) {
+        operationError?.let { msg ->
+            Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+            viewModel.clearOperationError()
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -193,7 +228,6 @@ fun TransactionHistoryScreen(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
-                                    // Total Deposits
                                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                         Box(
                                             modifier = Modifier
@@ -204,7 +238,7 @@ fun TransactionHistoryScreen(
                                             Icon(Icons.Default.Check, contentDescription = null, tint = Color(0xFF81C784), modifier = Modifier.size(16.dp))
                                         }
                                         Column {
-                                            Text("إجمالي الإيداعات", fontSize = 11.sp, color = Color(0xFFE0F2FE))
+                                            Text("إجمالي الواردات", fontSize = 11.sp, color = Color(0xFFE0F2FE))
                                             Text("${numberFormat.format(state.totalDeposits)} ريال", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
                                         }
                                     }
@@ -220,9 +254,27 @@ fun TransactionHistoryScreen(
                                             Icon(Icons.Default.Close, contentDescription = null, tint = Color(0xFFEF9A9A), modifier = Modifier.size(16.dp))
                                         }
                                         Column {
-                                            Text("إجمالي السحوبات", fontSize = 11.sp, color = Color(0xFFE0F2FE))
+                                            Text("إجمالي الصادرات", fontSize = 11.sp, color = Color(0xFFE0F2FE))
                                             Text("${numberFormat.format(state.totalWithdrawals)} ريال", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
                                         }
+                                    }
+                                }
+
+                                val pendingCount = state.topUpRequests.count { it.status.equals("PENDING", ignoreCase = true) }
+                                if (pendingCount > 0) {
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    Surface(
+                                        color = Color(0xFFF59E0B).copy(alpha = 0.22f),
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text(
+                                            text = "⏳ لديك $pendingCount طلب شحن رصيد قيد المراجعة والاعتماد الإداري",
+                                            fontSize = 11.sp,
+                                            color = Color(0xFFFEF3C7),
+                                            fontWeight = FontWeight.SemiBold,
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                        )
                                     }
                                 }
                             }
@@ -411,44 +463,98 @@ fun TransactionHistoryScreen(
         }
     }
 
-    // Deposit dialog
+    // Top-Up Request dialog (PENDING review, never instant client-side credit)
     if (showDepositDialog) {
+        val isSending = topUpUi is TopUpUi.Sending
+        val failedMessage = (topUpUi as? TopUpUi.Failed)?.message
+
         AlertDialog(
-            onDismissRequest = { showDepositDialog = false },
-            title = { Text("شحن المحفظة الإلكترونية", fontWeight = FontWeight.Bold) },
+            onDismissRequest = {
+                if (!isSending) {
+                    showDepositDialog = false
+                    viewModel.resetTopUpUi()
+                }
+            },
+            title = { Text("طلب شحن المحفظة الإلكترونية", fontWeight = FontWeight.Bold) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("أدخل المبلغ بالريال اليمني للشحن الفوري:", fontSize = 13.sp)
+                    Text(
+                        "أدخل المبلغ ورقم مرجع الحوالة لإرسال طلب شحن يراجعه ويُعتمده فريق الإدارة:",
+                        fontSize = 12.sp,
+                        color = Color(0xFF475569)
+                    )
                     OutlinedTextField(
                         value = depositAmountText,
                         onValueChange = { depositAmountText = it.filter { char -> char.isDigit() } },
+                        label = { Text("المبلغ بالريال اليمني") },
                         placeholder = { Text("مثال: 25000") },
                         trailingIcon = { Text("YER", modifier = Modifier.padding(end = 8.dp), fontWeight = FontWeight.Bold) },
                         modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
+                        singleLine = true,
+                        enabled = !isSending
                     )
+                    OutlinedTextField(
+                        value = topUpReferenceText,
+                        onValueChange = { topUpReferenceText = it },
+                        label = { Text("رقم المرجع / الحوالة *") },
+                        placeholder = { Text("مثال: KRM-948201") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        enabled = !isSending
+                    )
+                    OutlinedTextField(
+                        value = topUpNoteText,
+                        onValueChange = { topUpNoteText = it },
+                        label = { Text("ملاحظة (اختياري)") },
+                        placeholder = { Text("اسم المحفظة أو البنك المحوّل منه") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        enabled = !isSending
+                    )
+                    if (!failedMessage.isNullOrBlank()) {
+                        Text(
+                            text = failedMessage,
+                            color = Color(0xFFDC2626),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
                 }
             },
             confirmButton = {
                 Button(
                     onClick = {
-                        val amount = depositAmountText.toDoubleOrNull() ?: 0.0
-                        if (amount > 0) {
-                            viewModel.deposit(amount, "شحن رصيد محفظة فوري")
-                            showDepositDialog = false
-                            depositAmountText = ""
-                            Toast.makeText(context, "تم إيداع ${numberFormat.format(amount)} ريال بنجاح!", Toast.LENGTH_SHORT).show()
-                        } else {
-                            Toast.makeText(context, "يرجى إدخال مبلغ صحيح", Toast.LENGTH_SHORT).show()
-                        }
+                        val amount = depositAmountText.toLongOrNull() ?: 0L
+                        viewModel.submitTopUpRequest(
+                            amount = amount,
+                            referenceNumber = topUpReferenceText,
+                            note = topUpNoteText
+                        )
                     },
+                    enabled = !isSending,
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00668B))
                 ) {
-                    Text("تأكيد الشحن")
+                    if (isSending) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            color = Color.White,
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("جاري الإرسال...")
+                    } else {
+                        Text("إرسال طلب الشحن")
+                    }
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDepositDialog = false }) {
+                TextButton(
+                    onClick = {
+                        showDepositDialog = false
+                        viewModel.resetTopUpUi()
+                    },
+                    enabled = !isSending
+                ) {
                     Text("إلغاء")
                 }
             }

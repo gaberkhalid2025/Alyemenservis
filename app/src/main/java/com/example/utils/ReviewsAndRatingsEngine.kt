@@ -88,7 +88,7 @@ object ReviewsAndRatingsEngine {
                 return@verifyCompletedBookingEligibility
             }
 
-            val reviewId = "rev_${System.currentTimeMillis()}_${(1000..9999).random()}"
+            val reviewId = EntityIdGenerator.generateReviewId()
             val overallAvg = ratings.calculateOverallAverage()
 
             val ratingEntity = RatingEntity(
@@ -212,7 +212,7 @@ object ReviewsAndRatingsEngine {
             return
         }
 
-        val reportId = "rep_${System.currentTimeMillis()}"
+        val reportId = EntityIdGenerator.generate("REP")
         val reportPayload = hashMapOf<String, Any?>(
             "id" to reportId,
             "reviewId" to reviewId,

@@ -150,8 +150,8 @@ object BookingStateMachine {
         if (appointmentTime > 0L) {
             val diffMs = appointmentTime - System.currentTimeMillis()
             val eightHoursMs = 8 * 60 * 60 * 1000L
-            if (diffMs in 1..eightHoursMs) {
-                // متبقي أقل من 8 ساعات على الموعد
+            if (diffMs <= eightHoursMs) {
+                // الموعد منتهٍ أو متبقي أقل من 8 ساعات عليه
                 return false
             }
         }

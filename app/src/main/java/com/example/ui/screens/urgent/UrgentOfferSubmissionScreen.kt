@@ -219,17 +219,23 @@ fun UrgentOfferSubmissionScreen(
                         requestId = currentReq.id,
                         requestCode = currentReq.requestCode,
                         technicianId = currentUserId,
-                        technicianName = currentUserName.ifBlank { "فني طوارئ معتمد" },
+                        technicianName = currentUserName.ifBlank { "مقدم خدمة معتمد" },
                         technicianPhone = currentUserPhone.ifBlank { currentUserId },
                         technicianAvatar = "",
                         technicianRating = 5.0f,
                         price = price,
                         estimatedArrivalTime = estimatedArrival,
                         estimatedDuration = estimatedDuration,
-                        notes = notesText
+                        notes = notesText,
+                        onResult = { ok, msg ->
+                            if (ok) {
+                                scope.launch { snackbarHostState.showSnackbar("تم إرسال عرضك الفوري بنجاح!") }
+                                onOfferSubmitted()
+                            } else {
+                                scope.launch { snackbarHostState.showSnackbar(msg.ifBlank { "تعذر إرسال العرض" }) }
+                            }
+                        }
                     )
-                    scope.launch { snackbarHostState.showSnackbar("تم إرسال عرضك الفوري بنجاح!") }
-                    onOfferSubmitted()
                 },
                 modifier = Modifier.fillMaxWidth().height(52.dp).testTag("submit_urgent_offer_btn"),
                 shape = RoundedCornerShape(12.dp),

@@ -443,7 +443,7 @@ fun AdminJobsPanel(
                             return@Button
                         }
                         val newJob = JobEntity(
-                            id = "job_${System.currentTimeMillis()}",
+                            id = com.example.utils.EntityIdGenerator.generateJobId(),
                             title = jobTitleInput.trim(),
                             companyName = jobCompanyInput.trim(),
                             phone = jobPhoneInput.trim(),

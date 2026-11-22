@@ -9,7 +9,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -18,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.NetworkUtils
@@ -26,6 +31,9 @@ import androidx.compose.ui.unit.sp
 import com.example.data.models.InstantRequestEntity
 import com.example.data.models.RequestOfferEntity
 import com.example.ui.MainViewModel
+import com.example.ui.components.InteractiveMapLocationPickerDialog
+import com.example.utils.LandmarkAddress
+import com.example.utils.OfflineYemenGazetteer
 import com.example.utils.VisualThemePalette
 
 @Composable
@@ -172,15 +180,41 @@ fun CreateInstantRequestDialog(
     themeColors: VisualThemePalette,
     onDismiss: () -> Unit
 ) {
+    val currentUserPhone by viewModel.currentUserPhone.collectAsState()
+    val userLat by viewModel.userLatitude.collectAsState()
+    val userLng by viewModel.userLongitude.collectAsState()
+    val isRealLoc by viewModel.isUserLocationReal.collectAsState()
+    val hasGps = isRealLoc && LandmarkAddress.isValid(userLat, userLng)
+
+    val sectionOptions = remember {
+        listOf(
+            "SERVICES" to "🔧 الخدمات والفنيين والصيانة",
+            "STORES" to "🏬 المتاجر والسلع والمحلات",
+            "RESTAURANTS" to "🍽️ المطاعم والكافيهات والوجبات",
+            "MEDICAL" to "🏥 المراكز الطبية والصيدليات",
+            "PROPERTIES" to "🏢 العقارات والشقق والأراضي"
+        )
+    }
+
+    var selectedSection by rememberSaveable { mutableStateOf("SERVICES") }
+    var sectionDropdownExpanded by remember { mutableStateOf(false) }
     var title by rememberSaveable { mutableStateOf("") }
     var details by rememberSaveable { mutableStateOf("") }
-    var city by rememberSaveable { mutableStateOf("") }
+    var city by rememberSaveable { mutableStateOf("صنعاء") }
+    var neighborhood by rememberSaveable { mutableStateOf("") }
+    var phoneInput by rememberSaveable(currentUserPhone) { mutableStateOf(currentUserPhone) }
+    var pickedLat by rememberSaveable { mutableDoubleStateOf(0.0) }
+    var pickedLng by rememberSaveable { mutableDoubleStateOf(0.0) }
+    var showMapPicker by remember { mutableStateOf(false) }
     var isSubmitting by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
+    val selectedSectionLabel = sectionOptions.find { it.first == selectedSection }?.second ?: "🔧 الخدمات والفنيين"
+    val hasPickedCoords = LandmarkAddress.isValid(pickedLat, pickedLng)
+
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("طلب خدمة فورية", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp) },
+        title = { Text("طلب خدمة أو سلعة فورية", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp) },
         text = {
             Column(
                 modifier = Modifier
@@ -188,28 +222,90 @@ fun CreateInstantRequestDialog(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = selectedSectionLabel,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("القسم المختص") },
+                        trailingIcon = {
+                            IconButton(onClick = { sectionDropdownExpanded = true }) {
+                                Icon(Icons.Default.ArrowDropDown, contentDescription = "اختيار القسم", tint = Color.White)
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        textStyle = LocalTextStyle.current.copy(color = Color.White)
+                    )
+                    DropdownMenu(
+                        expanded = sectionDropdownExpanded,
+                        onDismissRequest = { sectionDropdownExpanded = false }
+                    ) {
+                        sectionOptions.forEach { (code, label) ->
+                            DropdownMenuItem(
+                                text = { Text(label, fontWeight = FontWeight.Medium) },
+                                onClick = {
+                                    selectedSection = code
+                                    sectionDropdownExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
-                    label = { Text("عنوان الخدمة المطلوبة") },
+                    label = { Text("عنوان الطلب / السلعة / الخدمة *") },
                     modifier = Modifier.fillMaxWidth(),
                     textStyle = LocalTextStyle.current.copy(color = Color.White)
                 )
                 OutlinedTextField(
                     value = details,
                     onValueChange = { details = it },
-                    label = { Text("التفاصيل والمشكلة") },
+                    label = { Text("التفاصيل والمواصفات المطلوبة") },
                     modifier = Modifier.fillMaxWidth(),
-                    minLines = 3,
+                    minLines = 2,
                     textStyle = LocalTextStyle.current.copy(color = Color.White)
                 )
                 OutlinedTextField(
                     value = city,
                     onValueChange = { city = it },
-                    label = { Text("المدينة / الحي") },
+                    label = { Text("المدينة / المحافظة *") },
                     modifier = Modifier.fillMaxWidth(),
                     textStyle = LocalTextStyle.current.copy(color = Color.White)
                 )
+                OutlinedTextField(
+                    value = neighborhood,
+                    onValueChange = { neighborhood = it },
+                    label = { Text("الحي / المعلم / عنوان التوصيل") },
+                    modifier = Modifier.fillMaxWidth(),
+                    textStyle = LocalTextStyle.current.copy(color = Color.White)
+                )
+                OutlinedTextField(
+                    value = phoneInput,
+                    onValueChange = { phoneInput = it },
+                    label = { Text("رقم الهاتف للتواصل *") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    textStyle = LocalTextStyle.current.copy(color = Color.White)
+                )
+                OutlinedButton(
+                    onClick = { showMapPicker = true },
+                    modifier = Modifier.fillMaxWidth().height(48.dp)
+                ) {
+                    Icon(Icons.Default.LocationOn, contentDescription = null, tint = Color(0xFF10B981))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = if (hasPickedCoords) {
+                            "تم تحديد الموقع: ${OfflineYemenGazetteer.formatCoordinates(pickedLat, pickedLng)}"
+                        } else {
+                            "📍 تحديد الموقع على خريطة التطبيق"
+                        },
+                        color = Color(0xFF10B981),
+                        fontSize = 12.sp
+                    )
+                }
             }
         },
         confirmButton = {
@@ -219,23 +315,41 @@ fun CreateInstantRequestDialog(
                         Toast.makeText(context, "الرجاء تعبئة العنوان والمدينة", Toast.LENGTH_SHORT).show()
                         return@Button
                     }
+                    val cleanPhone = com.example.ui.helpers.AppPreferenceHelper.normalizePhoneNumber(phoneInput).trim()
+                    if (cleanPhone.length < 9) {
+                        Toast.makeText(context, "يرجى إدخال رقم هاتف صحيح للتواصل", Toast.LENGTH_SHORT).show()
+                        return@Button
+                    }
+                    val finalLat = when {
+                        hasPickedCoords -> pickedLat
+                        hasGps -> userLat
+                        else -> 0.0
+                    }
+                    val finalLng = when {
+                        hasPickedCoords -> pickedLng
+                        hasGps -> userLng
+                        else -> 0.0
+                    }
                     isSubmitting = true
                     viewModel.createInstantRequest(
-                        userId = viewModel.currentUserId.value,
-                        userName = viewModel.currentUserName.value,
-                        userPhone = viewModel.currentUserPhone.value,
-                        userCity = city,
-                        userNeighborhood = city,
-                        categoryId = "GENERAL",
-                        categoryName = "عام",
-                        serviceTitle = title,
-                        description = details,
+                        userId = viewModel.currentUserId.value.ifBlank { "user_$cleanPhone" },
+                        userName = viewModel.currentUserName.value.ifBlank { "عميل ($cleanPhone)" },
+                        userPhone = cleanPhone,
+                        userCity = city.trim(),
+                        userNeighborhood = neighborhood.ifBlank { city.trim() },
+                        categoryId = selectedSection,
+                        categoryName = selectedSectionLabel.drop(2).trim(),
+                        serviceTitle = title.trim(),
+                        description = details.trim(),
                         images = emptyList(),
-                        urgencyTime = "فوراً (خلال 30 دقيقة)"
-                    ) { success, reqId, reqCode ->
+                        urgencyTime = "فوراً (خلال 30 دقيقة)",
+                        latitude = finalLat,
+                        longitude = finalLng,
+                        sectionType = selectedSection
+                    ) { success, reqCode, _ ->
                         isSubmitting = false
                         if (success) {
-                            Toast.makeText(context, "✅ تم إرسال طلبك للفنيين بنجاح", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "✅ تم إرسال طلبك ($reqCode) وإشعار المختصين بنجاح", Toast.LENGTH_SHORT).show()
                             onDismiss()
                         } else {
                             Toast.makeText(context, "❌ تعذر إرسال الطلب، يرجى التأكد من اتصال الإنترنت والمحاولة ثانية", Toast.LENGTH_LONG).show()
@@ -254,6 +368,26 @@ fun CreateInstantRequestDialog(
         },
         containerColor = Color(0xFF1E293B)
     )
+
+    if (showMapPicker) {
+        InteractiveMapLocationPickerDialog(
+            initialLat = if (hasPickedCoords) pickedLat else if (hasGps) userLat else 15.3694,
+            initialLng = if (hasPickedCoords) pickedLng else if (hasGps) userLng else 44.1910,
+            hasGps = hasGps,
+            gpsLat = userLat,
+            gpsLng = userLng,
+            title = "📍 تحديد موقع الطلب على الخريطة",
+            onDismiss = { showMapPicker = false },
+            onLocationPicked = { res ->
+                pickedLat = res.latitude
+                pickedLng = res.longitude
+                if (res.formattedAddress.isNotBlank()) {
+                    neighborhood = res.formattedAddress
+                }
+                showMapPicker = false
+            }
+        )
+    }
 }
 
 @Composable
@@ -282,15 +416,19 @@ fun SubmitOfferDialog(
                 Text("الطلب: ${request.serviceTitle}", color = Color.LightGray, fontSize = 12.sp)
                 OutlinedTextField(
                     value = price,
-                    onValueChange = { price = it },
-                    label = { Text("السعر المقترح (ريال)") },
+                    onValueChange = { input -> if (input.all { it.isDigit() || it == '.' }) price = input },
+                    label = { Text("السعر المقترح (ريال) *") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     textStyle = LocalTextStyle.current.copy(color = Color.White)
                 )
                 OutlinedTextField(
                     value = time,
                     onValueChange = { time = it },
-                    label = { Text("وقت الوصول المتوقع (دقائق)") },
+                    label = { Text("وقت الوصول / التوصيل المتوقع (دقائق)") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     textStyle = LocalTextStyle.current.copy(color = Color.White)
                 )
@@ -307,9 +445,17 @@ fun SubmitOfferDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    if (price.isBlank()) {
-                        Toast.makeText(context, "الرجاء تحديد السعر", Toast.LENGTH_SHORT).show()
+                    val priceVal = price.toDoubleOrNull()
+                    if (priceVal == null || priceVal <= 0.0) {
+                        Toast.makeText(context, "الرجاء إدخال سعر صحيح أكبر من صفر", Toast.LENGTH_SHORT).show()
                         return@Button
+                    }
+                    val arrivalText = time.trim().let { raw ->
+                        when {
+                            raw.isBlank() -> "خلال 30 دقيقة"
+                            raw.contains("دقيق") || raw.contains("ساع") -> raw
+                            else -> "$raw دقيقة"
+                        }
                     }
                     isSubmitting = true
                     viewModel.submitOfferForRequest(
@@ -320,14 +466,20 @@ fun SubmitOfferDialog(
                         technicianPhone = viewModel.currentUserPhone.value,
                         technicianAvatar = "",
                         technicianRating = 5.0f,
-                        price = price.toDoubleOrNull() ?: 0.0,
-                        estimatedArrivalTime = "$time دقيقة",
+                        price = priceVal,
+                        estimatedArrivalTime = arrivalText,
                         estimatedDuration = "ساعتان",
-                        notes = notes
+                        notes = notes.trim(),
+                        onResult = { ok, msg ->
+                            isSubmitting = false
+                            if (ok) {
+                                Toast.makeText(context, "✅ تم تقديم عرضك بنجاح للعميل", Toast.LENGTH_SHORT).show()
+                                onDismiss()
+                            } else {
+                                Toast.makeText(context, "❌ ${msg.ifBlank { "تعذر تقديم العرض" }}", Toast.LENGTH_LONG).show()
+                            }
+                        }
                     )
-                    isSubmitting = false
-                    Toast.makeText(context, "✅ تم تقديم عرضك بنجاح للعميل", Toast.LENGTH_SHORT).show()
-                    onDismiss()
                 },
                 enabled = !isSubmitting && price.isNotBlank(),
                 colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent)

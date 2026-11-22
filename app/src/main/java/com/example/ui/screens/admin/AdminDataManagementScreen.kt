@@ -535,7 +535,13 @@ fun AdminDataManagementScreenContent(
             confirmButton = {
                 Button(
                     onClick = {
-                        val newId = "item_${System.currentTimeMillis()}"
+                        val newId = when (selectedSection) {
+                            "العقارات" -> com.example.utils.EntityIdGenerator.generatePropertyId()
+                            "إعلانات الوظائف" -> com.example.utils.EntityIdGenerator.generateJobId()
+                            "المطاعم والكافيهات" -> com.example.utils.EntityIdGenerator.generate("REST")
+                            "المراكز الطبية" -> com.example.utils.EntityIdGenerator.generate("MED")
+                            else -> com.example.utils.EntityIdGenerator.generateStoreId()
+                        }
                         val targetSection = when (selectedSection) {
                             "المطاعم والكافيهات" -> "restaurants"
                             "المراكز الطبية" -> "medical"

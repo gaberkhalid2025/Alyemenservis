@@ -36,7 +36,10 @@ import com.example.ui.screens.urgent.components.UrgentFormFields
 import android.net.Uri
 import androidx.compose.ui.draw.clip
 import coil.compose.AsyncImage
+import com.example.ui.components.InteractiveMapLocationPickerDialog
 import com.example.utils.FirebaseStorageUploader
+import com.example.utils.LandmarkAddress
+import com.example.utils.OfflineYemenGazetteer
 import java.util.UUID
 
 /**
@@ -61,6 +64,11 @@ fun UrgentRequestScreen(
     val currentUserPhone by viewModel.currentUserPhone.collectAsState()
     val uiState by instantViewModel.uiState.collectAsState()
 
+    val userLat by viewModel.userLatitude.collectAsState()
+    val userLng by viewModel.userLongitude.collectAsState()
+    val isRealLoc by viewModel.isUserLocationReal.collectAsState()
+    val hasGps = isRealLoc && LandmarkAddress.isValid(userLat, userLng)
+
     var customerPhone by remember(currentUserPhone) { mutableStateOf(currentUserPhone) }
     var customerName by remember(currentUserName, currentUserPhone) { 
         mutableStateOf(currentUserName.ifEmpty { if (currentUserPhone.isNotEmpty()) "عميل ($currentUserPhone)" else "" }) 
@@ -71,6 +79,9 @@ fun UrgentRequestScreen(
     var serviceDetails by rememberSaveable { mutableStateOf("") }
     var selectedCity by rememberSaveable { mutableStateOf("صنعاء") }
     var selectedArea by rememberSaveable { mutableStateOf("") }
+    var pickedLat by rememberSaveable { mutableDoubleStateOf(0.0) }
+    var pickedLng by rememberSaveable { mutableDoubleStateOf(0.0) }
+    var showMapPicker by remember { mutableStateOf(false) }
     var pinCode by rememberSaveable { mutableStateOf("") }
     var isPinVisible by remember { mutableStateOf(false) }
     var attachedImageUri by remember { mutableStateOf<Uri?>(null) }
@@ -176,6 +187,25 @@ fun UrgentRequestScreen(
                 selectedArea = selectedArea,
                 onAreaChange = { selectedArea = it }
             )
+
+            val hasPickedCoords = LandmarkAddress.isValid(pickedLat, pickedLng)
+            OutlinedButton(
+                onClick = { showMapPicker = true },
+                modifier = Modifier.fillMaxWidth().height(48.dp).testTag("urgent_pick_map_btn"),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Icon(Icons.Default.LocationOn, contentDescription = null, tint = Color(0xFF10B981))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = if (hasPickedCoords) {
+                        "📍 تم تحديد الإحداثيات: ${OfflineYemenGazetteer.formatCoordinates(pickedLat, pickedLng)}"
+                    } else {
+                        "📍 تحديد موقع الطلب على خريطة التطبيق (موصى به)"
+                    },
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
 
             // اختيار القسم الرئيسي والفرعي (فنيين، محلات وتجارة، مطاعم، مراكز طبية، عقارات)
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -356,6 +386,25 @@ fun UrgentRequestScreen(
 
                     isSubmitting = true
 
+                    val finalLat = when {
+                        LandmarkAddress.isValid(pickedLat, pickedLng) -> pickedLat
+                        hasGps -> userLat
+                        else -> 0.0
+                    }
+                    val finalLng = when {
+                        LandmarkAddress.isValid(pickedLat, pickedLng) -> pickedLng
+                        hasGps -> userLng
+                        else -> 0.0
+                    }
+                    val sectionCode = when (selectedDepartment) {
+                        "خدمات وفنيين" -> "SERVICES"
+                        "محلات ومراكز تجارية" -> "STORES"
+                        "مطاعم وكافيهات" -> "RESTAURANTS"
+                        "مراكز وعيادات طبية" -> "MEDICAL"
+                        "عقارات وشقق" -> "PROPERTIES"
+                        else -> "GENERAL"
+                    }
+
                     val executeCreateRequest: (String) -> Unit = { uploadedImageUrl ->
                         try {
                             instantViewModel.createInstantRequest(
@@ -364,11 +413,15 @@ fun UrgentRequestScreen(
                                 userPhone = cleanPhone,
                                 userCity = selectedCity,
                                 userNeighborhood = selectedArea,
-                                categoryId = selectedDepartment,
-                                categoryName = selectedCategory,
-                                serviceTitle = serviceTitle,
-                                description = if (uploadedImageUrl.isNotBlank()) "$serviceDetails\n[مرفق صورة: $uploadedImageUrl]" else serviceDetails,
+                                categoryId = sectionCode,
+                                categoryName = "$selectedDepartment - $selectedCategory",
+                                serviceTitle = serviceTitle.trim(),
+                                description = serviceDetails.trim(),
+                                images = if (uploadedImageUrl.isNotBlank()) listOf(uploadedImageUrl) else emptyList(),
                                 customPin = pinCode,
+                                latitude = finalLat,
+                                longitude = finalLng,
+                                sectionType = sectionCode,
                                 onResult = { success, returnedCodeOrMsg, returnedPin ->
                                     isSubmitting = false
                                     if (success) {
@@ -447,7 +500,7 @@ fun UrgentRequestScreen(
             },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("تم تعميم طلبك على الفنيين المتاحين فوراً.")
+                    Text("تم تعميم طلبك على مقدمي الخدمة والمنشآت المختصة المتاحين فوراً.")
                     Text("رمز الطلب: ${createdRequestCode ?: "URG-XXXX"}", fontWeight = FontWeight.Bold, color = Color(0xFFD32F2F))
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -480,6 +533,26 @@ fun UrgentRequestScreen(
                 ) {
                     Text("متابعة العروض الآن")
                 }
+            }
+        )
+    }
+
+    if (showMapPicker) {
+        InteractiveMapLocationPickerDialog(
+            initialLat = if (LandmarkAddress.isValid(pickedLat, pickedLng)) pickedLat else if (hasGps) userLat else 15.3694,
+            initialLng = if (LandmarkAddress.isValid(pickedLat, pickedLng)) pickedLng else if (hasGps) userLng else 44.1910,
+            hasGps = hasGps,
+            gpsLat = userLat,
+            gpsLng = userLng,
+            title = "📍 تحديد موقع الطلب العاجل على الخريطة",
+            onDismiss = { showMapPicker = false },
+            onLocationPicked = { res ->
+                pickedLat = res.latitude
+                pickedLng = res.longitude
+                if (res.formattedAddress.isNotBlank()) {
+                    selectedArea = res.formattedAddress
+                }
+                showMapPicker = false
             }
         )
     }

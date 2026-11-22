@@ -423,6 +423,14 @@ fun AppNavigator(
                     relatedEntityId = viewModel.targetChatRelatedEntityId,
                     relatedEntityType = viewModel.targetChatRelatedEntityType,
                     showClientIdentityToProviders = viewModel.settings.value.showClientIdentityToProviders,
+                    onOpenLocationInApp = { lat, lng, label, startNav ->
+                        viewModel.openInAppMap(
+                            latitude = lat,
+                            longitude = lng,
+                            label = label,
+                            startNavigation = startNav
+                        )
+                    },
                     onBackClick = {
                         viewModel.targetChatChannelId = null
                         viewModel.targetChatUserId = null

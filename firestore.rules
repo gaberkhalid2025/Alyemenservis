@@ -83,7 +83,13 @@ service cloud.firestore {
     match /{path=**}/offers/{offerId} {
       allow read: if true;
       allow create: if isSignedIn();
-      allow update, delete: if isStaff() || matchesOwner(resource.data);
+      allow update: if isSignedIn() && (
+        isStaff() ||
+        matchesOwner(resource.data) ||
+        (('requestId' in resource.data) && resource.data.requestId is string &&
+          matchesOwner(get(/databases/$(db)/documents/instant_requests/$(resource.data.requestId)).data))
+      );
+      allow delete: if isStaff() || matchesOwner(resource.data);
     }
     match /coupons/{couponId} {
       allow read: if true;
@@ -262,17 +268,44 @@ service cloud.firestore {
       );
     }
     match /instant_requests/{d} {
-      allow read, write: if isSignedIn();
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && (
+        isStaff() ||
+        matchesOwner(resource.data) ||
+        (('acceptedTechnicianId' in resource.data) && resource.data.acceptedTechnicianId == request.auth.uid) ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['offersCount', 'updatedAt'])
+      );
+      allow delete: if isStaff() || matchesOwner(resource.data);
+
+      match /offers/{offerId} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn();
+        allow update: if isSignedIn() && (
+          isStaff() ||
+          matchesOwner(resource.data) ||
+          matchesOwner(get(/databases/$(db)/documents/instant_requests/$(d)).data)
+        );
+        allow delete: if isStaff() || matchesOwner(resource.data);
+      }
     }
     match /urgent_requests/{d} {
-      allow read, write: if isSignedIn();
+      allow read, create: if isSignedIn();
+      allow update, delete: if isStaff() || matchesOwner(resource.data);
     }
     match /service_requests/{d} {
-      allow read, write: if isSignedIn();
+      allow read, create: if isSignedIn();
+      allow update, delete: if isStaff() || matchesOwner(resource.data);
     }
     match /request_offers/{d} {
       allow read, create: if isSignedIn();
-      allow update, delete: if isStaff() || matchesOwner(resource.data);
+      allow update: if isSignedIn() && (
+        isStaff() ||
+        matchesOwner(resource.data) ||
+        (('requestId' in resource.data) && resource.data.requestId is string &&
+          matchesOwner(get(/databases/$(db)/documents/instant_requests/$(resource.data.requestId)).data))
+      );
+      allow delete: if isStaff() || matchesOwner(resource.data);
     }
     match /orders/{orderId} {
       allow read: if isSignedIn() && (
@@ -314,7 +347,7 @@ service cloud.firestore {
     }
     match /notifications/{notifId} {
       allow read: if isSignedIn();
-      allow create: if isStaff();
+      allow create: if isSignedIn();
       allow update: if isSignedIn() && (
         isStaff() || resource.data.targetValue == request.auth.uid
       );
@@ -332,8 +365,16 @@ service cloud.firestore {
       allow update, delete: if isStaff();
     }
     match /wallets/{d} {
-      allow read: if isSignedIn();
-      allow write: if isStaff() || (isSignedIn() && d == request.auth.uid);
+      allow read: if isSignedIn() && (isStaff() || d == request.auth.uid || d == ('wallet_' + request.auth.uid) || (resource != null && matchesOwner(resource.data)));
+      allow write: if isStaff();
+    }
+    match /wallet_topups/{topupId} {
+      allow read: if isSignedIn() && (isStaff() || resource.data.userId == request.auth.uid || resource.data.walletId == ('wallet_' + request.auth.uid) || matchesOwner(resource.data));
+      allow create: if isSignedIn() &&
+        request.resource.data.status == 'PENDING' &&
+        request.resource.data.amount is number &&
+        request.resource.data.amount > 0;
+      allow update, delete: if isStaff();
     }
     match /internal_wallets/{d} {
       allow read: if isSignedIn() && (isStaff() || d == request.auth.uid || matchesOwner(resource.data));
@@ -344,10 +385,10 @@ service cloud.firestore {
       allow read: if isSignedIn() && (
         isStaff() ||
         resource.data.walletId == request.auth.uid ||
+        resource.data.walletId == ('wallet_' + request.auth.uid) ||
         resource.data.userId == request.auth.uid
       );
-      allow create: if isSignedIn();
-      allow update, delete: if isStaff();
+      allow create, update, delete: if isStaff();
     }
     match /transactions/{d} {
       allow read, create: if isSignedIn();
@@ -360,10 +401,9 @@ service cloud.firestore {
         isStaff() || request.auth.uid in resource.data.participants
       );
       allow create: if isSignedIn();
-      allow update: if isSignedIn() && (
+      allow update, delete: if isSignedIn() && (
         isStaff() || request.auth.uid in resource.data.participants
       );
-      allow delete: if isStaff();
 
       match /messages/{msgId} {
         allow read: if isSignedIn() && (
@@ -371,9 +411,16 @@ service cloud.firestore {
           request.auth.uid in get(/databases/$(db)/documents/chat_channels/$(channelId)).data.participants
         );
         allow create: if isSignedIn() && (
+          isStaff() ||
           request.auth.uid in get(/databases/$(db)/documents/chat_channels/$(channelId)).data.participants
         );
-        allow update, delete: if isStaff();
+        allow update: if isSignedIn() && (
+          isStaff() ||
+          request.auth.uid in get(/databases/$(db)/documents/chat_channels/$(channelId)).data.participants
+        );
+        allow delete: if isStaff() || (
+          isSignedIn() && resource.data.senderId == request.auth.uid
+        );
       }
     }
     match /chat_rooms/{roomId} {

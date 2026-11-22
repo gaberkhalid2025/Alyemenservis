@@ -321,21 +321,21 @@ internal fun ColumnScope.OwnerBackdoorCoreAndFooterSection(
         Text("محرك الخرائط المعتمد:", color = Color.White, fontSize = 13.sp)
         Row {
             FilterChip(
-                selected = state.mapProviderState == "MAPLIBRE",
+                selected = state.mapProviderState.equals("MAPLIBRE", ignoreCase = true),
                 onClick = { state.mapProviderState = "MAPLIBRE" },
-                label = { Text("MapLibre", fontSize = 10.sp) }
+                label = { Text("المدمجة 🗺️", fontSize = 10.sp) }
             )
             Spacer(modifier = Modifier.width(4.dp))
             FilterChip(
-                selected = state.mapProviderState == "GOOGLE",
-                onClick = { state.mapProviderState = "GOOGLE" },
-                label = { Text("Google", fontSize = 10.sp) }
-            )
-            Spacer(modifier = Modifier.width(4.dp))
-            FilterChip(
-                selected = state.mapProviderState == "MAPBOX",
+                selected = state.mapProviderState.equals("MAPBOX", ignoreCase = true),
                 onClick = { state.mapProviderState = "MAPBOX" },
-                label = { Text("Mapbox", fontSize = 10.sp) }
+                label = { Text("الشوارع 🌐", fontSize = 10.sp) }
+            )
+            Spacer(modifier = Modifier.width(4.dp))
+            FilterChip(
+                selected = state.mapProviderState.equals("SATELLITE", ignoreCase = true),
+                onClick = { state.mapProviderState = "SATELLITE" },
+                label = { Text("فضائية 🛰️", fontSize = 10.sp) }
             )
         }
     }

@@ -302,7 +302,7 @@ fun AdminMedicalPanel(
                             return@Button
                         }
                         val newStore = StoreEntity(
-                            id = "med_${System.currentTimeMillis()}",
+                            id = com.example.utils.EntityIdGenerator.generate("MED"),
                             name = medName.trim(),
                             phone = medPhone.trim(),
                             cityId = medCity.trim(),

@@ -141,7 +141,7 @@ class ChatViewModel @Inject constructor(
         val channelType = if (isPasswordRecovery) ChannelType.SUPPORT else ChannelType.PRIVATE
         val finalOtherId = if (isPasswordRecovery) ChatRepository.SUPPORT_ADMIN_ID else otherUserId.trim()
         val finalOtherName = if (isPasswordRecovery) ChatRepository.SUPPORT_ADMIN_NAME else otherUserName.trim().ifBlank { "مقدم الخدمة" }
-        val provId = "direct_${minOf(currentUserId, finalOtherId)}_${maxOf(currentUserId, finalOtherId)}"
+        val provId = "channel_${minOf(currentUserId, finalOtherId)}_${maxOf(currentUserId, finalOtherId)}"
 
         if (_currentChannel.value?.id != provId) {
             val provisional = ChatChannel(
@@ -204,42 +204,58 @@ class ChatViewModel @Inject constructor(
         attachment: ChatAttachment? = null,
         audioWaveform: List<Int> = emptyList()
     ) {
-        var channel = _currentChannel.value
-        if (channel == null) {
-            val fallbackChId = "direct_${activeUserId.ifBlank { senderId }}"
-            channel = ChatChannel(
-                id = fallbackChId,
-                participants = listOf(senderId.ifBlank { activeUserId }),
-                title = "محادثة"
-            )
-            _currentChannel.value = channel
-        }
         if (text.isBlank() && mediaUrl.isBlank() && attachment == null) return
 
         val replyTo = editManager.replyingToMessage.value
         editManager.setReplyingTo(null)
 
-        messagesManager.sendMessage(
-            channelId = channel.id,
-            senderId = senderId.ifBlank { activeUserId },
-            senderName = senderName,
-            text = text.trim(),
-            mediaType = mediaType,
-            mediaUrl = mediaUrl,
-            replyTo = replyTo,
-            attachment = attachment,
-            audioWaveform = audioWaveform,
-            onSuccess = { sentMsg ->
-                viewModelScope.launch {
-                    _eventFlow.emit(ChatEvent.MessageSent(sentMsg.id))
+        val resolvedSenderId = senderId.ifBlank { activeUserId }
+        val dispatchSend: (ChatChannel) -> Unit = { targetChannel ->
+            messagesManager.sendMessage(
+                channelId = targetChannel.id,
+                senderId = resolvedSenderId,
+                senderName = senderName,
+                text = text.trim(),
+                mediaType = mediaType,
+                mediaUrl = mediaUrl,
+                replyTo = replyTo,
+                attachment = attachment,
+                audioWaveform = audioWaveform,
+                onSuccess = { sentMsg ->
+                    viewModelScope.launch {
+                        _eventFlow.emit(ChatEvent.MessageSent(sentMsg.id))
+                    }
+                },
+                onError = { errMsg ->
+                    viewModelScope.launch {
+                        _eventFlow.emit(ChatEvent.ShowError(errMsg))
+                    }
                 }
-            },
-            onError = { errMsg ->
-                viewModelScope.launch {
-                    _eventFlow.emit(ChatEvent.ShowError(errMsg))
+            )
+        }
+
+        val currentCh = _currentChannel.value
+        if (currentCh != null) {
+            dispatchSend(currentCh)
+        } else {
+            viewModelScope.launch {
+                val created = repository.getOrCreateChannel(
+                    currentUserId = resolvedSenderId,
+                    currentUserName = senderName.ifBlank { "العميل" },
+                    currentUserPhoto = "",
+                    otherUserId = ChatRepository.SUPPORT_ADMIN_ID,
+                    otherUserName = ChatRepository.SUPPORT_ADMIN_NAME,
+                    otherUserPhoto = "",
+                    type = ChannelType.SUPPORT
+                )
+                if (created is AppResult.Success) {
+                    _currentChannel.value = created.data
+                    dispatchSend(created.data)
+                } else {
+                    _eventFlow.emit(ChatEvent.ShowError("تعذر تهيئة قناة المحادثة، يرجى المحاولة مجدداً"))
                 }
             }
-        )
+        }
     }
 
     // [إصلاح نهائي] إظهار رسالة الوسائط فوراً في الواجهة كـ SENDING بالرابط المحلي (Optimistic UI)

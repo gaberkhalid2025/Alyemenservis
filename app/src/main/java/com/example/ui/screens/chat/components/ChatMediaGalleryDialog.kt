@@ -36,12 +36,14 @@ import com.example.data.models.MediaType
 import com.example.utils.AudioPlayerManager
 import com.example.utils.ChatIcons
 import com.example.utils.DateFormatter
+import com.example.utils.OfflineYemenGazetteer
 import com.example.utils.VisualThemePalette
 
 @Composable
 fun ChatMediaGalleryDialog(
     messages: List<ChatMessage>,
     onDismiss: () -> Unit,
+    onOpenLocationInApp: ((lat: Double, lng: Double, label: String, startNavigation: Boolean) -> Unit)? = null,
     themeColors: VisualThemePalette
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
@@ -221,12 +223,15 @@ fun ChatMediaGalleryDialog(
                                             modifier = Modifier
                                                 .fillMaxWidth()
                                                 .clickable {
-                                                    try {
-                                                        val mapIntent = Intent(Intent.ACTION_VIEW, Uri.parse(msg.mediaUrl))
-                                                        mapIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                                        context.startActivity(mapIntent)
-                                                    } catch (_: Exception) {
-                                                        Toast.makeText(context, "تعذر فتح الخريطة", Toast.LENGTH_SHORT).show()
+                                                    val coords = OfflineYemenGazetteer.parseCoordinates(msg.mediaUrl)
+                                                        ?: OfflineYemenGazetteer.parseCoordinates(msg.message)
+                                                    val label = OfflineYemenGazetteer.extractLocationLabel(msg.mediaUrl)
+                                                        ?: msg.message.ifBlank { "موقع في المحادثة" }
+                                                    if (coords != null && onOpenLocationInApp != null) {
+                                                        onDismiss()
+                                                        onOpenLocationInApp(coords.first, coords.second, label, false)
+                                                    } else {
+                                                        Toast.makeText(context, "تعذر فتح الموقع داخل الخريطة", Toast.LENGTH_SHORT).show()
                                                     }
                                                 }
                                         ) {

@@ -11,12 +11,21 @@ import kotlinx.coroutines.launch
 fun MainViewModel.triggerOpenChatForRequest(requestId: String, customerPhone: String, serviceType: String) {
     val targetPhone = customerPhone.ifBlank { _currentUserPhone.value }
     if (targetPhone.isNotBlank()) {
-        getOrCreateChatChannel(
-            providerId = "request_$requestId",
-            providerName = "صاحب الطلب ($targetPhone)",
-            customerId = _currentUserPhone.value.ifBlank { "guest" },
-            customerName = _currentUserName.value.ifBlank { "مستخدم الدليل" }
-        )
+        val cleanPhone = com.example.ui.helpers.AppPreferenceHelper.normalizePhoneNumber(targetPhone).ifBlank { targetPhone }
+        openOrCreateChatChannel(
+            targetId = "user_$cleanPhone",
+            targetType = "URGENT_REQUEST",
+            targetName = "صاحب الطلب ($targetPhone)",
+            targetPhone = cleanPhone,
+            targetCategory = serviceType,
+            relatedEntityId = requestId,
+            relatedEntityType = "URGENT_REQUEST"
+        ) { channel ->
+            if (channel != null) {
+                targetChatChannelId = channel.id
+                navigateToScreen(AppScreens.CHAT_DIRECT)
+            }
+        }
     } else {
         triggerNotification("💬 يمكنك التحدث مع مقدمي العروض عبر شاشة المحادثات")
     }
@@ -58,7 +67,33 @@ fun MainViewModel.blockChatChannel(channelId: String, blocked: Boolean) {
 }
 
 fun MainViewModel.wipeOldChatChannels(days: Int) {
-    triggerToast("🧹 تم تصفية وحذف سجل المحادثات الأقدم من $days أيام بنجاح!")
+    val safeDays = days.coerceAtLeast(1)
+    val cutoffMs = System.currentTimeMillis() - (safeDays * 86_400_000L)
+    val oldChannels = _chatChannels.value.filter { ch ->
+        val refTime = if (ch.lastMessageTime > 0L) ch.lastMessageTime else ch.timestamp
+        refTime in 1L until cutoffMs
+    }
+    if (oldChannels.isEmpty()) {
+        triggerToast("ℹ️ لا توجد محادثات أقدم من $safeDays أيام للحذف")
+        return
+    }
+    viewModelScope.launch {
+        val models = oldChannels.map {
+            com.example.data.models.ChatChannel(
+                id = it.id,
+                participants = it.participants,
+                title = it.title
+            )
+        }
+        val res = chatRepo.deleteAllChannels(models)
+        if (res is AppResult.Success) {
+            val oldIds = oldChannels.map { it.id }.toSet()
+            _chatChannels.value = _chatChannels.value.filterNot { it.id in oldIds }
+            triggerToast("🧹 تم حذف ${oldChannels.size} محادثة أقدم من $safeDays أيام بنجاح")
+        } else {
+            triggerToast("⚠️ تعذر حذف المحادثات القديمة، يرجى المحاولة مجدداً")
+        }
+    }
 }
 
 fun MainViewModel.openSupportChat() {
@@ -146,11 +181,23 @@ fun MainViewModel.openOrCreateChatChannel(
             ChatRepository.SUPPORT_ADMIN_NAME,
             ChannelType.SUPPORT
         )
-        else -> Triple(
-            targetId.ifBlank { targetPhone.ifBlank { "provider_$targetName" } },
-            targetName.ifBlank { "مقدم الخدمة" },
-            if (targetType.equals("SUPPORT", ignoreCase = true)) ChannelType.SUPPORT else ChannelType.PRIVATE
-        )
+        else -> {
+            val resolvedId = targetId.trim().ifBlank {
+                com.example.ui.helpers.AppPreferenceHelper.normalizePhoneNumber(targetPhone).ifBlank {
+                    relatedEntityId.trim()
+                }
+            }
+            if (resolvedId.isBlank()) {
+                triggerNotification("⚠️ بيانات حساب الطرف الآخر غير مكتملة لبدء المحادثة")
+                onCreated(null)
+                return
+            }
+            Triple(
+                resolvedId,
+                targetName.ifBlank { "مقدم الخدمة" },
+                if (targetType.equals("SUPPORT", ignoreCase = true)) ChannelType.SUPPORT else ChannelType.PRIVATE
+            )
+        }
     }
     
     viewModelScope.launch {

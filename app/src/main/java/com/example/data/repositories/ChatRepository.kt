@@ -110,7 +110,8 @@ class ChatRepository(
         replyToId: String?,
         replyToText: String?,
         attachment: ChatAttachment?,
-        audioWaveform: List<Int>
+        audioWaveform: List<Int>,
+        existingMessageId: String?
     ): AppResult<ChatMessage> = messageDelegate.sendMessage(
         channelId = channelId,
         senderId = senderId,
@@ -121,7 +122,8 @@ class ChatRepository(
         replyToId = replyToId,
         replyToText = replyToText,
         attachment = attachment,
-        audioWaveform = audioWaveform
+        audioWaveform = audioWaveform,
+        existingMessageId = existingMessageId
     )
 
     override suspend fun updateMessageMediaUrl(

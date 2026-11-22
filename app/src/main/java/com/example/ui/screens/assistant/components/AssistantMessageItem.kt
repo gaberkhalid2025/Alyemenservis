@@ -71,6 +71,34 @@ fun AssistantMessageItem(
                 modifier = Modifier.widthIn(max = 320.dp)
             ) {
                 Column(modifier = Modifier.padding(12.dp)) {
+                    if (!msg.isUser && msg.safetyLevel.equals("HIGH", ignoreCase = true)) {
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFFEF4444).copy(alpha = 0.16f)),
+                            border = BorderStroke(1.dp, Color(0xFFEF4444).copy(alpha = 0.7f)),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 8.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(
+                                    text = "🚨 تنبيه أمان عالٍ — لا تحاول الإصلاح يدوياً",
+                                    color = Color(0xFFEF4444),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                if (!msg.safetyWarning.isNullOrBlank()) {
+                                    Text(
+                                        text = msg.safetyWarning,
+                                        color = themeColors.textPrimary,
+                                        fontSize = 10.sp,
+                                        lineHeight = 14.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
+
                     Text(
                         text = msg.text,
                         fontSize = 12.sp,

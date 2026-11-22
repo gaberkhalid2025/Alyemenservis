@@ -35,7 +35,11 @@ import com.example.VoiceManager
 import com.example.data.AdminSettingsEntity
 import com.example.data.ProviderEntity
 import com.example.ui.MainViewModel
+import android.Manifest
 import com.example.utils.VisualThemePalette
+import com.example.utils.VoiceSearchHelper
+import com.example.utils.VoiceState
+import com.example.utils.VoiceStatus
 import com.example.ui.viewmodels.AssistantViewModel
 import kotlinx.coroutines.launch
 import java.util.UUID
@@ -44,7 +48,10 @@ data class AssistantMessage(
     val id: String = UUID.randomUUID().toString(),
     val text: String,
     val isUser: Boolean,
-    val matchedEntities: List<Any> = emptyList()
+    val matchedEntities: List<Any> = emptyList(),
+    val safetyLevel: String = "LOW",
+    val safetyWarning: String? = null,
+    val immediateActions: List<String> = emptyList()
 )
 
 /**
@@ -99,19 +106,42 @@ fun SmartAssistantDialogView(
     val typedText by assistantViewModel.typedText.collectAsState()
     val isGenerating by assistantViewModel.isGenerating.collectAsState()
 
-    val speechLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            val data = result.data
-            val spokenMatches = data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
-            val spokenText = spokenMatches?.firstOrNull()
-            if (!spokenText.isNullOrBlank()) {
-                assistantViewModel.updateTypedText(spokenText)
+    var voiceState by remember { mutableStateOf(VoiceState()) }
+    val voiceHelper = remember(context) {
+        VoiceSearchHelper(
+            context = context,
+            onFinal = { spoken ->
+                assistantViewModel.updateTypedText(spoken)
                 coroutineScope.launch {
-                    snackbarHostState.showSnackbar("🎙️ تم الاستماع: '$spokenText'")
+                    snackbarHostState.showSnackbar("🎙️ تم الاستماع: '$spoken'")
                 }
-            }
+            },
+            onState = { st -> voiceState = st }
+        )
+    }
+    DisposableEffect(voiceHelper) {
+        onDispose { voiceHelper.destroy() }
+    }
+    val micPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            voiceHelper.start()
+        } else {
+            voiceState = VoiceState(
+                status = VoiceStatus.ERROR,
+                message = "يلزم منح إذن الميكروفون لاستعمال البحث الصوتي.",
+                canUseKeyboard = true
+            )
+        }
+    }
+    val startVoiceSearch: () -> Unit = {
+        if (voiceState.status == VoiceStatus.LISTENING) {
+            voiceHelper.stop()
+        } else if (!voiceHelper.hasMicPermission()) {
+            micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        } else {
+            voiceHelper.start()
         }
     }
 
@@ -184,61 +214,96 @@ fun SmartAssistantDialogView(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 14.dp, vertical = 6.dp)
-                            .clickable {
-                                try {
-                                    val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                                        putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                                        putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ar-YE")
-                                        putExtra(RecognizerIntent.EXTRA_PROMPT, "تحدث باسم الخدمة أو الفني أو المشكلة...")
-                                    }
-                                    speechLauncher.launch(intent)
-                                } catch (e: Exception) {
-                                    try {
-                                        VoiceManager.onHear?.invoke { spoken ->
-                                            if (spoken.isNotEmpty()) {
-                                                assistantViewModel.updateTypedText(spoken)
-                                            }
-                                        }
-                                    } catch (_: Exception) {}
-                                }
-                            },
-                        colors = CardDefaults.cardColors(containerColor = themeColors.surface),
-                        border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.5f)),
+                            .clickable { startVoiceSearch() },
+                        colors = CardDefaults.cardColors(
+                            containerColor = when (voiceState.status) {
+                                VoiceStatus.LISTENING -> themeColors.accent.copy(alpha = 0.14f)
+                                VoiceStatus.ERROR -> Color(0xFFEF4444).copy(alpha = 0.12f)
+                                VoiceStatus.IDLE -> themeColors.surface
+                            }
+                        ),
+                        border = BorderStroke(
+                            1.dp,
+                            if (voiceState.status == VoiceStatus.ERROR) Color(0xFFEF4444).copy(alpha = 0.6f)
+                            else themeColors.accent.copy(alpha = 0.5f)
+                        ),
                         shape = RoundedCornerShape(10.dp)
                     ) {
-                        Row(
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = 12.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             Row(
+                                modifier = Modifier.fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Text("🎙️", fontSize = 18.sp)
-                                Column {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text(if (voiceState.status == VoiceStatus.LISTENING) "🔴" else "🎙️", fontSize = 18.sp)
+                                    Column {
+                                        Text(
+                                            text = when (voiceState.status) {
+                                                VoiceStatus.LISTENING -> "جاري الاستماع... تحدث الآن"
+                                                VoiceStatus.ERROR -> "تعذر التعرف الصوتي"
+                                                VoiceStatus.IDLE -> "البحث الصوتي الذكي"
+                                            },
+                                            fontSize = 11.5.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (voiceState.status == VoiceStatus.ERROR) Color(0xFFEF4444) else themeColors.accent
+                                        )
+                                        Text(
+                                            text = when {
+                                                voiceState.status == VoiceStatus.LISTENING && voiceState.partial.isNotBlank() -> voiceState.partial
+                                                voiceState.status == VoiceStatus.ERROR && !voiceState.message.isNullOrBlank() -> voiceState.message!!
+                                                else -> "انقر للتحدث أو البحث بصوتك (دعم متعدد للهجات العربية)"
+                                            },
+                                            fontSize = 9.5.sp,
+                                            color = themeColors.textSecondary
+                                        )
+                                    }
+                                }
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(if (voiceState.status == VoiceStatus.LISTENING) Color(0xFFEF4444) else themeColors.accent)
+                                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                                ) {
                                     Text(
-                                        text = "البحث الصوتي الذكي",
-                                        fontSize = 11.5.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = themeColors.accent
-                                    )
-                                    Text(
-                                        text = "انقر للتحدث أو البحث بصوتك فوراً",
-                                        fontSize = 9.5.sp,
-                                        color = themeColors.textSecondary
+                                        text = if (voiceState.status == VoiceStatus.LISTENING) "إيقاف" else "تحدث الآن",
+                                        fontSize = 9.sp,
+                                        color = if (voiceState.status == VoiceStatus.LISTENING) Color.White else Color.Black,
+                                        fontWeight = FontWeight.Bold
                                     )
                                 }
                             }
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(themeColors.accent)
-                                    .padding(horizontal = 8.dp, vertical = 4.dp)
-                            ) {
-                                Text("تحدث الآن", fontSize = 9.sp, color = Color.Black, fontWeight = FontWeight.Bold)
+                            if (voiceState.status == VoiceStatus.ERROR && voiceState.canOpenSettings) {
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Text(
+                                        text = "⚙️ فتح إعدادات الصوت",
+                                        fontSize = 9.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = themeColors.accent,
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(6.dp))
+                                            .clickable { VoiceSearchHelper.openVoiceSettings(context) }
+                                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                                    )
+                                    Text(
+                                        text = "✖️ إخفاء",
+                                        fontSize = 9.5.sp,
+                                        color = themeColors.textSecondary,
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(6.dp))
+                                            .clickable { voiceHelper.cancel() }
+                                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                                    )
+                                }
                             }
                         }
                     }
@@ -354,24 +419,7 @@ fun SmartAssistantDialogView(
                                     coroutineScope.launch { snackbarHostState.showSnackbar("تعذر معالجة الطلب: ${e.localizedMessage}") }
                                 }
                             },
-                            onMicClick = {
-                                try {
-                                    val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                                        putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                                        putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ar-YE")
-                                        putExtra(RecognizerIntent.EXTRA_PROMPT, "تحدث باسم الخدمة أو الفني أو المشكلة...")
-                                    }
-                                    speechLauncher.launch(intent)
-                                } catch (e: Exception) {
-                                    try {
-                                        VoiceManager.onHear?.invoke { spoken ->
-                                            if (spoken.isNotEmpty()) {
-                                                assistantViewModel.updateTypedText(spoken)
-                                            }
-                                        }
-                                    } catch (_: Exception) {}
-                                }
-                            }
+                            onMicClick = { startVoiceSearch() }
                         )
                     }
                 }

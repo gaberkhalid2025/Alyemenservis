@@ -89,6 +89,7 @@ class ChatListViewModel @Inject constructor(
         super.onCleared()
         channelsJob?.cancel()
         channelsJob = null
+        presenceManager.clear()
     }
 }
 

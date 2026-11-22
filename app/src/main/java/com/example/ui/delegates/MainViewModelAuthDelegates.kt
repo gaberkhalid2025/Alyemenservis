@@ -544,10 +544,29 @@ fun MainViewModel.createInstantRequest(
     urgencyTime: String = "فوراً (خلال 30 دقيقة)",
     deliveryMethod: String = "",
     customPin: String = "",
+    latitude: Double = 0.0,
+    longitude: Double = 0.0,
+    sectionType: String = "",
     onResult: (Boolean, String, String) -> Unit = { _, _, _ -> }
 ) {
     instantRequestViewModel.createInstantRequest(
-        userId, userName, userPhone, userCity, userNeighborhood, categoryId, categoryName, serviceTitle, description, images, urgencyTime, deliveryMethod, customPin, onResult
+        userId = userId,
+        userName = userName,
+        userPhone = userPhone,
+        userCity = userCity,
+        userNeighborhood = userNeighborhood,
+        categoryId = categoryId,
+        categoryName = categoryName,
+        serviceTitle = serviceTitle,
+        description = description,
+        images = images,
+        urgencyTime = urgencyTime,
+        deliveryMethod = deliveryMethod,
+        customPin = customPin,
+        latitude = latitude,
+        longitude = longitude,
+        sectionType = sectionType,
+        onResult = onResult
     )
 }
 
@@ -562,10 +581,22 @@ fun MainViewModel.submitOfferForRequest(
     price: Double,
     estimatedArrivalTime: String = "خلال 30 دقيقة",
     estimatedDuration: String = "ساعتان",
-    notes: String = ""
+    notes: String = "",
+    onResult: (Boolean, String) -> Unit = { _, _ -> }
 ) {
     instantRequestViewModel.submitOfferForRequest(
-        requestId, requestCode, technicianId, technicianName, technicianPhone, technicianAvatar, technicianRating, price, estimatedArrivalTime, estimatedDuration, notes
+        requestId = requestId,
+        requestCode = requestCode,
+        technicianId = technicianId,
+        technicianName = technicianName,
+        technicianPhone = technicianPhone,
+        technicianAvatar = technicianAvatar,
+        technicianRating = technicianRating,
+        price = price,
+        estimatedArrivalTime = estimatedArrivalTime,
+        estimatedDuration = estimatedDuration,
+        notes = notes,
+        onResult = onResult
     )
 }
 

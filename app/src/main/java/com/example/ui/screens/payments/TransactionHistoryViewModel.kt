@@ -1,17 +1,19 @@
 package com.example.ui.screens.payments
 
 import androidx.lifecycle.ViewModel
-import com.example.ui.*
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.data.models.Transaction
 import com.example.utils.WalletManager
+import com.example.utils.WalletTopUpRequest
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlin.math.round
 
 /**
  * Sealed class representing UI States for transaction history.
@@ -19,16 +21,27 @@ import kotlinx.coroutines.launch
 sealed class TransactionHistoryUiState {
     object Loading : TransactionHistoryUiState()
     data class Success(
-        val balance: Double,
+        val balance: Long,
         val transactions: List<Transaction>,
-        val totalDeposits: Double,
-        val totalWithdrawals: Double
+        val totalDeposits: Long,
+        val totalWithdrawals: Long,
+        val topUpRequests: List<WalletTopUpRequest> = emptyList()
     ) : TransactionHistoryUiState()
     data class Error(val message: String) : TransactionHistoryUiState()
 }
 
 /**
- * ViewModel managing payment wallet and transactions.
+ * Sealed class representing top-up request submission states.
+ */
+sealed class TopUpUi {
+    object Idle : TopUpUi()
+    object Sending : TopUpUi()
+    data class Done(val requestId: String, val amount: Long) : TopUpUi()
+    data class Failed(val message: String) : TopUpUi()
+}
+
+/**
+ * ViewModel managing payment wallet, top-up requests, and transactions safely using Long integer arithmetic.
  */
 class TransactionHistoryViewModel(
     private val walletManager: WalletManager,
@@ -45,7 +58,7 @@ class TransactionHistoryViewModel(
     val statusFilter: StateFlow<String> = _statusFilter.asStateFlow()
 
     private val _allTransactions = MutableStateFlow<List<Transaction>>(emptyList())
-    private val _balance = MutableStateFlow(0.0)
+    private val _balance = MutableStateFlow(0L)
 
     val filteredTransactions: StateFlow<List<Transaction>> = combine(
         _allTransactions, _searchQuery, _typeFilter, _statusFilter
@@ -67,8 +80,9 @@ class TransactionHistoryViewModel(
                 else -> true
             }
             val matchesSearch = query.isBlank() ||
-                    tx.id.contains(query, ignoreCase = true) ||
-                    tx.note.contains(query, ignoreCase = true)
+                tx.id.contains(query, ignoreCase = true) ||
+                tx.note.contains(query, ignoreCase = true) ||
+                tx.referenceNumber.contains(query, ignoreCase = true)
 
             matchesType && matchesStatus && matchesSearch
         }
@@ -77,6 +91,12 @@ class TransactionHistoryViewModel(
     private val _uiState = MutableStateFlow<TransactionHistoryUiState>(TransactionHistoryUiState.Loading)
     val uiState: StateFlow<TransactionHistoryUiState> = _uiState.asStateFlow()
 
+    private val _topUpUi = MutableStateFlow<TopUpUi>(TopUpUi.Idle)
+    val topUpUi: StateFlow<TopUpUi> = _topUpUi.asStateFlow()
+
+    private val _operationError = MutableStateFlow<String?>(null)
+    val operationError: StateFlow<String?> = _operationError.asStateFlow()
+
     private var lastRefreshTime = 0L
     private val CACHE_TTL_MS = 15_000L
 
@@ -84,8 +104,25 @@ class TransactionHistoryViewModel(
         refreshData(forceRefresh = true)
     }
 
+    companion object {
+        fun computeTotalsLong(transactions: List<Transaction>): Pair<Long, Long> {
+            var totalInflows = 0L
+            var totalOutflows = 0L
+            for (tx in transactions) {
+                if (!tx.status.equals("COMPLETED", ignoreCase = true)) continue
+                val amtLong = round(tx.amount).toLong()
+                if (amtLong <= 0L) continue
+                when (tx.type.uppercase()) {
+                    "DEPOSIT", "REFUND" -> totalInflows += amtLong
+                    "WITHDRAWAL", "PAYMENT", "TRANSFER" -> totalOutflows += amtLong
+                }
+            }
+            return totalInflows to totalOutflows
+        }
+    }
+
     /**
-     * Refreshes wallet balances and logs.
+     * Refreshes wallet balances, top-up requests, and transaction logs.
      */
     fun refreshData(forceRefresh: Boolean = false) {
         val now = System.currentTimeMillis()
@@ -93,20 +130,21 @@ class TransactionHistoryViewModel(
         lastRefreshTime = now
         viewModelScope.launch {
             try {
-                val balance = walletManager.getBalance(walletId)
-                val allTx = walletManager.getTransactions(walletId)
+                val balance = walletManager.fetchBalanceLong(walletId)
+                val allTx = walletManager.fetchTransactions(walletId)
+                val topUps = walletManager.getTopUpRequests(walletId)
 
                 _balance.value = balance
                 _allTransactions.value = allTx
 
-                val totalDep = allTx.filter { it.type == "DEPOSIT" && it.status == "COMPLETED" }.sumOf { it.amount }
-                val totalWith = allTx.filter { (it.type == "WITHDRAWAL" || it.type == "PAYMENT") && it.status == "COMPLETED" }.sumOf { it.amount }
+                val (totalDep, totalWith) = computeTotalsLong(allTx)
 
                 _uiState.value = TransactionHistoryUiState.Success(
                     balance = balance,
                     transactions = allTx,
                     totalDeposits = totalDep,
-                    totalWithdrawals = totalWith
+                    totalWithdrawals = totalWith,
+                    topUpRequests = topUps
                 )
             } catch (e: Exception) {
                 _uiState.value = TransactionHistoryUiState.Error(e.message ?: "فشل تحميل البيانات المالية")
@@ -127,26 +165,76 @@ class TransactionHistoryViewModel(
     }
 
     /**
-     * Execute a custom deposit into the wallet.
+     * Submit a PENDING wallet top-up request for admin verification (never credits client-side).
      */
-    fun deposit(amount: Double, note: String) {
+    fun submitTopUpRequest(
+        amount: Long,
+        referenceNumber: String,
+        paymentMethod: String = "BANK_TRANSFER",
+        note: String = ""
+    ) {
+        if (_topUpUi.value is TopUpUi.Sending) return
+        if (amount <= 0L) {
+            _topUpUi.value = TopUpUi.Failed("يرجى إدخال مبلغ صحيح أكبر من الصفر")
+            return
+        }
+        val cleanRef = referenceNumber.trim()
+        if (cleanRef.length < 3) {
+            _topUpUi.value = TopUpUi.Failed("يرجى إدخال رقم الحوالة أو المرجع المالي للتحقق")
+            return
+        }
+
+        _topUpUi.value = TopUpUi.Sending
         viewModelScope.launch {
-            val result = walletManager.deposit(walletId, amount, "YER", note)
-            if (result.isSuccess) {
+            val result = walletManager.requestTopUp(
+                walletId = walletId,
+                amount = amount,
+                referenceNumber = cleanRef,
+                paymentMethod = paymentMethod,
+                note = note
+            )
+            result.onSuccess { req ->
+                _topUpUi.value = TopUpUi.Done(req.id, req.amount)
                 refreshData(forceRefresh = true)
+            }.onFailure { err ->
+                _topUpUi.value = TopUpUi.Failed(err.message ?: "تعذر إرسال طلب الشحن، حاول مرة أخرى")
             }
         }
     }
 
+    fun resetTopUpUi() {
+        _topUpUi.value = TopUpUi.Idle
+    }
+
+    fun clearOperationError() {
+        _operationError.value = null
+    }
+
     /**
-     * Execute a custom withdrawal from the wallet.
+     * Execute a withdrawal from the wallet with explicit failure reporting.
      */
-    fun withdraw(amount: Double, note: String) {
+    fun withdraw(amount: Long, note: String) {
         viewModelScope.launch {
-            val result = walletManager.withdraw(walletId, amount, "YER", note)
-            if (result.isSuccess) {
+            val result = walletManager.withdraw(walletId, amount.toDouble(), "YER", note)
+            result.onSuccess {
                 refreshData(forceRefresh = true)
+            }.onFailure { err ->
+                _operationError.value = err.message ?: "تعذر تنفيذ عملية السحب"
             }
         }
     }
 }
+
+class TransactionHistoryViewModelFactory(
+    private val walletManager: WalletManager,
+    private val walletId: String
+) : ViewModelProvider.Factory {
+    @Suppress("UNCHECKED_CAST")
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(TransactionHistoryViewModel::class.java)) {
+            return TransactionHistoryViewModel(walletManager, walletId) as T
+        }
+        throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
+    }
+}
+

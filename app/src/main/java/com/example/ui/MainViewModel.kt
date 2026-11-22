@@ -338,7 +338,32 @@ class MainViewModel @Inject constructor(
     var targetChatUserPhoto by mutableStateOf<String?>(null)
     var targetChatRelatedEntityId by mutableStateOf<String?>(null)
     var targetChatRelatedEntityType by mutableStateOf<String?>(null)
+    var pendingMapFocusPoint by mutableStateOf<com.example.utils.NavWaypoint?>(null)
+    var pendingMapAutoNavigate by mutableStateOf(false)
     val triggerRestoreAccountDialog = MutableStateFlow<Boolean>(false)
+
+    fun openInAppMap(
+        latitude: Double,
+        longitude: Double,
+        label: String = "موقع مشارك",
+        startNavigation: Boolean = false
+    ) {
+        if (!com.example.utils.LandmarkAddress.isValid(latitude, longitude)) {
+            triggerToast("⚠️ تعذر قراءة إحداثيات الموقع")
+            return
+        }
+        pendingMapFocusPoint = com.example.utils.NavWaypoint(
+            name = label.ifBlank { "موقع مشارك" },
+            latitude = latitude,
+            longitude = longitude
+        )
+        pendingMapAutoNavigate = startNavigation
+        selectedProvider = null
+        selectedStore = null
+        selectedProperty = null
+        selectedJob = null
+        navigateToScreen(AppScreens.MAP_VIEW)
+    }
 
     fun openDirectChat(
         targetUserId: String,

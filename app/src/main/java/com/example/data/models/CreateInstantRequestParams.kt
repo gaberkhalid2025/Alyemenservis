@@ -20,5 +20,8 @@ data class CreateInstantRequestParams(
     val images: List<String> = emptyList(),
     val urgencyTime: String = "فوراً (خلال 30 دقيقة)",
     val deliveryMethod: String = "",
-    val customPin: String = ""
+    val customPin: String = "",
+    val latitude: Double = 0.0,
+    val longitude: Double = 0.0,
+    val sectionType: String = ""
 )

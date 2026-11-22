@@ -259,7 +259,8 @@ data class ChatMessage(
     val readAt: Long = 0L,
     val syncStatus: SyncStatus = SyncStatus.SYNCED,
     val audioWaveform: List<Int> = emptyList(),
-    val isPinned: Boolean = false
+    val isPinned: Boolean = false,
+    val updatedAt: Long = 0L
 ) : Serializable {
 
     fun toCanonicalMessage(chId: String = channelId): ChatMessage {

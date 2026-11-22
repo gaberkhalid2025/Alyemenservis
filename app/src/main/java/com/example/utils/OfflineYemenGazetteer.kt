@@ -361,17 +361,21 @@ object OfflineYemenGazetteer {
         val normalized = normalizeDigits(raw).trim()
         if (normalized.isBlank()) return null
 
-        // 1) روابط خرائط جوجل / واتساب / OSM / geo
+        // 1) روابط التطبيق الداخلية أو خرائط جوجل / واتساب / OSM / geo
         val urlPatterns = listOf(
+            Regex("[?&]lat=([+-]?\\d+(?:\\.\\d+)?)[^\\s]*?&lng=([+-]?\\d+(?:\\.\\d+)?)"),
+            Regex("[?&]lng=([+-]?\\d+(?:\\.\\d+)?)[^\\s]*?&lat=([+-]?\\d+(?:\\.\\d+)?)"),
             Regex("(?:q|ll|center)=([+-]?\\d+(?:\\.\\d+)?),\\s*([+-]?\\d+(?:\\.\\d+)?)"),
             Regex("@([+-]?\\d+(?:\\.\\d+)?),([+-]?\\d+(?:\\.\\d+)?)"),
             Regex("geo:([+-]?\\d+(?:\\.\\d+)?),([+-]?\\d+(?:\\.\\d+)?)"),
             Regex("#map=\\d+/([+-]?\\d+(?:\\.\\d+)?)/([+-]?\\d+(?:\\.\\d+)?)")
         )
-        for (p in urlPatterns) {
+        for ((index, p) in urlPatterns.withIndex()) {
             p.find(normalized)?.let { m ->
-                val lat = m.groupValues[1].toDoubleOrNull()
-                val lng = m.groupValues[2].toDoubleOrNull()
+                val rawFirst = m.groupValues[1].toDoubleOrNull()
+                val rawSecond = m.groupValues[2].toDoubleOrNull()
+                val lat = if (index == 1) rawSecond else rawFirst
+                val lng = if (index == 1) rawFirst else rawSecond
                 if (lat != null && lng != null && LandmarkAddress.isValid(lat, lng)) return lat to lng
             }
         }
@@ -410,6 +414,22 @@ object OfflineYemenGazetteer {
         }
 
         return null
+    }
+
+    fun buildAppLocationUri(lat: Double, lng: Double, label: String = "موقع محدد"): String {
+        val latStr = String.format(Locale.US, "%.6f", lat)
+        val lngStr = String.format(Locale.US, "%.6f", lng)
+        val encodedLabel = android.net.Uri.encode(label.ifBlank { "موقع محدد" })
+        return "yemenserv://map?lat=$latStr&lng=$lngStr&label=$encodedLabel"
+    }
+
+    fun extractLocationLabel(raw: String): String? {
+        return try {
+            val uri = android.net.Uri.parse(raw)
+            uri.getQueryParameter("label")?.takeIf { it.isNotBlank() }
+        } catch (_: Exception) {
+            null
+        }
     }
 
     fun formatCoordinates(lat: Double, lng: Double): String =

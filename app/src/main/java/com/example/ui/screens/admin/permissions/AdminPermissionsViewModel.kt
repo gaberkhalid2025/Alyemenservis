@@ -5,6 +5,8 @@ import com.example.data.models.AdminPermissionItem
 import com.example.data.models.AdminPermissionsRegistry
 import com.example.data.models.PermissionCategory
 import com.example.data.models.PermissionLevel
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -34,6 +36,7 @@ class AdminPermissionsViewModel : ViewModel() {
     val allPermissions: List<AdminPermissionItem> = AdminPermissionsRegistry.allPermissions
 
     private var savedRoleOverrides: Map<String, Set<String>> = emptyMap()
+    private var matrixListener: ListenerRegistration? = null
 
     init {
         loadSavedRolePermissions()
@@ -41,13 +44,13 @@ class AdminPermissionsViewModel : ViewModel() {
 
     fun loadSavedRolePermissions() {
         try {
-            com.google.firebase.firestore.FirebaseFirestore.getInstance()
+            matrixListener?.remove()
+            matrixListener = FirebaseFirestore.getInstance()
                 .collection("settings")
                 .document("admin_permissions_matrix")
-                .get()
-                .addOnSuccessListener { doc ->
-                    if (!doc.exists()) return@addOnSuccessListener
-                    val rolesRaw = doc.get("roles") as? Map<*, *> ?: return@addOnSuccessListener
+                .addSnapshotListener { doc, _ ->
+                    if (doc == null || !doc.exists()) return@addSnapshotListener
+                    val rolesRaw = doc.get("roles") as? Map<*, *> ?: return@addSnapshotListener
                     val parsed = mutableMapOf<String, Set<String>>()
                     rolesRaw.forEach { (roleKey, value) ->
                         val rName = roleKey?.toString()?.uppercase() ?: return@forEach
@@ -67,6 +70,12 @@ class AdminPermissionsViewModel : ViewModel() {
                 }
         } catch (_: Exception) {
         }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        matrixListener?.remove()
+        matrixListener = null
     }
 
     fun selectRole(roleKey: String) {

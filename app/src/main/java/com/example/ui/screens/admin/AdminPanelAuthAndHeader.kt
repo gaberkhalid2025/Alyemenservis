@@ -159,7 +159,7 @@ fun buildAdminTabsForRole(
     }.toMutableList()
 
     if (adminRole == "OWNER") {
-        filteredByRole.add(0, Triple("BACKDOOR", "1️⃣ ⚙️ البوابة الخلفية (BACKDOOR)", "SECURITY"))
+        filteredByRole.add(0, Triple("BACKDOOR", "1️⃣ 👑 لوحة المالك المتقدمة", "SECURITY"))
     }
     return filteredByRole
 }
@@ -528,7 +528,7 @@ fun AdminDashboardTopBar(
                 color = themeColors.accent
             )
             val roleLabel = when (adminRole.uppercase()) {
-                "OWNER" -> "👑 مالك التطبيق (صلاحيات كاملة + البوابة الخلفية)"
+                "OWNER" -> "👑 مالك التطبيق (صلاحيات كاملة)"
                 "ADMIN" -> "🛡️ مدير النظام"
                 "SUPERVISOR" -> "👮 مشرف (صلاحيات مخصصة)"
                 else -> adminRole

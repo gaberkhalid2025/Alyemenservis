@@ -223,7 +223,7 @@ fun ReviewOffersDialog(
                             isSubmitting = true
                             viewModel.submitReport(
                                 report = com.example.data.ReportEntity(
-                                    id = "rep_${System.currentTimeMillis()}",
+                                    id = com.example.utils.EntityIdGenerator.generate("REP"),
                                     reporterName = viewModel.currentUserName.value,
                                     reporterPhone = viewModel.currentUserPhone.value,
                                     providerId = uiState.complaintTarget ?: "",

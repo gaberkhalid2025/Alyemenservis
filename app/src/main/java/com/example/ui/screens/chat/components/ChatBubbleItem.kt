@@ -53,6 +53,7 @@ import com.example.data.models.MessageStatus
 import com.example.utils.AudioPlayerManager
 import com.example.utils.ChatIcons
 import com.example.utils.DateFormatter
+import com.example.utils.OfflineYemenGazetteer
 import com.example.utils.VisualThemePalette
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -69,6 +70,7 @@ fun ChatBubbleItem(
     onLongClick: () -> Unit,
     onReactionClick: ((emoji: String) -> Unit)? = null,
     onRetryClick: ((String) -> Unit)? = null,
+    onOpenLocationInApp: ((lat: Double, lng: Double, label: String, startNavigation: Boolean) -> Unit)? = null,
     themeColors: VisualThemePalette? = null
 ) {
     val hapticFeedback = LocalHapticFeedback.current
@@ -449,25 +451,26 @@ fun ChatBubbleItem(
                     }
                     MediaType.LOCATION -> {
                         val context = LocalContext.current
+                        val parsedCoords = remember(message.mediaUrl, message.message) {
+                            OfflineYemenGazetteer.parseCoordinates(message.mediaUrl)
+                                ?: OfflineYemenGazetteer.parseCoordinates(message.message)
+                        }
+                        val locationLabel = remember(message.mediaUrl, message.message) {
+                            OfflineYemenGazetteer.extractLocationLabel(message.mediaUrl)
+                                ?: message.message.removePrefix("📍").trim().ifBlank { "موقع جغرافي مباشر" }
+                        }
                         Surface(
                             color = Color.Black.copy(alpha = 0.35f),
                             shape = RoundedCornerShape(12.dp),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF38BDF8).copy(alpha = 0.3f)),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.4f)),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(bottom = 6.dp)
                                 .clickable {
-                                    try {
-                                        val uri = if (message.mediaUrl.startsWith("geo:") || message.mediaUrl.startsWith("http")) {
-                                            Uri.parse(message.mediaUrl)
-                                        } else {
-                                            Uri.parse("https://maps.google.com/?q=${message.mediaUrl}")
-                                        }
-                                        val mapIntent = Intent(Intent.ACTION_VIEW, uri)
-                                        mapIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                        context.startActivity(mapIntent)
-                                    } catch (e: Exception) {
-                                        Toast.makeText(context, "تعذر فتح تطبيق الخرائط", Toast.LENGTH_SHORT).show()
+                                    if (parsedCoords != null && onOpenLocationInApp != null) {
+                                        onOpenLocationInApp(parsedCoords.first, parsedCoords.second, locationLabel, false)
+                                    } else {
+                                        Toast.makeText(context, "تعذر استخراج إحداثيات الموقع", Toast.LENGTH_SHORT).show()
                                     }
                                 }
                         ) {
@@ -475,37 +478,48 @@ fun ChatBubbleItem(
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .height(110.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(
-                                        Brush.verticalGradient(
-                                            listOf(Color(0xFF1E3A8A), Color(0xFF0F172A))
-                                        )
-                                    ),
+                                        .height(106.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(
+                                            Brush.verticalGradient(
+                                                listOf(Color(0xFF064E3B), Color(0xFF0F172A))
+                                            )
+                                        ),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Column(
                                         horizontalAlignment = Alignment.CenterHorizontally,
-                                        verticalArrangement = Arrangement.Center
+                                        verticalArrangement = Arrangement.Center,
+                                        modifier = Modifier.padding(horizontal = 8.dp)
                                     ) {
                                         Icon(
                                             imageVector = Icons.Default.LocationOn,
                                             contentDescription = "موقع جغرافي",
-                                            tint = Color(0xFFEF4444),
-                                            modifier = Modifier.size(34.dp)
+                                            tint = Color(0xFF10B981),
+                                            modifier = Modifier.size(32.dp)
                                         )
                                         Spacer(modifier = Modifier.height(4.dp))
                                         Text(
-                                            text = "موقع جغرافي مباشر 📍",
+                                            text = locationLabel,
                                             color = Color.White,
                                             fontSize = 12.sp,
-                                            fontWeight = FontWeight.Bold
+                                            fontWeight = FontWeight.Bold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
                                         )
-                                        Text(
-                                            text = "اضغط لعرض الموقع وتتبع المسار",
-                                            color = Color(0xFF93C5FD),
-                                            fontSize = 10.sp
-                                        )
+                                        if (parsedCoords != null) {
+                                            Text(
+                                                text = OfflineYemenGazetteer.formatCoordinates(parsedCoords.first, parsedCoords.second),
+                                                color = Color(0xFFA7F3D0),
+                                                fontSize = 10.sp
+                                            )
+                                        } else {
+                                            Text(
+                                                text = "اضغط لعرض الموقع على خريطة التطبيق",
+                                                color = Color(0xFF93C5FD),
+                                                fontSize = 10.sp
+                                            )
+                                        }
                                     }
                                 }
                                 Spacer(modifier = Modifier.height(6.dp))
@@ -515,16 +529,35 @@ fun ChatBubbleItem(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
-                                        text = "🗺️ فتح الموقع بالخريطة",
+                                        text = "🗺️ عرض على خريطة التطبيق",
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.SemiBold,
-                                        color = Color(0xFF60A5FA)
+                                        color = Color(0xFF34D399)
                                     )
-                                    Text(
-                                        text = "Google Maps ↗",
-                                        fontSize = 10.sp,
-                                        color = Color.LightGray
-                                    )
+                                    if (parsedCoords != null && onOpenLocationInApp != null) {
+                                        Surface(
+                                            color = Color(0xFF10B981).copy(alpha = 0.22f),
+                                            shape = RoundedCornerShape(8.dp),
+                                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.6f)),
+                                            modifier = Modifier.clickable {
+                                                onOpenLocationInApp(parsedCoords.first, parsedCoords.second, locationLabel, true)
+                                            }
+                                        ) {
+                                            Text(
+                                                text = "🧭 ملاحة التوصيل الآن",
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFF6EE7B7),
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                            )
+                                        }
+                                    } else {
+                                        Text(
+                                            text = "خريطة التطبيق 🧭",
+                                            fontSize = 10.sp,
+                                            color = Color.LightGray
+                                        )
+                                    }
                                 }
                             }
                         }

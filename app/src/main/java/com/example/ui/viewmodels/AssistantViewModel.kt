@@ -218,10 +218,9 @@ class AssistantViewModel : ViewModel() {
                         mainViewModel = mainViewModel
                     )
                 } else {
-                    val (localText, localEntities) = generateLocalOfflineResponse(prompt, mainViewModel)
-                    val res = AssistantMessage(text = localText, isUser = false, matchedEntities = localEntities)
-                    cacheResponse(prompt, res)
-                    res
+                    val localMsg = generateLocalOfflineMessage(prompt, mainViewModel)
+                    cacheResponse(prompt, localMsg)
+                    localMsg
                 }
 
                 withContext(Dispatchers.Main) {
@@ -363,10 +362,9 @@ class AssistantViewModel : ViewModel() {
             com.example.utils.AppErrorLogManager.logApiError("GeminiAssistant", "فشل استدعاء Gemini API: ${e.localizedMessage}", e)
         }
 
-        val (localText, localEntities) = generateLocalOfflineResponse(prompt, mainViewModel)
-        val response = AssistantMessage(text = localText, isUser = false, matchedEntities = localEntities)
-        cacheResponse(prompt, response)
-        return response
+        val localMsg = generateLocalOfflineMessage(prompt, mainViewModel)
+        cacheResponse(prompt, localMsg)
+        return localMsg
     }
 
     data class DiyGuide(
@@ -375,7 +373,10 @@ class AssistantViewModel : ViewModel() {
         val steps: List<String>,
         val preventiveTip: String? = null,
         val estimatedCost: String? = null,
-        val targetCategory: String = "سباكة"
+        val targetCategory: String = "سباكة",
+        val safetyLevel: String = "LOW",
+        val safetyWarning: String? = null,
+        val immediateActions: List<String> = emptyList()
     )
 
     private val diyGuides = listOf(
@@ -445,17 +446,19 @@ class AssistantViewModel : ViewModel() {
             targetCategory = "تكييف"
         ),
         DiyGuide(
-            keywords = listOf("طاقة شمسية", "الواح", "انفرتر", "انفيرتر", "بطارية", "القاطع نزل", "التماس", "فولتية"),
-            title = "فحص منظومة الطاقة الشمسية والبطاريات",
-            steps = listOf(
-                "افحص شاشة جهاز الانفرتر وسجل كود الخطأ (Fault Code).",
-                "تأكد من نظافة زجاج الألواح الشمسية من الغبار المتراكم الذي يقلل الإنتاج بنسبة 40%.",
-                "افحص سلامة أقطاب البطاريات وعدم وجود أملاح بيضاء متأكسدة (نظفها بماء دافئ).",
-                "في حال نزول القاطع الرئيسي، افصل الأجهزة الكبيرة ثم ارفع القاطع تدريجياً لتحديد العطل."
-            ),
-            preventiveTip = "لا تفرغ بطاريات الجل أو الليثيوم لأقل من 30% من سعتها للحفاظ على عمرها الافتراضي.",
+            keywords = listOf("طاقة شمسية", "الواح", "انفرتر", "انفيرتر", "بطارية", "القاطع نزل", "التماس", "شورت", "كهرباء", "فيش محروق", "كابستر", "سخان", "لسعة", "صعقة", "فولتية"),
+            title = "تحذير أمان: أعطال الكهرباء والطاقة الشمسية والجهد العالي",
+            steps = listOf(),
+            preventiveTip = "استخدم قاطع الحماية التفاضلي (RCCB) وافحص التمديدات دورياً عبر فني معتمد.",
             estimatedCost = "4,000 - 8,000 ريال يمني",
-            targetCategory = "كهرباء"
+            targetCategory = "كهرباء",
+            safetyLevel = "HIGH",
+            safetyWarning = "خطر صعق كهربائي أو حريق: لا تفتح لوحة التوزيع أو الإنفرتر أو غطاء المكثف بيدك ولا تلمس الأسلاك المكشوفة.",
+            immediateActions = listOf(
+                "افصل القاطع الرئيسي للكهرباء أو قاطع المنظومة فوراً.",
+                "أبعد الماء والأشخاص عن مصدر الشرارة أو التسريب الكهربائي.",
+                "اطلب فني كهرباء أو طاقة شمسية معتمد فوراً من الأسفل."
+            )
         ),
         DiyGuide(
             keywords = listOf("بنشر", "تاير", "كفر", "بطارية سيارة", "ما تدقش سلف", "عطلان في الطريق", "ميكانيكي", "سطحة"),
@@ -472,6 +475,11 @@ class AssistantViewModel : ViewModel() {
     )
 
     fun generateLocalOfflineResponse(prompt: String, viewModel: MainViewModel): Pair<String, List<Any>> {
+        val msg = generateLocalOfflineMessage(prompt, viewModel)
+        return Pair(msg.text, msg.matchedEntities)
+    }
+
+    fun generateLocalOfflineMessage(prompt: String, viewModel: MainViewModel): AssistantMessage {
         val qNormalized = normalizeArabic(prompt)
         val providers = viewModel.providers.value
         val stores = viewModel.stores.value
@@ -479,18 +487,27 @@ class AssistantViewModel : ViewModel() {
         val categories = viewModel.categories.value
         val settings = viewModel.settings.value
 
-        // [المحور الرابع] فحص أدلة الصيانة الذكية وخطوات DIY أولاً
+        // [المحور الرابع] فحص أدلة الصيانة الذكية مع أولوية سلامة الأعطال الخطرة
         val matchedDiyGuide = diyGuides.firstOrNull { guide ->
-            guide.keywords.any { kw -> qNormalized.contains(kw) }
+            guide.keywords.any { kw -> qNormalized.contains(normalizeArabic(kw)) }
         }
         if (matchedDiyGuide != null) {
             val sb = StringBuilder()
-            sb.append("🛠️ *${matchedDiyGuide.title}*\n\n")
-            sb.append("📋 خطوات الفحص والإصلاح السريع (DIY):\n")
-            matchedDiyGuide.steps.forEachIndexed { i, step -> sb.append("${i + 1}. $step\n") }
+            val isHighRisk = matchedDiyGuide.safetyLevel.equals("HIGH", ignoreCase = true)
+            sb.append(if (isHighRisk) "🚨 *${matchedDiyGuide.title}*\n\n" else "🛠️ *${matchedDiyGuide.title}*\n\n")
+            if (isHighRisk) {
+                matchedDiyGuide.safetyWarning?.let { sb.append("⚠️ $it\n\n") }
+                if (matchedDiyGuide.immediateActions.isNotEmpty()) {
+                    sb.append("🛡️ خطوات الأمان الفورية:\n")
+                    matchedDiyGuide.immediateActions.forEachIndexed { i, act -> sb.append("${i + 1}. $act\n") }
+                }
+            } else {
+                sb.append("📋 خطوات الفحص والإصلاح السريع (DIY):\n")
+                matchedDiyGuide.steps.forEachIndexed { i, step -> sb.append("${i + 1}. $step\n") }
+            }
             matchedDiyGuide.preventiveTip?.let { sb.append("\n💡 نصيحة وقائية: $it\n") }
             matchedDiyGuide.estimatedCost?.let { sb.append("\n💰 التكلفة التقديرية: $it\n") }
-            sb.append("\nيمكنك أيضاً طلب فني معتمد فوراً من القائمة أدناه 👇")
+            sb.append("\nيمكنك طلب فني معتمد فوراً من القائمة أدناه 👇")
 
             val relatedProviders = providers.filter { p ->
                 val pProf = normalizeArabic(p.profession)
@@ -498,7 +515,14 @@ class AssistantViewModel : ViewModel() {
                 val cat = normalizeArabic(matchedDiyGuide.targetCategory)
                 pProf.contains(cat) || pSpec.contains(cat)
             }.take(3)
-            return Pair(sb.toString(), relatedProviders)
+            return AssistantMessage(
+                text = sb.toString(),
+                isUser = false,
+                matchedEntities = relatedProviders,
+                safetyLevel = matchedDiyGuide.safetyLevel,
+                safetyWarning = matchedDiyGuide.safetyWarning,
+                immediateActions = matchedDiyGuide.immediateActions
+            )
         }
 
         val isSupportContact = qNormalized.contains("رقم") || qNormalized.contains("اتصال") || 
@@ -550,7 +574,7 @@ class AssistantViewModel : ViewModel() {
 
         if (isWashingMachinePrice) {
             val priceText = "🧺 متوسط تكلفة معاينة وصيانة الغسالات في دليل خدمات اليمن يتراوح بين 4,000 إلى 9,000 ريال يمني (حسب نوع الغسالة والعطل وقطع الغيار). يمكنك طلب فني صيانة غسالات معتمد للمعاينة المباشرة!"
-            return Pair(priceText, matchedEntities)
+            return AssistantMessage(text = priceText, isUser = false, matchedEntities = matchedEntities)
         }
 
         if (matchedEntities.isNotEmpty()) {
@@ -574,7 +598,7 @@ class AssistantViewModel : ViewModel() {
                 }
             }
             sb.append("💡 انقر على البطاقة بالأسفل لمزيد من التفاصيل!")
-            return Pair(sb.toString(), matchedEntities)
+            return AssistantMessage(text = sb.toString(), isUser = false, matchedEntities = matchedEntities)
         }
 
         val textResult = when {
@@ -612,7 +636,7 @@ class AssistantViewModel : ViewModel() {
                 "عذراً، لم أتمكن من فهم استفسارك بدقة (\"$prompt\"). يمكنك كتابة اسم المهنة أو الخدمة المطلوبة بوضوح مثل: (أحتاج سباك، كهربائي، صيانة غسالة، مطعم، عقار، دكتور) أو الضغط على زر '⚡ اطلب الآن' لإرسال طلب فوري."
             }
         }
-        return Pair(textResult, emptyList())
+        return AssistantMessage(text = textResult, isUser = false, matchedEntities = emptyList())
     }
 
     fun normalizeArabic(text: String): String {

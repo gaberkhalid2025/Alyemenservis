@@ -274,7 +274,7 @@ internal class AdminProvidersAndCatalogDelegate(
             val p = snapshot.toObject(ProviderEntity::class.java)
             if (p != null) {
                 vm.db.collection("providers").document(providerId).set(
-                    p.copy(isRecommended = isRecommended, rating = if (isRecommended) 5.0f else 4.2f)
+                    p.copy(isRecommended = isRecommended)
                 )
             }
         }

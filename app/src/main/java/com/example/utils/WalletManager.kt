@@ -409,15 +409,116 @@ class WalletManager(private val context: Context? = null) {
     }
 
     /**
+     * الحصول على الرصيد الصحيح بدون كسور عشرية غير آمنة (Long)
+     */
+    fun getBalanceLong(walletId: String, currency: String = "YER"): Long {
+        return kotlin.math.round(getBalance(walletId, currency)).toLong()
+    }
+
+    /**
+     * مزامنة رصيد المحفظة من Firestore بشكل آمن مع دعم الحقول الرقمية القديمة
+     */
+    suspend fun fetchBalanceLong(walletId: String, currency: String = "YER"): Long =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val snap = firestore.collection("wallets").document(walletId).get().await()
+                if (snap.exists()) {
+                    val walletObj = snap.toObject(Wallet::class.java)
+                    val cur = currency.uppercase()
+                    val fieldName = when (cur) {
+                        "USD" -> "balanceUsd"
+                        "SAR" -> "balanceSar"
+                        else -> "balanceYer"
+                    }
+                    val rawNum = snap.get(fieldName) as? Number
+                        ?: snap.get("balance") as? Number
+                    val balLong = rawNum?.let { kotlin.math.round(it.toDouble()).toLong() }
+                        ?: kotlin.math.round(
+                            when (cur) {
+                                "USD" -> walletObj?.balanceUsd ?: 0.0
+                                "SAR" -> walletObj?.balanceSar ?: 0.0
+                                else -> walletObj?.balanceYer ?: walletObj?.balance ?: 0.0
+                            }
+                        ).toLong()
+                    if (walletObj != null) {
+                        localWallets[walletObj.id] = walletObj
+                        if (walletObj.userId.isNotBlank()) localWallets[walletObj.userId] = walletObj
+                    }
+                    return@withContext balLong
+                }
+            } catch (_: Exception) {
+            }
+            getBalanceLong(walletId, currency)
+        }
+
+    /**
+     * تقديم طلب شحن رصيد بحالة PENDING لمراجعة واعتماد الإدارة
+     */
+    suspend fun requestTopUp(
+        walletId: String,
+        amount: Long,
+        referenceNumber: String,
+        paymentMethod: String = "BANK_TRANSFER",
+        note: String = ""
+    ): Result<WalletTopUpRequest> {
+        val userId = walletId.removePrefix("wallet_")
+        return WalletRequests.submitTopUpRequest(
+            firestore = firestore,
+            walletId = walletId,
+            userId = userId,
+            amount = amount,
+            referenceNumber = referenceNumber,
+            currency = "YER",
+            paymentMethod = paymentMethod,
+            note = note
+        )
+    }
+
+    suspend fun getTopUpRequests(walletId: String): List<WalletTopUpRequest> =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val snap = firestore.collection(WalletRequests.COLLECTION_TOPUPS)
+                    .whereEqualTo("walletId", walletId)
+                    .orderBy("createdAt", Query.Direction.DESCENDING)
+                    .limit(20)
+                    .get()
+                    .await()
+                snap.documents.mapNotNull { it.toObject(WalletTopUpRequest::class.java) }
+            } catch (_: Exception) {
+                emptyList()
+            }
+        }
+
+    /**
      * 6. سجل المعاملات لمحفظة معينة
      */
     // [تحسين مدمج]: Bounded pagination applied.
     fun getTransactions(walletId: String, limit: Int = 30): List<Transaction> {
         val clean = walletId.trim()
         return _transactionsFlow.value
-            .filter { it.walletId == clean || it.userId == clean }
+            .filter { it.walletId == clean || it.userId == clean || it.walletId == "wallet_$clean" || it.userId == clean.removePrefix("wallet_") }
             .take(limit)
     }
+
+    suspend fun fetchTransactions(walletId: String, limit: Int = 30): List<Transaction> =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val clean = walletId.trim()
+                val uid = clean.removePrefix("wallet_")
+                val snap = firestore.collection("wallet_transactions")
+                    .whereEqualTo("userId", uid)
+                    .orderBy("timestamp", Query.Direction.DESCENDING)
+                    .limit(limit.toLong())
+                    .get()
+                    .await()
+                val remote = snap.documents.mapNotNull { it.toObject(Transaction::class.java) }
+                if (remote.isNotEmpty()) {
+                    return@withContext remote
+                }
+            } catch (_: Exception) {
+            }
+            getTransactions(walletId, limit)
+        }
 
     /**
      * 7. سجل المعاملات لمستخدم معين

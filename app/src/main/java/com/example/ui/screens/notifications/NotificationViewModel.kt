@@ -103,9 +103,13 @@ class NotificationViewModel(
         val seenKeys = mutableSetOf<String>()
 
         return allList.filter { notif ->
-            if (!notif.isValid()) return@filter false
+            if (!notif.isValid() || notif.isExpired()) return@filter false
 
-            val dKey = if (notif.dedupKey.isNotBlank()) notif.dedupKey else "${notif.notificationType}_${notif.title}_${notif.timestamp / (30 * 1000L)}"
+            val dKey = when {
+                notif.dedupKey.isNotBlank() -> notif.dedupKey
+                notif.id.isNotBlank() -> notif.id
+                else -> "${notif.notificationType}_${notif.title.hashCode()}_${notif.message.hashCode()}_${notif.timestamp}"
+            }
             if (!seenKeys.add(dKey)) return@filter false
 
             NotificationAudienceFilter.isAudienceMatched(
@@ -117,7 +121,7 @@ class NotificationViewModel(
                 isProvider = isProv,
                 currentResidence = currentRes
             )
-        }.distinctBy { it.id.ifBlank { "${it.title}_${it.timestamp}" } }.take(200) // حصر عدد الإشعارات بحد أقصى 200 في الذاكرة
+        }.distinctBy { it.id.ifBlank { "${it.title}_${it.message.hashCode()}_${it.timestamp}" } }.take(200) // حصر عدد الإشعارات بحد أقصى 200 في الذاكرة
     }
 
     fun addNotification(
@@ -130,8 +134,8 @@ class NotificationViewModel(
         targetUserIds: List<String> = emptyList(),
         notificationType: String = "NORMAL"
     ) {
-        // فحص منع التكرار باستخدام dedupKey وقائمة آخر 300 إشعار
-        val dedupKey = "${notificationType}_${title.hashCode()}_${targetValue}_${targetUserIds.sorted().joinToString(",")}_${System.currentTimeMillis() / 90000}"
+        // فحص منع التكرار باستخدام dedupKey شامل لنص الرسالة ضمن نافذة 10 ثوانٍ
+        val dedupKey = "${notificationType}_${title.trim().hashCode()}_${message.trim().hashCode()}_${targetValue.trim()}_${targetUserIds.sorted().joinToString(",")}_${System.currentTimeMillis() / 10_000L}"
         synchronized(recentDedupKeys) {
             if (recentDedupKeys.contains(dedupKey)) {
                 return // تم الإشعار مسبقاً، منع التكرار

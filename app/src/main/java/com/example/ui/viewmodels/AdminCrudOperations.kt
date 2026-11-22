@@ -45,6 +45,7 @@ class AdminCrudOperations(private val db: FirebaseFirestore) {
             "calls",
             "payment_wallets",
             "internal_wallets",
+            "wallet_topups",
             "wallet_transactions",
             "payments",
             "transactions",

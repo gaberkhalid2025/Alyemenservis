@@ -41,12 +41,14 @@ internal class ChatMessageDelegate(
         val visibleCached = cached.filter { !it.isHiddenFor(currentUserId) }
         trySend(visibleCached)
 
-        val lastLocalTimestamp = cached.maxOfOrNull { it.timestamp } ?: 0L
+        val lastLocalSyncWatermark = cached.maxOfOrNull {
+            maxOf(it.updatedAt, it.editTimestamp, it.readAt, it.timestamp)
+        } ?: 0L
 
-        // 2. Real-time Firebase Listener with Delta Sync optimization (Spark Plan Saver)
+        // 2. Real-time Firebase Listener with Delta Sync optimization (captures new & mutated messages)
         val messagesRef = channelsCollection.document(channelId).collection("messages")
-        val query = if (lastLocalTimestamp > 0L) {
-            messagesRef.whereGreaterThan("timestamp", lastLocalTimestamp).orderBy("timestamp", Query.Direction.ASCENDING)
+        val query = if (lastLocalSyncWatermark > 0L) {
+            messagesRef.whereGreaterThan("updatedAt", lastLocalSyncWatermark).orderBy("updatedAt", Query.Direction.ASCENDING)
         } else {
             messagesRef.orderBy("timestamp", Query.Direction.ASCENDING).limitToLast(limit.coerceAtLeast(25).toLong())
         }
@@ -107,7 +109,8 @@ internal class ChatMessageDelegate(
         replyToId: String?,
         replyToText: String?,
         attachment: ChatAttachment?,
-        audioWaveform: List<Int>
+        audioWaveform: List<Int>,
+        existingMessageId: String? = null
     ): AppResult<ChatMessage> = sendMessageInternal(
         channelId = channelId,
         senderId = senderId,
@@ -119,7 +122,7 @@ internal class ChatMessageDelegate(
         replyToText = replyToText,
         attachment = attachment,
         audioWaveform = audioWaveform,
-        existingMessageId = null,
+        existingMessageId = existingMessageId,
         existingTimestamp = null
     )
 
@@ -160,7 +163,8 @@ internal class ChatMessageDelegate(
             status = MessageStatus.SENDING,
             timestamp = now,
             syncStatus = SyncStatus.PENDING_UPLOAD,
-            audioWaveform = audioWaveform
+            audioWaveform = audioWaveform,
+            updatedAt = now
         )
 
         try {
@@ -178,7 +182,11 @@ internal class ChatMessageDelegate(
                 return@withContext AppResult.Error(AppError.UnauthorizedError("لا يمكنك إرسال الرسالة لأنك محظور في هذه المحادثة."))
             }
 
-            val confirmedMsg = initialMsg.copy(status = MessageStatus.SENT, syncStatus = SyncStatus.SYNCED)
+            val confirmedMsg = initialMsg.copy(
+                status = MessageStatus.SENT,
+                syncStatus = SyncStatus.SYNCED,
+                updatedAt = System.currentTimeMillis()
+            )
 
             val displayLast = when (mediaType) {
                 MediaType.IMAGE -> "📷 صورة"
@@ -245,7 +253,8 @@ internal class ChatMessageDelegate(
                 mapOf(
                     "mediaUrl" to downloadUrl,
                     "status" to newStatus.name,
-                    "syncStatus" to SyncStatus.SYNCED.name
+                    "syncStatus" to SyncStatus.SYNCED.name,
+                    "updatedAt" to System.currentTimeMillis()
                 )
             ).await()
             AppResult.Success(Unit)
@@ -264,7 +273,12 @@ internal class ChatMessageDelegate(
         try {
             local?.updateMessageStatus(channelId, messageId, status)
             val msgRef = channelsCollection.document(channelId).collection("messages").document(messageId)
-            msgRef.update("status", status.name).await()
+            msgRef.update(
+                mapOf(
+                    "status" to status.name,
+                    "updatedAt" to System.currentTimeMillis()
+                )
+            ).await()
             AppResult.Success(Unit)
         } catch (e: Exception) {
             Log.e("ChatRepository", "updateMessageStatus failed: ${e.message}")
@@ -330,6 +344,7 @@ internal class ChatMessageDelegate(
             }
 
             if (unreadDocs.isNotEmpty()) {
+                val now = System.currentTimeMillis()
                 val batch = firestore.batch()
                 for (doc in unreadDocs) {
                     batch.update(
@@ -337,7 +352,8 @@ internal class ChatMessageDelegate(
                         mapOf(
                             "status" to MessageStatus.READ.name,
                             "isRead" to true,
-                            "readAt" to System.currentTimeMillis()
+                            "readAt" to now,
+                            "updatedAt" to now
                         )
                     )
                 }
@@ -357,6 +373,7 @@ internal class ChatMessageDelegate(
         currentUserId: String
     ): AppResult<Unit> = withContext(Dispatchers.IO) {
         if (channelId.isBlank() || messageId.isBlank() || newText.isBlank()) return@withContext AppResult.Success(Unit)
+        val local = localProvider()
         try {
             val resolvedUserId = currentUserId.trim().ifBlank {
                 try {
@@ -374,14 +391,25 @@ internal class ChatMessageDelegate(
             if (message == null || message.senderId != resolvedUserId) {
                 return@withContext AppResult.Error(AppError.ValidationError("senderId", "غير مصرح لك بتعديل هذه الرسالة (ليست من إرسالك)"))
             }
-            val encryptedText = com.example.utils.ChatCryptoManager.encrypt(newText.trim())
+            val cleanText = newText.trim()
+            val now = System.currentTimeMillis()
             msgRef.update(
                 mapOf(
-                    "message" to encryptedText,
+                    "message" to cleanText,
                     "isEdited" to true,
-                    "editTimestamp" to System.currentTimeMillis()
+                    "editTimestamp" to now,
+                    "updatedAt" to now
                 )
             ).await()
+            local?.insertOrUpdateMessage(
+                message.copy(
+                    id = messageId,
+                    message = cleanText,
+                    isEdited = true,
+                    editTimestamp = now,
+                    updatedAt = now
+                )
+            )
             AppResult.Success(Unit)
         } catch (e: Exception) {
             AppResult.Error(AppError.NetworkError(e))
@@ -402,15 +430,22 @@ internal class ChatMessageDelegate(
 
             // Remote update
             val msgRef = channelsCollection.document(channelId).collection("messages").document(messageId)
+            val now = System.currentTimeMillis()
             if (forEveryone) {
                 msgRef.update(
                     mapOf(
                         "isDeleted" to true,
-                        "message" to "تم حذف هذه الرسالة"
+                        "message" to "تم حذف هذه الرسالة",
+                        "updatedAt" to now
                     )
                 ).await()
             } else {
-                msgRef.update("deletedForUsers", FieldValue.arrayUnion(currentUserId)).await()
+                msgRef.update(
+                    mapOf(
+                        "deletedForUsers" to FieldValue.arrayUnion(currentUserId),
+                        "updatedAt" to now
+                    )
+                ).await()
             }
             AppResult.Success(Unit)
         } catch (e: Exception) {
@@ -441,7 +476,12 @@ internal class ChatMessageDelegate(
                 emoji
             }
 
-            msgRef.update("reactions.$cleanUserId", newValue).await()
+            msgRef.update(
+                mapOf(
+                    "reactions.$cleanUserId" to newValue,
+                    "updatedAt" to System.currentTimeMillis()
+                )
+            ).await()
             AppResult.Success(Unit)
         } catch (e: Exception) {
             AppResult.Error(AppError.NetworkError(e))
@@ -458,11 +498,17 @@ internal class ChatMessageDelegate(
         if (cleanChannelId.isBlank() || cleanMessageId.isBlank()) return@withContext AppResult.Success(Unit)
         val local = localProvider()
         try {
+            val now = System.currentTimeMillis()
             val msgRef = channelsCollection.document(cleanChannelId).collection("messages").document(cleanMessageId)
-            msgRef.update("isPinned", isPinned).await()
+            msgRef.update(
+                mapOf(
+                    "isPinned" to isPinned,
+                    "updatedAt" to now
+                )
+            ).await()
             val cachedList = local?.getMessages(cleanChannelId)
             if (cachedList != null) {
-                val updated = cachedList.map { if (it.id == cleanMessageId) it.copy(isPinned = isPinned) else it }
+                val updated = cachedList.map { if (it.id == cleanMessageId) it.copy(isPinned = isPinned, updatedAt = now) else it }
                 local?.saveMessages(cleanChannelId, updated)
             }
             AppResult.Success(Unit)
@@ -479,7 +525,7 @@ internal class ChatMessageDelegate(
             val messagesRef = channelsCollection.document(channelId).collection("messages")
 
             val snapshot = if (lastSync > 0) {
-                messagesRef.whereGreaterThan("timestamp", lastSync).limit(100).get().await()
+                messagesRef.whereGreaterThan("updatedAt", lastSync).limit(100).get().await()
             } else {
                 messagesRef.orderBy("timestamp", Query.Direction.DESCENDING).limit(50).get().await()
             }
@@ -490,7 +536,10 @@ internal class ChatMessageDelegate(
 
             if (newMessages.isNotEmpty()) {
                 val current = local?.getMessages(channelId) ?: emptyList()
-                val merged = (current + newMessages).distinctBy { it.id }.sortedBy { it.timestamp }
+                val mergedMap = LinkedHashMap<String, ChatMessage>()
+                current.forEach { mergedMap[it.id] = it }
+                newMessages.forEach { mergedMap[it.id] = it }
+                val merged = mergedMap.values.sortedBy { it.timestamp }
                 local?.saveMessages(channelId, merged)
                 local?.setLastSyncTimestamp(channelId, System.currentTimeMillis())
             }

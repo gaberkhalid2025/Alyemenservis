@@ -386,7 +386,7 @@ fun LazyListScope.adminSectionPaymentsAndWallets(
                     Button(
                         onClick = {
                             val newW = InternalWalletEntity(
-                                id = "W_${System.currentTimeMillis().toString().takeLast(6)}",
+                                id = com.example.utils.EntityIdGenerator.generate("WAL"),
                                 ownerName = "محل/فني جديد",
                                 ownerPhone = "770000000",
                                 ownerType = "STORE",

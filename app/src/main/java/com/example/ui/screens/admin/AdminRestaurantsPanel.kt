@@ -374,7 +374,7 @@ fun AdminRestaurantsPanel(
                             return@Button
                         }
                         val newStore = StoreEntity(
-                            id = "rest_${System.currentTimeMillis()}",
+                            id = com.example.utils.EntityIdGenerator.generate("REST"),
                             name = restName.trim(),
                             phone = restPhone.trim(),
                             cityId = restCity.trim(),

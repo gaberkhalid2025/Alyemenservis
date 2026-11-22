@@ -1,0 +1,319 @@
+# 72 – النطق الصوتي (TTS) في الملاحة والمساعد: إصلاح جذري
+## 1) ما تُظهره صورك بالضبط
+- محرك النطق المفضّل عندك: **Samsung TTS**، واللغات المثبتة فيه: **الإنجليزية (أمريكا) والإسبانية (المكسيك) فقط**. لا توجد عربية أصلاً؛ فلا يمكن لأي تطبيق أن ينطق عربياً عبر هذا المحرك.
+- شريط الحالة في كل الصور يعرض **وضع الطيران ✈**. تنزيل الحزم اللغوية يتطلب إنترنت فعلياً؛ مع وضع الطيران أو شبكة بلا إنترنت يفشل «التثبيت» بصمت. أطفئ وضع الطيران وتأكد أن Wi‑Fi يفتح مواقع.
+- حوار «إعداد الصوت العربي» عندك يطلب «تنزيل حزمة العربية عبر Google» لكنه لا يعرف هل **Speech Services by Google** مثبّت أصلاً، ولا يختار المحرك الذي فيه العربية؛ فيبقى يستعمل Samsung.
+## 2) الحل بثلاث طبقات (يعمل مهما كان جهاز المستخدم)
+1. **اختيار المحرك الذي يملك العربية تلقائياً** (Google إن وُجد) دون تغيير إعدادات النظام.
+2. **صوت مسجّل داخل التطبيق** (مقاطع قصيرة بلهجة يمنية) يعمل **بلا إنترنت وبلا أي محرك TTS**: هذا هو الضمان الحقيقي لوصوله لكل الأجهزة.
+3. **نغمات ونص مرئي** كحد أدنى (موجودة عندك).
+الترتيب في الوضع التلقائي: مقاطع مسجّلة (إن كانت كاملة) ← TTS عربي ← نغمات.
+## 3) ملف جديد: `com/example/utils/TtsManager.kt`
+```kotlin
+package com.example.utils
+
+import android.content.Context
+import android.content.Intent
+import android.media.AudioAttributes
+import android.media.AudioFocusRequest
+import android.media.AudioManager
+import android.net.Uri
+import android.os.Build
+import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
+import java.util.Locale
+import kotlin.coroutines.resume
+
+enum class ArabicStatus { AVAILABLE, MISSING_DATA, NOT_SUPPORTED, ENGINE_ERROR }
+data class TtsEngineInfo(val pkg: String, val label: String, val isDefault: Boolean, val arabic: ArabicStatus, val locale: Locale?)
+
+class TtsManager(context: Context) {
+    private val app = context.applicationContext
+    private val audio = app.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+    private var tts: TextToSpeech? = null
+    private var focusReq: AudioFocusRequest? = null
+    @Volatile var ready = false; private set
+    @Volatile var activeEngine: String? = null; private set
+    private val arabic = listOf(Locale("ar", "YE"), Locale("ar", "SA"), Locale("ar", "EG"), Locale("ar"))
+
+    private suspend fun open(pkg: String?): TextToSpeech? = withContext(Dispatchers.Main) {
+        withTimeoutOrNull(5_000L) {
+            suspendCancellableCoroutine<TextToSpeech?> { cont ->
+                var t: TextToSpeech? = null
+                // تُستدعى الدالة غير المتزامنة بعد إنشاء الكائن؛ لذلك t مُسندة عند الاستدعاء
+                t = try {
+                    TextToSpeech(app, { st ->
+                        if (cont.isActive) { if (st == TextToSpeech.SUCCESS && t != null) cont.resume(t) else { try { t?.shutdown() } catch (_: Exception) {}; cont.resume(null) } }
+                    }, pkg)
+                } catch (e: Exception) { if (cont.isActive) cont.resume(null); null }
+                cont.invokeOnCancellation { try { t?.shutdown() } catch (_: Exception) {} }
+            }
+        }
+    }
+
+    private fun arabicOf(t: TextToSpeech): Pair<ArabicStatus, Locale?> {
+        var missing = false
+        for (l in arabic) when (t.isLanguageAvailable(l)) {
+            TextToSpeech.LANG_AVAILABLE, TextToSpeech.LANG_COUNTRY_AVAILABLE, TextToSpeech.LANG_COUNTRY_VAR_AVAILABLE -> return ArabicStatus.AVAILABLE to l
+            TextToSpeech.LANG_MISSING_DATA -> missing = true
+        }
+        return (if (missing) ArabicStatus.MISSING_DATA else ArabicStatus.NOT_SUPPORTED) to null
+    }
+
+    /** تشخيص كل المحركات المثبتة وحالة العربية في كلٍّ منها. */
+    suspend fun diagnose(): List<TtsEngineInfo> {
+        val probe = open(null) ?: return emptyList()
+        val engines = try { probe.engines } catch (e: Exception) { emptyList() }
+        val defPkg = try { probe.defaultEngine } catch (e: Exception) { null }
+        try { probe.shutdown() } catch (_: Exception) {}
+        return engines.map { e ->
+            val t = open(e.name)
+            if (t == null) TtsEngineInfo(e.name, e.label, e.name == defPkg, ArabicStatus.ENGINE_ERROR, null)
+            else { val (st, loc) = arabicOf(t); try { t.shutdown() } catch (_: Exception) {}; TtsEngineInfo(e.name, e.label, e.name == defPkg, st, loc) }
+        }
+    }
+
+    /** يختار محركاً يملك العربية (يفضّل Google). false إن لم يوجد. */
+    suspend fun start(): Boolean {
+        shutdown()
+        val pick = diagnose().filter { it.arabic == ArabicStatus.AVAILABLE }
+            .sortedByDescending { it.pkg == GOOGLE_TTS }.firstOrNull() ?: return false
+        val t = open(pick.pkg) ?: return false
+        t.language = pick.locale
+        t.setSpeechRate(0.95f)
+        t.setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE).setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build())
+        t.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+            override fun onStart(id: String?) {}
+            override fun onDone(id: String?) { abandonFocus() }
+            @Deprecated("Deprecated in Java") override fun onError(id: String?) { abandonFocus() }
+        })
+        tts = t; activeEngine = pick.pkg; ready = true
+        return true
+    }
+
+    fun speak(text: String, flush: Boolean = false) {
+        val t = tts ?: return
+        if (!ready || text.isBlank()) return
+        requestFocus()
+        t.speak(text, if (flush) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD, null, "u${System.nanoTime()}")
+    }
+
+    private fun requestFocus() {
+        if (Build.VERSION.SDK_INT >= 26) {
+            val r = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
+                .setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE).setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build()).build()
+            focusReq = r; audio.requestAudioFocus(r)
+        } else @Suppress("DEPRECATION") audio.requestAudioFocus(null, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
+    }
+    private fun abandonFocus() {
+        if (Build.VERSION.SDK_INT >= 26) focusReq?.let { audio.abandonAudioFocusRequest(it) } else @Suppress("DEPRECATION") audio.abandonAudioFocus(null)
+    }
+    fun shutdown() { ready = false; try { tts?.stop(); tts?.shutdown() } catch (_: Exception) {}; tts = null; activeEngine = null }
+
+    companion object {
+        const val GOOGLE_TTS = "com.google.android.tts"
+        fun installDataIntent(pkg: String?) = Intent(TextToSpeech.Engine.ACTION_INSTALL_TTS_DATA).apply { if (pkg != null) setPackage(pkg) }
+        fun ttsSettingsIntent() = Intent("com.android.settings.TTS_SETTINGS")
+        fun playStoreIntent() = Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=$GOOGLE_TTS"))
+        fun playStoreWebIntent() = Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=$GOOGLE_TTS"))
+        fun safeStart(ctx: Context, vararg intents: Intent) {
+            for (i in intents) { try { ctx.startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); return } catch (_: Exception) {} }
+        }
+    }
+}
+```
+**`AndroidManifest.xml`** (داخل `<queries>`؛ مطلوب لرؤية محركات النطق على أندرويد 11+):
+```xml
+<intent><action android:name="android.intent.action.TTS_SERVICE" /></intent>
+```
+## 4) الصوت المسجّل بلهجة يمنية (يعمل بلا إنترنت وبلا TTS)
+### المقاطع المطلوبة (بصيغة OGG، داخل `app/src/main/assets/voice/ye/`)
+| المعرّف | النص |
+|---|---|
+| `after` | بعد |
+| `d30` `d50` `d70` | ثلاثين متر • خمسين متر • سبعين متر |
+| `d100` `d150` `d200` `d250` | مية متر • مية وخمسين متر • ميتين متر • ميتين وخمسين متر |
+| `d300` `d400` `d500` `d600` `d700` `d800` `d900` | ثلاثمية • أربعمية • خمسمية • ستمية • سبعمية • ثمانمية • تسعمية (متر) |
+| `d1000` `d1500` `d2000` | كيلو • كيلو ونص • كيلوين |
+| `left` `right` | لف يسار • لف يمين |
+| `slight_left` `slight_right` | خذ يسار شوية • خذ يمين شوية |
+| `sharp_left` `sharp_right` | لف يسار بقوة • لف يمين بقوة |
+| `uturn` `roundabout` `straight` | ارجع دوّر • عند الجولة كمّل • واصل على طول |
+| `arrive_soon` `arrive` | توصل • وصلت |
+| `reroute` `offroute` `gps_weak` `hazard` `start` | جاري إعادة حساب المسار • خرجت عن المسار • إشارة الجي بي إس ضعيفة • تنبيه طريق وعر • ابدأ الرحلة |
+**الإنتاج (مجاني):** سجّل صوتك أنت أو صوت متحدث يمني (الأفضل للهجة)، بصمت وبمسافة ثابتة من الميكروفون، ثم حوّل ووحّد الصوت:
+```bash
+for f in raw/*.wav; do
+  n=$(basename "$f" .wav)
+  ffmpeg -y -i "$f" -ac 1 -ar 22050 -af "silenceremove=1:0:-45dB,loudnorm=I=-16:TP=-1.5" -c:a libopus -b:a 24k "assets/voice/ye/$n.ogg"
+done
+```
+(حجم المجموعة كلها أقل من 500KB.) التسجيل بصوتك يمنحك لهجة حقيقية لا يقدمها أي محرك TTS.
+### ملف جديد: `com/example/utils/VoicePrompts.kt`
+```kotlin
+package com.example.utils
+
+import android.content.Context
+import android.media.AudioAttributes
+import android.media.MediaPlayer
+import android.os.Handler
+import android.os.Looper
+import kotlin.math.abs
+
+object PromptBuilder {
+    private val DIST = intArrayOf(30, 50, 70, 100, 150, 200, 250, 300, 400, 500, 600, 700, 800, 900, 1000, 1500, 2000)
+    fun distanceId(m: Double): String = "d" + (DIST.minByOrNull { abs(it - m) } ?: 100)
+    fun maneuverId(m: ManeuverType): String = when (m) {
+        ManeuverType.LEFT -> "left"; ManeuverType.RIGHT -> "right"
+        ManeuverType.SLIGHT_LEFT -> "slight_left"; ManeuverType.SLIGHT_RIGHT -> "slight_right"
+        ManeuverType.SHARP_LEFT -> "sharp_left"; ManeuverType.SHARP_RIGHT -> "sharp_right"
+        ManeuverType.UTURN -> "uturn"; ManeuverType.ROUNDABOUT -> "roundabout"
+        ManeuverType.DESTINATION -> "arrive"; else -> "straight"
+    }
+    fun upcoming(m: ManeuverType, meters: Double): List<String> =
+        if (m == ManeuverType.DESTINATION) listOf("after", distanceId(meters), "arrive_soon") else listOf("after", distanceId(meters), maneuverId(m))
+    fun now(m: ManeuverType): List<String> = listOf(maneuverId(m))
+}
+
+/** يشغّل سلسلة مقاطع مسجّلة من assets/voice/ye بلا إنترنت. */
+class VoicePromptEngine(context: Context) {
+    private val app = context.applicationContext
+    private val main = Handler(Looper.getMainLooper())
+    private val dir = "voice/ye"
+    private val available: Set<String> = try { app.assets.list(dir)?.map { it.substringBeforeLast('.') }?.toSet().orEmpty() } catch (e: Exception) { emptySet() }
+    private val queue = ArrayDeque<String>()
+    private var player: MediaPlayer? = null
+    private var playing = false
+
+    /** يُعدّ المحرك صالحاً إن وُجدت أغلب المقاطع الأساسية. */
+    val isComplete: Boolean get() = listOf("after", "d100", "d200", "left", "right", "straight", "arrive").all { it in available }
+    fun canSay(ids: List<String>) = ids.isNotEmpty() && ids.all { it in available }
+
+    fun play(ids: List<String>, interrupt: Boolean = false) {
+        if (!canSay(ids)) return
+        main.post { if (interrupt) stopNow(); ids.forEach { queue.addLast(it) }; if (!playing) next() }
+    }
+    private fun next() {
+        val id = queue.removeFirstOrNull()
+        if (id == null) { playing = false; return }
+        playing = true
+        try {
+            val afd = app.assets.openFd("$dir/$id.ogg")
+            val mp = MediaPlayer().apply {
+                setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
+                setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE).setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build())
+                setOnCompletionListener { it.release(); player = null; next() }
+                setOnErrorListener { m, _, _ -> m.release(); player = null; next(); true }
+                prepare(); start()
+            }
+            afd.close(); player = mp
+        } catch (e: Exception) { player = null; next() }
+    }
+    fun stopNow() { queue.clear(); try { player?.stop(); player?.release() } catch (_: Exception) {}; player = null; playing = false }
+    fun release() = stopNow()
+}
+```
+## 5) الموجّه الموحّد `VoiceRouter` (يستبدل نداءات النطق المتفرقة)
+```kotlin
+class VoiceRouter(context: Context, private val tone: () -> Unit) {
+    private val prompts = VoicePromptEngine(context)
+    val tts = TtsManager(context)
+    enum class Mode { AUTO, RECORDED, TTS, TONES }
+    var mode = Mode.AUTO
+
+    suspend fun init() { if (!prompts.isComplete || mode == Mode.TTS) tts.start() }       // لا نُجهّز TTS إن كانت المقاطع تكفي
+    fun hasRecorded() = prompts.isComplete
+    fun hasTts() = tts.ready
+
+    fun announceUpcoming(m: ManeuverType, street: String?, meters: Double, urgent: Boolean) {
+        if (mode != Mode.TTS && mode != Mode.TONES && prompts.isComplete && prompts.canSay(PromptBuilder.upcoming(m, meters))) { prompts.play(PromptBuilder.upcoming(m, meters), urgent); return }
+        if (mode != Mode.TONES && tts.ready) { tts.speak(YemeniPhrases.upcoming(m, street, meters), urgent); return }
+        tone()
+    }
+    fun announceNow(m: ManeuverType, street: String?) {
+        if (mode != Mode.TTS && mode != Mode.TONES && prompts.isComplete && prompts.canSay(PromptBuilder.now(m))) { prompts.play(PromptBuilder.now(m), true); return }
+        if (mode != Mode.TONES && tts.ready) { tts.speak(YemeniPhrases.maneuver(m, street), true); return }
+        tone()
+    }
+    /** عبارات حرّة: إعادة الحساب/الخروج عن المسار/إشارة ضعيفة/تنبيه. */
+    fun sayKey(key: String, fallbackText: String, urgent: Boolean = true) {
+        if (mode != Mode.TTS && mode != Mode.TONES && prompts.canSay(listOf(key))) { prompts.play(listOf(key), urgent); return }
+        if (mode != Mode.TONES && tts.ready) { tts.speak(fallbackText, urgent); return }
+        tone()
+    }
+    fun release() { prompts.release(); tts.shutdown() }
+}
+```
+**الربط في `NavigationScreen`:**
+```kotlin
+val voice = remember { VoiceRouter(context, tone = { /* دالتك الحالية للنغمة */ }) }
+LaunchedEffect(Unit) { voice.init() }
+DisposableEffect(Unit) { onDispose { voice.release() } }
+// مؤثر النطق: بدل speak(...):
+if (level == "N") voice.announceNow(upcoming.maneuverType, upcoming.streetName)
+else voice.announceUpcoming(upcoming.maneuverType, upcoming.streetName, distToManeuver, urgent = false)
+// إعادة الحساب:  voice.sayKey("reroute", "جاري إعادة حساب المسار")
+// تحذير الخطر:    voice.sayKey("hazard", "تنبيه: طريق وعر")
+// إشارة ضعيفة:    voice.sayKey("gps_weak", "إشارة GPS ضعيفة")
+```
+> `YemeniPhrases` من المستند 61. وأبقِ النص المكتوب فصيحاً في البطاقة.
+## 6) حوار «إعداد الصوت» الجديد (يعكس الواقع ولا يعد بما لا يملك)
+```kotlin
+@Composable
+fun VoiceSetupDialog(router: VoiceRouter, onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var engines by remember { mutableStateOf<List<TtsEngineInfo>?>(null) }
+    var testMsg by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) { engines = router.tts.diagnose() }
+    AlertDialog(
+        onDismissRequest = onDismiss, containerColor = Color(0xFF0F172A),
+        title = { Text("الصوت في الملاحة", color = Color.White, fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.verticalScroll(rememberScrollState())) {
+                Text(if (router.hasRecorded()) "✅ الصوت المسجّل (لهجة يمنية) متاح ويعمل بلا إنترنت." else "الصوت المسجّل غير مضاف بعد (مقاطع assets/voice/ye).", color = Color(0xFFCBD5E1), fontSize = 13.sp)
+                val list = engines
+                if (list == null) LinearProgressIndicator(Modifier.fillMaxWidth())
+                else if (list.isEmpty()) Text("لا يوجد محرك نطق على الجهاز.", color = Color(0xFFF59E0B), fontSize = 13.sp)
+                else list.forEach { e ->
+                    val st = when (e.arabic) { ArabicStatus.AVAILABLE -> "العربية ✅"; ArabicStatus.MISSING_DATA -> "العربية تحتاج تنزيل بيانات"; ArabicStatus.NOT_SUPPORTED -> "العربية غير مدعومة ❌"; else -> "تعذر الفحص" }
+                    Text("• ${e.label}${if (e.isDefault) " (الافتراضي)" else ""}: $st", color = Color.White, fontSize = 13.sp)
+                }
+                if (list != null && list.none { it.arabic == ArabicStatus.AVAILABLE }) {
+                    Text("لا يوجد محرك بالعربية. شغّل الإنترنت (وأطفئ وضع الطيران) ثم ثبّت «Speech Services by Google» ونزّل بيانات العربية، أو استعمل الصوت المسجّل.", color = Color(0xFFF59E0B), fontSize = 12.sp)
+                    OutlinedButton(onClick = { TtsManager.safeStart(context, TtsManager.playStoreIntent(), TtsManager.playStoreWebIntent()) }, modifier = Modifier.fillMaxWidth()) { Text("تثبيت Speech Services by Google") }
+                    val missing = list.firstOrNull { it.arabic == ArabicStatus.MISSING_DATA }
+                    if (missing != null) OutlinedButton(onClick = { TtsManager.safeStart(context, TtsManager.installDataIntent(missing.pkg), TtsManager.ttsSettingsIntent()) }, modifier = Modifier.fillMaxWidth()) { Text("تنزيل بيانات العربية") }
+                    OutlinedButton(onClick = { TtsManager.safeStart(context, TtsManager.ttsSettingsIntent(), Intent(android.provider.Settings.ACTION_SETTINGS)) }, modifier = Modifier.fillMaxWidth()) { Text("إعدادات النطق في النظام") }
+                }
+                testMsg?.let { Text(it, color = Color(0xFF10B981), fontSize = 12.sp) }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { scope.launch {
+                router.init()
+                router.announceUpcoming(ManeuverType.LEFT, null, 200.0, true)
+                testMsg = if (router.hasRecorded() || router.hasTts()) "تم تشغيل الجملة التجريبية" else "لا يوجد صوت متاح: سيعمل التطبيق بالنغمات والنص"
+            } }) { Text("تجربة الصوت", color = Color(0xFF00E5FF)) }
+        },
+        dismissButton = { TextButton(onClick = { engines = null; scope.launch { engines = router.tts.diagnose() } }) { Text("إعادة الفحص") } }
+    )
+}
+```
+## 7) تعليمات مختصرة لك على هاتف سامسونج الآن
+1. أطفئ **وضع الطيران**، وتأكد أن Wi‑Fi يفتح مواقع.
+2. Play Store ← ابحث «**Speech Services by Google**» ← ثبّت/حدّث.
+3. الإعدادات ← الإدارة العامة ← اللغة ← **تحويل النص إلى كلام** ← المحرك المفضّل: **Google** ← أيقونة الترس ← **تثبيت بيانات الصوت** ← العربية ← نزّل.
+4. افتح التطبيق ← «الصوت في الملاحة» ← «إعادة الفحص»: يجب أن تظهر «Google: العربية ✅».
+> إن لم تُعرض العربية في Google على جهازك، فالصوت المسجّل (القسم 4) هو الحل الذي يعمل دائماً.
+## 8) البحث الصوتي (STT) في المساعد
+`SmartAssistantDialogView` ما زال يستعمل `RecognizerIntent` بـ`ar-YE` في موضعين (المستمع والميكروفون). استبدلهما بـ`VoiceSearchHelper` من المستند 65 (مع نافذة الاستماع وسلسلة اللغات والبديل بميكروفون لوحة المفاتيح).
+## 9) اختبار
+1. بلا Google TTS ولا مقاطع: النغمات تعمل ونص الملاحة ظاهر + الحوار يشرح السبب بدقة.
+2. بعد تثبيت Google والعربية: الحوار يعرض «Google: العربية ✅» وتنطق الملاحة العربية.
+3. بعد إضافة المقاطع المسجّلة: تُنطق «بعد ميتين متر، لف يسار» بلهجتك بلا إنترنت وبلا TTS (أطفئ الإنترنت وجرّب).
+4. أثناء الموسيقى: تنخفض ثم تعود (AudioFocus).

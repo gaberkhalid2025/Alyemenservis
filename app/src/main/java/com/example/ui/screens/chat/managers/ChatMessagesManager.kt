@@ -80,7 +80,8 @@ class ChatMessagesManager(
                     replyToId = replyTo?.id,
                     replyToText = replyTo?.message,
                     attachment = attachment,
-                    audioWaveform = audioWaveform
+                    audioWaveform = audioWaveform,
+                    existingMessageId = messageId
                 )
 
                 _isSending.value = false
@@ -132,7 +133,8 @@ class ChatMessagesManager(
                     replyToId = targetMsg.replyToId,
                     replyToText = targetMsg.replyToText,
                     attachment = targetMsg.attachment,
-                    audioWaveform = targetMsg.audioWaveform
+                    audioWaveform = targetMsg.audioWaveform,
+                    existingMessageId = targetMsg.id
                 )
                 when (result) {
                     is AppResult.Success -> {

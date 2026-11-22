@@ -5,14 +5,17 @@ import com.example.ui.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.utils.VisualThemePalette
@@ -67,6 +70,14 @@ fun AssistantInputBar(
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(20.dp),
                 singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                keyboardActions = KeyboardActions(
+                    onSend = {
+                        if (typedText.isNotBlank() && !isGenerating) {
+                            onSend()
+                        }
+                    }
+                ),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedTextColor = themeColors.textPrimary,
                     unfocusedTextColor = themeColors.textPrimary,
@@ -86,7 +97,7 @@ fun AssistantInputBar(
                     .background(if (typedText.isNotBlank()) themeColors.accent else themeColors.surface)
             ) {
                 Icon(
-                    imageVector = Icons.Default.Send,
+                    imageVector = Icons.AutoMirrored.Filled.Send,
                     contentDescription = "إرسال",
                     tint = if (typedText.isNotBlank()) Color.Black else themeColors.textSecondary,
                     modifier = Modifier.size(18.dp)
