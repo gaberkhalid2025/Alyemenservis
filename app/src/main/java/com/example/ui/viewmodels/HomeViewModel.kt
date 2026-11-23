@@ -399,31 +399,19 @@ open class HomeViewModel @Inject constructor(
     fun openExternalDirections(context: android.content.Context, destLat: Double, destLng: Double, label: String = "الوجهة") {
         val encodedLabel = android.net.Uri.encode(label.ifBlank { "الوجهة" })
         try {
-            val gmapsUri = android.net.Uri.parse("geo:$destLat,$destLng?q=$destLat,$destLng($encodedLabel)")
-            val mapIntent = android.content.Intent(android.content.Intent.ACTION_VIEW, gmapsUri).apply {
-                setPackage("com.google.android.apps.maps")
+            val geoUri = android.net.Uri.parse("geo:$destLat,$destLng?q=$destLat,$destLng($encodedLabel)")
+            val chooser = android.content.Intent.createChooser(
+                android.content.Intent(android.content.Intent.ACTION_VIEW, geoUri).apply {
+                    addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                },
+                "فتح الموقع باستخدام"
+            ).apply {
                 addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
             }
-            if (mapIntent.resolveActivity(context.packageManager) != null) {
-                context.startActivity(mapIntent)
-            } else {
-                val browserUri = android.net.Uri.parse("https://www.google.com/maps/dir/?api=1&destination=$destLat,$destLng")
-                val browserIntent = android.content.Intent(android.content.Intent.ACTION_VIEW, browserUri).apply {
-                    addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-                context.startActivity(browserIntent)
-            }
-        } catch (e: Exception) {
-            try {
-                val fallbackUri = android.net.Uri.parse("https://www.google.com/maps/search/?api=1&query=$destLat,$destLng")
-                val fallbackIntent = android.content.Intent(android.content.Intent.ACTION_VIEW, fallbackUri).apply {
-                    addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-                context.startActivity(fallbackIntent)
-            } catch (ex: Exception) {
-                android.util.Log.e("HomeViewModel", "Failed to open external directions", ex)
-                triggerToast("❌ تعذر فتح تطبيق الخرائط على هذا الجهاز")
-            }
+            context.startActivity(chooser)
+        } catch (ex: Exception) {
+            android.util.Log.e("HomeViewModel", "Failed to open geo directions", ex)
+            triggerToast("❌ تعذر فتح تطبيق الخرائط على هذا الجهاز")
         }
     }
 }

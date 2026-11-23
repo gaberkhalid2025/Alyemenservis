@@ -645,6 +645,7 @@ fun ProfileOwnerAdminControlBar(
                                         name = trimmedName,
                                         phone = trimmedPhone,
                                         area = trimmedArea,
+                                        localNeighborhood = trimmedArea,
                                         profession = trimmedDesc,
                                         latitude = editLat,
                                         longitude = editLng
@@ -654,7 +655,7 @@ fun ProfileOwnerAdminControlBar(
                                     val updated = store.copy(
                                         name = trimmedName,
                                         phone = trimmedPhone,
-                                        cityId = trimmedArea,
+                                        cityId = store.cityId,
                                         localNeighborhood = trimmedArea,
                                         description = trimmedDesc,
                                         latitude = editLat,
@@ -665,7 +666,7 @@ fun ProfileOwnerAdminControlBar(
                                     val updated = property.copy(
                                         title = trimmedName,
                                         phone = trimmedPhone,
-                                        cityId = trimmedArea,
+                                        cityId = property.cityId,
                                         localNeighborhood = trimmedArea,
                                         description = trimmedDesc,
                                         latitude = editLat,
@@ -744,26 +745,30 @@ fun ProfileOwnerAdminControlBar(
                 }
                 var editOffer by remember {
                     mutableStateOf(
-                        provider?.specialOffersJson?.takeIf { it.isNotBlank() } ?: "خصم 15% للمعاينة الأولى وخدمات الصيانة"
+                        provider?.specialOffersJson?.takeIf { it.isNotBlank() }
+                            ?: store?.specialOffersJson?.takeIf { it.isNotBlank() }
+                            ?: "خصم 15% للمعاينة الأولى والخدمات"
                     )
                 }
 
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text("🏷️ إدارة الأسعار والعروض الترويجية", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
 
-                    OutlinedTextField(
-                        value = editPrice,
-                        onValueChange = { editPrice = it },
-                        label = { Text("السعر الأساسي / رسوم المعاينة والكشفية (ريال يمني)") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = themeColors.textPrimary,
-                            unfocusedTextColor = themeColors.textPrimary,
-                            focusedLabelColor = themeColors.accent,
-                            unfocusedLabelColor = themeColors.textSecondary
+                    if (store == null) {
+                        OutlinedTextField(
+                            value = editPrice,
+                            onValueChange = { editPrice = it },
+                            label = { Text("السعر الأساسي / رسوم المعاينة والكشفية (ريال يمني)") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = themeColors.textPrimary,
+                                unfocusedTextColor = themeColors.textPrimary,
+                                focusedLabelColor = themeColors.accent,
+                                unfocusedLabelColor = themeColors.textSecondary
+                            )
                         )
-                    )
+                    }
 
                     OutlinedTextField(
                         value = editOffer,
@@ -783,7 +788,7 @@ fun ProfileOwnerAdminControlBar(
                         Button(
                             onClick = {
                                 val parsedPrice = editPrice.trim().toDoubleOrNull()
-                                if (editPrice.isNotBlank() && (parsedPrice == null || parsedPrice < 0.0)) {
+                                if (store == null && editPrice.isNotBlank() && (parsedPrice == null || parsedPrice < 0.0)) {
                                     Toast.makeText(context, "يرجى إدخال سعر صحيح", Toast.LENGTH_SHORT).show()
                                     return@Button
                                 }
@@ -792,6 +797,9 @@ fun ProfileOwnerAdminControlBar(
                                 if (provider != null) {
                                     val updated = provider.copy(previewPrice = pVal, specialOffersJson = trimmedOffer)
                                     viewModel.updateProviderEntity(updated)
+                                } else if (store != null) {
+                                    val updated = store.copy(specialOffersJson = trimmedOffer)
+                                    viewModel.updateStoreEntity(updated)
                                 } else if (property != null) {
                                     val updated = property.copy(price = pVal)
                                     viewModel.updatePropertyEntity(updated)
@@ -801,10 +809,12 @@ fun ProfileOwnerAdminControlBar(
                                     val offerPayload = hashMapOf(
                                         "id" to offerId,
                                         "ownerId" to entityId,
+                                        "providerId" to entityId,
                                         "title" to "عرض خاص - ${provider?.name ?: store?.name ?: property?.title ?: ""}".trim(),
                                         "description" to trimmedOffer,
                                         "discountPercent" to 15,
                                         "isActive" to true,
+                                        "isEnabled" to true,
                                         "updatedAt" to System.currentTimeMillis()
                                     )
                                     viewModel.db.collection("special_offers").document(offerId)

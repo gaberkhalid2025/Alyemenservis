@@ -102,7 +102,10 @@ class DashboardRepositoryImpl(
         workingHours: String,
         isAvailable: Boolean,
         photoUrl: String?,
-        coverUrl: String?
+        coverUrl: String?,
+        phone: String?,
+        latitude: Double?,
+        longitude: Double?
     ): Result<Unit> {
         val cleanOwnerId = ownerId.trim()
         if (cleanOwnerId.isBlank()) return Result.failure(IllegalArgumentException("معرف الحساب غير صالح"))
@@ -116,6 +119,16 @@ class DashboardRepositoryImpl(
                 "isActive" to isAvailable,
                 "updatedAt" to System.currentTimeMillis()
             )
+            val cleanPhone = phone?.trim().orEmpty()
+            if (cleanPhone.isNotBlank()) {
+                updates["phone"] = cleanPhone
+            }
+            if (latitude != null && longitude != null &&
+                com.example.utils.LandmarkAddress.isValid(latitude, longitude)
+            ) {
+                updates["latitude"] = latitude
+                updates["longitude"] = longitude
+            }
             when (collectionName) {
                 AppConstants.COL_PROVIDERS -> {
                     updates["name"] = name.trim()
@@ -127,8 +140,6 @@ class DashboardRepositoryImpl(
                 AppConstants.COL_PROPERTIES -> {
                     updates["title"] = name.trim()
                     updates["localNeighborhood"] = cityArea.trim()
-                    if (!photoUrl.isNullOrBlank()) updates["profileImage"] = photoUrl.trim()
-                    if (!coverUrl.isNullOrBlank()) updates["coverImage"] = coverUrl.trim()
                     val newImgs = listOfNotNull(
                         coverUrl?.trim()?.takeIf { it.isNotBlank() },
                         photoUrl?.trim()?.takeIf { it.isNotBlank() }

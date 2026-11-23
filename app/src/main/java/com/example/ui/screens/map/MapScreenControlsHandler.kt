@@ -256,7 +256,11 @@ internal fun MapLayersAndServicesSheetsHost(
     onDismissMoreLayersSheet: () -> Unit,
     showZones: Boolean,
     onSetShowZones: (Boolean) -> Unit,
-    onCoverageCleared: () -> Unit
+    onCoverageCleared: () -> Unit,
+    adminRole: String = "GUEST",
+    isRegisteredUser: Boolean = false,
+    isProvider: Boolean = false,
+    enableLiveTrafficByAdmin: Boolean = true
 ) {
     if (showServicesSheet) {
         ModalBottomSheet(
@@ -431,6 +435,12 @@ internal fun MapLayersAndServicesSheetsHost(
                 coroutineScope.launch { snackbarHostState.showSnackbar("✓ تم مسح سجل التغطية المحلي") }
             },
             initialTab = initialTab,
+            adminRole = adminRole,
+            isRegisteredUser = isRegisteredUser,
+            isProvider = isProvider,
+            liveTrafficEnabled = state.liveTrafficEnabled,
+            onToggleLiveTraffic = { state.liveTrafficEnabled = it },
+            enableLiveTrafficByAdmin = enableLiveTrafficByAdmin,
             onDismiss = {
                 state.showLayerDialog = false
                 onDismissMoreLayersSheet()

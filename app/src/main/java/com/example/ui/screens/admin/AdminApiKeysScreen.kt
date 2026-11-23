@@ -65,10 +65,8 @@ fun AdminApiKeysScreenContent(
     var showGeminiKey by remember { mutableStateOf(false) }
     var showOpenAiKey by remember { mutableStateOf(false) }
 
-    var googleMapsKey by remember { mutableStateOf("") }
     var mapboxKey by remember { mutableStateOf("") }
-    var selectedMapEngine by remember { mutableStateOf("OPEN_STREET_MAP") }
-    var showMapsKey by remember { mutableStateOf(false) }
+    var selectedMapEngine by remember { mutableStateOf("MAPLIBRE") }
     var showMapboxKey by remember { mutableStateOf(false) }
 
     var kuraimiToken by remember { mutableStateOf("") }
@@ -94,9 +92,8 @@ fun AdminApiKeysScreenContent(
         geminiApiKey = apiKeyRepository.getApiKey("geminiApiKey").getOrDefault("")
         openaiApiKey = apiKeyRepository.getApiKey("openaiApiKey").getOrDefault("")
         selectedAiModel = apiKeyRepository.getApiKey("selectedAiModel").getOrDefault("gemini-1.5-flash")
-        googleMapsKey = apiKeyRepository.getApiKey("googleMapsKey").getOrDefault("")
         mapboxKey = apiKeyRepository.getApiKey("mapboxKey").getOrDefault("")
-        selectedMapEngine = apiKeyRepository.getApiKey("selectedMapEngine").getOrDefault("OPEN_STREET_MAP")
+        selectedMapEngine = apiKeyRepository.getApiKey("selectedMapEngine").getOrDefault("MAPLIBRE")
         kuraimiToken = apiKeyRepository.getApiKey("kuraimiToken").getOrDefault("")
         jawwalPayKey = apiKeyRepository.getApiKey("jawwalPayKey").getOrDefault("")
         floosakKey = apiKeyRepository.getApiKey("floosakKey").getOrDefault("")
@@ -104,6 +101,22 @@ fun AdminApiKeysScreenContent(
         webhookUrl = apiKeyRepository.getApiKey("webhookUrl").getOrDefault("")
         whatsappToken = apiKeyRepository.getApiKey("whatsappToken").getOrDefault("")
         smsGatewayKey = apiKeyRepository.getApiKey("smsGatewayKey").getOrDefault("")
+        val customRaw = apiKeyRepository.getApiKey("customKeysJson").getOrDefault("")
+        if (customRaw.isNotBlank()) {
+            try {
+                val arr = org.json.JSONArray(customRaw)
+                customKeys.clear()
+                for (i in 0 until arr.length()) {
+                    val o = arr.optJSONObject(i) ?: continue
+                    val n = o.optString("name", "")
+                    val k = o.optString("key", "")
+                    val e = o.optString("endpoint", "")
+                    if (n.isNotBlank() && k.isNotBlank()) {
+                        customKeys.add(Triple(n, k, e))
+                    }
+                }
+            } catch (_: Exception) {}
+        }
     }
 
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -165,28 +178,19 @@ fun AdminApiKeysScreenContent(
             Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Icon(Icons.Default.LocationOn, contentDescription = null, tint = Color(0xFF34D399))
-                    Text("🗺️ مفاتيح الخرائط وتحديد المواقع", fontSize = 13.5.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    Text("🗺️ مفاتيح الخرائط المفتوحة والملاحة (MapLibre / OSM / Valhalla)", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
                 }
 
-                OutlinedTextField(
-                    value = googleMapsKey,
-                    onValueChange = { googleMapsKey = it },
-                    label = { Text("Google Maps SDK API Key") },
-                    visualTransformation = if (showMapsKey) VisualTransformation.None else PasswordVisualTransformation(),
-                    trailingIcon = {
-                        IconButton(onClick = { showMapsKey = !showMapsKey }) {
-                            Icon(if (showMapsKey) Icons.Default.VisibilityOff else Icons.Default.Visibility, contentDescription = "إظهار/إخفاء", tint = Color.Gray)
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(10.dp),
-                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                Text(
+                    "يعتمد التطبيق على خرائط OpenStreetMap / MapLibre / Esri Satellite و Valhalla محلياً مجاناً بدون خرائط جوجل.",
+                    fontSize = 10.5.sp,
+                    color = Color(0xFF10B981)
                 )
 
                 OutlinedTextField(
                     value = mapboxKey,
                     onValueChange = { mapboxKey = it },
-                    label = { Text("Mapbox Access Token (اختياري)") },
+                    label = { Text("Mapbox / OpenTile Access Token (اختياري)") },
                     visualTransformation = if (showMapboxKey) VisualTransformation.None else PasswordVisualTransformation(),
                     trailingIcon = {
                         IconButton(onClick = { showMapboxKey = !showMapboxKey }) {
@@ -379,11 +383,19 @@ fun AdminApiKeysScreenContent(
         Button(
             onClick = {
                 scope.launch {
+                    val customJson = org.json.JSONArray().apply {
+                        customKeys.forEach { (n, k, e) ->
+                            put(org.json.JSONObject().apply {
+                                put("name", n)
+                                put("key", k)
+                                put("endpoint", e)
+                            })
+                        }
+                    }.toString()
                     val results = listOf(
                         apiKeyRepository.setApiKey("geminiApiKey", geminiApiKey),
                         apiKeyRepository.setApiKey("openaiApiKey", openaiApiKey),
                         apiKeyRepository.setApiKey("selectedAiModel", selectedAiModel),
-                        apiKeyRepository.setApiKey("googleMapsKey", googleMapsKey),
                         apiKeyRepository.setApiKey("mapboxKey", mapboxKey),
                         apiKeyRepository.setApiKey("selectedMapEngine", selectedMapEngine),
                         apiKeyRepository.setApiKey("kuraimiToken", kuraimiToken),
@@ -392,7 +404,8 @@ fun AdminApiKeysScreenContent(
                         apiKeyRepository.setApiKey("oneCashKey", oneCashKey),
                         apiKeyRepository.setApiKey("webhookUrl", webhookUrl),
                         apiKeyRepository.setApiKey("whatsappToken", whatsappToken),
-                        apiKeyRepository.setApiKey("smsGatewayKey", smsGatewayKey)
+                        apiKeyRepository.setApiKey("smsGatewayKey", smsGatewayKey),
+                        apiKeyRepository.setApiKey("customKeysJson", customJson)
                     )
                     if (results.all { it.isSuccess }) {
                         Toast.makeText(context, "✅ تم حفظ ومزامنة كافة المفاتيح سحابياً فوراً وأمان تام!", Toast.LENGTH_LONG).show()

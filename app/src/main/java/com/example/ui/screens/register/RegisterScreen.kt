@@ -104,7 +104,23 @@ fun RegisterScreen(
         val address = (data["address"] as? String) ?: ""
         val photoPath = (data["imageUri"] as? String) ?: ""
         val idCardPath = (data["idCardUri"] as? String) ?: ""
-        val gpsCoords = (data["gpsCoords"] as? String)?.takeIf { it.isNotBlank() } ?: "15.36940,44.19100"
+        val gpsCoords = (data["gpsCoords"] as? String)?.takeIf { it.isNotBlank() } ?: ""
+        val metadataJson = (data["productAttachmentsJson"] as? String) ?: ""
+        val cleanPhone = com.example.ui.helpers.AppPreferenceHelper.normalizePhoneNumber(phone)
+
+        val onSubmitComplete: (Boolean) -> Unit = { success ->
+            if (success) {
+                val sp = context.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE)
+                sp.edit().apply {
+                    putString("join_request_phone", cleanPhone)
+                    putString("user_phone", cleanPhone)
+                    apply()
+                }
+                viewModel.setJoinRequestPhone(context, cleanPhone)
+                forceShowForm = false
+                selectedType = null
+            }
+        }
 
         when (type) {
             RegistrationType.PROVIDER -> {
@@ -121,7 +137,9 @@ fun RegisterScreen(
                     idCardPath = idCardPath,
                     gpsCoords = gpsCoords,
                     customCategoryName = craftType,
-                    password = password
+                    password = password,
+                    productAttachmentsJson = metadataJson,
+                    onSubmissionResult = onSubmitComplete
                 )
             }
             RegistrationType.STORE -> {
@@ -138,7 +156,9 @@ fun RegisterScreen(
                     idCardPath = idCardPath,
                     gpsCoords = gpsCoords,
                     customCategoryName = category,
-                    password = password
+                    password = password,
+                    productAttachmentsJson = metadataJson,
+                    onSubmissionResult = onSubmitComplete
                 )
             }
             RegistrationType.RESTAURANT -> {
@@ -155,7 +175,9 @@ fun RegisterScreen(
                     idCardPath = idCardPath,
                     gpsCoords = gpsCoords,
                     customCategoryName = cuisine,
-                    password = password
+                    password = password,
+                    productAttachmentsJson = metadataJson,
+                    onSubmissionResult = onSubmitComplete
                 )
             }
             RegistrationType.MEDICAL -> {
@@ -172,7 +194,9 @@ fun RegisterScreen(
                     idCardPath = idCardPath,
                     gpsCoords = gpsCoords,
                     customCategoryName = specialty,
-                    password = password
+                    password = password,
+                    productAttachmentsJson = metadataJson,
+                    onSubmissionResult = onSubmitComplete
                 )
             }
             RegistrationType.PROPERTY -> {
@@ -189,7 +213,9 @@ fun RegisterScreen(
                     idCardPath = idCardPath,
                     gpsCoords = gpsCoords,
                     customCategoryName = propType,
-                    password = password
+                    password = password,
+                    productAttachmentsJson = metadataJson,
+                    onSubmissionResult = onSubmitComplete
                 )
             }
             RegistrationType.JOB -> {
@@ -206,7 +232,9 @@ fun RegisterScreen(
                     idCardPath = idCardPath,
                     gpsCoords = gpsCoords,
                     customCategoryName = title,
-                    password = password
+                    password = password,
+                    productAttachmentsJson = metadataJson,
+                    onSubmissionResult = onSubmitComplete
                 )
             }
             RegistrationType.JOB_SEEKER -> {
@@ -223,7 +251,9 @@ fun RegisterScreen(
                     idCardPath = idCardPath,
                     gpsCoords = gpsCoords,
                     customCategoryName = cat,
-                    password = password
+                    password = password,
+                    productAttachmentsJson = metadataJson,
+                    onSubmissionResult = onSubmitComplete
                 )
             }
             RegistrationType.CLIENT -> {
@@ -239,22 +269,12 @@ fun RegisterScreen(
                     idCardPath = idCardPath,
                     gpsCoords = gpsCoords,
                     customCategoryName = "حساب عميل",
-                    password = password
+                    password = password,
+                    productAttachmentsJson = metadataJson,
+                    onSubmissionResult = onSubmitComplete
                 )
             }
         }
-
-        // حفظ الهاتف وتحديث الواجهة لتتحول مباشرة إلى شاشة الانتظار
-        val cleanPhone = com.example.ui.helpers.AppPreferenceHelper.normalizePhoneNumber(phone)
-        val sp = context.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE)
-        sp.edit().apply {
-            putString("join_request_phone", cleanPhone)
-            putString("user_phone", cleanPhone)
-            apply()
-        }
-        viewModel.setJoinRequestPhone(context, cleanPhone)
-        forceShowForm = false
-        selectedType = null
     }
 
     androidx.activity.compose.BackHandler(enabled = selectedType != null) {

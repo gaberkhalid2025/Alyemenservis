@@ -373,6 +373,10 @@ fun ChatScreen(
                         )
                     }
                 } else {
+                    val smartSummary = remember(filteredMessages) {
+                        ChatSmartSuggestionsEngine.summarizeMessages(filteredMessages)
+                    }
+
                     LazyColumn(
                         state = listState,
                         modifier = Modifier.fillMaxSize(),
@@ -398,7 +402,6 @@ fun ChatScreen(
                         }
 
                         // Smart conversation summary card when opening a busy chat
-                        val smartSummary = ChatSmartSuggestionsEngine.summarizeMessages(filteredMessages)
                         if (smartSummary != null) {
                             item(key = "conversation_summary_card") {
                                 Surface(
@@ -457,6 +460,15 @@ fun ChatScreen(
                                 onLongClick = { selectedMessageForAction = msg },
                                 onReactionClick = { emoji -> chatViewModel.toggleReaction(msg.id, emoji) },
                                 onRetryClick = { chatViewModel.resendMessage(msg.id) },
+                                onQuoteClick = { replyId, replyText ->
+                                    val targetIdx = filteredMessages.indexOfFirst { cand ->
+                                        (!replyId.isNullOrBlank() && cand.id == replyId) ||
+                                            (replyText.isNotBlank() && cand.message == replyText)
+                                    }
+                                    if (targetIdx >= 0) {
+                                        scope.launch { listState.animateScrollToItem(targetIdx) }
+                                    }
+                                },
                                 onOpenLocationInApp = onOpenLocationInApp,
                                 themeColors = themeColors
                             )

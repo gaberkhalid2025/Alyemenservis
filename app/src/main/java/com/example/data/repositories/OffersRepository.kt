@@ -12,10 +12,25 @@ class OffersRepository @Inject constructor(
     private val firestore: FirebaseFirestore,
     private val cacheManager: LocalAppCacheManager
 ) {
-    suspend fun getOffers(): Result<List<SpecialOfferEntity>> {
+    companion object {
+        private const val OFFERS_CACHE_TTL_MS = 5 * 60 * 1000L
+        private const val OFFERS_QUERY_LIMIT = 30L
+    }
+
+    @Volatile
+    private var lastOffersFetchMs: Long = 0L
+
+    suspend fun getOffers(forceRefresh: Boolean = false): Result<List<SpecialOfferEntity>> {
+        val now = System.currentTimeMillis()
+        if (!forceRefresh && (now - lastOffersFetchMs) < OFFERS_CACHE_TTL_MS) {
+            val cached = readLocalCache()
+            if (cached.isNotEmpty()) {
+                return Result.success(cached)
+            }
+        }
         return try {
             val snapshot = firestore.collection("special_offers")
-                .limit(50)
+                .limit(OFFERS_QUERY_LIMIT)
                 .get()
                 .await()
 
@@ -25,7 +40,7 @@ class OffersRepository @Inject constructor(
 
             if (offers.isEmpty()) {
                 val legacySnapshot = firestore.collection("offers")
-                    .limit(50)
+                    .limit(OFFERS_QUERY_LIMIT)
                     .get()
                     .await()
                 offers = legacySnapshot.documents.mapNotNull { doc ->
@@ -33,6 +48,7 @@ class OffersRepository @Inject constructor(
                 }
             }
 
+            lastOffersFetchMs = System.currentTimeMillis()
             cacheManager.saveOffersCache(SpecialOfferEntity.serializeList(offers))
             Result.success(offers)
         } catch (e: Exception) {
@@ -43,6 +59,24 @@ class OffersRepository @Inject constructor(
             } else {
                 Result.failure(e)
             }
+        }
+    }
+
+    suspend fun getOffersForEntity(entityId: String): Result<List<SpecialOfferEntity>> {
+        if (entityId.isBlank()) return getOffers()
+        return try {
+            val snapshot = firestore.collection("special_offers")
+                .whereEqualTo("providerId", entityId)
+                .limit(OFFERS_QUERY_LIMIT)
+                .get()
+                .await()
+            val offers = snapshot.documents.mapNotNull { doc ->
+                doc.toObject(SpecialOfferEntity::class.java)?.copy(id = doc.id)
+            }
+            Result.success(offers)
+        } catch (e: Exception) {
+            val cached = readLocalCache().filter { it.providerId == entityId }
+            if (cached.isNotEmpty()) Result.success(cached) else Result.failure(e)
         }
     }
 
@@ -63,6 +97,7 @@ class OffersRepository @Inject constructor(
             try {
                 firestore.collection("offers").document(docId).set(finalOffer).await()
             } catch (_: Exception) {}
+            lastOffersFetchMs = 0L
             val currentOffers = readLocalCache()
             if (currentOffers.none { it.id == docId }) {
                 currentOffers.add(0, finalOffer)
@@ -82,6 +117,7 @@ class OffersRepository @Inject constructor(
             try {
                 firestore.collection("offers").document(docId).set(finalOffer).await()
             } catch (_: Exception) {}
+            lastOffersFetchMs = 0L
             val currentOffers = readLocalCache().map {
                 if (it.id == docId) finalOffer else it
             }
@@ -98,6 +134,7 @@ class OffersRepository @Inject constructor(
             try {
                 firestore.collection("offers").document(offerId).delete().await()
             } catch (_: Exception) {}
+            lastOffersFetchMs = 0L
             val currentOffers = readLocalCache().filter { it.id != offerId }
             cacheManager.saveOffersCache(SpecialOfferEntity.serializeList(currentOffers))
             Result.success(Unit)

@@ -130,7 +130,7 @@ fun AssistantMessageItem(
                             }
 
                             // 2. Show on Map
-                            // [إصلاح نهائي] عند الضغط على زر الخريطة يتم تمرير الكيان والمدينة وفتح الخريطة وتحديد موقعه
+                            // عرض الموقع على الخريطة الداخلية دون تغيير إحداثيات GPS الفعلية للمستخدم
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(6.dp))
@@ -138,25 +138,41 @@ fun AssistantMessageItem(
                                     .border(0.8.dp, Color(0xFF10B981).copy(alpha = 0.6f), RoundedCornerShape(6.dp))
                                     .clickable {
                                         val firstEntity = msg.matchedEntities.orEmpty().filterNotNull().firstOrNull()
-                                        if (firstEntity != null) {
-                                            when (firstEntity) {
-                                                is ProviderEntity -> {
+                                        when (firstEntity) {
+                                            is ProviderEntity -> {
+                                                if (com.example.utils.LandmarkAddress.isValid(firstEntity.latitude, firstEntity.longitude)) {
+                                                    viewModel.openInAppMap(
+                                                        latitude = firstEntity.latitude,
+                                                        longitude = firstEntity.longitude,
+                                                        label = firstEntity.name,
+                                                        startNavigation = false
+                                                    )
+                                                } else {
                                                     viewModel.selectedProvider = firstEntity
-                                                    if (firstEntity.latitude != 0.0 && firstEntity.longitude != 0.0) {
-                                                        viewModel.updateUserLocation(firstEntity.latitude, firstEntity.longitude)
-                                                    }
                                                 }
-                                                is StoreEntity -> {
+                                            }
+                                            is StoreEntity -> {
+                                                if (com.example.utils.LandmarkAddress.isValid(firstEntity.latitude, firstEntity.longitude)) {
+                                                    viewModel.openInAppMap(
+                                                        latitude = firstEntity.latitude,
+                                                        longitude = firstEntity.longitude,
+                                                        label = firstEntity.name,
+                                                        startNavigation = false
+                                                    )
+                                                } else {
                                                     viewModel.selectedStore = firstEntity
-                                                    if (firstEntity.latitude != 0.0 && firstEntity.longitude != 0.0) {
-                                                        viewModel.updateUserLocation(firstEntity.latitude, firstEntity.longitude)
-                                                    }
                                                 }
-                                                is PropertyEntity -> {
+                                            }
+                                            is PropertyEntity -> {
+                                                if (com.example.utils.LandmarkAddress.isValid(firstEntity.latitude, firstEntity.longitude)) {
+                                                    viewModel.openInAppMap(
+                                                        latitude = firstEntity.latitude,
+                                                        longitude = firstEntity.longitude,
+                                                        label = firstEntity.title,
+                                                        startNavigation = false
+                                                    )
+                                                } else {
                                                     viewModel.selectedProperty = firstEntity
-                                                    if (firstEntity.latitude != 0.0 && firstEntity.longitude != 0.0) {
-                                                        viewModel.updateUserLocation(firstEntity.latitude, firstEntity.longitude)
-                                                    }
                                                 }
                                             }
                                         }
@@ -185,12 +201,22 @@ fun AssistantMessageItem(
                                                     relatedEntityId = firstEntity.id,
                                                     relatedEntityType = "PROVIDER"
                                                 )
-                                                is StoreEntity -> viewModel.openDirectChat(
-                                                    targetUserId = firstEntity.id,
-                                                    targetUserName = firstEntity.name,
-                                                    relatedEntityId = firstEntity.id,
-                                                    relatedEntityType = "STORE"
-                                                )
+                                                is StoreEntity -> {
+                                                    val resolvedStoreType = when {
+                                                        firstEntity.sectionId.equals("restaurants", ignoreCase = true) -> "RESTAURANT"
+                                                        firstEntity.sectionId.equals("medical", ignoreCase = true) -> "MEDICAL"
+                                                        firstEntity.sectionId.equals("malls", ignoreCase = true) ||
+                                                            firstEntity.categoryId.equals("malls", ignoreCase = true) ||
+                                                            firstEntity.providerType.equals("MALL", ignoreCase = true) -> "MALL"
+                                                        else -> "STORE"
+                                                    }
+                                                    viewModel.openDirectChat(
+                                                        targetUserId = firstEntity.id,
+                                                        targetUserName = firstEntity.name,
+                                                        relatedEntityId = firstEntity.id,
+                                                        relatedEntityType = resolvedStoreType
+                                                    )
+                                                }
                                                 is PropertyEntity -> viewModel.openDirectChat(
                                                     targetUserId = firstEntity.id,
                                                     targetUserName = firstEntity.title,
@@ -247,10 +273,12 @@ fun AssistantMessageItem(
                             }
 
                             // 7. TTS Voice Audio Play Button
+                            val msgContext = androidx.compose.ui.platform.LocalContext.current
                             IconButton(
                                 onClick = {
                                     try {
-                                        VoiceManager.onSpeak?.invoke(msg.text)
+                                        VoiceManager.init(msgContext)
+                                        VoiceManager.speak(msg.text)
                                     } catch (_: Exception) {}
                                 },
                                 modifier = Modifier.size(20.dp)

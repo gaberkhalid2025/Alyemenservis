@@ -6,12 +6,19 @@ import com.example.data.models.AdminPermissionsRegistry
 import com.example.data.models.PermissionCategory
 import com.example.data.models.PermissionLevel
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.ListenerRegistration
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 class AdminPermissionsViewModel : ViewModel() {
+
+    companion object {
+        private const val MATRIX_CACHE_TTL_MS = 5 * 60 * 1000L
+        @Volatile
+        private var cachedRoleOverrides: Map<String, Set<String>> = emptyMap()
+        @Volatile
+        private var lastMatrixFetchMs: Long = 0L
+    }
 
     private val _selectedRole = MutableStateFlow("ADMIN")
     val selectedRole: StateFlow<String> = _selectedRole.asStateFlow()
@@ -36,21 +43,32 @@ class AdminPermissionsViewModel : ViewModel() {
     val allPermissions: List<AdminPermissionItem> = AdminPermissionsRegistry.allPermissions
 
     private var savedRoleOverrides: Map<String, Set<String>> = emptyMap()
-    private var matrixListener: ListenerRegistration? = null
 
     init {
         loadSavedRolePermissions()
     }
 
-    fun loadSavedRolePermissions() {
+    fun invalidatePermissionsCache() {
+        lastMatrixFetchMs = 0L
+    }
+
+    fun loadSavedRolePermissions(forceRefresh: Boolean = false) {
+        val now = System.currentTimeMillis()
+        if (!forceRefresh && cachedRoleOverrides.isNotEmpty() && (now - lastMatrixFetchMs) < MATRIX_CACHE_TTL_MS) {
+            savedRoleOverrides = cachedRoleOverrides
+            cachedRoleOverrides[_selectedRole.value.uppercase()]?.let {
+                _activePermissions.value = it
+            }
+            return
+        }
         try {
-            matrixListener?.remove()
-            matrixListener = FirebaseFirestore.getInstance()
+            FirebaseFirestore.getInstance()
                 .collection("settings")
                 .document("admin_permissions_matrix")
-                .addSnapshotListener { doc, _ ->
-                    if (doc == null || !doc.exists()) return@addSnapshotListener
-                    val rolesRaw = doc.get("roles") as? Map<*, *> ?: return@addSnapshotListener
+                .get()
+                .addOnSuccessListener { doc ->
+                    if (doc == null || !doc.exists()) return@addOnSuccessListener
+                    val rolesRaw = doc.get("roles") as? Map<*, *> ?: return@addOnSuccessListener
                     val parsed = mutableMapOf<String, Set<String>>()
                     rolesRaw.forEach { (roleKey, value) ->
                         val rName = roleKey?.toString()?.uppercase() ?: return@forEach
@@ -63,6 +81,8 @@ class AdminPermissionsViewModel : ViewModel() {
                         }
                     }
                     savedRoleOverrides = parsed
+                    cachedRoleOverrides = parsed
+                    lastMatrixFetchMs = System.currentTimeMillis()
                     val currentOverride = parsed[_selectedRole.value.uppercase()]
                     if (currentOverride != null) {
                         _activePermissions.value = currentOverride
@@ -70,12 +90,6 @@ class AdminPermissionsViewModel : ViewModel() {
                 }
         } catch (_: Exception) {
         }
-    }
-
-    override fun onCleared() {
-        super.onCleared()
-        matrixListener?.remove()
-        matrixListener = null
     }
 
     fun selectRole(roleKey: String) {

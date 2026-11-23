@@ -34,6 +34,9 @@ object AudioPlayerManager {
     private val _playbackProgress = MutableStateFlow(0f)
     val playbackProgress: StateFlow<Float> = _playbackProgress.asStateFlow()
 
+    private val _playbackSpeed = MutableStateFlow(1.0f)
+    val playbackSpeed: StateFlow<Float> = _playbackSpeed.asStateFlow()
+
     private var lastContext: Context? = null
 
     var onAudioFinished: ((completedMessageId: String) -> Unit)? = null
@@ -89,6 +92,7 @@ object AudioPlayerManager {
             }
 
             player.prepare()
+            applySpeedToPlayer(player, _playbackSpeed.value)
             player.start()
 
             mediaPlayer = player
@@ -143,6 +147,29 @@ object AudioPlayerManager {
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error resuming audio: ${e.message}")
+        }
+    }
+
+    fun cyclePlaybackSpeed(): Float {
+        val next = when (_playbackSpeed.value) {
+            1.0f -> 1.5f
+            1.5f -> 2.0f
+            else -> 1.0f
+        }
+        _playbackSpeed.value = next
+        mediaPlayer?.let { applySpeedToPlayer(it, next) }
+        return next
+    }
+
+    private fun applySpeedToPlayer(player: MediaPlayer, speed: Float) {
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                val params = player.playbackParams
+                params.speed = speed
+                player.playbackParams = params
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Unable to set playback speed: ${e.message}")
         }
     }
 

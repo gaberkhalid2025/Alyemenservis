@@ -62,16 +62,33 @@ fun RestoreAccountDialog(
         }.getOrNull()
     }
 
-    // في حال تدوير الشاشة أثناء الخطوة 2 وفقدان matchResult غير القابل للحفظ في Bundle، نعيد جلبه تلقائياً
+    // في حال تدوير الشاشة أثناء الخطوة 2 أو 3 وفقدان القوائم غير القابلة للحفظ في Bundle، نعيد جلبها تلقائياً
     LaunchedEffect(restoreStep) {
+        val cleanPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(restorePhoneInput).filter { it.isDigit() }
         if (restoreStep == 2 && matchResult == null) {
-            val cleanPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(restorePhoneInput).filter { it.isDigit() }
             if (cleanPhone.length >= 7) {
                 isSearchingAccount = true
                 viewModel.searchAccountForRestore(cleanPhone) { match ->
                     isSearchingAccount = false
                     if (match != null) {
                         matchResult = match
+                    } else {
+                        restoreStep = 1
+                    }
+                }
+            } else {
+                restoreStep = 1
+            }
+        } else if (restoreStep == 3 && foundAccounts.isEmpty()) {
+            if (cleanPhone.length >= 7) {
+                isSearchingAccount = true
+                viewModel.searchAllAccountsForRestore(cleanPhone) { matches ->
+                    isSearchingAccount = false
+                    if (matches.size > 1) {
+                        foundAccounts = matches
+                    } else if (matches.size == 1) {
+                        matchResult = matches.first()
+                        restoreStep = 2
                     } else {
                         restoreStep = 1
                     }

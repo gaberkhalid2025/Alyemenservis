@@ -69,7 +69,8 @@ fun AppNavigator(
     val joinRequestPhone by viewModel.joinRequestPhone.collectAsState()
     val currentUserPhone by viewModel.currentUserPhone.collectAsState()
 
-    if (settingsState.isMaintenanceActive && adminRole == "GUEST") {
+    val isAllowedDuringMaintenance = settingsState.adminBypassActive && adminRole != "GUEST"
+    if (settingsState.isMaintenanceActive && !isAllowedDuringMaintenance) {
         MaintenanceSplashView(settingsState = settingsState, themeColors = themeColors, viewModel = viewModel)
         return
     }
@@ -442,29 +443,41 @@ fun AppNavigator(
                     }
                 )
                 AppScreens.CREATE_BOOKING -> {
-                    val pId = viewModel.selectedProvider?.id
-                        ?: viewModel.selectedStore?.id
-                        ?: viewModel.selectedProperty?.id
-                        ?: ""
-                    val pName = viewModel.selectedProvider?.name
-                        ?: viewModel.selectedStore?.name
-                        ?: viewModel.selectedProperty?.title
-                        ?: ""
-                    val pService = viewModel.selectedProvider?.specialization?.ifBlank { viewModel.selectedProvider?.profession }
-                        ?: viewModel.selectedStore?.categoryId
-                        ?: viewModel.selectedProperty?.title
-                        ?: ""
                     BackHandler { viewModel.goBack() }
-                    CreateBookingScreen(
-                        providerId = pId,
-                        providerName = pName,
-                        preselectedService = pService,
-                        onBack = { viewModel.goBack() },
-                        onBookingCreated = { booking ->
-                            viewModel.createBooking(booking)
-                            viewModel.navigateToScreen(AppScreens.BOOKINGS_VIEW)
+                    if (settingsState.emergencyFreezeOrders && adminRole !in listOf("OWNER", "ADMIN", "SUPERVISOR")) {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(24.dp)) {
+                                Text("⛔ تم تجميد استقبال الحجوزات الجديدة مؤقتاً", color = Color(0xFFF59E0B), fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                                Spacer(Modifier.height(8.dp))
+                                Text(settingsState.chatDisabledAnnouncement, color = Color.LightGray, fontSize = 12.sp)
+                                Spacer(Modifier.height(16.dp))
+                                Button(onClick = { viewModel.goBack() }) { Text("رجوع") }
+                            }
                         }
-                    )
+                    } else {
+                        val pId = viewModel.selectedProvider?.id
+                            ?: viewModel.selectedStore?.id
+                            ?: viewModel.selectedProperty?.id
+                            ?: ""
+                        val pName = viewModel.selectedProvider?.name
+                            ?: viewModel.selectedStore?.name
+                            ?: viewModel.selectedProperty?.title
+                            ?: ""
+                        val pService = viewModel.selectedProvider?.specialization?.ifBlank { viewModel.selectedProvider?.profession }
+                            ?: viewModel.selectedStore?.categoryId
+                            ?: viewModel.selectedProperty?.title
+                            ?: ""
+                        CreateBookingScreen(
+                            providerId = pId,
+                            providerName = pName,
+                            preselectedService = pService,
+                            onBack = { viewModel.goBack() },
+                            onBookingCreated = { booking ->
+                                viewModel.createBooking(booking)
+                                viewModel.navigateToScreen(AppScreens.BOOKINGS_VIEW)
+                            }
+                        )
+                    }
                 }
                 AppScreens.DYNAMIC_PROFILE, AppScreens.OWNER_PROFILE_VIEW, AppScreens.PROVIDER_DETAILS, AppScreens.STORE_DETAILS, AppScreens.PROPERTY_DETAILS -> DynamicPolymorphicProfileScreen(
                     provider = viewModel.selectedProvider,
@@ -641,12 +654,24 @@ fun AppNavigator(
                     )
                 }
                 AppScreens.QUICK_SERVICE_REQUEST -> {
-                    QuickServiceRequestDialog(
-                        viewModel = viewModel,
-                        themeColors = themeColors,
-                        onDismiss = { viewModel.goBack() },
-                        onRequestCreated = { viewModel.navigateToScreen(AppScreens.ORDERS_VIEW) }
-                    )
+                    if (settingsState.emergencyFreezeOrders && adminRole == "GUEST") {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(24.dp)) {
+                                Text("⛔ تم تجميد استقبال الطلبات الجديدة مؤقتاً", color = Color(0xFFF59E0B), fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                                Spacer(Modifier.height(8.dp))
+                                Text(settingsState.chatDisabledAnnouncement, color = Color.LightGray, fontSize = 12.sp)
+                                Spacer(Modifier.height(14.dp))
+                                Button(onClick = { viewModel.goBack() }) { Text("رجوع") }
+                            }
+                        }
+                    } else {
+                        QuickServiceRequestDialog(
+                            viewModel = viewModel,
+                            themeColors = themeColors,
+                            onDismiss = { viewModel.goBack() },
+                            onRequestCreated = { viewModel.navigateToScreen(AppScreens.ORDERS_VIEW) }
+                        )
+                    }
                 }
                 AppScreens.UNIFIED_SEARCH -> {
                     UnifiedGlobalSearchScreen(

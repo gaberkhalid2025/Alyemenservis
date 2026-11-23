@@ -1,0 +1,165 @@
+# 75 – إصلاحات لوحات القطاعات والإعدادات والاسترجاع (متوسطة وحرجة ثانوية)
+> الأولوية: نفّذ المستند 74 أولاً. التقرير من AI Studio ولم أتحقق من ادعاءاته على الكود؛ أكتب كل بند كعقد + كود مستقل. **البروتوكول في 74-القسم 1 إلزامي.**
+
+## 1) ملف نشاط غير موجود: دوران لا نهائي (`UnifiedBusinessProfileDashboard`)
+**الإصلاح:** آلة حالات + مهلة + جلب منفرد من Firestore + مطابقة بـ(المعرّف + نوع القسم) + زر رجوع.
+```kotlin
+sealed class ProfileLoad<out T> {
+    object Loading : ProfileLoad<Nothing>()
+    data class Loaded<T>(val value: T) : ProfileLoad<T>()
+    object NotFound : ProfileLoad<Nothing>()
+    data class Failed(val message: String) : ProfileLoad<Nothing>()
+}
+
+suspend fun <T> loadBusinessSafely(
+    inMemory: () -> T?,                         // بحث في الـStateFlow المحلي بالمعرّف + sectionId معاً
+    fetchRemote: suspend () -> T?,              // db.collection(sectionCollection).document(id).get() → تحويل
+    timeoutMs: Long = 10_000L
+): ProfileLoad<T> {
+    inMemory()?.let { return ProfileLoad.Loaded(it) }
+    return try {
+        val r = kotlinx.coroutines.withTimeoutOrNull(timeoutMs) { fetchRemote() }
+        if (r != null) ProfileLoad.Loaded(r) else ProfileLoad.NotFound
+    } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+    catch (e: Exception) { ProfileLoad.Failed(e.message ?: "تعذر التحميل") }
+}
+```
+في الشاشة: `var state by remember(id, section) { mutableStateOf<ProfileLoad<X>>(ProfileLoad.Loading) }` و`LaunchedEffect(id, section, retryTick) { state = loadBusinessSafely(...) }`، وللحالات: `Loading` مؤشر، `NotFound` «لم نجد هذا النشاط» + زر رجوع + «إعادة المحاولة»، `Failed` رسالة + إعادة. و`BackHandler { onBack() }` دائماً. لا تطابق بـ`id` وحده.
+## 2) شريط الأدمن ومعاينة المالك (`DynamicPolymorphicProfileScreen`)
+الشرط `if (liveStore != null && !isOwner) return StoreCustomerCatalogView` يخفي شريط الإدارة عن الأدمن ويمنع «معاينة كعميل». **الإصلاح:**
+```kotlin
+val canManage = isOwner || isStaff                      // isStaff: ADMIN/SUPERVISOR بصلاحية العرض
+var previewAsCustomer by rememberSaveable { mutableStateOf(false) }
+if (liveStore != null && (!canManage || previewAsCustomer)) {
+    Box {
+        StoreCustomerCatalogView(/* كما هو */)
+        if (canManage) AssistChip(onClick = { previewAsCustomer = false }, label = { Text("خروج من المعاينة") }, modifier = Modifier.align(Alignment.TopStart).statusBarsPadding().padding(8.dp))
+    }
+    return
+}
+// في ProfileOwnerAdminControlBar: زر «معاينة كعميل» ← previewAsCustomer = true
+```
+## 3) عروض المتجر تختفي (حد 50 عالمي ثم تصفية محلية)
+```kotlin
+// OffersRepository: جلب عروض المزوّد مباشرة (يتطلب فهرساً مركباً providerId+createdAt؛ ينشئه Firestore برابط في الخطأ)
+suspend fun offersFor(db: FirebaseFirestore, providerId: String, limit: Long = 30): List<DocumentSnapshot> = try {
+    db.collection("offers").whereEqualTo("providerId", providerId).orderBy("createdAt", Query.Direction.DESCENDING).limit(limit).get().await().documents
+} catch (e: Exception) {           // قبل إنشاء الفهرس: تصفية بلا ترتيب ثم ترتيب محلي
+    db.collection("offers").whereEqualTo("providerId", providerId).limit(100).get().await().documents
+        .sortedByDescending { it.getLong("createdAt") ?: 0L }.take(limit.toInt())
+}
+```
+## 4) محادثة المطعم تمر كمتجر
+```kotlin
+object ChatTypeResolver {
+    fun forStore(sectionId: String, categoryId: String, name: String): String {
+        val t = "${sectionId.lowercase()} ${categoryId.lowercase()} ${name}"
+        return when {
+            listOf("medical", "pharm", "clinic", "طبي", "صيدلية", "مستشفى").any { it in t } -> "MEDICAL"
+            listOf("restaurant", "cafe", "مطعم", "كافيه", "بوفيه").any { it in t } -> "RESTAURANT"
+            else -> "STORE"
+        }
+    }
+}
+// في StoreCustomerCatalogView: type = ChatTypeResolver.forStore(store.sectionId, store.categoryId, store.name)
+```
+(وتأكد أن `ChannelType` يملك قيمة RESTAURANT؛ وإلا أضفها بقيمة افتراضية آمنة.)
+## 5) محرر الموقع والهاتف في `TabProfileEdit`
+**محدد نقطة قابل لإعادة الاستعمال** (يستعمل `pickMode` من المستند 54):
+```kotlin
+@Composable
+fun PointPickerDialog(initialLat: Double, initialLng: Double, onPick: (Double, Double) -> Unit, onDismiss: () -> Unit) {
+    var picked by remember { mutableStateOf<Pair<Double, Double>?>(if (LandmarkAddress.isValid(initialLat, initialLng)) initialLat to initialLng else null) }
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss, properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)) {
+        Box(Modifier.fillMaxSize().background(Color(0xFF0B0F19))) {
+            RealLeafletMapView(
+                userCoords = Pair(0.0, 0.0), nearbyProviders = emptyList(), nearbyStores = emptyList(), nearbyProperties = emptyList(),
+                dynamicOffsets = emptyMap(), currentMapMode = MapMode.OSM, selectedCity = "الكل", selectedEntity = null,
+                onProviderSelected = {}, onStoreSelected = {}, onPropertySelected = {}, onDeselect = {},
+                waypointMarkers = picked?.let { listOf(Triple("الموقع", it.first, it.second)) }.orEmpty(),
+                focusPoint = picked?.let { Triple("الموقع", it.first, it.second) },
+                pickMode = true, onMapPicked = { la, lo -> picked = la to lo }, modifier = Modifier.fillMaxSize()
+            )
+            Row(Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = { picked?.let { onPick(it.first, it.second) } }, enabled = picked != null) { Text("اعتماد الموقع") }
+                OutlinedButton(onClick = onDismiss) { Text("إلغاء") }
+            }
+        }
+    }
+}
+```
+وزر «موقعي الحالي» يستعمل `LocationCapture.fresh(...)` (المستند 74). **الهاتف:** لا تجعله حقلاً حراً (يتيح اختطاف حساب)؛ اجعل تغييره «طلب تغيير رقم» بحالة PENDING يعتمده المشرف، أو يتطلب كلمة المرور الحالية + فحص عدم تكرار الرقم.
+## 6) تبويب «المتقدمين» الفارغ (`JobPosterDashboard`)
+```kotlin
+data class JobApplicant(val id: String, val name: String, val phone: String, val cv: String, val status: String, val createdAt: Long)
+
+suspend fun loadApplicants(db: FirebaseFirestore, posterId: String, limit: Long = 50): List<JobApplicant> = try {
+    db.collection("job_applications").whereEqualTo("posterId", posterId).orderBy("createdAt", Query.Direction.DESCENDING).limit(limit).get().await()
+        .documents.map { d -> JobApplicant(d.id, d.getString("name").orEmpty(), d.getString("phone").orEmpty(), d.getString("cv").orEmpty(), d.getString("status") ?: "NEW", d.getLong("createdAt") ?: 0L) }
+} catch (e: Exception) { emptyList() }
+
+suspend fun setApplicantStatus(db: FirebaseFirestore, id: String, status: String) { // ACCEPTED/REJECTED
+    db.collection("job_applications").document(id).update(mapOf("status" to status, "reviewedAt" to System.currentTimeMillis())).await()
+}
+```
+واجهة: قائمة بطاقات (اسم، هاتف، مؤهل، تاريخ) + أزرار قبول/رفض/دردشة/اتصال (باستعمال `SosDispatcher.dialIntent`). وقاعدة Firestore: القراءة/التحديث لـ`posterId == request.auth.uid` فقط، والإنشاء لأي مسجّل.
+## 7) أخطاء قطاعية
+| الخطأ | الإصلاح |
+|---|---|
+| `MedicalDashboard` يعيد بناء الكيان بهوية "stores" | عرّف ثوابت `SectionIds` (`PROVIDERS/STORES/MEDICAL/PROPERTIES/RESTAURANTS`) واستعملها في كل بناء/كتابة؛ واختبر بإنشاء كيان طبي وقراءته |
+| صور العقارات `profileImage/coverImage` بدل `images` | عند الكتابة: `images = (existing + listOfNotNull(cover, profile)).distinct()` وأبقِ الحقول القديمة للتوافق؛ وعند القراءة أعد دمجها |
+| «تحديث الأسعار» لا يفتح محرراً للمتاجر (`store != null` يُتخطى) | اعكس الشرط: `if (store != null) openPriceEditor(store) else if (provider != null) ...` وأضف اختباراً لكل قطاع |
+| تكرار `OwnerDashboardScreen` والستة لوحات | وحّد الشاشة المشتركة `SectorDashboardScaffold(sections)` تدريجياً؛ لا تعد كتابتها دفعة واحدة |
+| نموذج «المراكز التجارية» غير موجود | بيانات: `malls/{id}{name,cityId,lat,lng,floors[]}` وللمتجر `mallId,floor,unit` (حقول اختيارية)؛ وشاشة دليل طوابق لاحقاً |
+## 8) إعدادات النظام: حفظ بلا قراءة، وأزرار وهمية
+**نمط موحّد** لكل شاشة إعدادات: `LaunchedEffect(Unit) { state = repo.load() }` ثم `repo.save(state)` وزر يعرض نتيجة الحفظ. شاشات: `AdminSystemSettingsScreen` (الإصدار/اللغة/العملة/الثيم/autoDetectLanguage/forceRtl) و`AdminAutoRoutingScreen` (3 أنصاف أقطار تُقرأ عند الفتح).
+### بث الطوارئ والصيانة (بلا FCM/خادم): مستند واحد يستمع له كل عميل
+```kotlin
+data class MaintenanceConfig(val active: Boolean = false, val message: String = "", val emergencyFreezeOrders: Boolean = false,
+                             val broadcastId: Long = 0L, val broadcastMessage: String = "", val untilMs: Long = 0L)
+
+class MaintenanceRepository(private val db: FirebaseFirestore) {
+    private val _config = MutableStateFlow(MaintenanceConfig())
+    val config: StateFlow<MaintenanceConfig> = _config
+    private var reg: ListenerRegistration? = null
+    fun start() { if (reg != null) return
+        reg = db.collection("settings").document("maintenance").addSnapshotListener { s, _ ->     // مستند واحد = قراءة رخيصة
+            if (s != null && s.exists()) _config.value = MaintenanceConfig(s.getBoolean("active") ?: false, s.getString("message").orEmpty(),
+                s.getBoolean("emergencyFreezeOrders") ?: false, s.getLong("broadcastId") ?: 0L, s.getString("broadcastMessage").orEmpty(), s.getLong("untilMs") ?: 0L) } }
+    fun stop() { reg?.remove(); reg = null }
+}
+```
+في الواجهة: لافتة عليا عند `broadcastId` جديد (محفوظ محلياً آخر معرّف مقروء)، ومنع إنشاء الحجوزات عند `emergencyFreezeOrders` برسالة، ومنع الدخول عند `active` (ما عدا الأدمن). زر الأدمن «بث» يكتب `broadcastId = now` و`broadcastMessage`. (إشعار نظام لحظي لكل المستخدمين يتطلب FCM من خادم؛ هذا بديل مجاني داخل التطبيق.)
+## 9) الهيدر والفوتر وطبقات الخرائط من إعدادات الأدمن (فعلياً)
+```kotlin
+data class AppUiConfig(
+    val footerItemsOrder: List<String> = listOf("INFO", "BOOKINGS", "TEXT", "LANG", "ADMIN"),
+    val isMapFeatureEnabled: Boolean = true, val isMapsIconVisible: Boolean = true,
+    val langIconType: String = "DEFAULT", val adminIconType: String = "DEFAULT"
+)
+data class MapLayerRule(val enabled: Boolean = true, val minRole: String = "GUEST")      // GUEST < USER < PROVIDER < ADMIN
+data class MapLayersConfig(
+    val engine: String = "LEAFLET",                                                       // LEAFLET | MAPLIBRE3D (يحدد ما يفتحه زر 3D)
+    val layers: Map<String, MapLayerRule> = emptyMap(),                                   // مفاتيح: GIBS, EOX, EUMET, QUAKES, RAIN, RELIABILITY, PEAK, COVERAGE, HAZARD, OFFLINE, AR
+    val ecoMode: Boolean = false
+) {
+    private val order = listOf("GUEST", "USER", "PROVIDER", "ADMIN")
+    fun allows(layerKey: String, role: String): Boolean {
+        val r = layers[layerKey] ?: return true                                           // غير مذكورة = مسموحة (لا نكسر القائم)
+        return r.enabled && order.indexOf(role.uppercase()).coerceAtLeast(0) >= order.indexOf(r.minRole.uppercase()).coerceAtLeast(0)
+    }
+}
+```
+مستندان في Firestore: `settings/ui_config` و`settings/map_layers_config`، يقرؤهما مستودع واحد باستماع واحد لكل منهما (مرة لكل تشغيل) ويكشف `StateFlow`ين؛ وحين تفشل القراءة تُستعمل القيم الافتراضية أعلاه. **الربط:** `AppFooterBar` يرتّب حسب `footerItemsOrder` (ويتجاهل مفاتيح غير معروفة)، و`AppHeaderBar` يخفي أيقونة الخرائط عند `!isMapsIconVisible`، وفي `MoreLayersSheet` اعرض الصف فقط إن `mapConfig.allows("EOX", role)`، وشارة المدينة في الهيدر: `onClick = { showCityPicker = true }` (احذف `onClick` الفارغ). وانقل `isEcoMode` من SharedPreferences المحلي إلى `ecoMode` في الإعداد المشترك مع إبقاء خيار المستخدم الشخصي.
+## 10) مفاتيح API والأمان (`AdminApiKeysScreen`)
+1. احذف صف «Google Maps SDK API Key» (لا يُستعمل).
+2. **لا تحفظ مفاتيح بوابات الدفع السرية في Firestore من جهاز العميل**: أي مفتاح سرّي يجب أن يبقى في الخادم؛ بلا خادم لا تحفظه إطلاقاً (احفظ فقط المعرّفات العامة غير السرية).
+3. قائمة `customKeys` في الذاكرة فقط: إما احذف الميزة أو احفظ **أسماء ووصفاً فقط** بلا قيم، وانقل القيم لمتغيرات بناء (`local.properties`/GitHub Secrets) المستعملة وقت البناء.
+## 11) التقارير المالية
+`bookings.size * 500` تقدير مختلق ⇒ احسب من حركات المحفظة الفعلية المعتمدة (`transactions` بحالة COMPLETED ونوع PAYMENT/DEPOSIT) بالـ`Long`، أو اعرض «غير متاح» بدل رقم مزيف. فعّل زر التصدير بـ`ReportExporter` (CSV مهرّب + BOM، المستند 57)، وPDF لاحقاً بـ`PdfDocument` (نمط المستند 63).
+## 12) استرجاع الحساب
+- احفظ قائمة الحسابات المتعددة في `rememberSaveable`/ViewModel لئلا يستدعي `LaunchedEffect` البحث الفردي عند التدوير (اجعل مفتاحه `(phone)` فقط وفرع على `accounts.isEmpty()`).
+- التحقق برمز: Firebase Phone Auth قد يكون محدوداً/مدفوعاً حسب خطتك (تحقق من حدود الخطة)؛ بديل مجاني متاح: التحقق بكلمة المرور القديمة + طلب إعادة تعيين يعتمده المشرف (الموجود) مع **تسجيل تدقيق** (من اعتمد ومتى) وإشعار للمستخدم.
+- وحّد مصدر الحقيقة بين `pending_providers` و`join_requests` (أحدهما فقط)، مع ترحيل لمرة واحدة ثم حذف الآخر.
+## اختبار
+1. افتح نشاطاً محذوفاً: ظهور «غير موجود» خلال 10 ث، والرجوع يعمل. 2. أدمن يرى شريط الإدارة وزر المعاينة. 3. مالك يعدّل الموقع من الخريطة ويحفظ. 4. تبويب المتقدمين يعرض طلبات حقيقية. 5. تغيير `footerItemsOrder` في Firestore يغيّر ترتيب الفوتر بلا إصدار جديد. 6. تعطيل طبقة EOX من الأدمن يخفيها عند المستخدم.

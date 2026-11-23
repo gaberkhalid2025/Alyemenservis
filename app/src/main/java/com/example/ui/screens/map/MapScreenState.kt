@@ -45,6 +45,7 @@ class MapScreenState(
     var peakEnabled by mutableStateOf(false)
     var coverageEnabled by mutableStateOf(false)
     var hazardEnabled by mutableStateOf(false)
+    var liveTrafficEnabled by mutableStateOf(true)
     var zoomInTick by mutableIntStateOf(0)
     var zoomOutTick by mutableIntStateOf(0)
     var recenterTick by mutableIntStateOf(0)

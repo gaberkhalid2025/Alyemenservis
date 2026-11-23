@@ -1,14 +1,16 @@
 package com.example.ui.viewmodels
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import com.example.ui.*
 import androidx.lifecycle.viewModelScope
-import com.example.BuildConfig
 import com.example.data.AdminSettingsEntity
 import com.example.data.CategoryEntity
 import com.example.data.ProviderEntity
 import com.example.ui.MainViewModel
 import com.example.ui.screens.assistant.AssistantMessage
+import com.example.utils.AiAssistantEngine
+import com.example.utils.AiResponse
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -19,10 +21,8 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody
-import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Locale
-import java.util.UUID
 import java.util.concurrent.TimeUnit
 
 /**
@@ -31,6 +31,13 @@ import java.util.concurrent.TimeUnit
  * يدعم الذكاء الاصطناعي التوليدي عبر Gemini API ومحرك الاستجابة المحلي بدون إنترنت.
  */
 class AssistantViewModel : ViewModel() {
+
+    private var cachedEngine: AiAssistantEngine? = null
+    private fun getOrCreateEngine(context: Context): AiAssistantEngine {
+        return cachedEngine ?: synchronized(this) {
+            cachedEngine ?: AiAssistantEngine(context.applicationContext).also { cachedEngine = it }
+        }
+    }
 
     private val defaultWelcome = "مرحباً بك في المساعد الذكي لدليل خدمات اليمن 🇾🇪! كيف يمكنني خدمتك ومساعدتك اليوم؟"
 
@@ -174,7 +181,8 @@ class AssistantViewModel : ViewModel() {
         mainViewModel: MainViewModel,
         settings: AdminSettingsEntity,
         onSpeechSpeak: ((String) -> Unit)? = null,
-        onError: ((String) -> Unit)? = null
+        onError: ((String) -> Unit)? = null,
+        context: Context? = null
     ) {
         if (prompt.isBlank() || _isGenerating.value) return
 
@@ -183,7 +191,6 @@ class AssistantViewModel : ViewModel() {
         if (cached != null) {
             val userMsg = AssistantMessage(text = prompt.trim(), isUser = true)
             var updatedHistory = _chatHistory.value + userMsg + cached
-            // [إصلاح نهائي] حصر الذاكرة بحد أقصى 100 رسالة لمنع استهلاك الذاكرة
             if (updatedHistory.size > 100) updatedHistory = updatedHistory.takeLast(100)
             _chatHistory.value = updatedHistory
             _typedText.value = ""
@@ -195,7 +202,6 @@ class AssistantViewModel : ViewModel() {
 
         val userMsg = AssistantMessage(text = prompt.trim(), isUser = true)
         var updatedHistory = _chatHistory.value + userMsg
-        // [إصلاح نهائي] حصر سجل المحادثة بحد أقصى 100 رسالة
         if (updatedHistory.size > 100) {
             updatedHistory = updatedHistory.takeLast(100)
         }
@@ -205,27 +211,24 @@ class AssistantViewModel : ViewModel() {
 
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val providersList = mainViewModel.providers.value
-                val categoriesList = mainViewModel.categories.value
-
-                val responseMsg = if (isOnline) {
-                    queryGeminiApiOrFallback(
+                var engineResp: AiResponse? = null
+                if (context != null) {
+                    val engine = getOrCreateEngine(context)
+                    engine.queryAssistant(
                         prompt = prompt,
-                        providersList = providersList,
-                        categoriesList = categoriesList,
-                        settings = settings,
-                        history = _chatHistory.value,
-                        mainViewModel = mainViewModel
-                    )
-                } else {
-                    val localMsg = generateLocalOfflineMessage(prompt, mainViewModel)
-                    cacheResponse(prompt, localMsg)
-                    localMsg
+                        currentCity = mainViewModel.homeViewModel.selectedCityName.value.ifBlank { "صنعاء" },
+                        isOnlineAvailable = isOnline
+                    ) { resp ->
+                        engineResp = resp
+                    }
                 }
+
+                val localMsg = generateLocalOfflineMessage(prompt, mainViewModel)
+                val responseMsg = mergeEngineWithLocalEntities(prompt, localMsg, engineResp)
+                cacheResponse(prompt, responseMsg)
 
                 withContext(Dispatchers.Main) {
                     var updatedHistoryWithResp = _chatHistory.value + responseMsg
-                    // [إصلاح نهائي] حصر سجل المحادثة بحد أقصى 100 رسالة
                     if (updatedHistoryWithResp.size > 100) {
                         updatedHistoryWithResp = updatedHistoryWithResp.takeLast(100)
                     }
@@ -245,6 +248,55 @@ class AssistantViewModel : ViewModel() {
         }
     }
 
+    private fun mergeEngineWithLocalEntities(
+        prompt: String,
+        localMsg: AssistantMessage,
+        engineResp: AiResponse?
+    ): AssistantMessage {
+        if (engineResp == null) return localMsg
+        // إذا كان الرد المحلي من دليل الصيانة السريع أو سلامة HIGH أو عثر على نتائج من قاعدة البيانات
+        if (localMsg.safetyLevel.equals("HIGH", ignoreCase = true)) {
+            return localMsg
+        }
+        val engineHasRichGuide = engineResp.diySteps.isNotEmpty() ||
+            engineResp.immediateActions.isNotEmpty() ||
+            engineResp.safetyLevel.equals("HIGH", ignoreCase = true) ||
+            !engineResp.estimatedCost.isNullOrBlank()
+        if (!engineHasRichGuide) return localMsg
+
+        val sb = StringBuilder()
+        if (engineResp.safetyLevel.equals("HIGH", ignoreCase = true)) {
+            sb.append("🚨 *${engineResp.title}*\n\n")
+            engineResp.safetyWarning?.let { sb.append("⚠️ $it\n\n") }
+            if (engineResp.immediateActions.isNotEmpty()) {
+                sb.append("🛡️ خطوات الأمان الفورية:\n")
+                engineResp.immediateActions.forEachIndexed { idx, act -> sb.append("${idx + 1}. $act\n") }
+            }
+        } else {
+            sb.append("🤖 *${engineResp.title}*\n\n")
+            if (engineResp.message.isNotBlank()) {
+                sb.append("${engineResp.message}\n\n")
+            }
+            if (engineResp.diySteps.isNotEmpty()) {
+                sb.append("📋 خطوات الفحص السريع:\n")
+                engineResp.diySteps.forEachIndexed { idx, step -> sb.append("${idx + 1}. $step\n") }
+            }
+        }
+        engineResp.preventiveTips?.takeIf { it.isNotBlank() }?.let { sb.append("\n💡 نصيحة وقائية: $it\n") }
+        engineResp.estimatedCost?.takeIf { it.isNotBlank() }?.let { sb.append("\n💰 التكلفة التقديرية: $it\n") }
+        if (localMsg.matchedEntities.isNotEmpty()) {
+            sb.append("\n👇 عثرت لك على نتائج مطابقة في دليلك:")
+        }
+        return AssistantMessage(
+            text = sb.toString().trim(),
+            isUser = false,
+            matchedEntities = localMsg.matchedEntities,
+            safetyLevel = engineResp.safetyLevel,
+            safetyWarning = engineResp.safetyWarning,
+            immediateActions = engineResp.immediateActions
+        )
+    }
+
     // كاش محلي يحتفظ بآخر 40 سؤال وجواب كحد أقصى
     private val cachedResponses = object : LinkedHashMap<String, AssistantMessage>(40, 0.75f, true) {
         override fun removeEldestEntry(eldest: Map.Entry<String, AssistantMessage>?): Boolean {
@@ -252,119 +304,16 @@ class AssistantViewModel : ViewModel() {
         }
     }
 
+    @Synchronized
     fun getCachedResponse(query: String): AssistantMessage? {
         val normalized = normalizeArabic(query)
         return cachedResponses[normalized]
     }
 
+    @Synchronized
     fun cacheResponse(query: String, response: AssistantMessage) {
         val normalized = normalizeArabic(query)
         cachedResponses[normalized] = response
-    }
-
-    private fun queryGeminiApiOrFallback(
-        prompt: String,
-        providersList: List<ProviderEntity>,
-        categoriesList: List<CategoryEntity>,
-        settings: AdminSettingsEntity,
-        history: List<AssistantMessage>,
-        mainViewModel: MainViewModel
-    ): AssistantMessage {
-        val cached = getCachedResponse(prompt)
-        if (cached != null) {
-            return cached
-        }
-
-        val qNormalized = normalizeArabic(prompt)
-        val matched = providersList.filter { p ->
-            val catName = categoriesList.find { it.id == p.categoryId }?.name ?: ""
-            val pNameNorm = normalizeArabic(p.name)
-            val pProfNorm = normalizeArabic(p.profession)
-            val pSpecNorm = normalizeArabic(p.specialization)
-            val pAreaNorm = normalizeArabic(p.area)
-            val catNameNorm = normalizeArabic(catName)
-
-            pNameNorm.contains(qNormalized) ||
-            pProfNorm.contains(qNormalized) ||
-            pSpecNorm.contains(qNormalized) ||
-            pAreaNorm.contains(qNormalized) ||
-            catNameNorm.contains(qNormalized)
-        }.take(5)
-
-        try {
-            val apiKey = ""
-            if (apiKey.isNotEmpty()) {
-                val mediaType = "application/json; charset=utf-8".toMediaType()
-                val ragList = if (matched.isNotEmpty()) matched else providersList.filter { it.isVip }.take(10)
-
-                val dbContextText = StringBuilder()
-                dbContextText.append("البيانات المسترجعة من قاعدة بيانات المنصة في اليمن (RAG Data):\n")
-                ragList.forEach { p ->
-                    val catName = categoriesList.find { it.id == p.categoryId }?.name ?: "خدمة عامة"
-                    dbContextText.append("- الفني: ${p.name} | الهاتف: ${p.phone} | المنطقة: ${p.area} | الحي: ${p.localNeighborhood} | التخصص: ${p.specialization.ifEmpty { p.profession }} | القسم: $catName | التقييم: ${p.rating}/5.0 | الحالة: ${if (p.isAvailable) "متاح" else "مشغول"}\n")
-                }
-                dbContextText.append("\nمعلومات الدعم الفني:\n")
-                dbContextText.append("- هاتف الدعم: ${settings.supportPhone}\n")
-                dbContextText.append("- واتساب: ${settings.supportWhatsapp}\n")
-
-                val systemInstructionText = "أنت 'مساعد منصة دليل خدمات اليمن الذكي'. أجب باللغة العربية الفصحى أو اللهجة اليمنية المحببة باختصار ودقة. اقترح بيانات الفنيين المسترجعة عند السؤال عن خدمات أو صيانات.\n\nالبيانات المتاحة:\n$dbContextText"
-
-                val contentsArray = JSONArray()
-                history.takeLast(6).forEach { hMsg ->
-                    val contentObj = JSONObject()
-                    contentObj.put("role", if (hMsg.isUser) "user" else "model")
-                    val partsArray = JSONArray()
-                    val partObj = JSONObject()
-                    partObj.put("text", hMsg.text)
-                    partsArray.put(partObj)
-                    contentObj.put("parts", partsArray)
-                    contentsArray.put(contentObj)
-                }
-
-                val systemInstructionObj = JSONObject()
-                val sysParts = JSONArray()
-                val sysPart = JSONObject()
-                sysPart.put("text", systemInstructionText)
-                sysParts.put(sysPart)
-                systemInstructionObj.put("parts", sysParts)
-
-                val finalRequestJsonObj = JSONObject()
-                finalRequestJsonObj.put("contents", contentsArray)
-                finalRequestJsonObj.put("systemInstruction", systemInstructionObj)
-
-                val request = Request.Builder()
-                    .url("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$apiKey")
-                    .post(RequestBody.create(mediaType, finalRequestJsonObj.toString()))
-                    .build()
-
-                sharedHttpClient.newCall(request).execute().use { apiResponse ->
-                    if (apiResponse.isSuccessful) {
-                        val bodyString = apiResponse.body?.string() ?: ""
-                        val jsonObject = JSONObject(bodyString)
-                        val candidates = jsonObject.optJSONArray("candidates")
-                        val candidate = candidates?.optJSONObject(0)
-                        val content = candidate?.optJSONObject("content")
-                        val parts = content?.optJSONArray("parts")
-                        val part = parts?.optJSONObject(0)
-                        val textVal = part?.optString("text")
-                        if (!textVal.isNullOrBlank()) {
-                            val response = AssistantMessage(text = textVal, isUser = false, matchedEntities = matched)
-                            cacheResponse(prompt, response)
-                            return response
-                        }
-                    } else {
-                        com.example.utils.AppErrorLogManager.logApiError("GeminiAssistant", "HTTP Error: ${apiResponse.code} - ${apiResponse.message}")
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-            com.example.utils.AppErrorLogManager.logApiError("GeminiAssistant", "فشل استدعاء Gemini API: ${e.localizedMessage}", e)
-        }
-
-        val localMsg = generateLocalOfflineMessage(prompt, mainViewModel)
-        cacheResponse(prompt, localMsg)
-        return localMsg
     }
 
     data class DiyGuide(

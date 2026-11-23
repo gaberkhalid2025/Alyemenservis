@@ -126,10 +126,11 @@ class FakeChatRepository : IChatRepository {
         replyToId: String?,
         replyToText: String?,
         attachment: ChatAttachment?,
-        audioWaveform: List<Int>
+        audioWaveform: List<Int>,
+        existingMessageId: String?
     ): AppResult<ChatMessage> {
         val msg = ChatMessage(
-            id = "msg_${messages.size + 1}",
+            id = existingMessageId ?: "msg_${messages.size + 1}",
             channelId = channelId,
             senderId = senderId,
             message = messageText,

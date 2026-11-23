@@ -689,6 +689,12 @@ fun UnifiedLayersSheet(
     onSelectEumetLayer: (String) -> Unit = {},
     onCoverageCleared: () -> Unit = {},
     initialTab: Int = 0,
+    adminRole: String = "GUEST",
+    isRegisteredUser: Boolean = false,
+    isProvider: Boolean = false,
+    liveTrafficEnabled: Boolean = true,
+    onToggleLiveTraffic: (Boolean) -> Unit = {},
+    enableLiveTrafficByAdmin: Boolean = true,
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
@@ -696,6 +702,12 @@ fun UnifiedLayersSheet(
     val valhallaMb = if (valhallaSizeMb > 0) valhallaSizeMb else ValhallaTileDownloader.EXPECTED_INSTALLED_MB
     var cellCount by remember { mutableIntStateOf(CoverageLog.cellCount(context)) }
     var showClearConfirm by remember { mutableStateOf(false) }
+
+    fun isVisible(id: String): Boolean = true
+
+    fun orderOf(id: String, fallback: Int): Int = fallback
+
+    fun labelOf(id: String, fallback: String): String = fallback
 
     var eumetLayers by remember { mutableStateOf<List<com.example.utils.WmsLayerInfo>?>(null) }
     var eumetMenu by remember { mutableStateOf(false) }
@@ -798,17 +810,22 @@ fun UnifiedLayersSheet(
             ) {
                 when (selectedTab) {
                     0 -> {
-                        // 1. الخريطة (الأساسية) — شرائح للأساس + صفوف مسطّحة
+                        // 1. الخريطة (الأساسية) — شرائح للأساس + صفوف مسطّحة مرتبة حسب صلاحيات الإدارة
                         SectionTitle("خريطة الأساس", Color(0xFF10B981))
 
-                        val baseModes = listOf(
-                            Triple(MapMode.HOT, "🗺️ شوارع", "HOT الميدانية"),
-                            Triple(MapMode.SATELLITE, "🛰️ أقمار", "Esri القياسية"),
-                            Triple(MapMode.SATELLITE_CLARITY, "💎 وضوح", "Esri Clarity"),
-                            Triple(MapMode.VELA, "✨ VELA", "خريطة الشوارع"),
-                            Triple(MapMode.OSM, "🌐 قياسي", "OpenStreetMap"),
-                            Triple(MapMode.TOPO, "⛰️ تضاريس", "OpenTopoMap")
+                        val allBaseModes = listOf(
+                            Triple(MapMode.HOT, "HOT", "🗺️ شوارع"),
+                            Triple(MapMode.SATELLITE, "SATELLITE", "🛰️ أقمار"),
+                            Triple(MapMode.SATELLITE_CLARITY, "SATELLITE_CLARITY", "💎 وضوح"),
+                            Triple(MapMode.VELA, "VELA", "✨ VELA"),
+                            Triple(MapMode.OSM, "OSM", "🌐 قياسي"),
+                            Triple(MapMode.TOPO, "TOPO", "⛰️ تضاريس")
                         )
+                        val visibleBaseModes = remember(adminRole, isRegisteredUser, isProvider) {
+                            allBaseModes
+                                .filter { (_, id, _) -> isVisible(id) }
+                                .sortedBy { (_, id, _) -> orderOf(id, 99) }
+                        }
 
                         @OptIn(ExperimentalLayoutApi::class)
                         FlowRow(
@@ -816,14 +833,15 @@ fun UnifiedLayersSheet(
                             verticalArrangement = Arrangement.spacedBy(4.dp),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            baseModes.forEach { (mode, label, _) ->
+                            visibleBaseModes.forEach { (mode, _, defaultLabel) ->
                                 val selected = currentMapMode == mode
+                                val chipLabel = defaultLabel
                                 FilterChip(
                                     selected = selected,
                                     onClick = { onSelectMapMode(mode); onDismiss() },
                                     label = {
                                         Text(
-                                            label,
+                                            chipLabel,
                                             fontSize = 12.sp,
                                             fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
                                         )
@@ -846,178 +864,219 @@ fun UnifiedLayersSheet(
 
                         HorizontalDivider(color = Color.White.copy(alpha = 0.06f))
 
-                        LayerRow(
-                            title = "خرائط بلا إنترنت",
-                            subtitle = if (isValhallaDownloaded) "حزمة اليمن جاهزة محلياً (~$valhallaMb ميجابايت)" else "استعمل الخريطة المحفوظة على الجهاز (حزم المناطق)",
-                            checked = mapLayer == MapLayer.VALHALLA_OFFLINE,
-                            onChange = { checked ->
-                                onToggleMapLayer(if (checked) MapLayer.VALHALLA_OFFLINE else MapLayer.STANDARD)
-                                onDismiss()
-                            },
-                            testTag = "unified_valhalla_switch"
-                        )
+                        if (isVisible("VALHALLA_OFFLINE")) {
+                            LayerRow(
+                                title = labelOf("VALHALLA_OFFLINE", "خرائط بلا إنترنت"),
+                                subtitle = if (isValhallaDownloaded) "حزمة اليمن جاهزة محلياً (~$valhallaMb ميجابايت)" else "استعمل الخريطة المحفوظة على الجهاز (حزم المناطق)",
+                                checked = mapLayer == MapLayer.VALHALLA_OFFLINE,
+                                onChange = { checked ->
+                                    onToggleMapLayer(if (checked) MapLayer.VALHALLA_OFFLINE else MapLayer.STANDARD)
+                                    onDismiss()
+                                },
+                                testTag = "unified_valhalla_switch"
+                            )
 
-                        if (!isValhallaDownloaded) {
-                            OutlinedButton(
-                                onClick = { onDismiss(); onOpenValhallaDownload() },
-                                border = BorderStroke(1.dp, Color(0xFFF59E0B).copy(alpha = 0.6f)),
-                                shape = RoundedCornerShape(10.dp),
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).heightIn(min = 44.dp)
-                            ) {
-                                Icon(Icons.Default.CloudDownload, contentDescription = null, tint = Color(0xFFF59E0B), modifier = Modifier.size(18.dp))
-                                Spacer(Modifier.width(8.dp))
-                                Text(
-                                    "حزمة التوجيه بلا إنترنت (${ValhallaTileDownloader.EXPECTED_DOWNLOAD_MB} ميجابايت)",
-                                    color = Color(0xFFFBBF24),
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-
-                        LayerRow(
-                            title = "التضاريس ثلاثية الأبعاد (3D)",
-                            subtitle = if (is3DAvailable) "ارتفاعات الجبال وإمالة الكاميرا (62°)" else "وضع المنظور المائل 3D للخرائط",
-                            checked = is3DTerrainEnabled,
-                            onChange = { enabled ->
-                                onToggle3DTerrain(enabled)
-                                onDismiss()
-                            },
-                            testTag = "unified_3d_terrain_switch"
-                        )
-
-                        LayerRow(
-                            title = "الوضع الليلي للخريطة",
-                            subtitle = "تعتيم مريح للعين أثناء القيادة ليلاً",
-                            checked = nightMode,
-                            onChange = { onToggleNight(it); onDismiss() },
-                            testTag = "unified_night_switch"
-                        )
-                    }
-
-                    1 -> {
-                        // 2. أقمار حية — صفوف مسطّحة
-                        SectionTitle("🛰️ أقمار صناعية مباشرة ويومية", Color(0xFF10B981))
-
-                        LayerRow(
-                            title = "قمر Meteosat مباشر (EUMETSAT)",
-                            subtitle = "يتجدد كل ~15 دقيقة • سحب وغبار فوق اليمن • دقة ≈ 3 كم",
-                            checked = eumetEnabled,
-                            onChange = { onToggleEumet(it) },
-                            testTag = "unified_eumet_switch"
-                        )
-
-                        if (eumetEnabled) {
-                            val list = eumetLayers
-                            when {
-                                list == null -> LinearProgressIndicator(Modifier.fillMaxWidth().padding(vertical = 4.dp), color = Color(0xFF10B981))
-                                list.isNotEmpty() -> {
-                                    if (eumetLayerName.isEmpty()) {
-                                        val defaultLayer = (list.firstOrNull { it.title.contains("dust", true) } ?: list.first()).name
-                                        onSelectEumetLayer(defaultLayer)
-                                    }
-                                    Box(Modifier.padding(vertical = 4.dp)) {
-                                        OutlinedButton(
-                                            onClick = { eumetMenu = true },
-                                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF10B981)),
-                                            border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.5f))
-                                        ) {
-                                            Text(list.firstOrNull { it.name == eumetLayerName }?.arabicLabel() ?: "اختر طبقة", fontWeight = FontWeight.Bold)
-                                            Spacer(Modifier.width(6.dp))
-                                            Icon(Icons.Default.ArrowDropDown, contentDescription = null)
-                                        }
-                                        DropdownMenu(expanded = eumetMenu, onDismissRequest = { eumetMenu = false }, containerColor = Color(0xFF0F172A)) {
-                                            list.forEach { l ->
-                                                DropdownMenuItem(
-                                                    text = { Text(l.arabicLabel(), color = Color.White) },
-                                                    onClick = { onSelectEumetLayer(l.name); eumetMenu = false }
-                                                )
-                                            }
-                                        }
-                                    }
+                            if (!isValhallaDownloaded) {
+                                OutlinedButton(
+                                    onClick = { onDismiss(); onOpenValhallaDownload() },
+                                    border = BorderStroke(1.dp, Color(0xFFF59E0B).copy(alpha = 0.6f)),
+                                    shape = RoundedCornerShape(10.dp),
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).heightIn(min = 44.dp)
+                                ) {
+                                    Icon(Icons.Default.CloudDownload, contentDescription = null, tint = Color(0xFFF59E0B), modifier = Modifier.size(18.dp))
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        "حزمة التوجيه بلا إنترنت (${ValhallaTileDownloader.EXPECTED_DOWNLOAD_MB} ميجابايت)",
+                                        color = Color(0xFFFBBF24),
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
                                 }
                             }
                         }
 
-                        if (NavConfig.ENABLE_REALEARTH) {
+                        if (isVisible("TERRAIN_3D")) {
                             LayerRow(
-                                title = "أقمار الطقس والأرض (UW RealEarth)",
-                                subtitle = "بث فضائي محدث كل 15-30 دقيقة",
-                                checked = realTimeSatEnabled,
-                                onChange = { onToggleRealTimeSat(it); onDismiss() },
-                                testTag = "unified_realearth_switch"
+                                title = labelOf("TERRAIN_3D", "التضاريس ثلاثية الأبعاد (3D)"),
+                                subtitle = if (is3DAvailable) "ارتفاعات الجبال وإمالة الكاميرا (62°)" else "وضع المنظور المائل 3D للخرائط",
+                                checked = is3DTerrainEnabled,
+                                onChange = { enabled ->
+                                    onToggle3DTerrain(enabled)
+                                    onDismiss()
+                                },
+                                testTag = "unified_3d_terrain_switch"
                             )
                         }
 
-                        LayerRow(
-                            title = "صور ناسا اليومية (NASA GIBS)",
-                            subtitle = "صور NASA EOSDIS اليومية (VIIRS 375م و MODIS)",
-                            checked = gibsEnabled,
-                            onChange = { onToggleGibs(it); onDismiss() },
-                            testTag = "unified_gibs_switch"
-                        )
+                        if (isVisible("NIGHT_MODE")) {
+                            LayerRow(
+                                title = labelOf("NIGHT_MODE", "الوضع الليلي للخريطة"),
+                                subtitle = "تعتيم مريح للعين أثناء القيادة ليلاً",
+                                checked = nightMode,
+                                onChange = { onToggleNight(it); onDismiss() },
+                                testTag = "unified_night_switch"
+                            )
+                        }
+                    }
 
-                        LayerRow(
-                            title = "صور EOX Sentinel-2 (2016)",
-                            subtitle = "طبقة فضائية أوروبية صافية تماماً (CC BY 4.0)",
-                            checked = eoxEnabled,
-                            onChange = { onToggleEox(it); onDismiss() },
-                            testTag = "unified_eox_switch"
-                        )
+                    1 -> {
+                        // 2. أقمار حية — صفوف مسطّحة حسب صلاحيات الإدارة وترتيبها
+                        SectionTitle("🛰️ أقمار صناعية مباشرة ويومية", Color(0xFF10B981))
 
-                        LayerRow(
-                            title = "زلازل USGS (≥ 2.5 آخر أسبوع)",
-                            subtitle = "عرض الهزات المسجلة رسمياً مع تفاصيل النقطة",
-                            checked = quakesEnabled,
-                            onChange = { onToggleQuakes(it); onDismiss() },
-                            testTag = "unified_quakes_switch"
-                        )
+                        val satRows = listOf("EUMETSAT", "REALEARTH", "NASA_GIBS", "EOX_SENTINEL", "USGS_QUAKES")
+                            .filter { isVisible(it) }
+                            .sortedBy { orderOf(it, 99) }
+
+                        satRows.forEach { layerId ->
+                            when (layerId) {
+                                "EUMETSAT" -> {
+                                    LayerRow(
+                                        title = labelOf("EUMETSAT", "قمر Meteosat مباشر (EUMETSAT)"),
+                                        subtitle = "يتجدد كل ~15 دقيقة • سحب وغبار فوق اليمن • دقة ≈ 3 كم",
+                                        checked = eumetEnabled,
+                                        onChange = { onToggleEumet(it) },
+                                        testTag = "unified_eumet_switch"
+                                    )
+
+                                    if (eumetEnabled) {
+                                        val list = eumetLayers
+                                        when {
+                                            list == null -> LinearProgressIndicator(Modifier.fillMaxWidth().padding(vertical = 4.dp), color = Color(0xFF10B981))
+                                            list.isNotEmpty() -> {
+                                                if (eumetLayerName.isEmpty()) {
+                                                    val defaultLayer = (list.firstOrNull { it.title.contains("dust", true) } ?: list.first()).name
+                                                    onSelectEumetLayer(defaultLayer)
+                                                }
+                                                Box(Modifier.padding(vertical = 4.dp)) {
+                                                    OutlinedButton(
+                                                        onClick = { eumetMenu = true },
+                                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF10B981)),
+                                                        border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.5f))
+                                                    ) {
+                                                        Text(list.firstOrNull { it.name == eumetLayerName }?.arabicLabel() ?: "اختر طبقة", fontWeight = FontWeight.Bold)
+                                                        Spacer(Modifier.width(6.dp))
+                                                        Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+                                                    }
+                                                    DropdownMenu(expanded = eumetMenu, onDismissRequest = { eumetMenu = false }, containerColor = Color(0xFF0F172A)) {
+                                                        list.forEach { l ->
+                                                            DropdownMenuItem(
+                                                                text = { Text(l.arabicLabel(), color = Color.White) },
+                                                                onClick = { onSelectEumetLayer(l.name); eumetMenu = false }
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                "REALEARTH" -> if (NavConfig.ENABLE_REALEARTH) {
+                                    LayerRow(
+                                        title = labelOf("REALEARTH", "أقمار الطقس والأرض (UW RealEarth)"),
+                                        subtitle = "بث فضائي محدث كل 15-30 دقيقة",
+                                        checked = realTimeSatEnabled,
+                                        onChange = { onToggleRealTimeSat(it); onDismiss() },
+                                        testTag = "unified_realearth_switch"
+                                    )
+                                }
+                                "NASA_GIBS" -> {
+                                    LayerRow(
+                                        title = labelOf("NASA_GIBS", "صور ناسا اليومية (NASA GIBS)"),
+                                        subtitle = "صور NASA EOSDIS اليومية (VIIRS 375م و MODIS)",
+                                        checked = gibsEnabled,
+                                        onChange = { onToggleGibs(it); onDismiss() },
+                                        testTag = "unified_gibs_switch"
+                                    )
+                                }
+                                "EOX_SENTINEL" -> {
+                                    LayerRow(
+                                        title = labelOf("EOX_SENTINEL", "صور EOX Sentinel-2 (2016)"),
+                                        subtitle = "طبقة فضائية أوروبية صافية تماماً (CC BY 4.0)",
+                                        checked = eoxEnabled,
+                                        onChange = { onToggleEox(it); onDismiss() },
+                                        testTag = "unified_eox_switch"
+                                    )
+                                }
+                                "USGS_QUAKES" -> {
+                                    LayerRow(
+                                        title = labelOf("USGS_QUAKES", "زلازل USGS (≥ 2.5 آخر أسبوع)"),
+                                        subtitle = "عرض الهزات المسجلة رسمياً مع تفاصيل النقطة",
+                                        checked = quakesEnabled,
+                                        onChange = { onToggleQuakes(it); onDismiss() },
+                                        testTag = "unified_quakes_switch"
+                                    )
+                                }
+                            }
+                        }
                     }
 
                     2 -> {
-                        // 3. تحليل — صفوف مسطّحة
+                        // 3. تحليل — صفوف مسطّحة حسب صلاحيات الإدارة وترتيبها
                         SectionTitle("📊 أدوات المراقبة وتحليل الطريق", Color(0xFF10B981))
 
-                        LayerRow(
-                            title = "رادار الأمطار (RainViewer)",
-                            subtitle = if (NavConfig.ENABLE_RAINVIEWER) "تغطية السحب والأمطار الأخيرة" else "معطّلة افتراضياً",
-                            checked = rainEnabled,
-                            enabled = NavConfig.ENABLE_RAINVIEWER,
-                            onChange = { onToggleRain(it); onDismiss() },
-                            testTag = "unified_rain_switch"
-                        )
+                        val analysisRows = listOf("LIVE_TRAFFIC", "RAIN_RADAR", "RELIABILITY", "PEAK_HOURS", "COVERAGE_GAPS", "ROAD_HAZARDS")
+                            .filter { isVisible(it) }
+                            .sortedBy { orderOf(it, 99) }
 
-                        LayerRow(
-                            title = "مناطق توفر وموثوقية الخدمات",
-                            subtitle = "توزيع الفنيين والمتاجر المتاحين حولك",
-                            checked = reliabilityEnabled,
-                            onChange = { onToggleReliability(it); onDismiss() },
-                            testTag = "unified_reliability_switch"
-                        )
-
-                        LayerRow(
-                            title = "التنبؤ بساعات الذروة والطلب",
-                            subtitle = "تحليل محلي لسجل الحجوزات حسب الوقت",
-                            checked = peakEnabled,
-                            onChange = { onTogglePeak(it); onDismiss() },
-                            testTag = "unified_peak_switch"
-                        )
-
-                        LayerRow(
-                            title = "مناطق ضعف الشبكة المتعلمة محلياً",
-                            subtitle = "نقاط الانقطاع المرصودة على جهازك ($cellCount خلية)",
-                            checked = coverageEnabled,
-                            onChange = { onToggleCoverage(it); onDismiss() },
-                            testTag = "unified_coverage_switch"
-                        )
-
-                        LayerRow(
-                            title = "مناطق وعورة الطريق والمنحدرات",
-                            subtitle = "إبراز العقبات والنقائل الصعبة مع تنبيه مسبق",
-                            checked = hazardEnabled,
-                            onChange = { onToggleHazard(it); onDismiss() },
-                            testTag = "unified_hazard_switch"
-                        )
+                        analysisRows.forEach { layerId ->
+                            when (layerId) {
+                                "LIVE_TRAFFIC" -> if (enableLiveTrafficByAdmin) {
+                                    LayerRow(
+                                        title = labelOf("LIVE_TRAFFIC", "🚦 بلاغات الطرق والازدحام والوقود الحية"),
+                                        subtitle = "تنبيهات مجتمعية فورية للسيول والازدحام ومحطات الوقود",
+                                        checked = liveTrafficEnabled,
+                                        onChange = { onToggleLiveTraffic(it); onDismiss() },
+                                        testTag = "unified_live_traffic_switch"
+                                    )
+                                }
+                                "RAIN_RADAR" -> {
+                                    LayerRow(
+                                        title = labelOf("RAIN_RADAR", "رادار الأمطار (RainViewer)"),
+                                        subtitle = if (NavConfig.ENABLE_RAINVIEWER) "تغطية السحب والأمطار الأخيرة" else "معطّلة افتراضياً",
+                                        checked = rainEnabled,
+                                        enabled = NavConfig.ENABLE_RAINVIEWER,
+                                        onChange = { onToggleRain(it); onDismiss() },
+                                        testTag = "unified_rain_switch"
+                                    )
+                                }
+                                "RELIABILITY" -> {
+                                    LayerRow(
+                                        title = labelOf("RELIABILITY", "مناطق توفر وموثوقية الخدمات"),
+                                        subtitle = "توزيع الفنيين والمتاجر المتاحين حولك",
+                                        checked = reliabilityEnabled,
+                                        onChange = { onToggleReliability(it); onDismiss() },
+                                        testTag = "unified_reliability_switch"
+                                    )
+                                }
+                                "PEAK_HOURS" -> {
+                                    LayerRow(
+                                        title = labelOf("PEAK_HOURS", "التنبؤ بساعات الذروة والطلب"),
+                                        subtitle = "تحليل محلي لسجل الحجوزات حسب الوقت",
+                                        checked = peakEnabled,
+                                        onChange = { onTogglePeak(it); onDismiss() },
+                                        testTag = "unified_peak_switch"
+                                    )
+                                }
+                                "COVERAGE_GAPS" -> {
+                                    LayerRow(
+                                        title = labelOf("COVERAGE_GAPS", "مناطق ضعف الشبكة المتعلمة محلياً"),
+                                        subtitle = "نقاط الانقطاع المرصودة على جهازك ($cellCount خلية)",
+                                        checked = coverageEnabled,
+                                        onChange = { onToggleCoverage(it); onDismiss() },
+                                        testTag = "unified_coverage_switch"
+                                    )
+                                }
+                                "ROAD_HAZARDS" -> {
+                                    LayerRow(
+                                        title = labelOf("ROAD_HAZARDS", "مناطق وعورة الطريق والمنحدرات"),
+                                        subtitle = "إبراز العقبات والنقائل الصعبة مع تنبيه مسبق",
+                                        checked = hazardEnabled,
+                                        onChange = { onToggleHazard(it); onDismiss() },
+                                        testTag = "unified_hazard_switch"
+                                    )
+                                }
+                            }
+                        }
 
                         Spacer(Modifier.height(6.dp))
                         OutlinedButton(

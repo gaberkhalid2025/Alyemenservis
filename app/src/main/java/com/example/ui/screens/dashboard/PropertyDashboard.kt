@@ -268,6 +268,8 @@ fun PropertyDashboard(
                             isAvailable = liveAccount.rawProperty?.isActive ?: liveAccount.isActive,
                             rating = liveAccount.rating.toDouble(),
                             reviewCount = liveAccount.numReviews,
+                            latitude = liveAccount.latitude,
+                            longitude = liveAccount.longitude,
                             themeColors = themeColors,
                             onChangePhoto = { url ->
                                 propertyViewModel.updateProfile(
@@ -289,8 +291,19 @@ fun PropertyDashboard(
                                     coverUrl = url
                                 )
                             },
-                            onSaveProfile = { name, _, city, desc, hours, available ->
-                                propertyViewModel.updateProfile(name, city, desc, hours, available)
+                            onSaveLocation = { lat, lng ->
+                                propertyViewModel.updateProfile(
+                                    name = liveAccount.name,
+                                    cityArea = liveAccount.neighborhood.ifBlank { liveAccount.cityId },
+                                    description = liveAccount.description,
+                                    workingHours = liveAccount.workingHours,
+                                    isAvailable = liveAccount.rawProperty?.isActive ?: liveAccount.isActive,
+                                    latitude = lat,
+                                    longitude = lng
+                                )
+                            },
+                            onSaveProfile = { name, editedPhone, city, desc, hours, available ->
+                                propertyViewModel.updateProfile(name, city, desc, hours, available, phone = editedPhone)
                             },
                             onChangePassword = { oldP, newP ->
                                 propertyViewModel.changePassword(oldP, newP)

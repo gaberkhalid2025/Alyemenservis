@@ -70,6 +70,7 @@ fun ChatBubbleItem(
     onLongClick: () -> Unit,
     onReactionClick: ((emoji: String) -> Unit)? = null,
     onRetryClick: ((String) -> Unit)? = null,
+    onQuoteClick: ((replyToId: String?, replyToText: String) -> Unit)? = null,
     onOpenLocationInApp: ((lat: Double, lng: Double, label: String, startNavigation: Boolean) -> Unit)? = null,
     themeColors: VisualThemePalette? = null
 ) {
@@ -302,7 +303,13 @@ fun ChatBubbleItem(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(bottom = 6.dp)
-                            .clickable { onReplyClick() }
+                            .clickable {
+                                if (onQuoteClick != null) {
+                                    onQuoteClick(message.replyToId, message.replyToText)
+                                } else {
+                                    onReplyClick()
+                                }
+                            }
                     ) {
                         Row(
                             modifier = Modifier.padding(6.dp),
@@ -352,6 +359,7 @@ fun ChatBubbleItem(
                         val currentPlayingId by AudioPlayerManager.currentPlayingId.collectAsState()
                         val isAudioPlaying by AudioPlayerManager.isPlaying.collectAsState()
                         val liveProgress by AudioPlayerManager.playbackProgress.collectAsState()
+                        val playbackSpeed by AudioPlayerManager.playbackSpeed.collectAsState()
                         val isThisAudioActive = currentPlayingId == message.id && isAudioPlaying
 
                         // Amplitudes for waveform visualization
@@ -439,12 +447,31 @@ fun ChatBubbleItem(
 
                                 Spacer(modifier = Modifier.height(2.dp))
 
-                                Text(
-                                    text = message.message.ifBlank { "تسجيل صوتي 🎤" },
-                                    color = Color.White.copy(alpha = 0.85f),
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Normal
-                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = message.message.ifBlank { "تسجيل صوتي 🎤" },
+                                        color = Color.White.copy(alpha = 0.85f),
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Normal
+                                    )
+                                    Surface(
+                                        onClick = { AudioPlayerManager.cyclePlaybackSpeed() },
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = Color.White.copy(alpha = 0.16f)
+                                    ) {
+                                        Text(
+                                            text = if (playbackSpeed == 1.0f) "1x" else "${playbackSpeed}x",
+                                            color = Color(0xFF38BDF8),
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                }
                             }
                         }
                         Spacer(modifier = Modifier.height(6.dp))
@@ -459,10 +486,14 @@ fun ChatBubbleItem(
                             OfflineYemenGazetteer.extractLocationLabel(message.mediaUrl)
                                 ?: message.message.removePrefix("📍").trim().ifBlank { "موقع جغرافي مباشر" }
                         }
+                        val isLiveLocation = message.message.contains("مباشر") || message.mediaUrl.contains("live=1")
                         Surface(
                             color = Color.Black.copy(alpha = 0.35f),
                             shape = RoundedCornerShape(12.dp),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.4f)),
+                            border = androidx.compose.foundation.BorderStroke(
+                                1.dp,
+                                if (isLiveLocation) Color(0xFF34D399).copy(alpha = 0.7f) else Color(0xFF10B981).copy(alpha = 0.4f)
+                            ),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(bottom = 6.dp)
@@ -487,6 +518,21 @@ fun ChatBubbleItem(
                                         ),
                                     contentAlignment = Alignment.Center
                                 ) {
+                                    if (isLiveLocation) {
+                                        Surface(
+                                            color = Color(0xFF10B981).copy(alpha = 0.25f),
+                                            shape = RoundedCornerShape(8.dp),
+                                            modifier = Modifier.align(Alignment.TopStart).padding(6.dp)
+                                        ) {
+                                            Text(
+                                                "🟢 موقع حي مباشر",
+                                                fontSize = 9.5.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFF6EE7B7),
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                            )
+                                        }
+                                    }
                                     Column(
                                         horizontalAlignment = Alignment.CenterHorizontally,
                                         verticalArrangement = Arrangement.Center,
@@ -575,11 +621,13 @@ fun ChatBubbleItem(
                                         try {
                                             val intent = Intent(Intent.ACTION_VIEW).apply {
                                                 setDataAndType(Uri.parse(message.mediaUrl), "video/*")
-                                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                             }
-                                            context.startActivity(intent)
+                                            context.startActivity(Intent.createChooser(intent, "تشغيل الفيديو عبر").apply {
+                                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                            })
                                         } catch (e: Exception) {
-                                            Toast.makeText(context, "تعذر تشغيل الفيديو: ${e.message}", Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(context, "تعذر تشغيل الفيديو: لا يوجد مشغل مناسب", Toast.LENGTH_SHORT).show()
                                         }
                                     },
                                 contentAlignment = Alignment.Center
@@ -610,8 +658,62 @@ fun ChatBubbleItem(
                         }
                     }
                     MediaType.FILE -> {
-                        Text("📎 ${message.message.ifBlank { "ملف مرفق" }}", color = Color(0xFF90CAF9), fontSize = 12.sp)
-                        Spacer(modifier = Modifier.height(4.dp))
+                        val context = LocalContext.current
+                        val fileUrl = message.mediaUrl.ifBlank { message.attachment?.url.orEmpty() }
+                        val fileName = message.message.ifBlank { message.attachment?.fileName?.ifBlank { "ملف مرفق" } ?: "ملف مرفق" }
+                        Surface(
+                            color = Color.Black.copy(alpha = 0.28f),
+                            shape = RoundedCornerShape(10.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF60A5FA).copy(alpha = 0.4f)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 4.dp)
+                                .clickable {
+                                    if (fileUrl.isBlank()) {
+                                        Toast.makeText(context, "رابط الملف غير متاح حالياً", Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        try {
+                                            val mime = when {
+                                                fileName.endsWith(".pdf", true) -> "application/pdf"
+                                                fileName.endsWith(".doc", true) || fileName.endsWith(".docx", true) -> "application/msword"
+                                                else -> "*/*"
+                                            }
+                                            val viewIntent = Intent(Intent.ACTION_VIEW).apply {
+                                                setDataAndType(Uri.parse(fileUrl), mime)
+                                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                            }
+                                            context.startActivity(Intent.createChooser(viewIntent, "فتح الملف باستخدام").apply {
+                                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                            })
+                                        } catch (e: Exception) {
+                                            Toast.makeText(context, "تعذر فتح الملف على هذا الجهاز", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text("📎", fontSize = 18.sp)
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = fileName,
+                                        color = Color(0xFF93C5FD),
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = if (fileUrl.isNotBlank()) "اضغط للفتح أو التحميل 📥" else "جاري التحضير...",
+                                        color = Color.LightGray,
+                                        fontSize = 10.sp
+                                    )
+                                }
+                            }
+                        }
                     }
                     else -> {}
                 }

@@ -396,30 +396,43 @@ service cloud.firestore {
     }
 
     // 8. المحادثات والرسائل والتواجد والإشعارات
+    function isChannelParticipant(chData) {
+      return isSignedIn() && (
+        isStaff() ||
+        (('participants' in chData) && request.auth.uid in chData.participants) ||
+        (('participantUids' in chData) && request.auth.uid in chData.participantUids) ||
+        (('email' in request.auth.token) && request.auth.token.email is string && ('participants' in chData) && (
+          (request.auth.token.email.split('@')[0] in chData.participants) ||
+          (('prov_' + request.auth.token.email.split('@')[0]) in chData.participants) ||
+          (('store_' + request.auth.token.email.split('@')[0]) in chData.participants) ||
+          (('prop_' + request.auth.token.email.split('@')[0]) in chData.participants)
+        ))
+      );
+    }
+
     match /chat_channels/{channelId} {
       allow read: if isSignedIn() && (
-        isStaff() || request.auth.uid in resource.data.participants
+        isStaff() ||
+        request.auth.uid in resource.data.participants ||
+        (('participantUids' in resource.data) && request.auth.uid in resource.data.participantUids) ||
+        isChannelParticipant(resource.data)
       );
-      allow create: if isSignedIn();
-      allow update, delete: if isSignedIn() && (
-        isStaff() || request.auth.uid in resource.data.participants
+      allow create: if isSignedIn() && (
+        isStaff() ||
+        request.auth.uid in request.resource.data.participants ||
+        (('participantUids' in request.resource.data) && request.auth.uid in request.resource.data.participantUids)
       );
+      allow update, delete: if isChannelParticipant(resource.data);
 
       match /messages/{msgId} {
-        allow read: if isSignedIn() && (
-          isStaff() ||
-          request.auth.uid in get(/databases/$(db)/documents/chat_channels/$(channelId)).data.participants
-        );
-        allow create: if isSignedIn() && (
-          isStaff() ||
-          request.auth.uid in get(/databases/$(db)/documents/chat_channels/$(channelId)).data.participants
-        );
-        allow update: if isSignedIn() && (
-          isStaff() ||
-          request.auth.uid in get(/databases/$(db)/documents/chat_channels/$(channelId)).data.participants
+        allow read, create, update: if isChannelParticipant(
+          get(/databases/$(db)/documents/chat_channels/$(channelId)).data
         );
         allow delete: if isStaff() || (
-          isSignedIn() && resource.data.senderId == request.auth.uid
+          isSignedIn() && (
+            resource.data.senderId == request.auth.uid ||
+            isChannelParticipant(get(/databases/$(db)/documents/chat_channels/$(channelId)).data)
+          )
         );
       }
     }

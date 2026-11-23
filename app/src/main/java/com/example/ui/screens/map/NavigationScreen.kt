@@ -31,6 +31,23 @@ import kotlin.math.max
 
 private const val NAV_TAG = "NavigationScreen"
 
+enum class NavVehicleProfile(
+    val labelAr: String,
+    val emoji: String,
+    val hazardThresholdM: Double,
+    val speedFactor: Double
+) {
+    SEDAN("صالون", "🚗", 350.0, 1.0),
+    FOUR_BY_FOUR("دفع رباعي", "🚙", 220.0, 1.08),
+    MOTORCYCLE("دراجة", "🏍️", 300.0, 1.15);
+
+    fun next(): NavVehicleProfile = when (this) {
+        SEDAN -> FOUR_BY_FOUR
+        FOUR_BY_FOUR -> MOTORCYCLE
+        MOTORCYCLE -> SEDAN
+    }
+}
+
 /**
  * 🧭 NavigationScreen
  * المنسّق الرئيسي للملاحة خطوة بخطوة:
@@ -161,6 +178,7 @@ fun NavigationScreen(
     var isBottomCardCollapsed by remember { mutableStateOf(false) }
     var showHud by remember { mutableStateOf(false) }
     var isHudMirrored by remember { mutableStateOf(true) }
+    var vehicleProfile by remember { mutableStateOf(NavVehicleProfile.SEDAN) }
 
     val tripRecorder = remember { TripRecorder() }
     var isRecordingTrip by remember { mutableStateOf(false) }
@@ -172,13 +190,13 @@ fun NavigationScreen(
     var lastAlong by remember { mutableDoubleStateOf(0.0) }
     var lastSpeedMps by remember { mutableDoubleStateOf(0.0) }
 
-    // تنبيه صوتي ومرئي مسبق قبل الدخول لمناطق وعورة الطريق
-    LaunchedEffect(userLat, userLng, hazardZones, hasRealLocation) {
+    // تنبيه صوتي ومرئي مسبق قبل الدخول لمناطق وعورة الطريق وفق نوع المركبة
+    LaunchedEffect(userLat, userLng, hazardZones, hasRealLocation, vehicleProfile) {
         if (!hasRealLocation || hazardZones.isEmpty()) {
             activeHazardBanner = null
             return@LaunchedEffect
         }
-        val z = HazardAlerts.nearest(userLat, userLng, hazardZones, thresholdMeters = 300.0)
+        val z = HazardAlerts.nearest(userLat, userLng, hazardZones, thresholdMeters = vehicleProfile.hazardThresholdM)
         if (z != null) {
             val msg = HazardAlerts.describeZone(z)
             activeHazardBanner = msg
@@ -365,7 +383,7 @@ fun NavigationScreen(
     val baseSeconds = if (totalMeters > 1.0) (result?.totalDurationSeconds ?: 0.0) * (remainingMeters / totalMeters) else 0.0
     val expectedKmh = if ((result?.totalDurationSeconds ?: 0.0) > 0) totalMeters / result!!.totalDurationSeconds * 3.6 else 0.0
     val speedFactor = if (!isApproximate && currentSpeedKmh >= 15 && expectedKmh > 0) (expectedKmh / currentSpeedKmh).coerceIn(0.7, 1.5) else 1.0
-    val remainingSeconds = baseSeconds * speedFactor
+    val remainingSeconds = (baseSeconds * speedFactor) / vehicleProfile.speedFactor
     val currentStepIndex = run {
         var idx = 0
         for (i in steps.indices) {
@@ -488,6 +506,14 @@ fun NavigationScreen(
                 if (currentWaypointIndex >= waypoints.size) navigationFinished = true else routeVersion += 1
             },
             onOpenVoiceSetup = { showVoiceSetupDialog = true },
+            vehicleProfile = vehicleProfile,
+            onCycleVehicleProfile = {
+                val next = vehicleProfile.next()
+                vehicleProfile = next
+                scope.launch {
+                    snackbarHostState.showSnackbar("${next.emoji} وضع المركبة: ${next.labelAr}")
+                }
+            },
             modifier = Modifier.align(Alignment.TopCenter)
         )
 

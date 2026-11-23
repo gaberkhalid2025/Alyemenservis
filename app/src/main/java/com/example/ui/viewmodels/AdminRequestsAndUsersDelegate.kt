@@ -13,6 +13,7 @@ import com.example.domain.usecases.ValidatePhoneUseCase
 import com.example.utils.FirebaseStorageUploader
 import com.example.utils.PasswordHasher
 import com.example.utils.SecureHasher
+import com.example.utils.SecurityCryptoUtils
 import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.launch
 import java.util.UUID
@@ -25,14 +26,50 @@ import java.util.UUID
 internal class AdminRequestsAndUsersDelegate(
     private val vm: AdminViewModel
 ) {
-    fun approveRequest(request: PendingProviderEntity) {
-        val lowerArea = request.area.lowercase()
-        val finalCityId = when {
-            lowerArea.contains("عدن") || lowerArea.contains("aden") -> "ye_ade"
-            lowerArea.contains("تعز") || lowerArea.contains("taiz") -> "ye_tai"
-            lowerArea.contains("الحديدة") || lowerArea.contains("hodeidah") -> "ye_hod"
-            else -> "ye_san"
+    private fun decryptAttachmentSafe(raw: String): String {
+        val trimmed = raw.trim()
+        if (trimmed.isBlank()) return ""
+        if (trimmed.startsWith("http://") ||
+            trimmed.startsWith("https://") ||
+            trimmed.startsWith("data:image") ||
+            trimmed.startsWith("content://") ||
+            trimmed.startsWith("file://")
+        ) {
+            return trimmed
         }
+        return if (trimmed.startsWith("gcm:") || trimmed.startsWith("gcmx:") || trimmed.startsWith("enc::")) {
+            SecurityCryptoUtils.decryptCrossDevice(trimmed).ifBlank {
+                SecurityCryptoUtils.decrypt(trimmed)
+            }
+        } else {
+            trimmed
+        }
+    }
+
+    private fun parseCoordinates(request: PendingProviderEntity): Pair<Double, Double> {
+        val parts = request.gpsCoords.split(",")
+        val cityFallback = com.example.ui.screens.map.utils.OfflineMapManager.getCityCoordinates(request.area)
+        val parsedLat = request.latitude.takeIf { it != 0.0 } ?: parts.getOrNull(0)?.trim()?.toDoubleOrNull()
+        val parsedLng = request.longitude.takeIf { it != 0.0 } ?: parts.getOrNull(1)?.trim()?.toDoubleOrNull()
+        val lat = parsedLat?.takeIf { it != 0.0 && !it.isNaN() } ?: cityFallback.latitude
+        val lng = parsedLng?.takeIf { it != 0.0 && !it.isNaN() } ?: cityFallback.longitude
+        return lat to lng
+    }
+
+    private fun parseWorkingHours(json: String): String {
+        if (json.isBlank() || !json.contains("\"workingHours\"")) return "9:00 AM - 10:00 PM"
+        return runCatching {
+            Regex("\"workingHours\":\"(.*?)\"").find(json)?.groupValues?.getOrNull(1).orEmpty()
+        }.getOrDefault("").ifBlank { "9:00 AM - 10:00 PM" }
+    }
+
+    fun approveRequest(request: PendingProviderEntity) {
+        val finalCityId = com.example.domain.YemenCities.resolveCityId(request.area)
+        val (resolvedLat, resolvedLng) = parseCoordinates(request)
+        val resolvedWorkingHours = parseWorkingHours(request.productAttachmentsJson)
+        val decryptedSelfie = decryptAttachmentSafe(request.selfiePhotoBase64)
+        val decryptedIdCard = decryptAttachmentSafe(request.idPhotoBase64)
+        val decryptedWorkPhotos = request.workPhotosBase64.map { decryptAttachmentSafe(it) }.filter { it.isNotBlank() }
 
         val cleanPhone = ValidatePhoneUseCase.normalizePhone(request.phone)
             .ifBlank { request.phone.trim().replace(" ", "").replace("+", "") }
@@ -47,20 +84,11 @@ internal class AdminRequestsAndUsersDelegate(
 
         val clearPendingFromDbAndState = {
             vm.db.collection("pending_providers").document(request.id).delete()
-            if (cleanPhone.isNotEmpty()) {
+            if (cleanPhone.isNotEmpty() && cleanPhone != request.id) {
                 vm.db.collection("pending_providers").document(cleanPhone).delete()
-                vm.db.collection("pending_providers").whereEqualTo("phone", request.phone).get()
-                    .addOnSuccessListener { qs ->
-                        qs?.documents?.forEach { doc ->
-                            vm.db.collection("pending_providers").document(doc.id).delete()
-                        }
-                    }
             }
             vm._pendingProviders.value = vm._pendingProviders.value.filter {
-                it.id != request.id && it.id != cleanPhone && (
-                    cleanPhone.isEmpty() || ValidatePhoneUseCase.normalizePhone(it.phone)
-                        .ifBlank { it.phone.trim().replace(" ", "").replace("+", "") } != cleanPhone
-                    )
+                it.id != request.id
             }
         }
 
@@ -96,16 +124,29 @@ internal class AdminRequestsAndUsersDelegate(
                 else -> "stores"
             }
             vm.viewModelScope.launch {
-                val resolvedStoreDocUrl = if (request.idPhotoBase64.isNotBlank()) {
+                val resolvedStoreDocUrl = if (decryptedIdCard.isNotBlank()) {
                     FirebaseStorageUploader.resolveBase64ToStorageUrl(
-                        request.idPhotoBase64,
+                        decryptedIdCard,
                         "stores/$storeId/verification_doc.pdf"
                     )
                 } else ""
+                val resolvedLogoUrl = if (decryptedSelfie.isNotBlank()) {
+                    FirebaseStorageUploader.resolveBase64ToStorageUrl(
+                        decryptedSelfie,
+                        FirebaseStorageUploader.getStoreLogoPath(storeId)
+                    )
+                } else ""
+                val resolvedGallery = decryptedWorkPhotos.mapIndexed { idx, img ->
+                    FirebaseStorageUploader.resolveBase64ToStorageUrl(
+                        img,
+                        FirebaseStorageUploader.getStorePhotoPath(storeId, idx)
+                    )
+                }.filter { it.isNotBlank() }
+
                 val newStore = StoreEntity(
                     id = storeId,
                     name = request.name,
-                    description = request.specialization.ifBlank { "محل تجاري معتمد وموثق" },
+                    description = request.description.ifBlank { request.specialization.ifBlank { "محل تجاري معتمد وموثق" } },
                     ownerId = cleanPhone.ifBlank { request.phone },
                     ownerName = request.name,
                     phone = cleanPhone.ifBlank { request.phone },
@@ -113,12 +154,20 @@ internal class AdminRequestsAndUsersDelegate(
                     cityId = finalCityId,
                     sectionId = resolvedSectionId,
                     categoryId = resolvedCategory,
+                    coverImage = resolvedGallery.firstOrNull() ?: resolvedLogoUrl,
+                    logoImage = resolvedLogoUrl,
+                    workingHours = resolvedWorkingHours,
+                    latitude = resolvedLat,
+                    longitude = resolvedLng,
+                    images = resolvedGallery,
                     isActive = true,
                     isApproved = true,
+                    isVerified = true,
                     isPinned = false,
                     isDeleted = false,
                     passwordHash = resolvedPasswordHash,
-                    pdfFileBase64 = resolvedStoreDocUrl
+                    pdfFileBase64 = resolvedStoreDocUrl,
+                    productAttachmentsJson = request.productAttachmentsJson
                 )
                 if (request.id != storeId) {
                     vm.db.collection("stores").document(request.id).delete()
@@ -166,27 +215,46 @@ internal class AdminRequestsAndUsersDelegate(
                 0.0
             }
             vm.viewModelScope.launch {
-                val resolvedPropDocUrl = if (request.idPhotoBase64.isNotBlank()) {
+                val resolvedPropDocUrl = if (decryptedIdCard.isNotBlank()) {
                     FirebaseStorageUploader.resolveBase64ToStorageUrl(
-                        request.idPhotoBase64,
+                        decryptedIdCard,
                         "properties/$propId/verification_doc.pdf"
                     )
                 } else ""
+                val resolvedMainPhoto = if (decryptedSelfie.isNotBlank()) {
+                    FirebaseStorageUploader.resolveBase64ToStorageUrl(
+                        decryptedSelfie,
+                        FirebaseStorageUploader.getPropertyPhotoPath(propId, 0)
+                    )
+                } else ""
+                val resolvedPropGallery = (listOf(resolvedMainPhoto) + decryptedWorkPhotos.mapIndexed { idx, img ->
+                    FirebaseStorageUploader.resolveBase64ToStorageUrl(
+                        img,
+                        FirebaseStorageUploader.getPropertyPhotoPath(propId, idx + 1)
+                    )
+                }).filter { it.isNotBlank() }.distinct()
+
                 val newProp = PropertyEntity(
                     id = propId,
                     title = request.name,
-                    description = request.specialization.ifBlank { "عقار معلن وموثق" },
+                    description = request.description.ifBlank { request.specialization.ifBlank { "عقار معلن وموثق" } },
                     phone = cleanPhone.ifBlank { request.phone },
                     ownerId = cleanPhone.ifBlank { request.phone },
+                    ownerName = request.name,
                     localNeighborhood = request.localNeighborhood,
                     cityId = finalCityId,
+                    latitude = resolvedLat,
+                    longitude = resolvedLng,
+                    images = resolvedPropGallery,
                     isActive = true,
                     isApproved = true,
+                    isVerified = true,
                     isPinned = false,
                     isDeleted = false,
                     passwordHash = resolvedPasswordHash,
                     price = propPrice,
-                    pdfFileBase64 = resolvedPropDocUrl
+                    pdfFileBase64 = resolvedPropDocUrl,
+                    productAttachmentsJson = request.productAttachmentsJson
                 )
                 if (request.id != propId) {
                     vm.db.collection("properties").document(request.id).delete()
@@ -217,7 +285,8 @@ internal class AdminRequestsAndUsersDelegate(
                 phone = cleanPhone.ifBlank { request.phone },
                 cityId = finalCityId,
                 address = request.localNeighborhood,
-                description = request.specialization.ifBlank { "إعلان وظيفة معتمد وموثق" },
+                description = request.description.ifBlank { request.specialization.ifBlank { "إعلان وظيفة معتمد وموثق" } },
+                requirements = request.qualification,
                 isActive = true,
                 isApproved = true
             )
@@ -288,32 +357,54 @@ internal class AdminRequestsAndUsersDelegate(
             vm.mainViewModel.triggerNotification("✅ تم تفعيل حساب المستخدم ${request.name}")
         } else {
             val providerId = "prov_" + cleanPhone
-            val approvedProvider = ProviderEntity(
-                id = providerId,
-                name = request.name,
-                phone = cleanPhone.ifBlank { request.phone },
-                categoryId = request.categoryId,
-                area = request.area,
-                isVip = false,
-                subscriptionStatus = "APPROVED",
-                isAvailable = true,
-                cityId = finalCityId,
-                localNeighborhood = request.localNeighborhood,
-                rating = 5.0f,
-                isBlocked = false,
-                customCategoryName = request.customCategoryName,
-                passwordHash = resolvedPasswordHash,
-                isDeleted = false,
-                deletedAt = null
-            )
-            vm.db.collection("providers").document(approvedProvider.id).set(approvedProvider)
+            vm.viewModelScope.launch {
+                val resolvedProfileUrl = if (decryptedSelfie.isNotBlank()) {
+                    FirebaseStorageUploader.resolveBase64ToStorageUrl(
+                        decryptedSelfie,
+                        FirebaseStorageUploader.getProviderProfilePath(providerId)
+                    )
+                } else ""
+                val resolvedWorkGallery = decryptedWorkPhotos.mapIndexed { idx, img ->
+                    FirebaseStorageUploader.resolveBase64ToStorageUrl(
+                        img,
+                        FirebaseStorageUploader.getProviderWorkPhotoPath(providerId, idx)
+                    )
+                }.filter { it.isNotBlank() }
 
-            val currentProviders = vm.mainViewModel.homeViewModel._providers.value.filter {
-                it.id != approvedProvider.id && it.phone.trim().replace(" ", "").replace("+", "") != cleanPhone
-            }.toMutableList()
-            currentProviders.add(approvedProvider)
-            vm.mainViewModel.homeViewModel._providers.value = currentProviders
-            vm.mainViewModel.applyFilters()
+                val approvedProvider = ProviderEntity(
+                    id = providerId,
+                    name = request.name,
+                    phone = cleanPhone.ifBlank { request.phone },
+                    categoryId = request.categoryId,
+                    area = request.area,
+                    isVip = false,
+                    subscriptionStatus = "APPROVED",
+                    isAvailable = true,
+                    cityId = finalCityId,
+                    localNeighborhood = request.localNeighborhood,
+                    rating = 5.0f,
+                    coverImage = resolvedWorkGallery.firstOrNull() ?: resolvedProfileUrl,
+                    profileImage = resolvedProfileUrl,
+                    latitude = resolvedLat,
+                    longitude = resolvedLng,
+                    workPhotosBase64 = resolvedWorkGallery,
+                    productAttachmentsJson = request.productAttachmentsJson,
+                    specialization = request.specialization.ifBlank { request.description },
+                    isBlocked = false,
+                    customCategoryName = request.customCategoryName,
+                    passwordHash = resolvedPasswordHash,
+                    isDeleted = false,
+                    deletedAt = null
+                )
+                vm.db.collection("providers").document(approvedProvider.id).set(approvedProvider)
+
+                val currentProviders = vm.mainViewModel.homeViewModel._providers.value.filter {
+                    it.id != approvedProvider.id && it.phone.trim().replace(" ", "").replace("+", "") != cleanPhone
+                }.toMutableList()
+                currentProviders.add(approvedProvider)
+                vm.mainViewModel.homeViewModel._providers.value = currentProviders
+                vm.mainViewModel.applyFilters()
+            }
 
             vm.mainViewModel.addNotification(
                 title = "🎉 تهانينا! تم قبول انضمامك كفني معتمد",
@@ -341,16 +432,16 @@ internal class AdminRequestsAndUsersDelegate(
             "updatedAt" to now
         )
         vm.db.collection("join_requests").document(request.id).update(rejectUpdates)
-        if (cleanPhone.isNotEmpty() && cleanPhone != request.id) {
+        if (cleanPhone.isNotEmpty() && cleanPhone != request.id && !request.id.contains("_")) {
             vm.db.collection("join_requests").document(cleanPhone).update(rejectUpdates)
         }
 
         vm.db.collection("pending_providers").document(request.id).delete()
-        if (cleanPhone.isNotEmpty()) {
+        if (cleanPhone.isNotEmpty() && cleanPhone != request.id && !request.id.contains("_")) {
             vm.db.collection("pending_providers").document(cleanPhone).delete()
         }
         vm._pendingProviders.value = vm._pendingProviders.value.filter {
-            it.id != request.id && it.id != cleanPhone && (cleanPhone.isEmpty() || it.phone.trim().replace(" ", "").replace("+", "") != cleanPhone)
+            it.id != request.id
         }
 
         vm.mainViewModel.addNotification(
@@ -367,13 +458,10 @@ internal class AdminRequestsAndUsersDelegate(
         val technician = vm._pendingProviders.value.find { it.id == providerId }
         technician?.let {
             vm._pendingProviders.value = vm._pendingProviders.value.filter { item -> item.id != providerId }
-            val lowerArea = it.area.lowercase()
-            val finalCityId = when {
-                lowerArea.contains("عدن") || lowerArea.contains("aden") -> "ye_ade"
-                lowerArea.contains("تعز") || lowerArea.contains("taiz") -> "ye_tai"
-                lowerArea.contains("الحديدة") || lowerArea.contains("hodeidah") -> "ye_hod"
-                else -> "ye_san"
-            }
+            val finalCityId = com.example.domain.YemenCities.resolveCityId(it.area)
+            val (resolvedLat, resolvedLng) = parseCoordinates(it)
+            val decryptedSelfie = decryptAttachmentSafe(it.selfiePhotoBase64)
+            val decryptedWorkPhotos = it.workPhotosBase64.map { w -> decryptAttachmentSafe(w) }.filter { w -> w.isNotBlank() }
             val cleanTechPhone = ValidatePhoneUseCase.normalizePhone(it.phone)
                 .ifBlank { it.phone.trim().replace(" ", "").replace("+", "") }
             val finalId = "prov_" + cleanTechPhone
@@ -393,6 +481,10 @@ internal class AdminRequestsAndUsersDelegate(
                 area = it.area,
                 localNeighborhood = it.localNeighborhood,
                 cityId = finalCityId,
+                profileImage = decryptedSelfie,
+                coverImage = decryptedWorkPhotos.firstOrNull() ?: decryptedSelfie,
+                latitude = resolvedLat,
+                longitude = resolvedLng,
                 isVerified = true,
                 isRecommended = false,
                 subscriptionStatus = "APPROVED",
@@ -401,7 +493,9 @@ internal class AdminRequestsAndUsersDelegate(
                 isBlocked = false,
                 rating = 5.0f,
                 subscriptionExpiry = System.currentTimeMillis() + (30L * 24 * 60 * 60 * 1000),
-                workPhotosBase64 = it.workPhotosBase64,
+                workPhotosBase64 = decryptedWorkPhotos,
+                productAttachmentsJson = it.productAttachmentsJson,
+                specialization = it.specialization.ifBlank { it.description },
                 passwordHash = resolvedTechHash,
                 isDeleted = false,
                 deletedAt = null
@@ -455,9 +549,16 @@ internal class AdminRequestsAndUsersDelegate(
         }
     }
 
+    private var pendingTechListener: com.google.firebase.firestore.ListenerRegistration? = null
+
     fun loadPendingTechnicians() {
+        val role = vm._adminRole.value.uppercase()
+        val isStaff = role in setOf("OWNER", "ADMIN", "SUPER_ADMIN", "MAIN_ADMIN", "SUPERVISOR", "AUDITOR", "OPERATIONS", "SUPPORT")
+        if (!isStaff) return
         try {
-            vm.db.collection("pending_providers")
+            pendingTechListener?.remove()
+            pendingTechListener = vm.db.collection("pending_providers")
+                .limit(60)
                 .addSnapshotListener { snapshot, error ->
                     if (error != null) return@addSnapshotListener
                     if (snapshot != null) {
@@ -478,7 +579,13 @@ internal class AdminRequestsAndUsersDelegate(
                                         reason = doc.getString("reason") ?: "",
                                         idPhotoBase64 = doc.getString("idPhotoBase64") ?: "",
                                         selfiePhotoBase64 = doc.getString("selfiePhotoBase64") ?: "",
-                                        workPhotosBase64 = (doc.get("workPhotosBase64") as? List<*>)?.mapNotNull { it as? String } ?: emptyList()
+                                        workPhotosBase64 = (doc.get("workPhotosBase64") as? List<*>)?.mapNotNull { it as? String } ?: emptyList(),
+                                        gpsCoords = doc.getString("gpsCoords") ?: "",
+                                        latitude = doc.getDouble("latitude") ?: 0.0,
+                                        longitude = doc.getDouble("longitude") ?: 0.0,
+                                        experienceYears = doc.getString("experienceYears") ?: "",
+                                        qualification = doc.getString("qualification") ?: "",
+                                        description = doc.getString("description") ?: ""
                                     )
                                 } catch (e2: Exception) {
                                     null
@@ -488,7 +595,7 @@ internal class AdminRequestsAndUsersDelegate(
                         vm._pendingTechnicians.value = fetched
                     }
                 }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
         }
     }
 
@@ -651,7 +758,13 @@ internal class AdminRequestsAndUsersDelegate(
                     customCategoryName = req.categoryName,
                     profession = requestProfession,
                     passwordHash = req.passwordHash,
-                    providerType = requestProfession
+                    providerType = requestProfession,
+                    gpsCoords = snapshot.getString("gpsCoords") ?: "",
+                    latitude = snapshot.getDouble("latitude") ?: 0.0,
+                    longitude = snapshot.getDouble("longitude") ?: 0.0,
+                    experienceYears = snapshot.getString("experienceYears") ?: "",
+                    qualification = snapshot.getString("qualification") ?: "",
+                    description = snapshot.getString("description") ?: ""
                 )
                 approveRequest(pendingProvider)
                 loadPendingRequests()

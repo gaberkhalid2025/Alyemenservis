@@ -36,7 +36,7 @@ import kotlinx.coroutines.launch
 fun UrgentOfferSubmissionScreen(
     requestId: String,
     viewModel: MainViewModel,
-    instantViewModel: InstantRequestViewModel = viewModel(),
+    instantViewModel: InstantRequestViewModel = viewModel.instantRequestViewModel,
     onNavigateBack: () -> Unit = {},
     onOfferSubmitted: () -> Unit = {}
 ) {

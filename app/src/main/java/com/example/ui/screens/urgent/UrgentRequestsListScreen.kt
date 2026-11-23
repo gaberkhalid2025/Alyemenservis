@@ -29,7 +29,7 @@ import com.example.ui.viewmodels.InstantRequestViewModel
 @Composable
 fun UrgentRequestsListScreen(
     viewModel: MainViewModel,
-    instantViewModel: InstantRequestViewModel = viewModel(),
+    instantViewModel: InstantRequestViewModel = viewModel.instantRequestViewModel,
     themeColors: VisualThemePalette,
     onNavigateBack: () -> Unit = {},
     onNavigateToDetails: (requestId: String) -> Unit = {},

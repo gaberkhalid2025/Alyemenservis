@@ -143,7 +143,10 @@ class StoreDashboardViewModel(
         workingHours: String,
         isAvailable: Boolean,
         photoUrl: String? = null,
-        coverUrl: String? = null
+        coverUrl: String? = null,
+        phone: String? = null,
+        latitude: Double? = null,
+        longitude: Double? = null
     ) {
         viewModelScope.launch {
             dashboardRepository.updateBusinessProfile(
@@ -155,7 +158,10 @@ class StoreDashboardViewModel(
                 workingHours = workingHours,
                 isAvailable = isAvailable,
                 photoUrl = photoUrl,
-                coverUrl = coverUrl
+                coverUrl = coverUrl,
+                phone = phone,
+                latitude = latitude,
+                longitude = longitude
             ).onSuccess {
                 _eventFlow.emit(DashboardEvent.ShowToast("تم حفظ بيانات المتجر بنجاح ✅"))
             }.onFailure { e ->

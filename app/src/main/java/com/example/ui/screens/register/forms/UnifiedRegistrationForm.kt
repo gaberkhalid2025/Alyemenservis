@@ -62,13 +62,28 @@ fun UnifiedRegistrationForm(
     var locationDetected by remember { mutableStateOf(false) }
     var locationErrorText by remember { mutableStateOf<String?>(null) }
 
+    var showMapPicker by remember { mutableStateOf(false) }
+    var showManualCoords by remember { mutableStateOf(false) }
+
+    fun applyPickedCoordinates(lat: Double, lng: Double, summary: String = "") {
+        latitude = lat
+        longitude = lng
+        gpsCoords = "${String.format(java.util.Locale.US, "%.5f", lat)},${String.format(java.util.Locale.US, "%.5f", lng)}"
+        locationDetected = true
+        locationErrorText = null
+        if (summary.isNotBlank() && address.isBlank()) {
+            address = summary
+        }
+    }
+
+    @android.annotation.SuppressLint("MissingPermission")
     fun fetchDeviceLocation() {
         isLocating = true
         locationErrorText = null
         try {
             val locationManager = context.getSystemService(android.content.Context.LOCATION_SERVICE) as? android.location.LocationManager
             if (locationManager == null) {
-                locationErrorText = "خدمة الموقع غير متاحة في هذا الجهاز"
+                locationErrorText = "خدمة الموقع غير متاحة في هذا الجهاز — حدد موقعك من الخريطة"
                 isLocating = false
                 return
             }
@@ -80,20 +95,42 @@ fun UnifiedRegistrationForm(
                     bestLoc = l
                 }
             }
-            if (bestLoc != null) {
-                latitude = bestLoc.latitude
-                longitude = bestLoc.longitude
-                gpsCoords = "${String.format(java.util.Locale.US, "%.5f", bestLoc.latitude)},${String.format(java.util.Locale.US, "%.5f", bestLoc.longitude)}"
-                locationDetected = true
+            val nowMs = System.currentTimeMillis()
+            if (bestLoc != null && (nowMs - bestLoc.time) <= 10 * 60 * 1000L) {
+                applyPickedCoordinates(bestLoc.latitude, bestLoc.longitude)
+                isLocating = false
+                return
+            }
+            val activeProvider = when {
+                locationManager.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER) ->
+                    android.location.LocationManager.GPS_PROVIDER
+                locationManager.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER) ->
+                    android.location.LocationManager.NETWORK_PROVIDER
+                else -> null
+            }
+            if (activeProvider != null && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                locationManager.getCurrentLocation(
+                    activeProvider,
+                    null,
+                    context.mainExecutor
+                ) { fresh ->
+                    isLocating = false
+                    if (fresh != null) {
+                        applyPickedCoordinates(fresh.latitude, fresh.longitude)
+                    } else if (bestLoc != null) {
+                        applyPickedCoordinates(bestLoc.latitude, bestLoc.longitude)
+                        locationErrorText = "تم استخدام آخر موقع معروف — يمكنك تعديله من الخريطة"
+                    } else {
+                        locationErrorText = "تعذر التقاط إشارة GPS حالياً — يرجى التحديد من الخريطة أو إدخال الإحداثيات"
+                    }
+                }
+            } else if (bestLoc != null) {
+                applyPickedCoordinates(bestLoc.latitude, bestLoc.longitude)
+                locationErrorText = "تم استخدام آخر موقع محفوظ — يُنصح بتأكيده عبر الخريطة"
                 isLocating = false
             } else {
-                // وضع إحداثيات صنعاء كمركز افتراضي مع تمكين الإحداثيات
-                latitude = 15.3694
-                longitude = 44.1910
-                gpsCoords = "15.36940,44.19100"
-                locationDetected = true
                 isLocating = false
-                locationErrorText = "تم تثبيت إحداثيات المدينة، يمكنك الضغط للتحديث عند توفر إشارة GPS"
+                locationErrorText = "لم تتوفر إشارة GPS بعد — استخدم زر الخريطة لتحديد موقعك بدقة"
             }
         } catch (e: Exception) {
             isLocating = false
@@ -548,6 +585,28 @@ fun UnifiedRegistrationForm(
                         }
                     }
 
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = { showMapPicker = true },
+                            shape = RoundedCornerShape(8.dp),
+                            border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.55f)),
+                            modifier = Modifier.weight(1f).height(48.dp)
+                        ) {
+                            Text("🗺️ اختيار من الخريطة", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                        }
+                        OutlinedButton(
+                            onClick = { showManualCoords = true },
+                            shape = RoundedCornerShape(8.dp),
+                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.25f)),
+                            modifier = Modifier.weight(1f).height(48.dp)
+                        ) {
+                            Text("🔢 إحداثيات يدوياً", fontSize = 11.sp, color = Color.White)
+                        }
+                    }
+
                     if (locationDetected && gpsCoords.isNotBlank()) {
                         Row(
                             modifier = Modifier
@@ -600,12 +659,25 @@ fun UnifiedRegistrationForm(
                 }
             }
 
-            // 1️⃣2️⃣ حقول اختيارية للوصف أو السيرة الذاتية أو المؤهل العلمي
-            if (normalizedRole in listOf("JOB_SEEKER", "PROVIDER", "TECHNICIAN", "STORE", "PROPERTY", "JOB", "JOB_POSTER")) {
+            // 1️⃣2️⃣ حقل المؤهل العلمي والسيرة الذاتية للباحث عن عمل + حقل الوصف الإضافي
+            if (normalizedRole == "JOB_SEEKER") {
+                OutlinedTextField(
+                    value = cvUrlOrQualification,
+                    onValueChange = { cvUrlOrQualification = it },
+                    label = { Text("المؤهل العلمي / التخصص الأكاديمي *", fontSize = 12.sp) },
+                    placeholder = { Text("مثال: بكالوريوس هندسة كهربائية أو دبلوم صيانة", fontSize = 11.sp) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            if (normalizedRole in listOf("JOB_SEEKER", "PROVIDER", "TECHNICIAN", "STORE", "RESTAURANT", "MEDICAL", "PROPERTY", "JOB", "JOB_POSTER")) {
                 val notesLabel = when (normalizedRole) {
                     "PROVIDER", "TECHNICIAN" -> "نبذة عن الخدمات (اختياري)"
-                    "JOB_SEEKER" -> "المؤهل ورابط السيرة الذاتية (اختياري)"
+                    "JOB_SEEKER" -> "رابط السيرة الذاتية أو نبذة عن مهاراتك (اختياري)"
                     "STORE" -> "وصف مختصر للمتجر (اختياري)"
+                    "RESTAURANT" -> "وصف مختصر للمطعم (اختياري)"
+                    "MEDICAL" -> "وصف المركز الطبي والتجهيزات (اختياري)"
                     "PROPERTY" -> "نبذة عن المكتب العقاري (اختياري)"
                     "JOB", "JOB_POSTER" -> "نبذة عن الشركة ومزايا العمل (اختياري)"
                     else -> "ملاحظات إضافية (اختياري)"
@@ -615,13 +687,19 @@ fun UnifiedRegistrationForm(
                     onValueChange = { notesOrDescription = it },
                     label = { Text(notesLabel, fontSize = 12.sp) },
                     placeholder = { Text("أدخل تفاصيل إضافية هنا...", fontSize = 11.sp) },
-                    singleLine = true,
+                    singleLine = false,
+                    maxLines = 3,
                     modifier = Modifier.fillMaxWidth()
                 )
             }
 
-            // 1️⃣3️⃣ بطاقة الهوية للفنيين (اختياري)
-            if (normalizedRole in listOf("PROVIDER", "TECHNICIAN")) {
+            // 1️⃣3️⃣ بطاقة الهوية أو السجل التجاري / الترخيص لجميع الفئات التجارية والمهنية
+            if (normalizedRole in listOf("PROVIDER", "TECHNICIAN", "STORE", "RESTAURANT", "MEDICAL", "PROPERTY", "JOB", "JOB_POSTER")) {
+                val docTitle = when (normalizedRole) {
+                    "PROVIDER", "TECHNICIAN" -> "صورة البطاقة الشخصية / رخصة المهنة (اختياري)"
+                    "MEDICAL" -> "ترخيص المزاولة / السجل التجاري (اختياري)"
+                    else -> "السجل التجاري / البطاقة الشخصية للمالك (اختياري)"
+                }
                 Card(
                     shape = RoundedCornerShape(10.dp),
                     colors = CardDefaults.cardColors(containerColor = themeColors.background),
@@ -634,7 +712,7 @@ fun UnifiedRegistrationForm(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("صورة البطاقة الشخصية / رخصة المهنة (اختياري)", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            Text(docTitle, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
                             Text(if (idCardUri.isNotBlank()) "تم إرفاق المستند بنجاح ✅" else "لزيادة موثوقية حسابك وتسريع الاعتماد", fontSize = 10.sp, color = Color.Gray)
                         }
                         Button(
@@ -695,12 +773,24 @@ fun UnifiedRegistrationForm(
                         errorMessage = "يرجى إدخال المهنة أو التخصص المطلوب"
                         return@Button
                     }
+                    if (normalizedRole in listOf("PROVIDER", "TECHNICIAN", "STORE", "RESTAURANT", "MEDICAL", "PROPERTY") && (!locationDetected || gpsCoords.isBlank())) {
+                        errorMessage = "يرجى تحديد الموقع الجغرافي (GPS) أو اختياره من الخريطة لضمان ظهورك للعملاء القريبين"
+                        return@Button
+                    }
                     if (!agreedToTerms) {
                         errorMessage = "يرجى قراءة الشروط والأحكام والموافقة عليها للمتابعة"
                         return@Button
                     }
 
-                    val resolvedGps = if (gpsCoords.isNotBlank()) gpsCoords else "$latitude,$longitude"
+                    val resolvedGps = if (gpsCoords.isNotBlank()) gpsCoords else if (locationDetected) "$latitude,$longitude" else ""
+                    val metadataJson = org.json.JSONObject().apply {
+                        put("description", notesOrDescription.trim())
+                        put("qualification", cvUrlOrQualification.trim())
+                        put("experienceYears", experienceYears.trim())
+                        put("workingHours", workingHours.trim())
+                        put("hasDelivery", extraOption1 && normalizedRole == "RESTAURANT")
+                        put("hasEmergency", extraOption1 && normalizedRole == "MEDICAL")
+                    }.toString()
 
                     isSubmitting = true
                     errorMessage = null
@@ -724,6 +814,7 @@ fun UnifiedRegistrationForm(
                         "cvUrlOrQualification" to cvUrlOrQualification.trim(),
                         "hasDelivery" to extraOption1.toString(),
                         "hasEmergency" to extraOption1.toString(),
+                        "productAttachmentsJson" to metadataJson,
                         "imageUri" to imageUri,
                         "idCardUri" to idCardUri
                     )
@@ -742,5 +833,36 @@ fun UnifiedRegistrationForm(
                 }
             }
         }
+    }
+
+    if (showMapPicker) {
+        com.example.ui.components.InteractiveMapLocationPickerDialog(
+            initialLat = latitude,
+            initialLng = longitude,
+            hasGps = locationDetected,
+            gpsLat = latitude,
+            gpsLng = longitude,
+            title = "📍 حدد موقع النشاط / السكن على الخريطة",
+            onDismiss = { showMapPicker = false },
+            onLocationPicked = { picked ->
+                applyPickedCoordinates(picked.latitude, picked.longitude, picked.landmarkName.ifBlank { picked.label })
+                showMapPicker = false
+            }
+        )
+    }
+
+    if (showManualCoords) {
+        com.example.ui.components.ManualCoordinateDialog(
+            initialLat = if (locationDetected) latitude else 0.0,
+            initialLng = if (locationDetected) longitude else 0.0,
+            gpsLat = latitude,
+            gpsLng = longitude,
+            hasGps = locationDetected,
+            onDismiss = { showManualCoords = false },
+            onConfirm = { lat, lng, summary ->
+                applyPickedCoordinates(lat, lng, summary)
+                showManualCoords = false
+            }
+        )
     }
 }

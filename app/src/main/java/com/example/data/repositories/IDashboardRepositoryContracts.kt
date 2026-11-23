@@ -24,7 +24,10 @@ interface IDashboardRepository {
         workingHours: String,
         isAvailable: Boolean,
         photoUrl: String? = null,
-        coverUrl: String? = null
+        coverUrl: String? = null,
+        phone: String? = null,
+        latitude: Double? = null,
+        longitude: Double? = null
     ): Result<Unit> = Result.success(Unit)
     suspend fun changeBusinessPassword(
         ownerId: String,

@@ -8,7 +8,9 @@ import com.example.data.models.ChatChannel
 import com.example.utils.AnalyticsEventsHelper
 import com.example.utils.AppError
 import com.example.utils.AppResult
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.CollectionReference
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import kotlinx.coroutines.Dispatchers
@@ -56,11 +58,20 @@ internal class ChatChannelDelegate(
 
             var customChannelId: String? = null
 
+            val authUid = try {
+                FirebaseAuth.getInstance().currentUser?.uid?.takeIf { it.isNotBlank() }
+            } catch (_: Exception) {
+                null
+            }
+
             if (type == ChannelType.SUPPORT) {
                 try {
-                    val existingSupportQuery = channelsCollection
-                        .whereArrayContains("participants", cleanCurrent)
-                        .get().await()
+                    val supportQuery = if (authUid != null) {
+                        channelsCollection.whereArrayContains("participantUids", authUid).limit(25)
+                    } else {
+                        channelsCollection.whereArrayContains("participants", cleanCurrent).limit(25)
+                    }
+                    val existingSupportQuery = supportQuery.get().await()
 
                     val existingSupportDoc = existingSupportQuery.documents.find { doc ->
                         val docType = doc.getString("type") ?: ""
@@ -101,27 +112,37 @@ internal class ChatChannelDelegate(
                     put(cleanCurrent, currentUserPhoto)
                     if (cleanOther.isNotBlank() && otherUserPhoto.isNotBlank()) put(cleanOther, otherUserPhoto)
                 }
+                val mergedUids = if (authUid != null && !existing.participantUids.contains(authUid)) {
+                    (existing.participantUids + authUid).distinct()
+                } else {
+                    existing.participantUids
+                }
 
                 val finalChannel = existing.copy(
                     participantNames = updatedNames,
                     participantPhotos = updatedPhotos,
                     type = if (type == ChannelType.SUPPORT) ChannelType.SUPPORT else existing.type,
-                    title = if (type == ChannelType.SUPPORT) "الدعم الفني" else existing.title
+                    title = if (type == ChannelType.SUPPORT) "الدعم الفني" else existing.title,
+                    participantUids = mergedUids
                 )
 
-                if (updatedNames != existing.participantNames || updatedPhotos != existing.participantPhotos) {
-                    docRef.update(
-                        mapOf(
-                            "participantNames" to updatedNames,
-                            "participantPhotos" to updatedPhotos,
-                            "type" to finalChannel.type.name,
-                            "title" to finalChannel.title
-                        )
-                    ).await()
+                val needsUidSync = authUid != null && !existing.participantUids.contains(authUid)
+                if (updatedNames != existing.participantNames || updatedPhotos != existing.participantPhotos || needsUidSync) {
+                    val patch = mutableMapOf<String, Any>(
+                        "participantNames" to updatedNames,
+                        "participantPhotos" to updatedPhotos,
+                        "type" to finalChannel.type.name,
+                        "title" to finalChannel.title
+                    )
+                    if (authUid != null) {
+                        patch["participantUids"] = FieldValue.arrayUnion(authUid)
+                    }
+                    docRef.update(patch).await()
                 }
                 local?.saveOrUpdateChannel(finalChannel)
                 finalChannel
             } else {
+                val initialUids = listOfNotNull(authUid).distinct()
                 val newChannel = ChatChannel(
                     id = finalChannelId,
                     participants = listOf(cleanCurrent, cleanOther).filter { it.isNotBlank() },
@@ -135,7 +156,8 @@ internal class ChatChannelDelegate(
                     title = if (type == ChannelType.SUPPORT) "الدعم الفني" else finalOtherName.ifBlank { "" },
                     relatedEntityId = relatedEntityId,
                     relatedEntityType = relatedEntityType,
-                    lastMessageTime = System.currentTimeMillis()
+                    lastMessageTime = System.currentTimeMillis(),
+                    participantUids = initialUids
                 )
                 docRef.set(newChannel).await()
                 local?.saveOrUpdateChannel(newChannel)
@@ -206,11 +228,24 @@ internal class ChatChannelDelegate(
             }
         }
 
-        // 2. Attach Firestore Realtime Listener (Limited to 50 active channels to conserve Firestore quota)
-        val listener: ListenerRegistration = channelsCollection
-            .whereArrayContains("participants", cleanUserId)
-            .limit(50)
-            .addSnapshotListener { snapshot, error ->
+        // 2. Attach Firestore Realtime Listener aligned with Firestore auth UID rules (Limited to 40 active channels to conserve Spark quota)
+        val fbUser = try {
+            FirebaseAuth.getInstance().currentUser
+        } catch (_: Exception) {
+            null
+        }
+        val query = when {
+            cleanUserId.equals("ADMIN", ignoreCase = true) ->
+                channelsCollection.whereArrayContains("participants", cleanUserId).limit(40)
+            fbUser != null && !fbUser.isAnonymous &&
+                (cleanUserId.startsWith("prov_") || cleanUserId.startsWith("store_") || cleanUserId.startsWith("prop_") || cleanUserId.all { it.isDigit() }) ->
+                channelsCollection.whereArrayContains("participants", cleanUserId).limit(40)
+            fbUser != null ->
+                channelsCollection.whereArrayContains("participantUids", fbUser.uid).limit(40)
+            else ->
+                channelsCollection.whereArrayContains("participants", cleanUserId).limit(40)
+        }
+        val listener: ListenerRegistration = query.addSnapshotListener { snapshot, error ->
                 if (error != null) {
                     Log.e("ChatRepository", "Firestore channels listener error: ${error.message}")
                     return@addSnapshotListener

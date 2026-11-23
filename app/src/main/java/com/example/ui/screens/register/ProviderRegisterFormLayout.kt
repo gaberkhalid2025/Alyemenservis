@@ -144,11 +144,11 @@ fun ProviderRegisterFormLayout(
                         neighborhood = neighborhoodVal,
                         photoPath = photoVal,
                         idCardPath = idCardVal,
-                        gpsCoords = "",
+                        gpsCoords = data["gpsCoords"] ?: "",
                         workPhotos = emptyList(),
                         customCategoryName = data["specialization"] ?: "عام",
                         password = pass,
-                        productAttachmentsJson = ""
+                        productAttachmentsJson = data["productAttachmentsJson"] ?: ""
                     )
                 }
             )

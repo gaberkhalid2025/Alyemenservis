@@ -583,6 +583,10 @@ class MainViewModel @Inject constructor(
     fun updateOnlineStatus(online: Boolean) {
         _isOnline.value = online
     }
+
+    fun saveCustomSettingsState(newSettings: AdminSettingsEntity) {
+        settingsViewModel.saveCustomSettingsState(newSettings)
+    }
     fun retryConnection(context: android.content.Context) {
         val cm = context.getSystemService(android.content.Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager
         if (cm != null) {

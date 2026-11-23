@@ -94,6 +94,7 @@ fun BoxScope.FloatingIconsOverlay(
 
     // 2. زر "المساعد الذكي" الدائري بمحاذاة الشريط السفلي في الجهة المقابلة
     if (!settings.assistantHidden) {
+        val assistantFabSize = settings.assistantSize.coerceIn(48, 84).dp
         Surface(
             onClick = onAssistantClick,
             shape = CircleShape,
@@ -102,7 +103,7 @@ fun BoxScope.FloatingIconsOverlay(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(end = 12.dp, bottom = 6.dp)
-                .size(66.dp)
+                .size(assistantFabSize)
                 .shadow(10.dp, CircleShape)
                 .semantics { contentDescription = "المساعد الذكي" }
                 .testTag("fab_smart_assistant")

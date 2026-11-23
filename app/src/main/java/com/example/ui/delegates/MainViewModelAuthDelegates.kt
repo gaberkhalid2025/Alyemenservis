@@ -241,7 +241,8 @@ fun MainViewModel.submitJoinForm(
     workPhotos: List<String> = emptyList(),
     customCategoryName: String = "",
     password: String = "",
-    productAttachmentsJson: String = ""
+    productAttachmentsJson: String = "",
+    onSubmissionResult: ((Boolean) -> Unit)? = null
 ) {
     registrationHelper.submitJoinForm(
         context = context,
@@ -302,7 +303,8 @@ fun MainViewModel.submitJoinForm(
             _registeredUsersList.value = uList
         },
         onJoinRequestPhoneUpdated = { _joinRequestPhone.value = it },
-        onNavigateToScreen = { _currentScreen.value = it }
+        onNavigateToScreen = { _currentScreen.value = it },
+        onSubmissionResult = onSubmissionResult
     )
 }
 

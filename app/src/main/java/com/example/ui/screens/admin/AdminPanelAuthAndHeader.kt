@@ -72,10 +72,6 @@ fun hasAdminTabAccess(
         return true
     }
 
-    if (role == "ADMIN" && supervisorPermissions.isEmpty()) {
-        return true
-    }
-
     if (tabKey in supervisorPermissions) return true
 
     if (PermissionGuard.hasPermission(role, tabKey, supervisorPermissions)) return true

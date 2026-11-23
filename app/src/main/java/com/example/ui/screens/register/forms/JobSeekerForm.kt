@@ -58,12 +58,15 @@ fun JobSeekerForm(
                 gpsCoords = resolvedGps,
                 customCategoryName = craftType,
                 password = password,
-                productAttachmentsJson = metadataJson
+                productAttachmentsJson = metadataJson,
+                onSubmissionResult = { success ->
+                    if (success) {
+                        viewModel.setJoinRequestPhone(context, cleanPhone)
+                        viewModel.triggerNotification("✅ تم إرسال طلب التقديم للوظيفة بنجاح، جاري المراجعة من الإدارة")
+                        onSuccess()
+                    }
+                }
             )
-
-            viewModel.setJoinRequestPhone(context, cleanPhone)
-            viewModel.triggerNotification("✅ تم إرسال طلب التقديم للوظيفة بنجاح، جاري المراجعة من الإدارة")
-            onSuccess()
         }
     )
 }

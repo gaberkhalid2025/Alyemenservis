@@ -5,8 +5,16 @@ import com.example.ui.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Public
+import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Translate
+import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -35,11 +43,19 @@ fun AppFooterBar(viewModel: MainViewModel, themeColors: VisualThemePalette, onIn
             if (settingsState.footerBgColorHex.isNotBlank()) {
                 Color(android.graphics.Color.parseColor(settingsState.footerBgColorHex))
             } else {
-                Color(0xFF0B1120) // Luxury dark pill container (#063328 / #0B1120)
+                Color(0xFF0B1120)
             }
         } catch (e: Exception) {
             Color(0xFF0B1120)
         }
+    }
+
+    val orderedItems = remember(settingsState.footerItemsOrder) {
+        settingsState.footerItemsOrder
+            .split(",")
+            .map { it.trim().uppercase() }
+            .filter { it.isNotBlank() }
+            .ifEmpty { listOf("INFO", "BOOKINGS", "TEXT", "LANG", "ADMIN") }
     }
 
     Surface(
@@ -81,84 +97,109 @@ fun AppFooterBar(viewModel: MainViewModel, themeColors: VisualThemePalette, onIn
                 custCount + provCount
             }
 
-            // 1. Info Icon ("عن التطبيق")
-            if (settingsState.showInfoIcon) {
-                val isAbout = currentScreen == AppScreens.ABOUT_APP
-                Luxury3DNavIcon(
-                    emojiIcon = settingsState.bottomInfoIcon.ifEmpty { "ℹ️" },
-                    vectorIcon = Icons.Default.Info,
-                    label = if (isEn) "About" else "عن التطبيق",
-                    isSelected = isAbout,
-                    iconSizeDp = settingsState.navIconSizeDp,
-                    iconStyle = settingsState.topNavIconStyle,
-                    onClick = { onInfoClick() }
-                )
+            val bookingsVector = when (settingsState.bookingsIconType.uppercase()) {
+                "STAR" -> Icons.Default.Star
+                "FAVORITE" -> Icons.Default.Favorite
+                "HOME" -> Icons.Default.Home
+                else -> Icons.Default.DateRange
             }
 
-            // 2. Bookings Icon ("الحجوزات")
-            if (settingsState.showBookingsIcon) {
-                val isBookings = currentScreen == AppScreens.BOOKINGS_VIEW
-                Luxury3DNavIcon(
-                    emojiIcon = settingsState.bottomBookingsIcon.ifEmpty { "📅" },
-                    vectorIcon = Icons.Default.DateRange,
-                    label = if (isEn) "Bookings" else "الحجوزات",
-                    isSelected = isBookings,
-                    badgeCount = unreadCount,
-                    iconSizeDp = settingsState.navIconSizeDp,
-                    iconStyle = settingsState.topNavIconStyle,
-                    onClick = { viewModel.navigateTo("BOOKINGS_VIEW") }
-                )
+            val adminVector = when (settingsState.adminIconType.uppercase()) {
+                "SETTINGS", "GEAR" -> Icons.Default.Settings
+                "KEY" -> Icons.Default.VpnKey
+                "SHIELD" -> Icons.Default.Security
+                else -> Icons.Default.Lock
+            }
+            val adminEmoji = when (settingsState.adminIconType.uppercase()) {
+                "SETTINGS", "GEAR" -> "⚙️"
+                "KEY" -> "🔑"
+                "SHIELD" -> "🛡️"
+                else -> settingsState.bottomAdminIcon.ifEmpty { "🔒" }
             }
 
-            // 3. Center Brand Text ("WAM2026")
-            if (settingsState.showFooterText) {
-                Box(
-                    modifier = Modifier.padding(horizontal = 4.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = if (settingsState.footerMessage.startsWith("card_custom_") || settingsState.footerMessage.isBlank() || settingsState.footerMessage == "WAM2026") "ASH" else settingsState.footerMessage,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Black,
-                        color = Color(0xFFFFFFFF), // Glowing white
-                        letterSpacing = 1.sp,
-                        textAlign = TextAlign.Center,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
+            val (langEmoji, langVector) = when (settingsState.langIconType.uppercase()) {
+                "TRANSLATE" -> "🔤" to Icons.Default.Translate
+                "TEXT" -> (if (isEn) "AR" else "EN") to null
+                else -> (settingsState.bottomLangIcon.ifEmpty { if (isEn) "🌐" else "EN" }) to Icons.Default.Public
             }
 
-            // 4. Single Clean Language Switcher Icon ("EN" / "🌐")
-            if (settingsState.showLangIcon) {
-                Luxury3DNavIcon(
-                    emojiIcon = settingsState.bottomLangIcon.ifEmpty { if (isEn) "🌐" else "EN" },
-                    vectorIcon = null,
-                    label = if (isEn) "العربية" else "English",
-                    isSelected = false,
-                    iconSizeDp = settingsState.navIconSizeDp,
-                    iconStyle = settingsState.topNavIconStyle,
-                    onClick = {
-                        viewModel.switchLanguage()
-                        viewModel.triggerNotification(
-                            if (isEn) "تم التحويل إلى اللغة العربية 🇾🇪" else "Language switched to English 🌐"
+            orderedItems.forEach { slot ->
+                when (slot) {
+                    "INFO" -> if (settingsState.showInfoIcon) {
+                        val isAbout = currentScreen == AppScreens.ABOUT_APP
+                        Luxury3DNavIcon(
+                            emojiIcon = settingsState.bottomInfoIcon.ifEmpty { "ℹ️" },
+                            vectorIcon = Icons.Default.Info,
+                            label = if (isEn) "About" else "عن التطبيق",
+                            isSelected = isAbout,
+                            iconSizeDp = settingsState.navIconSizeDp,
+                            iconStyle = settingsState.topNavIconStyle,
+                            onClick = { onInfoClick() }
                         )
                     }
-                )
-            }
 
-            // 5. Admin Lock Icon ("الإدارة")
-            if (settingsState.showAdminIcon) {
-                val isAdmin = currentScreen == AppScreens.ADMIN_PANEL
-                Luxury3DNavIcon(
-                    emojiIcon = settingsState.bottomAdminIcon.ifEmpty { "🔒" },
-                    vectorIcon = Icons.Default.Lock,
-                    label = if (isEn) "Admin" else "الإدارة",
-                    isSelected = isAdmin,
-                    iconSizeDp = settingsState.navIconSizeDp,
-                    iconStyle = settingsState.topNavIconStyle,
-                    onClick = { viewModel.navigateTo("ADMIN_PANEL") }
-                )
+                    "BOOKINGS" -> if (settingsState.showBookingsIcon && settingsState.isBookingsIconVisible) {
+                        val isBookings = currentScreen == AppScreens.BOOKINGS_VIEW
+                        Luxury3DNavIcon(
+                            emojiIcon = settingsState.bottomBookingsIcon.ifEmpty { "📅" },
+                            vectorIcon = bookingsVector,
+                            label = if (isEn) "Bookings" else "الحجوزات",
+                            isSelected = isBookings,
+                            badgeCount = unreadCount,
+                            iconSizeDp = settingsState.navIconSizeDp,
+                            iconStyle = settingsState.topNavIconStyle,
+                            onClick = { viewModel.navigateTo("BOOKINGS_VIEW") }
+                        )
+                    }
+
+                    "TEXT" -> if (settingsState.showFooterText) {
+                        Box(
+                            modifier = Modifier.padding(horizontal = 4.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = if (settingsState.footerMessage.startsWith("card_custom_") || settingsState.footerMessage.isBlank() || settingsState.footerMessage == "WAM2026") "ASH" else settingsState.footerMessage,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Black,
+                                color = Color(0xFFFFFFFF),
+                                letterSpacing = 1.sp,
+                                textAlign = TextAlign.Center,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+
+                    "LANG" -> if (settingsState.showLangIcon) {
+                        Luxury3DNavIcon(
+                            emojiIcon = langEmoji,
+                            vectorIcon = langVector,
+                            label = if (isEn) "العربية" else "English",
+                            isSelected = false,
+                            iconSizeDp = settingsState.navIconSizeDp,
+                            iconStyle = settingsState.topNavIconStyle,
+                            onClick = {
+                                viewModel.switchLanguage()
+                                viewModel.triggerNotification(
+                                    if (isEn) "تم التحويل إلى اللغة العربية 🇾🇪" else "Language switched to English 🌐"
+                                )
+                            }
+                        )
+                    }
+
+                    "ADMIN" -> if (settingsState.showAdminIcon) {
+                        val isAdmin = currentScreen == AppScreens.ADMIN_PANEL
+                        Luxury3DNavIcon(
+                            emojiIcon = adminEmoji,
+                            vectorIcon = adminVector,
+                            label = if (isEn) "Admin" else "الإدارة",
+                            isSelected = isAdmin,
+                            iconSizeDp = settingsState.navIconSizeDp,
+                            iconStyle = settingsState.topNavIconStyle,
+                            onClick = { viewModel.navigateTo("ADMIN_PANEL") }
+                        )
+                    }
+                }
             }
         }
     }

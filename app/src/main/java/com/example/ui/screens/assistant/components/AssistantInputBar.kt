@@ -69,7 +69,8 @@ fun AssistantInputBar(
                 placeholder = { Text("اكتب سؤالك أو اطلب خدمة هنا...", fontSize = 11.sp, color = themeColors.textSecondary) },
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(20.dp),
-                singleLine = true,
+                singleLine = false,
+                maxLines = 4,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                 keyboardActions = KeyboardActions(
                     onSend = {

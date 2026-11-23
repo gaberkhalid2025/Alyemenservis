@@ -66,9 +66,11 @@ fun MapFilterBar(
             Triple("ALL", "كل الفئات 🌐", "🌐"),
             Triple("PROVIDERS", "فنيين 👷", "👷"),
             Triple("STORES", "متاجر ومحلات 🏪", "🏪"),
+            Triple("MALLS", "مراكز تجارية ومولات 🏬", "🏬"),
             Triple("RESTAURANTS", "مطاعم وكافيهات 🍔", "🍔"),
             Triple("MEDICAL", "مراكز طبية 🏥", "🏥"),
-            Triple("PROPERTIES", "عقارات 🏠", "🏠")
+            Triple("PROPERTIES", "عقارات 🏠", "🏠"),
+            Triple("DELIVERY", "توصيل سريع 🛵", "🛵")
         )
     }
 

@@ -355,7 +355,7 @@ fun SmartAssistantDialogView(
                                                 color = themeColors.accent,
                                                 strokeWidth = 2.dp
                                             )
-                                            Text("جاري توليد الإجابة الذكية...", fontSize = 11.sp, color = themeColors.textSecondary)
+                                            Text("جاري البحث وتجهيز الرد...", fontSize = 11.sp, color = themeColors.textSecondary)
                                         }
                                     }
                                 }
@@ -408,11 +408,15 @@ fun SmartAssistantDialogView(
                                             mainViewModel = viewModel,
                                             settings = settings,
                                             onSpeechSpeak = {
-                                                try { VoiceManager.onSpeak?.invoke(it) } catch (_: Exception) {}
+                                                try {
+                                                    VoiceManager.init(context)
+                                                    VoiceManager.speak(it)
+                                                } catch (_: Exception) {}
                                             },
                                             onError = { err ->
                                                 coroutineScope.launch { snackbarHostState.showSnackbar(err) }
-                                            }
+                                            },
+                                            context = context
                                         )
                                     }
                                 } catch (e: Exception) {

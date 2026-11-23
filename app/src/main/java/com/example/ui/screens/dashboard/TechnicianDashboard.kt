@@ -297,6 +297,8 @@ fun TechnicianDashboard(
                             isAvailable = liveAccount.rawProvider?.isAvailable ?: liveAccount.isActive,
                             rating = liveAccount.rating.toDouble(),
                             reviewCount = liveAccount.numReviews,
+                            latitude = liveAccount.latitude,
+                            longitude = liveAccount.longitude,
                             themeColors = themeColors,
                             onChangePhoto = { url ->
                                 techViewModel.updateProfile(
@@ -318,8 +320,19 @@ fun TechnicianDashboard(
                                     coverUrl = url
                                 )
                             },
-                            onSaveProfile = { name, _, city, desc, hours, available ->
-                                techViewModel.updateProfile(name, city, desc, hours, available)
+                            onSaveLocation = { lat, lng ->
+                                techViewModel.updateProfile(
+                                    name = liveAccount.name,
+                                    cityArea = liveAccount.neighborhood.ifBlank { liveAccount.cityId },
+                                    description = liveAccount.description,
+                                    workingHours = liveAccount.workingHours,
+                                    isAvailable = liveAccount.rawProvider?.isAvailable ?: liveAccount.isActive,
+                                    latitude = lat,
+                                    longitude = lng
+                                )
+                            },
+                            onSaveProfile = { name, editedPhone, city, desc, hours, available ->
+                                techViewModel.updateProfile(name, city, desc, hours, available, phone = editedPhone)
                             },
                             onChangePassword = { oldP, newP ->
                                 techViewModel.changePassword(oldP, newP)

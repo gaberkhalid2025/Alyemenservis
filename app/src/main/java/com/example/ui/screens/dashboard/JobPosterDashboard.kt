@@ -1,7 +1,11 @@
 package com.example.ui.screens.dashboard
 
+import android.content.Intent
+import android.net.Uri
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import com.example.ui.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -18,8 +22,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.UnifiedBusinessAccount
-import com.example.data.repositories.DashboardRepositoryImpl
-import com.example.data.repositories.ProductsRepositoryImpl
 import com.example.ui.MainViewModel
 import com.example.ui.screens.dashboard.components.UnifiedEmptyState
 import com.example.ui.screens.dashboard.components.UnifiedLoadingIndicator
@@ -36,6 +38,8 @@ fun JobPosterDashboard(
     onBackClick: () -> Unit,
     jobViewModel: JobPosterDashboardViewModel = hiltViewModel()
 ) {
+    BackHandler { onBackClick() }
+
     val context = LocalContext.current
     var activeTab by remember { mutableIntStateOf(0) }
 
@@ -45,6 +49,14 @@ fun JobPosterDashboard(
 
     val uiState by jobViewModel.uiState.collectAsState()
     val jobs by jobViewModel.jobs.collectAsState()
+    val allApplications by viewModel.adminViewModel.jobApplications.collectAsState()
+    val myJobIds = remember(jobs) { jobs.map { it.id }.toSet() }
+    val myApplications = remember(allApplications, myJobIds, account.name) {
+        allApplications.filter { app ->
+            app.jobId in myJobIds ||
+                (account.name.isNotBlank() && app.companyName.equals(account.name, ignoreCase = true))
+        }
+    }
 
     var showPostJobDialog by remember { mutableStateOf(false) }
     var titleInput by remember { mutableStateOf("") }
@@ -182,12 +194,106 @@ fun JobPosterDashboard(
                         }
                     }
                     1 -> {
-                        UnifiedEmptyState(
-                            title = "لا يوجد متقدمين جدد",
-                            description = "تظهر طلبات التقديم وسير المتقدمين هنا فور إرسالها من الباحثين عن عمل.",
-                            iconText = "📄",
-                            themeColors = themeColors
-                        )
+                        if (myApplications.isEmpty()) {
+                            UnifiedEmptyState(
+                                title = "لا يوجد متقدمين جدد",
+                                description = "تظهر طلبات التقديم وسير المتقدمين هنا فور إرسالها من الباحثين عن عمل.",
+                                iconText = "📄",
+                                themeColors = themeColors
+                            )
+                        } else {
+                            LazyColumn(
+                                modifier = Modifier.fillMaxSize(),
+                                contentPadding = PaddingValues(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                item {
+                                    Text(
+                                        text = "📄 طلبات التقديم الواردة (${myApplications.size})",
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = themeColors.textPrimary
+                                    )
+                                }
+                                items(myApplications, key = { it.id }) { app ->
+                                    val statusColor = when (app.status.uppercase()) {
+                                        "ACCEPTED" -> Color(0xFF10B981)
+                                        "REJECTED" -> Color(0xFFEF4444)
+                                        else -> Color(0xFFF59E0B)
+                                    }
+                                    val statusText = when (app.status.uppercase()) {
+                                        "ACCEPTED" -> "مقبول ✅"
+                                        "REJECTED" -> "مرفوض ❌"
+                                        else -> "قيد المراجعة ⏳"
+                                    }
+                                    Card(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                                        shape = RoundedCornerShape(12.dp),
+                                        border = BorderStroke(1.dp, themeColors.border)
+                                    ) {
+                                        Column(
+                                            modifier = Modifier.padding(12.dp),
+                                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Text(app.applicantName.ifBlank { "متقدم" }, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.textPrimary)
+                                                    Text("الوظيفة: ${app.jobTitle}", fontSize = 11.5.sp, color = themeColors.accent)
+                                                }
+                                                Surface(color = statusColor.copy(alpha = 0.16f), shape = RoundedCornerShape(6.dp)) {
+                                                    Text(statusText, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = statusColor, modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp))
+                                                }
+                                            }
+                                            if (app.applicantQuals.isNotBlank()) {
+                                                Text("المؤهلات: ${app.applicantQuals}", fontSize = 11.5.sp, color = themeColors.textSecondary)
+                                            }
+                                            if (app.applicantPhone.isNotBlank()) {
+                                                Text("الهاتف: ${app.applicantPhone}", fontSize = 11.sp, color = themeColors.textSecondary)
+                                            }
+                                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                                if (app.status.uppercase() == "PENDING") {
+                                                    Button(
+                                                        onClick = { viewModel.adminViewModel.acceptJobApplication(app.id) },
+                                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                                                        shape = RoundedCornerShape(8.dp),
+                                                        modifier = Modifier.weight(1f).height(36.dp),
+                                                        contentPadding = PaddingValues(horizontal = 6.dp)
+                                                    ) {
+                                                        Text("قبول ✅", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                                    }
+                                                    Button(
+                                                        onClick = { viewModel.adminViewModel.rejectJobApplication(app.id, "تم الاعتذار عن الطلب") },
+                                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
+                                                        shape = RoundedCornerShape(8.dp),
+                                                        modifier = Modifier.weight(1f).height(36.dp),
+                                                        contentPadding = PaddingValues(horizontal = 6.dp)
+                                                    ) {
+                                                        Text("رفض ❌", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                                    }
+                                                }
+                                                if (app.applicantPhone.isNotBlank()) {
+                                                    OutlinedButton(
+                                                        onClick = {
+                                                            context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:${app.applicantPhone}")))
+                                                        },
+                                                        shape = RoundedCornerShape(8.dp),
+                                                        modifier = Modifier.weight(1f).height(36.dp),
+                                                        contentPadding = PaddingValues(horizontal = 6.dp)
+                                                    ) {
+                                                        Text("اتصال 📞", fontSize = 11.sp, color = themeColors.accent)
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                     2 -> {
                         TabProfileEdit(
@@ -202,8 +308,8 @@ fun JobPosterDashboard(
                             rating = account.rating.toDouble(),
                             reviewCount = account.numReviews,
                             themeColors = themeColors,
-                            onSaveProfile = { name, _, city, desc, hours, available ->
-                                jobViewModel.updateProfile(name, city, desc, hours, available)
+                            onSaveProfile = { name, editedPhone, city, desc, hours, available ->
+                                jobViewModel.updateProfile(name, city, desc, hours, available, phone = editedPhone)
                             },
                             onChangePassword = { oldP, newP ->
                                 jobViewModel.changePassword(oldP, newP)

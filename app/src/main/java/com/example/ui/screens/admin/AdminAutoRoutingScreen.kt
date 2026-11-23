@@ -83,9 +83,12 @@ fun AdminAutoRoutingScreenContent(
                     isMedicalRoutingEnabled = doc.getBoolean("isMedicalRoutingEnabled") ?: true
                     isDeliveryRoutingEnabled = doc.getBoolean("isDeliveryRoutingEnabled") ?: true
                     storesCriteria = doc.getString("storesCriteria") ?: "الأقرب جغرافياً (GPS)"
+                    storesRadiusKm = doc.getString("storesRadiusKm") ?: (doc.get("storesRadiusKm")?.toString() ?: "15")
                     restaurantsCriteria = doc.getString("restaurantsCriteria") ?: "أقرب مطعم مع أسرع تحضير"
+                    restaurantsRadiusKm = doc.getString("restaurantsRadiusKm") ?: (doc.get("restaurantsRadiusKm")?.toString() ?: "10")
                     medicalCriteria = doc.getString("medicalCriteria") ?: "أقرب طوارئ وتوفر التخصص"
                     deliveryCriteria = doc.getString("deliveryCriteria") ?: "إسناد تلقائي لأقرب مندوب شاغر"
+                    deliveryMaxRadiusKm = doc.getString("deliveryMaxRadiusKm") ?: (doc.get("deliveryMaxRadiusKm")?.toString() ?: "25")
                 }
             }
     }

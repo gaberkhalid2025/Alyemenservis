@@ -57,9 +57,18 @@ fun StoreCustomerCatalogView(
     products: List<ProductEntity>,
     viewModel: MainViewModel,
     themeColors: VisualThemePalette,
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    isAdmin: Boolean = false,
+    isOwnerPreview: Boolean = false,
+    onExitOwnerPreview: (() -> Unit)? = null
 ) {
-    BackHandler { onBackClick() }
+    BackHandler {
+        if (isOwnerPreview && onExitOwnerPreview != null) {
+            onExitOwnerPreview()
+        } else {
+            onBackClick()
+        }
+    }
 
     val context = LocalContext.current
     val favoriteIds by viewModel.favoriteIds.collectAsState()
@@ -72,6 +81,12 @@ fun StoreCustomerCatalogView(
     val isMedical = store.sectionId.equals("medical", ignoreCase = true) ||
         store.medicalLicenseNo.isNotBlank()
     val isRestaurant = store.sectionId.equals("restaurants", ignoreCase = true)
+    val isMall = !isMedical && !isRestaurant && (
+        store.sectionId.contains("mall", ignoreCase = true) ||
+            store.name.contains("مول") ||
+            store.name.contains("مركز تجاري") ||
+            store.name.contains("مجمع تجاري")
+        )
 
     val ownerProducts by remember(store.id, context) {
         ProductsRepositoryImpl(context.applicationContext).getOwnerProducts(store.id)
@@ -391,6 +406,22 @@ fun StoreCustomerCatalogView(
                                             modifier = Modifier.size(16.dp)
                                         )
                                     }
+                                    if (isMall) {
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Surface(
+                                            color = Color(0xFF8B5CF6).copy(alpha = 0.2f),
+                                            shape = RoundedCornerShape(6.dp),
+                                            border = BorderStroke(0.6.dp, Color(0xFF8B5CF6))
+                                        ) {
+                                            Text(
+                                                text = "🏬 مول / مركز تجاري",
+                                                fontSize = 9.5.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFFA78BFA),
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                            )
+                                        }
+                                    }
                                 }
                                 Text(
                                     text = store.description.ifBlank {
@@ -477,7 +508,11 @@ fun StoreCustomerCatalogView(
                                             targetUserName = store.name,
                                             targetUserPhoto = store.logoImage,
                                             relatedEntityId = store.id,
-                                            relatedEntityType = if (isMedical) "MEDICAL" else "STORE"
+                                            relatedEntityType = when {
+                                                isMedical -> "MEDICAL"
+                                                isRestaurant -> "RESTAURANT"
+                                                else -> "STORE"
+                                            }
                                         )
                                     }
                                 },
@@ -515,6 +550,64 @@ fun StoreCustomerCatalogView(
                                 }
                             }
                         }
+                        // Action Buttons Row (Chat + Call + Book Appointment for Medical)
+                        // end of card content
+                    }
+                }
+            }
+
+            if (isOwnerPreview && onExitOwnerPreview != null) {
+                item {
+                    Surface(
+                        color = themeColors.accent.copy(alpha = 0.14f),
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, themeColors.accent),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp)
+                            .clickable { onExitOwnerPreview() }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "👁️ أنت الآن في وضع معاينة العميل",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = themeColors.accent
+                            )
+                            Text(
+                                text = "العودة لوضع الإدارة ↩",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (isAdmin && !isOwnerPreview) {
+                item {
+                    Box(modifier = Modifier.padding(horizontal = 10.dp)) {
+                        ProfileOwnerAdminControlBar(
+                            entityId = store.id,
+                            entityType = when {
+                                isMedical -> ProfileEntityType.MEDICAL
+                                isRestaurant -> ProfileEntityType.RESTAURANT
+                                else -> ProfileEntityType.STORE
+                            },
+                            provider = null,
+                            store = store,
+                            property = null,
+                            job = null,
+                            isOwner = false,
+                            isAdmin = true,
+                            viewModel = viewModel,
+                            themeColors = themeColors
+                        )
                     }
                 }
             }

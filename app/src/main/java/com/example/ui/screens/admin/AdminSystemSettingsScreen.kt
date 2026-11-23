@@ -63,7 +63,9 @@ fun AdminSystemSettingsScreenContent(
         mutableStateOf(viewModel.preferenceHelper.getValhallaTilesUrl(context))
     }
 
-    var defaultLanguage by remember { mutableStateOf("العربية") }
+    var defaultLanguage by remember(settingsState.appLanguage) {
+        mutableStateOf(if (settingsState.appLanguage.equals("en", ignoreCase = true)) "English" else "العربية")
+    }
     var showLanguageToggle by remember(settingsState.showLangIcon) { mutableStateOf(settingsState.showLangIcon) }
     var autoDetectLanguage by remember { mutableStateOf(true) }
     var forceRtlDirection by remember { mutableStateOf(true) }
@@ -72,6 +74,21 @@ fun AdminSystemSettingsScreenContent(
     var appDisplayName by remember(settingsState.appName) { mutableStateOf(settingsState.appName) }
     var welcomeMessage by remember(settingsState.welcomeMessage) { mutableStateOf(settingsState.welcomeMessage) }
     var defaultThemeMode by remember { mutableStateOf("الوضع الداكن (Dark)") }
+
+    LaunchedEffect(Unit) {
+        viewModel.db.collection("settings").document("main_settings").get()
+            .addOnSuccessListener { doc ->
+                if (doc != null && doc.exists()) {
+                    doc.getString("minRequiredVersion")?.let { if (it.isNotBlank()) minRequiredVersion = it }
+                    doc.getBoolean("forceUpdateEnabled")?.let { forceUpdateEnabled = it }
+                    doc.getString("defaultLanguage")?.let { if (it.isNotBlank()) defaultLanguage = it }
+                    doc.getBoolean("autoDetectLanguage")?.let { autoDetectLanguage = it }
+                    doc.getBoolean("forceRtlDirection")?.let { forceRtlDirection = it }
+                    doc.getString("defaultCurrency")?.let { if (it.isNotBlank()) defaultCurrency = it }
+                    doc.getString("defaultThemeMode")?.let { if (it.isNotBlank()) defaultThemeMode = it }
+                }
+            }
+    }
 
     val languages = listOf("العربية", "English")
     val currencies = listOf("ريال يمني (YER)", "ريال سعودي (SAR)", "دولار أمريكي (USD)")
@@ -252,14 +269,17 @@ fun AdminSystemSettingsScreenContent(
             onClick = {
                 if (isSavingSettings) return@Button
                 isSavingSettings = true
-                val st = settingsState
-                viewModel.updateBackdoorSettings(
-                    appDisplayName, welcomeMessage, st.footerMessage, st.activeThemeId,
-                    st.supportPhone, st.supportEmail, st.supportWhatsapp,
-                    st.isMaintenanceActive, st.hidePromoFooter, st.assistantHidden, st.assistantSize,
-                    st.chatHidden, st.chatSize, st.maxSearchRadiusKm, st.isSpeechSearchEnabled,
-                    false, 90
+                val langCode = if (defaultLanguage == "English") "en" else "ar"
+                val updated = settingsState.copy(
+                    appName = appDisplayName,
+                    welcomeMessage = welcomeMessage,
+                    appVersion = systemVersion,
+                    appDownloadUrl = updateDownloadUrl,
+                    showLangIcon = showLanguageToggle,
+                    appLanguage = langCode
                 )
+                viewModel.saveCustomSettingsState(updated)
+                viewModel.settingsViewModel.updateAppLanguage(langCode)
                 viewModel.preferenceHelper.setValhallaTilesUrl(context, valhallaTilesUrl)
                 viewModel.db.collection("settings").document("navigation_settings").set(
                     mapOf("valhallaTilesDownloadUrl" to valhallaTilesUrl, "updatedAt" to System.currentTimeMillis()),
@@ -272,6 +292,9 @@ fun AdminSystemSettingsScreenContent(
                         "forceUpdateEnabled" to forceUpdateEnabled,
                         "appDownloadUrl" to updateDownloadUrl,
                         "defaultLanguage" to defaultLanguage,
+                        "appLanguage" to langCode,
+                        "autoDetectLanguage" to autoDetectLanguage,
+                        "forceRtlDirection" to forceRtlDirection,
                         "showLangIcon" to showLanguageToggle,
                         "defaultCurrency" to defaultCurrency,
                         "defaultThemeMode" to defaultThemeMode,

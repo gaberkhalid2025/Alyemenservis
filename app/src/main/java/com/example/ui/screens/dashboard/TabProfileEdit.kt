@@ -29,9 +29,12 @@ fun TabProfileEdit(
     isAvailable: Boolean = true,
     rating: Double = 5.0,
     reviewCount: Int = 0,
+    latitude: Double = 0.0,
+    longitude: Double = 0.0,
     themeColors: VisualThemePalette,
     onChangePhoto: ((String) -> Unit)? = null,
     onChangeCover: ((String) -> Unit)? = null,
+    onSaveLocation: ((Double, Double) -> Unit)? = null,
     onSaveProfile: (name: String, phone: String, cityArea: String, description: String, workingHours: String, isAvailable: Boolean) -> Unit,
     onChangePassword: (oldPass: String, newPass: String) -> Unit
 ) {
@@ -77,8 +80,11 @@ fun TabProfileEdit(
             description = description,
             workingHours = workingHours,
             isAvailable = isAvailable,
+            latitude = latitude,
+            longitude = longitude,
             themeColors = themeColors,
             onSaveProfile = onSaveProfile,
+            onSaveLocation = onSaveLocation,
             onChangePassword = onChangePassword
         )
     }

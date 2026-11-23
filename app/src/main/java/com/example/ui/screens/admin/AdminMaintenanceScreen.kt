@@ -55,10 +55,12 @@ fun AdminMaintenanceScreenContent(
     var emergencyMessage by remember(settingsState.chatDisabledAnnouncement) {
         mutableStateOf(if (settingsState.chatDisabledAnnouncement.isNotBlank()) settingsState.chatDisabledAnnouncement else "التطبيق تحت الصيانة الفنية الطارئة لتحسين الخدمات، سنعود قريباً.")
     }
-    var emergencyFreezeOrders by remember { mutableStateOf(true) }
+    var emergencyFreezeOrders by remember(settingsState.emergencyFreezeOrders) { mutableStateOf(settingsState.emergencyFreezeOrders) }
     var emergencyLockoutChat by remember(settingsState.disableChatAll) { mutableStateOf(settingsState.disableChatAll) }
-    var adminBypassActive by remember { mutableStateOf(true) }
-    var selectedDuration by remember { mutableStateOf("حتى الإشعار اليدوي") }
+    var adminBypassActive by remember(settingsState.adminBypassActive) { mutableStateOf(settingsState.adminBypassActive) }
+    var selectedDuration by remember(settingsState.maintenanceDuration) {
+        mutableStateOf(settingsState.maintenanceDuration.ifBlank { "حتى الإشعار اليدوي" })
+    }
     var emergencyPhone by remember(settingsState.supportPhone) {
         mutableStateOf(if (settingsState.supportPhone.isNotBlank()) settingsState.supportPhone else "777644")
     }
@@ -116,18 +118,13 @@ fun AdminMaintenanceScreenContent(
                             .clickable {
                                 val newStatus = !isMaint
                                 isMaint = newStatus
-                                val st = settingsState
-                                viewModel.updateBackdoorSettings(
-                                    st.appName, st.welcomeMessage, st.footerMessage, st.activeThemeId,
-                                    st.supportPhone, st.supportEmail, st.supportWhatsapp,
-                                    newStatus, st.hidePromoFooter, st.assistantHidden, st.assistantSize,
-                                    st.chatHidden, st.chatSize, st.maxSearchRadiusKm, st.isSpeechSearchEnabled,
-                                    false, 90
-                                )
-                                viewModel.db.collection("settings").document("main_settings").update(
-                                    mapOf(
-                                        "isMaintenanceActive" to newStatus,
-                                        "chatDisabledAnnouncement" to emergencyMessage
+                                viewModel.saveCustomSettingsState(
+                                    settingsState.copy(
+                                        isMaintenanceActive = newStatus,
+                                        chatDisabledAnnouncement = emergencyMessage,
+                                        emergencyFreezeOrders = emergencyFreezeOrders,
+                                        adminBypassActive = adminBypassActive,
+                                        maintenanceDuration = selectedDuration
                                     )
                                 )
                                 Toast.makeText(context, if (newStatus) "🚨 تم تفعيل وضع الصيانة فوراً لجميع الأجهزة!" else "🟢 تم إيقاف وضع الصيانة وإعادة فتح التطبيق للعملاء!", Toast.LENGTH_SHORT).show()
@@ -139,18 +136,13 @@ fun AdminMaintenanceScreenContent(
                             checked = isMaint,
                             onCheckedChange = { checked ->
                                 isMaint = checked
-                                val st = settingsState
-                                viewModel.updateBackdoorSettings(
-                                    st.appName, st.welcomeMessage, st.footerMessage, st.activeThemeId,
-                                    st.supportPhone, st.supportEmail, st.supportWhatsapp,
-                                    checked, st.hidePromoFooter, st.assistantHidden, st.assistantSize,
-                                    st.chatHidden, st.chatSize, st.maxSearchRadiusKm, st.isSpeechSearchEnabled,
-                                    false, 90
-                                )
-                                viewModel.db.collection("settings").document("main_settings").update(
-                                    mapOf(
-                                        "isMaintenanceActive" to checked,
-                                        "chatDisabledAnnouncement" to emergencyMessage
+                                viewModel.saveCustomSettingsState(
+                                    settingsState.copy(
+                                        isMaintenanceActive = checked,
+                                        chatDisabledAnnouncement = emergencyMessage,
+                                        emergencyFreezeOrders = emergencyFreezeOrders,
+                                        adminBypassActive = adminBypassActive,
+                                        maintenanceDuration = selectedDuration
                                     )
                                 )
                                 Toast.makeText(context, if (checked) "🚨 تم تفعيل وضع الصيانة فوراً!" else "🟢 تم إيقاف وضع الصيانة بنجاح!", Toast.LENGTH_SHORT).show()
@@ -179,18 +171,13 @@ fun AdminMaintenanceScreenContent(
                     onClick = {
                         val newStatus = !isMaint
                         isMaint = newStatus
-                        val st = settingsState
-                        viewModel.updateBackdoorSettings(
-                            st.appName, st.welcomeMessage, st.footerMessage, st.activeThemeId,
-                            st.supportPhone, st.supportEmail, st.supportWhatsapp,
-                            newStatus, st.hidePromoFooter, st.assistantHidden, st.assistantSize,
-                            st.chatHidden, st.chatSize, st.maxSearchRadiusKm, st.isSpeechSearchEnabled,
-                            false, 90
-                        )
-                        viewModel.db.collection("settings").document("main_settings").update(
-                            mapOf(
-                                "isMaintenanceActive" to newStatus,
-                                "chatDisabledAnnouncement" to emergencyMessage
+                        viewModel.saveCustomSettingsState(
+                            settingsState.copy(
+                                isMaintenanceActive = newStatus,
+                                chatDisabledAnnouncement = emergencyMessage,
+                                emergencyFreezeOrders = emergencyFreezeOrders,
+                                adminBypassActive = adminBypassActive,
+                                maintenanceDuration = selectedDuration
                             )
                         )
                         Toast.makeText(context, if (newStatus) "🚨 تم تفعيل وضع الصيانة فوراً!" else "🟢 تم إيقاف وضع الصيانة وإعادة فتح التطبيق للعملاء!", Toast.LENGTH_LONG).show()
@@ -283,11 +270,22 @@ fun AdminMaintenanceScreenContent(
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(
                         onClick = {
+                            val notifId = "maint_${System.currentTimeMillis()}"
+                            val broadcastPayload = mapOf(
+                                "id" to notifId,
+                                "title" to "🚨 تنبيه صيانة وطوارئ",
+                                "message" to "$emergencyMessage (المدة المتوقعة: $selectedDuration)",
+                                "targetType" to "ALL",
+                                "targetAudience" to "ALL",
+                                "targetValue" to "",
+                                "timestamp" to System.currentTimeMillis()
+                            )
+                            viewModel.db.collection("notifications").document(notifId).set(broadcastPayload)
                             viewModel.triggerNotification("🚨 تنبيه صيانة: $emergencyMessage")
-                            Toast.makeText(context, "📢 تم بث إشعار الطوارئ لكافة المستخدمين بنجاح!", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "📢 تم بث إشعار الطوارئ لكافة المستخدمين عبر Firestore بنجاح!", Toast.LENGTH_SHORT).show()
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB45309)),
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.weight(1f).heightIn(min = 48.dp),
                         shape = RoundedCornerShape(8.dp)
                     ) {
                         Icon(Icons.Default.Notifications, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
@@ -297,20 +295,21 @@ fun AdminMaintenanceScreenContent(
 
                     Button(
                         onClick = {
-                            viewModel.db.collection("settings").document("main_settings").update(
-                                mapOf(
-                                    "chatDisabledAnnouncement" to emergencyMessage,
-                                    "supportPhone" to emergencyPhone,
-                                    "disableChatAll" to (isMaint && emergencyLockoutChat),
-                                    "emergencyFreezeOrders" to emergencyFreezeOrders,
-                                    "adminBypassActive" to adminBypassActive,
-                                    "maintenanceDuration" to selectedDuration
+                            val lockChatNow = isMaint && emergencyLockoutChat
+                            viewModel.saveCustomSettingsState(
+                                settingsState.copy(
+                                    chatDisabledAnnouncement = emergencyMessage,
+                                    supportPhone = emergencyPhone,
+                                    disableChatAll = lockChatNow,
+                                    emergencyFreezeOrders = emergencyFreezeOrders,
+                                    adminBypassActive = adminBypassActive,
+                                    maintenanceDuration = selectedDuration
                                 )
                             )
                             Toast.makeText(context, "💾 تم حفظ وتحديث كافة إعدادات الطوارئ سحابياً!", Toast.LENGTH_SHORT).show()
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.weight(1f).heightIn(min = 48.dp),
                         shape = RoundedCornerShape(8.dp)
                     ) {
                         Icon(Icons.Default.Check, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))

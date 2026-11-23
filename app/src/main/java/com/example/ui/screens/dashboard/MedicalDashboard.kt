@@ -49,7 +49,7 @@ fun MedicalDashboard(
     val providers by viewModel.providers.collectAsState()
     val liveAccount = remember(stores, providers, account) {
         stores.find { it.id == account.id }
-            ?.let { UnifiedBusinessAccount.fromStore(it, "stores") }
+            ?.let { UnifiedBusinessAccount.fromStore(it, "medical") }
             ?: providers.find { it.id == account.id }
                 ?.let { UnifiedBusinessAccount.fromProvider(it) }
             ?: account
@@ -340,6 +340,8 @@ fun MedicalDashboard(
                             isAvailable = liveAccount.rawStore?.isActive ?: liveAccount.isActive,
                             rating = liveAccount.rating.toDouble(),
                             reviewCount = liveAccount.numReviews,
+                            latitude = liveAccount.latitude,
+                            longitude = liveAccount.longitude,
                             themeColors = themeColors,
                             onChangePhoto = { url ->
                                 medicalViewModel.updateProfile(
@@ -361,8 +363,19 @@ fun MedicalDashboard(
                                     coverUrl = url
                                 )
                             },
-                            onSaveProfile = { name, _, city, desc, hours, available ->
-                                medicalViewModel.updateProfile(name, city, desc, hours, available)
+                            onSaveLocation = { lat, lng ->
+                                medicalViewModel.updateProfile(
+                                    name = liveAccount.name,
+                                    cityArea = liveAccount.neighborhood.ifBlank { liveAccount.cityId },
+                                    description = liveAccount.description,
+                                    workingHours = liveAccount.workingHours,
+                                    isAvailable = liveAccount.rawStore?.isActive ?: liveAccount.isActive,
+                                    latitude = lat,
+                                    longitude = lng
+                                )
+                            },
+                            onSaveProfile = { name, editedPhone, city, desc, hours, available ->
+                                medicalViewModel.updateProfile(name, city, desc, hours, available, phone = editedPhone)
                             },
                             onChangePassword = { oldP, newP ->
                                 medicalViewModel.changePassword(oldP, newP)

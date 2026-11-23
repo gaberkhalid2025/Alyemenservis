@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.ChatChannelEntity
 import com.example.ui.MainViewModel
+import com.example.ui.goBack
 import com.example.ui.screens.register.status.*
 import com.example.utils.VisualThemePalette
 import kotlinx.coroutines.launch

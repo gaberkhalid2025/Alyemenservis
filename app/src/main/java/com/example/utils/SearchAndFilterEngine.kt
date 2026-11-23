@@ -116,8 +116,9 @@ object SearchAndFilterEngine {
     fun createVoiceSearchIntent(): Intent {
         return Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ar-YE") // Arabic (Yemen)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "ar-YE")
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ar-SA") // Standard Arabic recognizer fallback
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "ar-YE") // Yemen dialect preference
+            putExtra(RecognizerIntent.EXTRA_ONLY_RETURN_LANGUAGE_PREFERENCE, false)
             putExtra(RecognizerIntent.EXTRA_PROMPT, "تحدث للبحث عن خدمة أو مركز تجاري...")
         }
     }

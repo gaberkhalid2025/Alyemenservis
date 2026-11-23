@@ -525,6 +525,17 @@ internal class SettingsThemeAndColorSyncDelegate(private val vm: SettingsViewMod
 
     fun saveCustomPermissionsMatrixToFirestore(permissions: List<String>, role: String = "ADMIN") {
         val cleanRole = role.trim().uppercase().ifBlank { "ADMIN" }
+        try {
+            val appCtx = com.example.MyApplication.instance
+            val prefs = appCtx?.getSharedPreferences("admin_rbac_cache", Context.MODE_PRIVATE)
+            prefs?.edit()
+                ?.putStringSet("role_perms_$cleanRole", permissions.toSet())
+                ?.putBoolean("role_configured_$cleanRole", true)
+                ?.apply()
+            if (vm.mainViewModel.adminViewModel.adminRole.value.equals(cleanRole, ignoreCase = true)) {
+                vm.mainViewModel.adminViewModel._supervisorPermissions.value = permissions
+            }
+        } catch (_: Exception) {}
         val payload = mapOf(
             "roles" to mapOf(
                 cleanRole to mapOf(

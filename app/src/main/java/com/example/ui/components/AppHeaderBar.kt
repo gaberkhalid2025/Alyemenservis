@@ -158,22 +158,72 @@ fun AppHeaderBar(
                         }
                         Spacer(modifier = Modifier.width(10.dp))
                     } else {
-                        // Location Pill (صنعاء ▾)
-                        Surface(
-                            onClick = { /* Select City */ },
-                            shape = RoundedCornerShape(999.dp),
-                            color = Color(0xFF141A2E),
-                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
-                            shadowElevation = 2.dp
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        // Location Pill (صنعاء ▾) with active Yemeni Cities DropdownMenu
+                        val citiesList by viewModel.cities.collectAsState()
+                        val selectedCityName by viewModel.homeViewModel.selectedCityName.collectAsState()
+                        val activeCityId by viewModel.filterCityId.collectAsState()
+                        var showCityMenu by remember { mutableStateOf(false) }
+                        val displayCityLabel = remember(selectedCityName, activeCityId, citiesList) {
+                            when {
+                                activeCityId.isNullOrBlank() || activeCityId == "ALL" -> selectedCityName.ifBlank { "الكل" }
+                                else -> citiesList.firstOrNull { it.id == activeCityId }?.nameAr ?: selectedCityName
+                            }
+                        }
+
+                        Box {
+                            Surface(
+                                onClick = { showCityMenu = true },
+                                shape = RoundedCornerShape(999.dp),
+                                color = Color(0xFF141A2E),
+                                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
+                                shadowElevation = 2.dp,
+                                modifier = Modifier.testTag("header_city_picker_btn")
                             ) {
-                                Icon(Icons.Default.LocationOn, null, tint = Color(0xFF06B6D4), modifier = Modifier.size(13.dp))
-                                Text("صنعاء", fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = TajawalFontFamily, color = Color.White)
-                                Icon(Icons.Default.KeyboardArrowDown, null, tint = Color(0xFF94A3B8), modifier = Modifier.size(13.dp))
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Icon(Icons.Default.LocationOn, null, tint = Color(0xFF06B6D4), modifier = Modifier.size(13.dp))
+                                    Text(
+                                        displayCityLabel,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = TajawalFontFamily,
+                                        color = Color.White,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Icon(Icons.Default.KeyboardArrowDown, null, tint = Color(0xFF94A3B8), modifier = Modifier.size(13.dp))
+                                }
+                            }
+
+                            DropdownMenu(
+                                expanded = showCityMenu,
+                                onDismissRequest = { showCityMenu = false },
+                                containerColor = Color(0xFF0F172A)
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("🇾🇪 كل المدن والمحافظات", color = Color(0xFF10B981), fontWeight = FontWeight.Bold, fontSize = 12.sp) },
+                                    onClick = {
+                                        viewModel.homeViewModel.setCityFilter(null)
+                                        viewModel.homeViewModel.selectYemeniCity("صنعاء")
+                                        showCityMenu = false
+                                    }
+                                )
+                                com.example.domain.YemenCities.list.forEach { gov ->
+                                    DropdownMenuItem(
+                                        text = { Text(gov, color = Color.White, fontSize = 12.sp) },
+                                        onClick = {
+                                            val matchedCity = citiesList.firstOrNull {
+                                                it.nameAr.contains(gov, ignoreCase = true) || gov.contains(it.nameAr, ignoreCase = true)
+                                            }
+                                            viewModel.homeViewModel.setCityFilter(matchedCity?.id ?: gov)
+                                            viewModel.homeViewModel.selectYemeniCity(gov)
+                                            showCityMenu = false
+                                        }
+                                    )
+                                }
                             }
                         }
                         Spacer(modifier = Modifier.width(10.dp))
@@ -266,15 +316,21 @@ fun AppHeaderBar(
                     onClick = { viewModel.navigateToScreen(AppScreens.USER_BROWSE) }
                 )
 
-                // 2. الخرائط
-                val isMap = currentScreen == AppScreens.MAP_VIEW
-                Luxury3DNavIcon(
-                    emojiIcon = "🗺️",
-                    vectorIcon = Icons.Default.Map,
-                    label = if (isEn) "Maps" else "الخرائط",
-                    isSelected = isMap,
-                    onClick = { viewModel.navigateToScreen(AppScreens.MAP_VIEW) }
-                )
+                // 2. الخرائط (خاضع لإعدادات المالك والإدارة)
+                val showMapsNav = settingsState.isMapFeatureEnabled &&
+                    (settingsState.isMapsIconVisible || adminRoleState != "GUEST")
+                if (showMapsNav) {
+                    val isMap = currentScreen == AppScreens.MAP_VIEW
+                    Luxury3DNavIcon(
+                        emojiIcon = settingsState.topMapsIcon.ifEmpty { "🗺️" },
+                        vectorIcon = Icons.Default.Map,
+                        label = if (isEn) "Maps" else "الخرائط",
+                        isSelected = isMap,
+                        iconSizeDp = settingsState.navIconSizeDp,
+                        iconStyle = settingsState.topNavIconStyle,
+                        onClick = { viewModel.navigateToScreen(AppScreens.MAP_VIEW) }
+                    )
+                }
 
                 // 3. الانضمام
                 val isJoin = currentScreen == AppScreens.REGISTER_FORM || currentScreen == AppScreens.JOIN_REQUEST_STATUS

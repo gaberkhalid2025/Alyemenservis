@@ -536,7 +536,10 @@ internal fun BoxScope.MapHudOverlay(
     isDrivingMode: Boolean,
     isHudMirrored: Boolean,
     onToggleMirror: () -> Unit,
-    onExitHud: () -> Unit
+    onExitHud: () -> Unit,
+    currentSpeedKmh: Int = 0,
+    nextDistanceText: String = "",
+    nextInstruction: String = "واصل السير على المسار الملاحي"
 ) {
     Box(
         modifier = Modifier
@@ -559,8 +562,16 @@ internal fun BoxScope.MapHudOverlay(
                 tint = Color(0xFF10B981),
                 modifier = Modifier.size(96.dp)
             )
+            if (nextDistanceText.isNotBlank()) {
+                Text(
+                    text = nextDistanceText,
+                    fontSize = 32.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color(0xFF00E5FF)
+                )
+            }
             Text(
-                text = if (isDrivingMode) "55" else "4.2",
+                text = currentSpeedKmh.coerceAtLeast(0).toString(),
                 fontSize = 80.sp,
                 fontWeight = FontWeight.Black,
                 color = Color(0xFF10B981)
@@ -571,10 +582,11 @@ internal fun BoxScope.MapHudOverlay(
                 color = Color.White
             )
             Text(
-                text = "واصل السير على المسار الملاحي",
+                text = nextInstruction,
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.White
+                color = Color.White,
+                textAlign = TextAlign.Center
             )
         }
 

@@ -21,6 +21,12 @@ object AppCategoryTaxonomy {
     val storesSubCategories = listOf(
         SubCategoryItem("all", "الكل", "🏪"),
         SubCategoryItem(
+            "malls",
+            "مراكز تجارية ومولات 🏬",
+            "🏬",
+            listOf("مول", "مركز تجاري", "مجمع تجاري", "سنتر", "بلازا", "جاليري", "mall")
+        ),
+        SubCategoryItem(
             "grocery",
             "سوبرماركت ومواد غذائية 🛒",
             "🛒",

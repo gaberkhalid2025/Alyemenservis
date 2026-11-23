@@ -723,6 +723,24 @@ fun ChatInputBar(
                             leadingIcon = { Icon(Icons.Default.LocationOn, contentDescription = null, tint = Color(0xFFEF4444)) }
                         )
                         DropdownMenuItem(
+                            text = { Text("🟢 بث موقعي الحي المباشر (خريطة التطبيق)", color = Color(0xFF34D399), fontSize = 13.sp, fontWeight = FontWeight.Bold) },
+                            onClick = {
+                                showAttachmentMenu = false
+                                val currentLoc = getBestLastKnownLocation(context)
+                                if (currentLoc != null) {
+                                    val lat = currentLoc.latitude
+                                    val lng = currentLoc.longitude
+                                    val summary = OfflineYemenGazetteer.nearestReferenceSummary(context, lat, lng).ifBlank { "موقعي المباشر" }
+                                    val appUri = OfflineYemenGazetteer.buildAppLocationUri(lat, lng, summary) + "&live=1"
+                                    onSendMessage("🟢 بث موقع حي مباشر: $summary", MediaType.LOCATION, appUri)
+                                    Toast.makeText(context, "✅ تم إرسال رابط التتبع الحي على خريطة التطبيق", Toast.LENGTH_SHORT).show()
+                                } else {
+                                    showMapLocationPicker = true
+                                }
+                            },
+                            leadingIcon = { Icon(Icons.Default.MyLocation, contentDescription = null, tint = Color(0xFF34D399)) }
+                        )
+                        DropdownMenuItem(
                             text = { Text("🗺️ تحديد موقع من خريطة التطبيق", color = Color(0xFF10B981), fontSize = 13.sp, fontWeight = FontWeight.Bold) },
                             onClick = {
                                 showAttachmentMenu = false

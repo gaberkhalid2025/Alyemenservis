@@ -79,13 +79,15 @@ class RegistrationHelper(
         onJobAdded: (JobEntity) -> Unit,
         onClientAdded: (Map<String, Any>) -> Unit,
         onJoinRequestPhoneUpdated: (String) -> Unit,
-        onNavigateToScreen: (String) -> Unit
+        onNavigateToScreen: (String) -> Unit,
+        onSubmissionResult: ((Boolean) -> Unit)? = null
     ) {
         val cleanPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(phone)
         val duplicateType = checkDuplicate(cleanPhone)
         if (duplicateType != null) {
             triggerNotification("❌ عذراً! رقم الهاتف ($phone) مسجل بالفعل كـ ($duplicateType). لا يُسمح بتكرار الحسابات.")
             logAdminActivity("محاولة تسجيل فني مكرر محجوبة لرقم: $cleanPhone - نوع التكرار: $duplicateType")
+            onSubmissionResult?.invoke(false)
             return
         }
 
@@ -103,6 +105,7 @@ class RegistrationHelper(
                 }
                 if (hasActiveJoinReq) {
                     triggerNotification("❌ يوجد طلب انضمام مسجل بالفعل قيد المراجعة أو مفعل لرقم الهاتف هذا")
+                    onSubmissionResult?.invoke(false)
                     return@launch
                 }
             } catch (e: Exception) {
@@ -333,16 +336,19 @@ class RegistrationHelper(
                     )
 
                     triggerNotification("📨 تم إرسال طلب انضمامك بنجاح، وهو قيد المراجعة لدى الإدارة")
+                    onSubmissionResult?.invoke(true)
                     onNavigateToScreen("JOIN_REQUEST_STATUS")
                 }
                 .addOnFailureListener { e ->
                     val errorMsg = e.localizedMessage ?: "تأكد من صغر حجم الصور واتصالك بالإنترنت"
                     triggerNotification("❌ فشل تقديم الطلب: $errorMsg")
+                    onSubmissionResult?.invoke(false)
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
                 com.example.utils.AppErrorLogManager.logFirestoreError("RegistrationHelper", "Error in submitJoinForm", e)
                 triggerNotification("❌ حدث خطأ أثناء إرسال الطلب: ${e.localizedMessage ?: "يرجى المحاولة مجدداً"}")
+                onSubmissionResult?.invoke(false)
             }
         }
     }
@@ -386,23 +392,30 @@ class RegistrationHelper(
     ) {
         val cleanPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(phone)
         if (cleanPhone.isNotEmpty()) {
-            val matching = pendingProviders.find { 
-                com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(it.phone) == cleanPhone || it.id == cleanPhone || it.id == phone 
+            val matchingList = pendingProviders.filter {
+                com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(it.phone) == cleanPhone ||
+                    it.id == cleanPhone || it.id == phone || it.id.startsWith("${cleanPhone}_")
             }
-            matching?.let {
-                onPendingRemoved(it.id)
+            matchingList.forEach { matched ->
+                onPendingRemoved(matched.id)
                 try {
-                    db.collection("pending_providers").document(it.id).delete()
-                } catch (e: Exception) {}
+                    db.collection("pending_providers").document(matched.id).delete()
+                    db.collection("join_requests").document(matched.id).delete()
+                } catch (_: Exception) {}
             }
             try {
                 db.collection("pending_providers").document(cleanPhone).delete()
                 db.collection("join_requests").document(cleanPhone).delete()
+                listOf("PROVIDER", "STORE", "RESTAURANT", "MEDICAL", "PROPERTY", "JOB", "JOB_SEEKER", "CLIENT").forEach { rType ->
+                    val compId = "${cleanPhone}_${rType}"
+                    db.collection("pending_providers").document(compId).delete()
+                    db.collection("join_requests").document(compId).delete()
+                }
                 if (phone != cleanPhone) {
                     db.collection("pending_providers").document(phone).delete()
                     db.collection("join_requests").document(phone).delete()
                 }
-            } catch (e: Exception) {}
+            } catch (_: Exception) {}
         }
         preferenceHelper.clearJoinRequestPhone(context)
         onPhoneCleared()

@@ -62,6 +62,8 @@ internal fun NavigationTopOverlay(
     onOpenDownloadDialog: () -> Unit,
     onRemoveWaypoint: (Int) -> Unit,
     onOpenVoiceSetup: () -> Unit,
+    vehicleProfile: NavVehicleProfile = NavVehicleProfile.SEDAN,
+    onCycleVehicleProfile: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -86,6 +88,21 @@ internal fun NavigationTopOverlay(
                 ) {
                     Box(Modifier.size(8.dp).clip(CircleShape).background(if (isApproximate) Color(0xFFF59E0B) else Color(0xFF10B981)))
                     Text(engineLabel, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                    Surface(
+                        onClick = onCycleVehicleProfile,
+                        shape = RoundedCornerShape(8.dp),
+                        color = Color(0xFF1E293B),
+                        border = BorderStroke(1.dp, Color(0xFF334155)),
+                        modifier = Modifier.testTag("nav_vehicle_profile_btn")
+                    ) {
+                        Text(
+                            text = "${vehicleProfile.emoji} ${vehicleProfile.labelAr}",
+                            color = Color(0xFF00E5FF),
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
                     IconButton(onClick = onToggleMapMode, modifier = Modifier.size(30.dp)) {
                         Icon(Icons.Default.Layers, contentDescription = "الطبقة", tint = Color(0xFF38BDF8), modifier = Modifier.size(18.dp))
                     }
@@ -170,59 +187,90 @@ internal fun NavigationTopOverlay(
                     shadowElevation = 12.dp,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Row(
-                        Modifier.fillMaxWidth().padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Surface(shape = CircleShape, color = Color(0xFF0284C7), modifier = Modifier.size(44.dp)) {
-                            Box(contentAlignment = Alignment.Center) {
-                                if (isLoadingRoute && !hasResult) CircularProgressIndicator(Modifier.size(22.dp), color = Color.White, strokeWidth = 2.dp)
-                                else Icon(maneuverIcon(if (isApproximate) null else upcoming?.maneuverType), contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp))
+                    Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Surface(shape = CircleShape, color = Color(0xFF0284C7), modifier = Modifier.size(44.dp)) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    if (isLoadingRoute && !hasResult) CircularProgressIndicator(Modifier.size(22.dp), color = Color.White, strokeWidth = 2.dp)
+                                    else Icon(maneuverIcon(if (isApproximate) null else upcoming?.maneuverType), contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp))
+                                }
                             }
-                        }
-                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                            val maneuverDistancePrompt = if (!isApproximate && upcoming != null) " · بعد ${MapDistanceCalculator.formatDistance(distToManeuver)}" else ""
-                            Text(
-                                text = (if (voiceEnabled) "🔊" else "🔇") + " · $currentSpeedKmh كم/س" + maneuverDistancePrompt,
-                                color = Color(0xFF00E5FF),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.ExtraBold
-                            )
-                            Text(instructionText, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                                val maneuverDistancePrompt = if (!isApproximate && upcoming != null) " · بعد ${MapDistanceCalculator.formatDistance(distToManeuver)}" else ""
+                                Text(
+                                    text = (if (voiceEnabled) "🔊" else "🔇") + " · $currentSpeedKmh كم/س" + maneuverDistancePrompt,
+                                    color = Color(0xFF00E5FF),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.ExtraBold
+                                )
+                                Text(instructionText, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                            }
+
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                                @OptIn(ExperimentalFoundationApi::class)
+                                Box(
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .clip(CircleShape)
+                                        .combinedClickable(
+                                            onClick = onToggleVoice,
+                                            onLongClick = onOpenVoiceSetup
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        if (voiceEnabled) (if (dialectVoice) Icons.Default.RecordVoiceOver else Icons.Default.VolumeUp) else Icons.Default.VolumeOff,
+                                        contentDescription = "الصوت (اضغط مطولاً لإعداد الصوت واللهجة)",
+                                        tint = when {
+                                            !voiceEnabled -> Color(0xFF94A3B8)
+                                            voiceUsingFallback -> Color(0xFFF59E0B)
+                                            dialectVoice -> Color(0xFF00E5FF)
+                                            else -> Color(0xFF10B981)
+                                        }
+                                    )
+                                }
+                                IconButton(
+                                    onClick = onOpenVoiceSetup,
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(Icons.Default.Tune, contentDescription = "إعدادات الصوت واللهجة", tint = Color(0xFFCBD5E1), modifier = Modifier.size(18.dp))
+                                }
+                                IconButton(onClick = { onToggleTopCardCollapsed(true) }, modifier = Modifier.size(36.dp)) {
+                                    Icon(Icons.Default.KeyboardArrowUp, contentDescription = "طي", tint = Color(0xFF94A3B8))
+                                }
+                            }
                         }
 
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                            @OptIn(ExperimentalFoundationApi::class)
-                            Box(
+                        // مؤشر المسارب البصري للمنعطف القادم
+                        if (!isApproximate && upcoming != null) {
+                            val activeLane = when (upcoming.maneuverType) {
+                                ManeuverType.LEFT, ManeuverType.SHARP_LEFT, ManeuverType.SLIGHT_LEFT -> 0
+                                ManeuverType.RIGHT, ManeuverType.SHARP_RIGHT, ManeuverType.SLIGHT_RIGHT -> 2
+                                else -> 1
+                            }
+                            Row(
                                 modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(CircleShape)
-                                    .combinedClickable(
-                                        onClick = onToggleVoice,
-                                        onLongClick = onOpenVoiceSetup
-                                    ),
-                                contentAlignment = Alignment.Center
+                                    .fillMaxWidth()
+                                    .background(Color(0xFF1E293B).copy(alpha = 0.7f), RoundedCornerShape(10.dp))
+                                    .padding(horizontal = 10.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
                             ) {
-                                Icon(
-                                    if (voiceEnabled) (if (dialectVoice) Icons.Default.RecordVoiceOver else Icons.Default.VolumeUp) else Icons.Default.VolumeOff,
-                                    contentDescription = "الصوت (اضغط مطولاً لإعداد الصوت واللهجة)",
-                                    tint = when {
-                                        !voiceEnabled -> Color(0xFF94A3B8)
-                                        voiceUsingFallback -> Color(0xFFF59E0B)
-                                        dialectVoice -> Color(0xFF00E5FF)
-                                        else -> Color(0xFF10B981)
-                                    }
-                                )
-                            }
-                            IconButton(
-                                onClick = onOpenVoiceSetup,
-                                modifier = Modifier.size(36.dp)
-                            ) {
-                                Icon(Icons.Default.Tune, contentDescription = "إعدادات الصوت واللهجة", tint = Color(0xFFCBD5E1), modifier = Modifier.size(18.dp))
-                            }
-                            IconButton(onClick = { onToggleTopCardCollapsed(true) }, modifier = Modifier.size(36.dp)) {
-                                Icon(Icons.Default.KeyboardArrowUp, contentDescription = "طي", tint = Color(0xFF94A3B8))
+                                val laneLabels = listOf("⬅️ يسار", "⬆️ مستقيم", "➡️ يمين")
+                                laneLabels.forEachIndexed { idx, label ->
+                                    val isAct = idx == activeLane
+                                    Text(
+                                        text = label,
+                                        color = if (isAct) Color(0xFF10B981) else Color(0xFF64748B),
+                                        fontSize = 11.sp,
+                                        fontWeight = if (isAct) FontWeight.ExtraBold else FontWeight.Normal,
+                                        modifier = Modifier.padding(horizontal = 8.dp)
+                                    )
+                                }
                             }
                         }
                     }

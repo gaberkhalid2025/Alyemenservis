@@ -9,11 +9,13 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.*
@@ -214,9 +216,9 @@ internal fun LazyListScope.adminModerationAndControlSection(
                         Text("📍 إعدادات مزود ونظام الخرائط:", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
 
                         val mapProviders = listOf(
-                            "MAPLIBRE" to "الخريطة المدمجة 🗺️",
-                            "MAPBOX" to "خريطة شوارع اليمن 🌐",
-                            "SATELLITE" to "الأقمار الصناعية 🛰️"
+                            "MAPLIBRE" to "الخريطة\nالمدمجة 🗺️",
+                            "MAPBOX" to "شوارع\nاليمن 🌐",
+                            "SATELLITE" to "الأقمار\nالصناعية 🛰️"
                         )
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -227,23 +229,31 @@ internal fun LazyListScope.adminModerationAndControlSection(
                                 Box(
                                     modifier = Modifier
                                         .weight(1f)
-                                        .clip(RoundedCornerShape(6.dp))
+                                        .heightIn(min = 48.dp)
+                                        .clip(RoundedCornerShape(8.dp))
                                         .background(if (isSel) themeColors.accent else Color.Black.copy(alpha = 0.3f))
                                         .clickable {
                                             viewModel.saveCustomSettingsState(settingsState.copy(mapProvider = provKey))
-                                            Toast.makeText(context, "تم تعيين مزود الخريطة: $provLabel", Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(context, "تم تعيين مزود الخريطة: ${provLabel.replace("\n", " ")}", Toast.LENGTH_SHORT).show()
                                         }
-                                        .padding(vertical = 8.dp),
+                                        .padding(vertical = 8.dp, horizontal = 6.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(
-                                        provLabel,
-                                        fontSize = 9.sp,
+                                        text = provLabel,
+                                        fontSize = 10.sp,
+                                        lineHeight = 13.sp,
                                         color = if (isSel) Color.Black else Color.White,
-                                        fontWeight = FontWeight.Bold
+                                        fontWeight = FontWeight.Bold,
+                                        textAlign = TextAlign.Center,
+                                        maxLines = 2
                                     )
                                 }
                             }
+                        }
+
+                        var isEcoLocal by remember(settingsState.isEcoMapDefault) {
+                            mutableStateOf(settingsState.isEcoMapDefault || com.example.utils.MapPowerDataPrefs.isEcoMode(context))
                         }
 
                         // ⚡ وضع توفير بيانات الإنترنت للخرائط
@@ -252,17 +262,24 @@ internal fun LazyListScope.adminModerationAndControlSection(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column(modifier = Modifier.weight(1f)) {
+                            Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
                                 Text("وضع التوفير الفائق لبيانات الإنترنت ⚡", fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.Bold)
                                 Text("تخفيض استهلاك البيانات بنسبة 60%+ عبر منع تحميل البلاطات الإضافية", fontSize = 10.sp, color = Color(0xFF10B981))
                             }
                             Switch(
-                                checked = com.example.utils.MapPowerDataPrefs.isEcoMode(context),
+                                checked = isEcoLocal,
                                 onCheckedChange = { eco ->
+                                    isEcoLocal = eco
                                     com.example.utils.MapPowerDataPrefs.setEcoMode(context, eco)
+                                    viewModel.saveCustomSettingsState(settingsState.copy(isEcoMapDefault = eco))
                                     Toast.makeText(context, if (eco) "تم تفعيل توفير البيانات الفائق ⚡ (توفير 60%+)" else "تم إيقاف وضع توفير البيانات", Toast.LENGTH_SHORT).show()
                                 },
-                                colors = SwitchDefaults.colors(checkedThumbColor = Color(0xFF10B981))
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color(0xFF10B981),
+                                    checkedTrackColor = Color(0xFF10B981).copy(alpha = 0.4f),
+                                    uncheckedThumbColor = Color.LightGray,
+                                    uncheckedTrackColor = Color.White.copy(alpha = 0.2f)
+                                )
                             )
                         }
 
@@ -271,13 +288,18 @@ internal fun LazyListScope.adminModerationAndControlSection(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("تفعيل ميزة الخرائط في المنصة بالكامل", fontSize = 12.sp, color = Color.White)
+                            Text("تفعيل ميزة الخرائط في المنصة بالكامل", fontSize = 12.sp, color = Color.White, modifier = Modifier.weight(1f).padding(end = 8.dp))
                             Switch(
                                 checked = settingsState.isMapFeatureEnabled,
                                 onCheckedChange = { enabled ->
                                     viewModel.saveCustomSettingsState(settingsState.copy(isMapFeatureEnabled = enabled))
                                 },
-                                colors = SwitchDefaults.colors(checkedThumbColor = themeColors.accent)
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = themeColors.accent,
+                                    checkedTrackColor = themeColors.accent.copy(alpha = 0.4f),
+                                    uncheckedThumbColor = Color.LightGray,
+                                    uncheckedTrackColor = Color.White.copy(alpha = 0.2f)
+                                )
                             )
                         }
 
@@ -286,23 +308,28 @@ internal fun LazyListScope.adminModerationAndControlSection(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("إظهار أيقونة الخرائط للجميع (الزوار والعملاء)", fontSize = 12.sp, color = Color.White)
+                            Text("إظهار أيقونة الخرائط للجميع (الزوار والعملاء)", fontSize = 12.sp, color = Color.White, modifier = Modifier.weight(1f).padding(end = 8.dp))
                             Switch(
                                 checked = settingsState.isMapsIconVisible,
                                 onCheckedChange = { visible ->
                                     viewModel.saveCustomSettingsState(settingsState.copy(isMapsIconVisible = visible))
                                 },
-                                colors = SwitchDefaults.colors(checkedThumbColor = themeColors.accent)
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = themeColors.accent,
+                                    checkedTrackColor = themeColors.accent.copy(alpha = 0.4f),
+                                    uncheckedThumbColor = Color.LightGray,
+                                    uncheckedTrackColor = Color.White.copy(alpha = 0.2f)
+                                )
                             )
                         }
 
                         Button(
                             onClick = {
-                                viewModel.saveCustomSettingsState(settingsState)
+                                viewModel.saveCustomSettingsState(settingsState.copy(isEcoMapDefault = isEcoLocal))
                                 Toast.makeText(context, "🗺️ تم حفظ ومزامنة إعدادات الخرائط في Firestore بنجاح", Toast.LENGTH_SHORT).show()
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
                         ) {
                             Text("حفظ ومزامنة إعدادات الخرائط 💾", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         }
@@ -312,25 +339,52 @@ internal fun LazyListScope.adminModerationAndControlSection(
 
             item {
                 Spacer(modifier = Modifier.height(8.dp))
-                AdminMapPanel(viewModel = viewModel, themeColors = themeColors)
+                AdminMapPanel(
+                    viewModel = viewModel,
+                    themeColors = themeColors,
+                    onOpenMap = { viewModel.navigateToScreen(AppScreens.MAP_VIEW) }
+                )
             }
         }
 
         "FINANCIAL_REPORTS" -> {
             item {
+                val revStats = androidx.compose.runtime.remember(bookings.size) {
+                    viewModel.adminViewModel.getRevenueStats("ALL")
+                }
+                val bookStats = androidx.compose.runtime.remember(bookings.size) {
+                    viewModel.adminViewModel.getBookingStats("ALL")
+                }
                 Card(colors = CardDefaults.cardColors(containerColor = themeColors.surface), modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("📈 تقارير الأرباح المتقدمة", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
-                        Text("إجمالي العمليات المنفذة: ${bookings.size}", fontSize = 12.sp, color = Color.White)
-                        Text("إجمالي الأرباح المتوقعة من العمولات: ${bookings.size * 500} ريال يمني", fontSize = 12.sp, color = Color(0xFF10B981), fontWeight = FontWeight.Bold)
+                        Text("📈 تقارير الأرباح والإيرادات الفعلية", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                        Text("إجمالي الحجوزات: ${bookStats.total} | مكتملة: ${bookStats.completed} | جارية: ${bookStats.inProgress}", fontSize = 12.sp, color = Color.White)
+                        Text("إجمالي الإيرادات المسجلة: ${String.format(java.util.Locale.US, "%.0f", revStats.totalRevenue)} ريال يمني", fontSize = 12.sp, color = Color(0xFF38BDF8), fontWeight = FontWeight.Bold)
+                        Text("صافي عمولة المنصة: ${String.format(java.util.Locale.US, "%.0f", revStats.platformCommission)} ريال يمني", fontSize = 12.sp, color = Color(0xFF10B981), fontWeight = FontWeight.Bold)
+                        Text("مستحقات مقدمي الخدمات: ${String.format(java.util.Locale.US, "%.0f", revStats.providerPayouts)} ريال يمني", fontSize = 11.5.sp, color = Color.LightGray)
                         Button(
-                            onClick = { },
-                            enabled = false,
-                            colors = ButtonDefaults.buttonColors(disabledContainerColor = Color.White.copy(alpha = 0.1f), disabledContentColor = Color.Gray)
+                            onClick = {
+                                val csv = buildString {
+                                    appendLine("Metric,Value,Currency")
+                                    appendLine("TotalBookings,${bookStats.total},COUNT")
+                                    appendLine("CompletedBookings,${bookStats.completed},COUNT")
+                                    appendLine("TotalRevenue,${revStats.totalRevenue},${revStats.currency}")
+                                    appendLine("PlatformCommission,${revStats.platformCommission},${revStats.currency}")
+                                    appendLine("ProviderPayouts,${revStats.providerPayouts},${revStats.currency}")
+                                }
+                                viewModel.adminViewModel.exportReport("FINANCIAL_CSV")
+                                val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                    type = "text/csv"
+                                    putExtra(android.content.Intent.EXTRA_SUBJECT, "تقرير الأرباح والعمولات")
+                                    putExtra(android.content.Intent.EXTRA_TEXT, csv)
+                                }
+                                context.startActivity(android.content.Intent.createChooser(shareIntent, "تصدير ومشاركة تقرير الأرباح"))
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
                         ) {
-                            Text("تصدير تقرير الأرباح (PDF) - قيد التطوير ⏳", fontSize = 11.sp)
+                            Text("📤 تصدير ومشاركة التقرير المالي (CSV)", color = Color.Black, fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
                         }
-                        Text("ميزة تصدير التقارير بصيغة PDF قيد التطوير وستتوفر في التحديث القادم.", fontSize = 10.sp, color = Color.Gray)
                     }
                 }
             }

@@ -140,7 +140,8 @@ data class ChatChannel(
     @Deprecated("استخدم title أو participantNames بدلاً منها", ReplaceWith("title"))
     val clientName: String = "",
     val clientPhoto: String = "",
-    val messages: List<ChatMessage> = emptyList()
+    val messages: List<ChatMessage> = emptyList(),
+    val participantUids: List<String> = emptyList()
 ) : Serializable {
     @Deprecated("استخدم participants بدلاً منها")
     val clientId: String get() = participants.firstOrNull() ?: ""

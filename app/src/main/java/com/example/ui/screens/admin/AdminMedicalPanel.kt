@@ -23,7 +23,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.data.StoreEntity
 import com.example.ui.MainViewModel
 import com.example.ui.screens.admin.components.AdminEntityCard
@@ -36,7 +36,7 @@ import com.example.utils.VisualThemePalette
 @Composable
 fun AdminMedicalPanel(
     onBack: () -> Unit = {},
-    viewModel: MainViewModel = viewModel(),
+    viewModel: MainViewModel = hiltViewModel(),
     themeColors: VisualThemePalette,
     modifier: Modifier = Modifier
 ) {

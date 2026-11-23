@@ -1,0 +1,86 @@
+# 76 – المساعد والصوت والدردشة والخرائط: الإصلاحات المتبقية من التقرير
+## 🔴 1) زر «📍 الخريطة» في المساعد يُفسد موقع المستخدم الحقيقي (`AssistantMessageItem` ≈ 146–158)
+الكود يستدعي `viewModel.updateUserLocation(entity.latitude, entity.longitude)` فيستبدل **موقع GPS الفعلي** بموقع الفني/المتجر ⇒ ملاحة ومسافات وفزعة كلها تنكسر. **الإصلاح:**
+```kotlin
+// بدل:   viewModel.updateUserLocation(first.latitude, first.longitude)
+// استعمل (الدالة موجودة بحسب التقرير):
+viewModel.openInAppMap(first.latitude, first.longitude, first.name)
+```
+و**حاجز يمنع تكرار الخطأ:** غيّر اسم `updateUserLocation` إلى `onLocationFix` واجعله `internal`، واستدعِه فقط من مسارات GPS (المستند 39). وأي استدعاء آخر يفشل الترجمة فتُكتشف الأخطاء المشابهة فوراً. تحقق بالبحث: `grep -rn "updateUserLocation(" app/src --include=*.kt`.
+## 🔴 2) المساعد لا يقرأ `ai_assistant_data.json` (محركان متفرقان)
+`SmartAssistantDialogView ← AssistantViewModel` يعتمد 7 أدلة ثابتة في الكود (بأسعار قديمة)، بينما `AiAssistantEngine` (32+ دليلاً وتحذيرات سلامة) يُستعمل في لوحة الأدمن فقط. **الإصلاح بتوحيد خلف واجهة (بلا حذف):**
+```kotlin
+interface AssistantBrain { suspend fun answer(question: String, userLat: Double?, userLng: Double?): AssistantAnswer }
+data class AssistantAnswer(val text: String, val guideId: String? = null, val safetyLevel: String = "LOW",
+                           val safetyWarning: String? = null, val immediateActions: List<String> = emptyList(), val referralAction: String? = null)
+
+class LocalGuideBrain(private val engine: AiAssistantEngine) : AssistantBrain {
+    override suspend fun answer(question: String, userLat: Double?, userLng: Double?): AssistantAnswer =
+        withContext(Dispatchers.Default) {
+            val expansions = DialectSynonyms.expand(question)
+            val g = engine.findBestGuide(expansions)          // عدّل لاسم دالتك؛ أو اطلب منها كل الأدلة ورتّب بمطابقة الكلمات
+            if (g == null) AssistantAnswer("لم أجد دليلاً مطابقاً. صِف العطل بكلمات أخرى أو اطلب فنياً.", referralAction = "CREATE_SERVICE_ORDER")
+            else AssistantAnswer(g.formatForChat(), g.id, g.safetyLevel, g.safetyWarning, g.immediateActions, g.referralAction)
+        }
+}
+```
+وفي `AssistantViewModel` احقن `AssistantBrain` واستبدل مصدر الـ7 أدلة تدريجياً (أبقِ القديمة كاحتياط إن عاد `null`). **عند `safetyLevel == "HIGH"`** لا تُظهر `diy_steps`؛ اعرض التحذير والإجراءات الفورية وزر «اطلب فنياً» (المستند 73-C5). وأعد تشغيل `patch_safety.py` على **كل** الـ32 دليلاً (التقرير يقول إن 9 فقط محمية) وراجع النتيجة بفني مرخّص.
+## 🔴 3) «الذكاء» غير فعال والرسالة مضلِّلة (`apiKey = ""` سطر 295)
+المساعد يعمل محلياً دائماً بينما الواجهة تقول «جاري توليد الإجابة الذكية». **الإصلاح الصادق:**
+1. اجعل `isGenerating` يعني «جاري البحث في الأدلة» فقط، والنص «أبحث لك في الأدلة…».
+2. سمِّ الشاشة «مساعد الأعطال» حتى يتوفر نموذج حقيقي.
+3. **لا تضع مفتاحاً في التطبيق إطلاقاً** (مفتاح فارغ كما هو أفضل من مفتاح مكشوف). الخيار الموصى به لاحقاً: **Firebase AI Logic** (Gemini عبر Firebase بلا مفتاح في التطبيق وبـApp Check). **تحقق من توثيق Firebase الحالي** لتوفره على خطتك المجانية وحدود الحصص قبل الاعتماد، وأبقِ الدليل المحلي طبقة أولى دائماً (سلامة + أوفلاين)، ولا تدع النموذج يتجاوز تحذيرات HIGH.
+## 🟠 4) الصوت
+- **`VoiceManager` (المساعد):** لا AudioFocus، وإذا غابت العربية يرجع إلى `Locale.getDefault()` فينطق بلغة الجهاز بشكل مشوّه. **الإصلاح:** مرّره عبر `VoiceRouter` (المستند 72): إن لم تتوفر العربية لا ينطق (يعرض النص فقط) بدل نطق خاطئ.
+- **مجلد `assets/voice/ye/` غير موجود** ⇒ لا صوت مسجّل. أنشئ المقاطع (قائمة 41 مقطعاً في المستند 72)؛ ابدأ بالحد الأدنى الذي يجعل `isComplete = true`: `after, d100, d200, left, right, straight, arrive` ثم أكمل الباقي.
+- **بقايا `RecognizerIntent ar-YE`** في `MainActivity.startVoiceInput` و`SearchAndFilterEngine` و`RegistrationField`: استبدلها بمكوّن واحد قابل لإعادة الاستعمال:
+```kotlin
+@Composable
+fun rememberVoiceInput(onText: (String) -> Unit): () -> Unit {
+    val context = LocalContext.current
+    var state by remember { mutableStateOf(VoiceState()) }
+    val helper = remember { VoiceSearchHelper(context, onFinal = onText, onState = { state = it }) }
+    DisposableEffect(Unit) { onDispose { helper.destroy() } }
+    val perm = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
+        if (ok) helper.start() else state = VoiceState(VoiceStatus.ERROR, message = "لا يمكن استعمال الصوت بلا إذن الميكروفون.", canUseKeyboard = true)
+    }
+    if (state.status != VoiceStatus.IDLE) VoiceSearchDialog(state, onCancel = { helper.cancel() }, onRetry = { helper.start() }, onUseKeyboard = { helper.cancel() }, onOpenSettings = { VoiceSearchHelper.openVoiceSettings(context) })
+    return { if (helper.hasMicPermission()) helper.start() else perm.launch(Manifest.permission.RECORD_AUDIO) }
+}
+// الاستعمال في أي حقل:   val startVoice = rememberVoiceInput { text -> query = text };   IconButton(onClick = startVoice) { ... }
+```
+## 🟠 5) الدردشة (متوسطة)
+**أ) مرفقات الملفات غير قابلة للفتح:**
+```kotlin
+fun openAttachment(context: Context, uriOrUrl: String, mime: String) {
+    val uri = Uri.parse(uriOrUrl)
+    val intent = Intent(Intent.ACTION_VIEW).setDataAndType(uri, mime.ifBlank { "*/*" }).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+    try { context.startActivity(intent) } catch (e: Exception) { Toast.makeText(context, "لا يوجد تطبيق لفتح هذا الملف", Toast.LENGTH_SHORT).show() }
+}
+// ChatBubbleItem: Modifier.clickable { openAttachment(context, msg.mediaUrl, msg.mimeType) } على فقاعة الملف
+```
+(للملفات المحلية `content://` استعمل `FileProvider`.) **ب) الفيديو:** لا تفتحه قبل اكتمال الرفع (`startsWith("http")`) وأظهر نسبة الرفع على الفقاعة، ومشغّل مدمج لاحقاً (Media3 يزيد الحجم؛ ابدأ بالخارجي مع الفحص).
+**ج) التلخيص داخل الـComposable:** `val summary = remember(filteredMessages) { ChatSmartSuggestionsEngine.summarizeMessages(filteredMessages) }` (أو `derivedStateOf`).
+**د) مفاتيح `unreadCount.$pId` و`reactions.$userId`:** المعرّفات التي فيها نقاط تكسر مسار الحقل. استعمل `FieldPath`:
+```kotlin
+ref.update(FieldPath.of("unreadCount", pId), FieldValue.increment(1))
+ref.update(FieldPath.of("reactions", userId), emoji)
+```
+(أو خزّن الخرائط تحت مفاتيح مُعقَّمة `id.replace(Regex("[^A-Za-z0-9_-]"), "_")` ثابتة بين الأجهزة.)
+## 🟠 6) الخرائط (من التقرير)
+| البند | الإصلاح |
+|---|---|
+| `mapProvider` وإعدادات الأدمن لا تُقرأ | تُحل بـ`MapLayersConfig` في المستند 75-القسم 9، وتمريرها إلى `MoreLayersSheet` وزر 3D (`engine`) |
+| HUD الليلي في `MapHudOverlay` يعرض «55» و«4.2» ثابتتين | مرّر السرعة والمسافة الحقيقيتين: `speedKmh = currentSpeedKmh` و`distance = formatDistance(distToManeuver)` كما في `HudMirror` (المستند 63)؛ وإن لم تتوفر فاعرض «—» |
+| تكافؤ الطبقات في `Map3DView` | قرّر: `Map3DView` للعرض ثلاثي الأبعاد فقط (علامات ومسار)؛ ولا تعد طبقات EOX/GIBS/الأمطار هناك (تعمل في Leaflet)، واكتب ذلك بوضوح في ورقة الطبقات لتفادي التوقع الخاطئ |
+| مناطق الخطر من ملاحظات الفنيين فقط | أضف بلاغات السائقين (القسم التالي) |
+### بلاغات الطريق المجتمعية (Waze-style) بتكلفة منخفضة
+`road_reports/{id}`: `{type: POTHOLE|FLOOD|BLOCKED|CHECKPOINT|FUEL, lat, lng, cell, createdAt, expiresAt, up, down, authorUid}` حيث `cell` = خلية جغرافية مقرّبة (`"%.2f_%.2f"`). **القراءة:** استعلام واحد `whereEqualTo("cell", c)` لكل خلية على المسار (≤ 6 خلايا) مع `expiresAt > now`، بلا مستمعين دائمين؛ **الكتابة:** مستخدم مسجّل، بحد 5 بلاغات/يوم من الجهاز، وتحقق في القواعد من الحقول؛ **التأكيد:** زر «ما زال موجوداً/انتهى» يزيد `up/down` بمعاملة، وتنتهي البلاغات تلقائياً (TTL 6–24 ساعة) بحذف الأقدم عند القراءة. التنبيه الصوتي قبل 500 م باستعمال `HazardAlerts` (المستند 63) ومفتاح `hazard` في الصوت المسجّل.
+## 🟡 7) متفرقات
+`AssistantInputBar`: `singleLine = false, maxLines = 3` مع `KeyboardOptions(imeAction = ImeAction.Send)`. الاقتراحات من JSON/Firestore بدل الكود. أسعار الأدلة: احذفها أو اعرضها «تقدير قديم». اختبارات JVM لـ`LocalGuideBrain` (سؤال «الكهرباء تنقطع» يعيد HIGH، «تنقيط حنفية» يعيد LOW).
+## ترتيب التنفيذ العام (كل التقرير)
+1. **74-A** صلاحيات الأدمن ← **74-B** اعتماد الطلبات والتسجيل ← **73-C1/C3** المحفظة والإشعارات (قواعد) ← **76-1** إصلاح زر المساعد (دقائق).
+2. **74-C** الهوية ثم قواعد الدردشة (بمراحل واختبار محاكي).
+3. **75** اللوحات والإعدادات وربط الأدمن بالخرائط.
+4. **76** توحيد المساعد، الصوت المسجّل، الدردشة، بلاغات الطريق.
+بعد كل بند: ابنِ، شغّل، وأرسل لي Logcat/الخطأ كما هو.

@@ -55,11 +55,27 @@ object MapScreenFilters {
         providers: List<ProviderEntity>,
         selectedCategory: String,
         selectedCity: String,
-        searchQuery: String
+        searchQuery: String,
+        customFilterLabel: String = ""
     ): List<ProviderEntity> {
         val cleanQuery = searchQuery.trim().lowercase()
+        val normCat = norm(selectedCategory)
+        val normLabel = norm(customFilterLabel)
+        val builtInNonProvider = setOf("STORES", "MALLS", "RESTAURANTS", "MEDICAL", "PROPERTIES")
         return providers.filter { p ->
-            val matchesCat = selectedCategory == "ALL" || selectedCategory == "PROVIDERS"
+            val matchesCat = when (selectedCategory) {
+                "ALL", "PROVIDERS" -> true
+                in builtInNonProvider -> false
+                "DELIVERY" -> {
+                    val blob = norm("${p.profession} ${p.specialization} ${p.customCategoryName}")
+                    blob.contains("توصيل") || blob.contains("ديليفري") || blob.contains("delivery")
+                }
+                else -> {
+                    val blob = norm("${p.profession} ${p.customCategoryName} ${p.specialization} ${p.categoryId} ${p.name}")
+                    (normCat.length >= 2 && blob.contains(normCat)) ||
+                        (normLabel.length >= 2 && blob.contains(normLabel))
+                }
+            }
             val matchesCity = matchesCityFilter(selectedCity, p.cityId, p.area, p.localNeighborhood)
             val matchesQuery = cleanQuery.isEmpty() ||
                     p.name.lowercase().contains(cleanQuery) ||
@@ -76,19 +92,48 @@ object MapScreenFilters {
         stores: List<StoreEntity>,
         selectedCategory: String,
         selectedCity: String,
-        searchQuery: String
+        searchQuery: String,
+        customFilterLabel: String = ""
     ): List<StoreEntity> {
         val cleanQuery = searchQuery.trim().lowercase()
+        val normCat = norm(selectedCategory)
+        val normLabel = norm(customFilterLabel)
         return stores.filter { s ->
-            val isMedical = s.sectionId.contains("medical") || s.categoryId.contains("medical") || s.name.contains("طبي") || s.name.contains("صيدلية") || s.name.contains("مستشفى") || s.name.contains("عيادة")
-            val isRestaurant = !isMedical && (s.sectionId.contains("restaurant") || s.categoryId.contains("restaurant") || s.name.contains("مطعم") || s.name.contains("كافيه") || s.name.contains("مأكولات") || s.name.contains("شاورما"))
+            val isMedical = s.sectionId.contains("medical", true) ||
+                s.categoryId.contains("medical", true) ||
+                s.providerType.contains("medical", true) ||
+                s.name.contains("طبي") || s.name.contains("صيدلية") || s.name.contains("مستشفى") || s.name.contains("عيادة")
+            val isRestaurant = !isMedical && (
+                s.sectionId.contains("restaurant", true) ||
+                s.categoryId.contains("restaurant", true) ||
+                s.providerType.contains("restaurant", true) ||
+                s.name.contains("مطعم") || s.name.contains("كافيه") || s.name.contains("مأكولات") || s.name.contains("شاورما")
+            )
+            val isMall = !isMedical && !isRestaurant && (
+                s.sectionId.contains("mall", true) ||
+                s.categoryId.contains("mall", true) ||
+                s.providerType.contains("mall", true) ||
+                s.name.contains("مول") || s.name.contains("مركز تجاري") || s.name.contains("مجمع تجاري") ||
+                s.description.contains("مول") || s.description.contains("مركز تجاري")
+            )
+            val hasDelivery = s.sectionId.contains("delivery", true) ||
+                s.description.contains("توصيل") || s.description.contains("ديليفري") ||
+                s.name.contains("توصيل") ||
+                s.keywords.any { it.contains("توصيل") || it.contains("delivery", true) }
 
             val matchesCat = when (selectedCategory) {
                 "ALL" -> true
                 "STORES" -> !isMedical && !isRestaurant
+                "MALLS" -> isMall
                 "RESTAURANTS" -> isRestaurant
                 "MEDICAL" -> isMedical
-                else -> false
+                "DELIVERY" -> hasDelivery
+                "PROVIDERS", "PROPERTIES" -> false
+                else -> {
+                    val blob = norm("${s.name} ${s.description} ${s.sectionId} ${s.categoryId} ${s.providerType} ${s.keywords.joinToString(" ")}")
+                    (normCat.length >= 2 && blob.contains(normCat)) ||
+                        (normLabel.length >= 2 && blob.contains(normLabel))
+                }
             }
             val matchesCity = matchesCityFilter(selectedCity, s.cityId, "", s.localNeighborhood)
             val matchesQuery = cleanQuery.isEmpty() ||
@@ -105,11 +150,23 @@ object MapScreenFilters {
         properties: List<PropertyEntity>,
         selectedCategory: String,
         selectedCity: String,
-        searchQuery: String
+        searchQuery: String,
+        customFilterLabel: String = ""
     ): List<PropertyEntity> {
         val cleanQuery = searchQuery.trim().lowercase()
+        val normCat = norm(selectedCategory)
+        val normLabel = norm(customFilterLabel)
+        val builtInNonProperty = setOf("PROVIDERS", "STORES", "MALLS", "RESTAURANTS", "MEDICAL", "DELIVERY")
         return properties.filter { pr ->
-            val matchesCat = selectedCategory == "ALL" || selectedCategory == "PROPERTIES"
+            val matchesCat = when (selectedCategory) {
+                "ALL", "PROPERTIES" -> true
+                in builtInNonProperty -> false
+                else -> {
+                    val blob = norm("${pr.title} ${pr.description} ${pr.propertyType}")
+                    (normCat.length >= 2 && blob.contains(normCat)) ||
+                        (normLabel.length >= 2 && blob.contains(normLabel))
+                }
+            }
             val matchesCity = matchesCityFilter(selectedCity, pr.cityId, "", pr.localNeighborhood)
             val matchesQuery = cleanQuery.isEmpty() ||
                     pr.title.lowercase().contains(cleanQuery) ||

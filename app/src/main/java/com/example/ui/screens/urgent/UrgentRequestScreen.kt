@@ -51,7 +51,7 @@ import java.util.UUID
 @Composable
 fun UrgentRequestScreen(
     viewModel: MainViewModel,
-    instantViewModel: InstantRequestViewModel = viewModel(),
+    instantViewModel: InstantRequestViewModel = viewModel.instantRequestViewModel,
     onNavigateBack: () -> Unit = {},
     onNavigateToUrgentList: () -> Unit = {}
 ) {

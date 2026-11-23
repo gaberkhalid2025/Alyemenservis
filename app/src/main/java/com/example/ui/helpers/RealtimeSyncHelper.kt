@@ -17,14 +17,14 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
 
     companion object {
         /**
-         * Real-time listeners limit (increased to 300 for direct sync).
+         * Real-time listeners limit (optimized to 80 to conserve Firestore Spark quota).
          */
-        var REALTIME_QUERY_LIMIT: Long = 300L
+        var REALTIME_QUERY_LIMIT: Long = 80L
 
         /**
-         * Default on-demand query limit (increased to 300 for direct sync).
+         * Default on-demand query limit (optimized to 80 to conserve Firestore Spark quota).
          */
-        var ON_DEMAND_FETCH_LIMIT: Long = 300L
+        var ON_DEMAND_FETCH_LIMIT: Long = 80L
     }
 
     val firestoreListeners = java.util.concurrent.CopyOnWriteArrayList<ListenerRegistration>()
@@ -399,8 +399,23 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
             }
         }
 
-        // 9. Pending Providers & Join Requests (Realtime Listener 9)
-        db.collection("pending_providers").limit(REALTIME_QUERY_LIMIT).addSnapshotListenerReg { snapshot, error ->
+        // 9. Pending Providers (Realtime Listener 9 - Staff gets active review queue, user gets own requests)
+        val fbUser = try {
+            com.google.firebase.auth.FirebaseAuth.getInstance().currentUser
+        } catch (_: Exception) {
+            null
+        }
+        val isStaffAuth = fbUser != null && !fbUser.isAnonymous
+        val userPhone = fbUser?.phoneNumber?.takeIf { it.isNotBlank() }?.let {
+            AppPreferenceHelper.normalizePhoneNumber(it)
+        }.orEmpty()
+
+        val pendingQuery = when {
+            isStaffAuth -> db.collection("pending_providers").limit(40)
+            userPhone.isNotBlank() -> db.collection("pending_providers").whereEqualTo("phone", userPhone).limit(5)
+            else -> null
+        }
+        pendingQuery?.addSnapshotListenerReg { snapshot, error ->
             if (error == null && snapshot != null) {
                 val fetched = snapshot.documents.mapNotNull { doc ->
                     try {
@@ -429,21 +444,28 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
             }
         }
 
-        // 10. Registered Users (Realtime Listener 10)
-        db.collection("registered_users").limit(REALTIME_QUERY_LIMIT).addSnapshotListenerReg { snapshot, error ->
-            if (error == null && snapshot != null) {
-                val fetched = snapshot.documents.mapNotNull { doc ->
-                    val data = doc.data?.toMutableMap() ?: mutableMapOf()
-                    data["id"] = doc.id
-                    data
+        // 10. Registered Users (Realtime Listener 10 - Staff only to prevent PERMISSION_DENIED on guest startup)
+        if (isStaffAuth) {
+            db.collection("registered_users").limit(40).addSnapshotListenerReg { snapshot, error ->
+                if (error == null && snapshot != null) {
+                    val fetched = snapshot.documents.mapNotNull { doc ->
+                        val data = doc.data?.toMutableMap() ?: mutableMapOf()
+                        data["id"] = doc.id
+                        data
+                    }
+                    appState._registeredUsersList.value = fetched
+                    appState._registeredUsersCount.value = fetched.size
                 }
-                appState._registeredUsersList.value = fetched
-                appState._registeredUsersCount.value = fetched.size
             }
         }
 
-        // 11. Fallback Sync from join_requests collection for any pending request
-        db.collection("join_requests").whereEqualTo("status", "PENDING").limit(REALTIME_QUERY_LIMIT).addSnapshotListenerReg { snapshot, error ->
+        // 11. Fallback Sync from join_requests collection
+        val joinReqQuery = when {
+            isStaffAuth -> db.collection("join_requests").whereEqualTo("status", "PENDING").limit(40)
+            userPhone.isNotBlank() -> db.collection("join_requests").whereEqualTo("phone", userPhone).limit(5)
+            else -> null
+        }
+        joinReqQuery?.addSnapshotListenerReg { snapshot, error ->
             if (error == null && snapshot != null) {
                 val currentPending = appState._pendingProviders.value.associateBy { it.id }.toMutableMap()
                 var updated = false

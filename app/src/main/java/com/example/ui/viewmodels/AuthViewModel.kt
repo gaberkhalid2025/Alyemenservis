@@ -26,15 +26,19 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
                 }
                 val cleanPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(currentUserPhone).filter { it.isDigit() }
                 if (cleanPhone.length >= 7) {
-                    val phoneVariants = listOf(cleanPhone, "0$cleanPhone", "+967$cleanPhone", "967$cleanPhone", "00967$cleanPhone").distinct()
+                    val phoneVariants = listOf(cleanPhone, "0$cleanPhone", "+967$cleanPhone", "967$cleanPhone", "00967$cleanPhone")
+                        .distinct()
+                        .take(10)
                     for (col in listOf("providers", "stores", "properties", "users", "registered_users")) {
-                        for (ph in phoneVariants) {
-                            db.collection(col).whereEqualTo("phone", ph).get().addOnSuccessListener { snaps ->
+                        db.collection(col)
+                            .whereIn("phone", phoneVariants)
+                            .limit(5)
+                            .get()
+                            .addOnSuccessListener { snaps ->
                                 for (doc in snaps.documents) {
                                     doc.reference.update("fcmToken", token)
                                 }
                             }
-                        }
                     }
                 }
             } catch (e: Exception) {

@@ -57,12 +57,7 @@ object PermissionGuard {
 
         if (supervisorGrantedPermissions.contains("ALL") || supervisorGrantedPermissions.contains("ALL_538")) return true
 
-        // Admin has full permission by default unless explicit custom list restricts it
-        if (role == AdminRole.ADMIN && supervisorGrantedPermissions.isEmpty()) {
-            return true
-        }
-
-        // Explicit permission check for Supervisor or restricted Admin
+        // Explicit permission check for Supervisor or Admin
         if (supervisorGrantedPermissions.contains(permission)) return true
 
         // Category-level check (e.g. if supervisor has "MANAGE_BOOKINGS", they can access all booking permissions)

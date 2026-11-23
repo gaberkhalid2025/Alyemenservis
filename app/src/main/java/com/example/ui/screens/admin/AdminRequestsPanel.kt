@@ -24,7 +24,50 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.PendingProviderEntity
 import com.example.ui.MainViewModel
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import coil.compose.AsyncImage
+import com.example.utils.SecurityCryptoUtils
 import com.example.utils.VisualThemePalette
+
+private fun decryptRequestAttachmentForPreview(raw: String): String {
+    val trimmed = raw.trim()
+    if (trimmed.isBlank()) return ""
+    if (trimmed.startsWith("http://") ||
+        trimmed.startsWith("https://") ||
+        trimmed.startsWith("data:image") ||
+        trimmed.startsWith("content://") ||
+        trimmed.startsWith("file://")
+    ) {
+        return trimmed
+    }
+    return if (trimmed.startsWith("gcm:") || trimmed.startsWith("gcmx:") || trimmed.startsWith("enc::")) {
+        SecurityCryptoUtils.decryptCrossDevice(trimmed).ifBlank {
+            SecurityCryptoUtils.decrypt(trimmed)
+        }
+    } else {
+        trimmed
+    }
+}
+
+private fun PendingProviderEntity.buildAttachmentPreviewItems(): List<Pair<String, String>> {
+    val items = mutableListOf<Pair<String, String>>()
+    decryptRequestAttachmentForPreview(selfiePhotoBase64).takeIf { it.isNotBlank() }?.let {
+        items.add("الصورة الشخصية / الشعار" to it)
+    }
+    decryptRequestAttachmentForPreview(idPhotoBase64).takeIf { it.isNotBlank() }?.let {
+        items.add("بطاقة الهوية / الترخيص" to it)
+    }
+    workPhotosBase64.forEachIndexed { index, raw ->
+        decryptRequestAttachmentForPreview(raw).takeIf { it.isNotBlank() }?.let {
+            items.add("صورة مرفقة ${index + 1}" to it)
+        }
+    }
+    return items
+}
 
 /**
  * 📨 AdminRequestsPanel
@@ -44,10 +87,15 @@ fun AdminRequestsPanel(
     val jobs by viewModel.jobs.collectAsState()
     val registeredUsersList by viewModel.registeredUsersList.collectAsState()
 
+    LaunchedEffect(Unit) {
+        viewModel.loadPendingTechnicians()
+    }
+
     var selectedTab by remember { mutableStateOf("SERVICES") }
     var rejectingRequest by remember { mutableStateOf<PendingProviderEntity?>(null) }
     var rejectionReason by remember { mutableStateOf("") }
     var pendingDeletionTarget by remember { mutableStateOf<Triple<String, String, String>?>(null) } // type, id, title
+    var previewingAttachmentsFor by remember { mutableStateOf<Pair<String, List<Pair<String, String>>>?>(null) }
 
     val pendingPropertiesList = properties.filter { !it.isApproved && !it.isDeleted }
     val pendingPropertiesFromProviders = pendingProviders.filter { 
@@ -170,6 +218,8 @@ fun AdminRequestsPanel(
                                     if (req.gpsCoords.isNotBlank() || req.latitude != 0.0) {
                                         val coordsStr = if (req.gpsCoords.isNotBlank()) req.gpsCoords else "${req.latitude}, ${req.longitude}"
                                         Text(text = "📍 إحداثيات الموقع: $coordsStr", fontSize = 10.5.sp, color = Color(0xFF10B981), fontWeight = FontWeight.Medium)
+                                    } else {
+                                        Text(text = "⚠️ بدون إحداثيات GPS — سيُستخدم مركز المدينة (${req.area.ifBlank { "صنعاء" }})", fontSize = 10.5.sp, color = Color(0xFFF59E0B), fontWeight = FontWeight.Medium)
                                     }
                                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 4.dp)) {
                                         if (req.selfiePhotoBase64.isNotBlank()) {
@@ -193,6 +243,21 @@ fun AdminRequestsPanel(
                                     }
                                     if (req.password.isNotBlank() || req.passwordHash.isNotBlank()) {
                                         Text(text = "🔒 كلمة المرور: محمية ومشفرة", fontSize = 11.sp, color = Color(0xFF10B981), fontWeight = FontWeight.Bold)
+                                    }
+                                    if (req.selfiePhotoBase64.isNotBlank() || req.idPhotoBase64.isNotBlank() || req.workPhotosBase64.isNotEmpty()) {
+                                        TextButton(
+                                            onClick = {
+                                                val items = req.buildAttachmentPreviewItems()
+                                                if (items.isNotEmpty()) {
+                                                    previewingAttachmentsFor = req.name to items
+                                                }
+                                            },
+                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                                        ) {
+                                            Icon(Icons.Default.Visibility, contentDescription = "معاينة المرفقات", tint = themeColors.accent, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("👁️ معاينة الصور والمستندات", fontSize = 11.sp, color = themeColors.accent, fontWeight = FontWeight.Bold)
+                                        }
                                     }
                                     Spacer(modifier = Modifier.height(8.dp))
                                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
@@ -235,6 +300,21 @@ fun AdminRequestsPanel(
                                     Text(text = "الهاتف: ${req.phone} | المنطقة: ${req.area} - ${req.localNeighborhood}", fontSize = 11.sp, color = themeColors.textSecondary)
                                     if (req.password.isNotBlank() || req.passwordHash.isNotBlank()) {
                                         Text(text = "🔒 كلمة المرور: محمية ومشفرة", fontSize = 11.sp, color = Color(0xFF10B981), fontWeight = FontWeight.Bold)
+                                    }
+                                    if (req.selfiePhotoBase64.isNotBlank() || req.idPhotoBase64.isNotBlank() || req.workPhotosBase64.isNotEmpty()) {
+                                        TextButton(
+                                            onClick = {
+                                                val items = req.buildAttachmentPreviewItems()
+                                                if (items.isNotEmpty()) {
+                                                    previewingAttachmentsFor = req.name to items
+                                                }
+                                            },
+                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                                        ) {
+                                            Icon(Icons.Default.Visibility, contentDescription = "معاينة المرفقات", tint = themeColors.accent, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("👁️ معاينة الصور والمستندات", fontSize = 11.sp, color = themeColors.accent, fontWeight = FontWeight.Bold)
+                                        }
                                     }
                                     Spacer(modifier = Modifier.height(8.dp))
                                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
@@ -315,6 +395,21 @@ fun AdminRequestsPanel(
                                     }
                                     if (req.password.isNotBlank() || req.passwordHash.isNotBlank()) {
                                         Text(text = "🔒 كلمة المرور: محمية ومشفرة", fontSize = 11.sp, color = Color(0xFF10B981), fontWeight = FontWeight.Bold)
+                                    }
+                                    if (req.selfiePhotoBase64.isNotBlank() || req.idPhotoBase64.isNotBlank() || req.workPhotosBase64.isNotEmpty()) {
+                                        TextButton(
+                                            onClick = {
+                                                val items = req.buildAttachmentPreviewItems()
+                                                if (items.isNotEmpty()) {
+                                                    previewingAttachmentsFor = req.name to items
+                                                }
+                                            },
+                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                                        ) {
+                                            Icon(Icons.Default.Visibility, contentDescription = "معاينة المرفقات", tint = themeColors.accent, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("👁️ معاينة الشعار والمستندات", fontSize = 11.sp, color = themeColors.accent, fontWeight = FontWeight.Bold)
+                                        }
                                     }
                                     Spacer(modifier = Modifier.height(8.dp))
                                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
@@ -556,6 +651,74 @@ fun AdminRequestsPanel(
             dismissButton = {
                 TextButton(onClick = { pendingDeletionTarget = null }) {
                     Text("إلغاء", color = Color.White)
+                }
+            }
+        )
+    }
+
+    previewingAttachmentsFor?.let { (applicantName, attachments) ->
+        AlertDialog(
+            onDismissRequest = { previewingAttachmentsFor = null },
+            title = {
+                Text("📎 مرفقات: $applicantName", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 420.dp)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    attachments.forEach { (label, source) ->
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(Color.Black.copy(alpha = 0.25f))
+                                .padding(8.dp)
+                        ) {
+                            Text(label, fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                            Spacer(modifier = Modifier.height(6.dp))
+                            if (source.startsWith("http://") || source.startsWith("https://") || source.startsWith("content://") || source.startsWith("file://")) {
+                                AsyncImage(
+                                    model = source,
+                                    contentDescription = label,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(170.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                )
+                            } else {
+                                val decodedBitmap = remember(source) {
+                                    runCatching {
+                                        val cleanB64 = if (source.contains(",")) source.substringAfter(",") else source
+                                        val bytes = android.util.Base64.decode(cleanB64, android.util.Base64.DEFAULT)
+                                        android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                                    }.getOrNull()
+                                }
+                                if (decodedBitmap != null) {
+                                    Image(
+                                        bitmap = decodedBitmap.asImageBitmap(),
+                                        contentDescription = label,
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(170.dp)
+                                            .clip(RoundedCornerShape(8.dp))
+                                    )
+                                } else {
+                                    Text("⚠️ تعذر فك ترميز هذا المرفق", fontSize = 11.sp, color = Color(0xFFFBBF24))
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { previewingAttachmentsFor = null }) {
+                    Text("إغلاق", color = themeColors.accent, fontWeight = FontWeight.Bold)
                 }
             }
         )

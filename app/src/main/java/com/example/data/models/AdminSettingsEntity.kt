@@ -72,16 +72,11 @@ data class AdminSettingsEntity(
     val activeFontFamily: String = "CAIRO", // "CAIRO", "DEFAULT", "TAHOMA", "AMIRI"
     val registrationRequirements: String = "الاسم الثلاثي للفني|Mandatory,رقم الهاتف|Mandatory,قسم الصيانة|Mandatory,المدينة والمحافظة|Mandatory,الحي أو الشارع|Optional,صورة سيلفي شخصية|Optional,صورة الهوية المهنية|Optional,نماذج من أعمالك السابقة|Optional",
     val maxWorkPhotos: Int = 5,
-    val showWorkPhotos: Boolean = true,
     val bypassVisitorRegistration: Boolean = true,
     val disableChatFirewall: Boolean = false,
     val disableBookingFirewall: Boolean = true,
     
     // X and Y scaling positions (as percentages of screen width/height, 0f..1f)
-    val assistantPositionX: Float = 0.85f,
-    val assistantPositionY: Float = 0.70f,
-    val chatPositionX: Float = 0.85f,
-    val chatPositionY: Float = 0.82f,
     val chatXOffset: Int = 20,
     val chatYOffset: Int = 80,
     val assistantXOffset: Int = 20,
@@ -89,10 +84,8 @@ data class AdminSettingsEntity(
 
     // Map feature switches
     val isMapFeatureEnabled: Boolean = true,
-    val mapProvider: String = "MAPLIBRE", // "MAPLIBRE", "GOOGLE", "MAPBOX"
+    val mapProvider: String = "MAPLIBRE", // "MAPLIBRE", "MAPBOX", "SATELLITE"
     val mapDefaultZoom: Float = 14f,
-    val mapMaxDistanceKm: Int = 20,
-    val mapPrecisionDigits: Int = 1, // 1 or 2 digits after decimal
 
     // Assistant controls
     val isAssistantEnabled: Boolean = true,
@@ -101,17 +94,13 @@ data class AdminSettingsEntity(
     // Card dimensions styles
     val coverHeight: Int = 0,
     val avatarSize: Int = 50,
-    val avatarShape: String = "CIRCLE", // "CIRCLE" or "ROUNDED"
     val cardBackgroundHex: String = "#1E293B",
     val providerNameColorHex: String = "#FFFFFF",
     val ratingColorHex: String = "#F59E0B",
     val locationColorHex: String = "#94A3B8",
-    val previewPriceColorHex: String = "#10B981",
 
     // Badges switches
-    val showUserIdInsteadOfNameInChat: Boolean = false,
     val requirePaymentProofImage: Boolean = true,
-    val enableBookingPaymentStep: Boolean = true,
     val showVipBadge: Boolean = true,
     val showVerifiedBadge: Boolean = true,
     val showRecommendedBadge: Boolean = true,
@@ -123,8 +112,6 @@ data class AdminSettingsEntity(
     val showCallButton: Boolean = true,
     val showVoiceCallButton: Boolean = false,
     val showInstantChatButton: Boolean = true,
-    val showReviewButton: Boolean = true,
-    val showReportButton: Boolean = true,
     val showWhatsappButton: Boolean = true,
     val showDetailsButton: Boolean = true,
     val showBookButton: Boolean = true,
@@ -136,10 +123,7 @@ data class AdminSettingsEntity(
 
     // Information rows switches and order
     val showDistance: Boolean = true,
-    val showPreviewPrice: Boolean = true,
     val showAvailability: Boolean = true,
-    val showReviewsCount: Boolean = true,
-    val infoRowsOrder: String = "NAME,RATING,DISTANCE,LOCATION,PRICE,AVAILABILITY",
 
     // Padding & Spacing
     val elementSpacing: Int = 8,
@@ -175,16 +159,10 @@ data class AdminSettingsEntity(
     val bannerDurationSeconds: Int = 10, // 0 for persistent, otherwise duration in seconds
     val bannerDisplayStyle: String = "SLIDE", // "SLIDE", "FADE", "BLINK", "SCROLL"
     val appDownloadUrl: String = "https://example.com/download_app",
-    val allowSendImages: Boolean = true,
-    val allowSendVideos: Boolean = true,
-    val maxImagesPerChat: Int = 5,
-    val maxVideosPerChat: Int = 2,
     val showRefreshIcon: Boolean = false,
     val showSettingsIcon: Boolean = false,
     val headerIconsOrder: String = "MENU,NOTIF,CHAT",
-    val headerIconsVisible: String = "MENU,NOTIF,CHAT",
     val categoriesLayoutType: String = "GRID_VERTICAL",
-    val isFavoritesEnabled: Boolean = true,
     val encryptionType: String = "تشفير آمن سحابي",
     val splashWelcomeMessage: String = "التطبيق الأول في اليمن والوطن العربي الذي يربط مقدمي الخدمات وأصحاب المهن بالمستخدمين فورياً",
     val websiteUrl: String = "https://www.yamandelil.com",
@@ -217,8 +195,6 @@ data class AdminSettingsEntity(
     val dynamicTabsList: String = "الرئيسية,المحلات,العقارات,المفضلة",
     val maxStorePhotos: Int = 5,
     val maxPropertyPhotos: Int = 5,
-    val storesRequiredFields: String = "الاسم,الوصف,الهاتف,الموقع",
-    val propertiesRequiredFields: String = "العنوان,الوصف,السعر,الهاتف",
     val recommendationsLayout: String = "GRID_HORIZONTAL",
     val storesTabName: String = "المحلات",
     val propertiesTabName: String = "العقارات",
@@ -273,20 +249,13 @@ data class AdminSettingsEntity(
     val maxCancellationHours: Int = 8,          // 8 ساعات قبل الموعد
     val maxCancellationAttempts: Int = 3,       // عدد محاولات الإلغاء المسموح بها
     val enableBookingPassword: Boolean = true,
-    val bookingPasswordLength: Int = 4,
-    val enableUniqueBookingNumber: Boolean = true,
     val bookingNumberPrefix: String = "BK",
-    // ⚠️ مكرر للتوافقية: استخدم advancePaymentPercent للحسابات. advancePaymentPercentage للتوافقية مع الشاشات القديمة.
-    val advancePaymentPercentage: Int = 30,
-    val enableProgressTracking: Boolean = true,
 
     // Advanced Payment, Instant Booking & Deposit Rule Controls
     val linkedCategoriesForInstantBooking: String = "",
-    val linkedProvidersForInstantBooking: String = "",
     val linkedProvidersForDeposit: String = "",
     val exemptUsersFromDeposit: String = "",
     val showWalletInProfile: Boolean = true,
-    val allowBookingWithoutDeposit: Boolean = true,
 
     // Voice Call In-App System Controls
     // ملاحظة أمنية: عند التعارض، disableVoiceCalls يتفوق على voiceCallsEnabled
@@ -295,12 +264,52 @@ data class AdminSettingsEntity(
     val voiceCallsAllowedProviders: String = "",
     val voiceCallsAllowedUsers: String = "",
     val disableVoiceCalls: Boolean = true,
-    val voiceCallsDisabledAnnouncement: String = "",
     val appLanguage: String = "ar",
     val hideTopHeaderBar: Boolean = false,
     val customAppName: String = "",
-    val showClientIdentityToProviders: Boolean = true
-)
+    val showClientIdentityToProviders: Boolean = true,
+    // Dynamic Map Layers/Services Admin Control & Maintenance Sync
+    val isEcoMapDefault: Boolean = false,
+    val enableMapLiveTrafficReports: Boolean = true,
+    val emergencyFreezeOrders: Boolean = false,
+    val adminBypassActive: Boolean = true,
+    val maintenanceDuration: String = "حتى الإشعار اليدوي"
+) {
+    // حقول إضافية في جسم الكلاس لتقليص عدد بارامترات المُنشئ دون كسر سقف الـ JVM (255 خانة) مع حفظ التوافقية الكاملة مع Firestore
+    var showWorkPhotos: Boolean = true
+    var assistantPositionX: Float = 0.85f
+    var assistantPositionY: Float = 0.70f
+    var chatPositionX: Float = 0.85f
+    var chatPositionY: Float = 0.82f
+    var mapMaxDistanceKm: Int = 20
+    var mapPrecisionDigits: Int = 1
+    var avatarShape: String = "CIRCLE"
+    var previewPriceColorHex: String = "#10B981"
+    var showUserIdInsteadOfNameInChat: Boolean = false
+    var enableBookingPaymentStep: Boolean = true
+    var showReviewButton: Boolean = true
+    var showReportButton: Boolean = true
+    var showPreviewPrice: Boolean = true
+    var showReviewsCount: Boolean = true
+    var infoRowsOrder: String = "NAME,RATING,DISTANCE,LOCATION,PRICE,AVAILABILITY"
+    var allowSendImages: Boolean = true
+    var allowSendVideos: Boolean = true
+    var maxImagesPerChat: Int = 5
+    var maxVideosPerChat: Int = 2
+    var headerIconsVisible: String = "MENU,NOTIF,CHAT"
+    var isFavoritesEnabled: Boolean = true
+    var storesRequiredFields: String = "الاسم,الوصف,الهاتف,الموقع"
+    var propertiesRequiredFields: String = "العنوان,الوصف,السعر,الهاتف"
+    var bookingPasswordLength: Int = 4
+    var enableUniqueBookingNumber: Boolean = true
+    var advancePaymentPercentage: Int = 30
+    var enableProgressTracking: Boolean = true
+    var linkedProvidersForInstantBooking: String = ""
+    var allowBookingWithoutDeposit: Boolean = true
+    var voiceCallsDisabledAnnouncement: String = ""
+    var mapLayersConfigJson: String = ""
+    var selectedCityFilterId: String = "ALL"
+}
 
 @Keep
 data class DynamicSection(

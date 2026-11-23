@@ -1,5 +1,6 @@
 package com.example.ui.screens.dashboard.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import com.example.ui.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -12,6 +13,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.ui.components.InteractiveMapLocationPickerDialog
+import com.example.utils.LandmarkAddress
+import com.example.utils.OfflineYemenGazetteer
 import com.example.utils.VisualThemePalette
 
 @Composable
@@ -22,8 +26,11 @@ fun UnifiedSettingsSection(
     description: String,
     workingHours: String = "",
     isAvailable: Boolean = true,
+    latitude: Double = 0.0,
+    longitude: Double = 0.0,
     themeColors: VisualThemePalette,
     onSaveProfile: (name: String, phone: String, cityArea: String, description: String, workingHours: String, isAvailable: Boolean) -> Unit,
+    onSaveLocation: ((lat: Double, lng: Double) -> Unit)? = null,
     onChangePassword: (oldPass: String, newPass: String) -> Unit
 ) {
     var nameInput by remember(name) { mutableStateOf(name) }
@@ -32,6 +39,10 @@ fun UnifiedSettingsSection(
     var descInput by remember(description) { mutableStateOf(description) }
     var hoursInput by remember(workingHours) { mutableStateOf(workingHours) }
     var availableState by remember(isAvailable) { mutableStateOf(isAvailable) }
+
+    var pickedLat by remember(latitude) { mutableDoubleStateOf(latitude) }
+    var pickedLng by remember(longitude) { mutableDoubleStateOf(longitude) }
+    var showMapPicker by remember { mutableStateOf(false) }
 
     var oldPasswordInput by remember { mutableStateOf("") }
     var newPasswordInput by remember { mutableStateOf("") }
@@ -42,7 +53,7 @@ fun UnifiedSettingsSection(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = themeColors.surface),
             shape = RoundedCornerShape(16.dp),
-            border = androidx.compose.foundation.BorderStroke(1.dp, themeColors.border)
+            border = BorderStroke(1.dp, themeColors.border)
         ) {
             Column(
                 modifier = Modifier.padding(16.dp),
@@ -65,15 +76,14 @@ fun UnifiedSettingsSection(
 
                 OutlinedTextField(
                     value = phoneInput,
-                    onValueChange = { /* Read only */ },
-                    label = { Text("رقم الهاتف المسجل (غير قابل للتعديل 🔒)") },
-                    enabled = false,
-                    readOnly = true,
+                    onValueChange = { phoneInput = it },
+                    label = { Text("رقم الهاتف للتواصل 📞", color = themeColors.textSecondary) },
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
-                        disabledBorderColor = themeColors.border,
-                        disabledTextColor = themeColors.textSecondary,
-                        disabledLabelColor = themeColors.textSecondary
+                        focusedBorderColor = themeColors.accent,
+                        unfocusedBorderColor = themeColors.border,
+                        focusedTextColor = themeColors.textPrimary,
+                        unfocusedTextColor = themeColors.textPrimary
                     )
                 )
 
@@ -89,6 +99,41 @@ fun UnifiedSettingsSection(
                         unfocusedTextColor = themeColors.textPrimary
                     )
                 )
+
+                if (onSaveLocation != null) {
+                    Surface(
+                        color = themeColors.background,
+                        shape = RoundedCornerShape(10.dp),
+                        border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.35f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("📍 إحداثيات الموقع على الخريطة", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = themeColors.textPrimary)
+                                Text(
+                                    text = if (LandmarkAddress.isValid(pickedLat, pickedLng)) {
+                                        OfflineYemenGazetteer.formatCoordinates(pickedLat, pickedLng)
+                                    } else {
+                                        "لم يتم تحديد الموقع الجغرافي بعد"
+                                    },
+                                    fontSize = 11.sp,
+                                    color = themeColors.accent
+                                )
+                            }
+                            OutlinedButton(
+                                onClick = { showMapPicker = true },
+                                shape = RoundedCornerShape(8.dp),
+                                border = BorderStroke(1.dp, Color(0xFF10B981))
+                            ) {
+                                Text("🗺️ تحديد", fontSize = 11.sp, color = Color(0xFF10B981), fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
 
                 OutlinedTextField(
                     value = descInput,
@@ -138,6 +183,9 @@ fun UnifiedSettingsSection(
                 Button(
                     onClick = {
                         onSaveProfile(nameInput, phoneInput, cityAreaInput, descInput, hoursInput, availableState)
+                        if (LandmarkAddress.isValid(pickedLat, pickedLng)) {
+                            onSaveLocation?.invoke(pickedLat, pickedLng)
+                        }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
                     shape = RoundedCornerShape(10.dp),
@@ -153,7 +201,7 @@ fun UnifiedSettingsSection(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = themeColors.surface),
             shape = RoundedCornerShape(16.dp),
-            border = androidx.compose.foundation.BorderStroke(1.dp, themeColors.border)
+            border = BorderStroke(1.dp, themeColors.border)
         ) {
             Column(
                 modifier = Modifier.padding(16.dp),
@@ -206,5 +254,28 @@ fun UnifiedSettingsSection(
                 }
             }
         }
+    }
+
+    if (showMapPicker) {
+        val initLat = if (LandmarkAddress.isValid(pickedLat, pickedLng)) pickedLat else 15.3694
+        val initLng = if (LandmarkAddress.isValid(pickedLat, pickedLng)) pickedLng else 44.1910
+        InteractiveMapLocationPickerDialog(
+            initialLat = initLat,
+            initialLng = initLng,
+            hasGps = LandmarkAddress.isValid(pickedLat, pickedLng),
+            gpsLat = initLat,
+            gpsLng = initLng,
+            title = "📍 حدد موقعك الجغرافي على الخريطة",
+            onDismiss = { showMapPicker = false },
+            onLocationPicked = { res ->
+                pickedLat = res.latitude
+                pickedLng = res.longitude
+                if (cityAreaInput.isBlank() && res.formattedAddress.isNotBlank()) {
+                    cityAreaInput = res.formattedAddress
+                }
+                onSaveLocation?.invoke(res.latitude, res.longitude)
+                showMapPicker = false
+            }
+        )
     }
 }

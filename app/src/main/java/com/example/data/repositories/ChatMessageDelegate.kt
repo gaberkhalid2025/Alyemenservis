@@ -6,6 +6,7 @@ import com.example.data.models.*
 import com.example.utils.AppError
 import com.example.utils.AppResult
 import com.google.firebase.firestore.CollectionReference
+import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
@@ -204,17 +205,24 @@ internal class ChatMessageDelegate(
                 "lastMessageSenderId" to senderId,
                 "updatedAt" to System.currentTimeMillis()
             )
-
-            channel?.participants?.forEach { pId ->
-                if (pId != senderId) {
-                    updates["unreadCount.$pId"] = FieldValue.increment(1)
-                }
+            val currentAuthUid = try {
+                com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid?.takeIf { it.isNotBlank() }
+            } catch (_: Exception) {
+                null
+            }
+            if (currentAuthUid != null) {
+                updates["participantUids"] = FieldValue.arrayUnion(currentAuthUid)
             }
 
             // Write message and update channel atomically in a single batch
             val batch = firestore.batch()
             batch.set(channelRef.collection("messages").document(messageId), confirmedMsg)
             batch.update(channelRef, updates)
+            channel?.participants?.forEach { pId ->
+                if (pId != senderId && pId.isNotBlank()) {
+                    batch.update(channelRef, FieldPath.of("unreadCount", pId), FieldValue.increment(1))
+                }
+            }
             batch.commit().await()
 
             // Update local to SENT and remove from pending queue if present
@@ -328,7 +336,15 @@ internal class ChatMessageDelegate(
             // Remote update
             val channelRef = channelsCollection.document(channelId)
             try {
-                channelRef.update("unreadCount.$currentUserId", 0).await()
+                val currentAuthUid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid?.takeIf { it.isNotBlank() }
+                if (currentAuthUid != null) {
+                    channelRef.update(
+                        FieldPath.of("unreadCount", currentUserId), 0,
+                        FieldPath.of("participantUids"), FieldValue.arrayUnion(currentAuthUid)
+                    ).await()
+                } else {
+                    channelRef.update(FieldPath.of("unreadCount", currentUserId), 0).await()
+                }
             } catch (e: Exception) {
                 // If field doesn't exist yet, ignore
             }
@@ -477,10 +493,8 @@ internal class ChatMessageDelegate(
             }
 
             msgRef.update(
-                mapOf(
-                    "reactions.$cleanUserId" to newValue,
-                    "updatedAt" to System.currentTimeMillis()
-                )
+                FieldPath.of("reactions", cleanUserId), newValue,
+                FieldPath.of("updatedAt"), System.currentTimeMillis()
             ).await()
             AppResult.Success(Unit)
         } catch (e: Exception) {

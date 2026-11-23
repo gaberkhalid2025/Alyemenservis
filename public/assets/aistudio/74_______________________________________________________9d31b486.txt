@@ -1,0 +1,251 @@
+# 74 – بروتوكول التطبيق الآمن + الإصلاحات الحرجة (صلاحيات الأدمن، الهوية والدردشة، اعتماد الطلبات، التسجيل)
+> **تنبيه صريح:** التقرير الذي لصقته صادر عن AI Studio ولم أتحقق من ادعاءاته على الكود. الأكواد هنا **ملفات مستقلة جديدة** وعقود ربط لا تفترض أسماء لم أرها؛ وأشير بوضوح إلى ما يحتاج مطابقة أسماء عندك. ولضمان «لا انهيار مفاجئ» اتبع القسم 1 حرفياً.
+
+## 1) بروتوكول التطبيق الآمن (يمنع الانهيار)
+أعطِ هذا لـAI Studio كما هو قبل أي تعديل:
+```
+قواعد صارمة لكل تعديل:
+1) خطوة واحدة صغيرة في كل مرة، ثم ابنِ المشروع (assembleDebug) وتأكد أنه يُترجم قبل الخطوة التالية.
+2) لا تغيّر توقيع أي دالة عامة موجودة؛ أضف معاملات اختيارية بقيم افتراضية، أو دالة جديدة بجانبها.
+3) كل حقل جديد في data class يحمل قيمة افتراضية (ليتحمّل Firestore/Room القديم). لا حقول بلا قيمة.
+4) أي تغيير في كيان Room (حقل/جدول) يتطلب رفع version وMigration صريحة؛ لا تستعمل fallbackToDestructiveMigration (يمسح بيانات المستخدم).
+5) كل قراءة من Firestore: getString/getLong/getDouble مع قيمة بديلة؛ لا `!!` ولا cast بلا فحص.
+6) كل Composable يعرض قائمة: key فريد مضمون؛ كل رمز خارج Composable يُحمي بـ try/catch ويسجّل في AppErrorLogManager.
+7) الميزات الخطرة خلف مفتاح (ثابت في NavConfig أو مستند settings في Firestore) قابل للإيقاف بلا إصدار جديد.
+8) لا تحذف كوداً قديماً قبل أن يعمل الجديد؛ علّمه @Deprecated وأبقه خطوة واحدة.
+9) بعد كل خطوة: شغّل التطبيق، افتح الشاشة المتأثرة، وأرسل لي أي Logcat بدل التخمين.
+```
+ترتيب الإصلاحات الحرجة (أعلاه → أسفل): **A** صلاحيات الأدمن ← **B** اعتماد الطلبات والتسجيل ← **C** الهوية والدردشة وقواعد Firestore ← **D** المحفظة والإشعارات (المستند 73).
+
+---
+## A) صلاحيات الأدمن: الافتراضي «السماح بكل شيء» (حرج)
+**المشكلة المذكورة:** `loginAdminSecure` يمرّر قائمة صلاحيات فارغة، و`hasAdminTabAccess` يعيد `true` لأي ADMIN إذا كانت القائمة فارغة؛ فتعديل مصفوفة الصلاحيات لا يمنع شيئاً. (ولدى المشرف يُبحث بـ id/name لا email.)
+**القاعدة الصحيحة:** *الرفض افتراضياً*؛ فراغ القائمة = لا صلاحيات (عدا المالك). وفرض الصلاحيات على **الخادم** (قواعد Firestore بـ Custom Claims) لا على الواجهة وحدها.
+### ملف جديد: `com/example/security/AdminPermissionResolver.kt`
+```kotlin
+package com.example.security
+
+object AdminPermissionResolver {
+    const val ALL = "*"
+
+    /** صلاحيات افتراضية دنيا للمشرف (أضف/احذف حسب مفاتيح تبويباتك الفعلية). */
+    val DEFAULT_SUPERVISOR = setOf("DASHBOARD", "REQUESTS", "SUPPORT_CHAT", "REPORTS_VIEW")
+    val DEFAULT_ADMIN = DEFAULT_SUPERVISOR + setOf("USERS", "PROVIDERS", "STORES", "NOTIFICATIONS")
+
+    /**
+     * @param role OWNER/ADMIN/SUPERVISOR/...  @param explicit صلاحيات الشخص نفسه من مستنده (قد تكون null/فارغة)
+     * @param matrix مصفوفة الدور من settings/admin_permissions_matrix (دور ← مفاتيح)
+     * القاعدة: المالك فقط يأخذ الكل. غيره: صلاحياته الصريحة ثم مصفوفة دوره ثم الافتراضي الأدنى. لا «الكل عند الفراغ».
+     */
+    fun resolve(role: String, explicit: Collection<String>?, matrix: Map<String, Collection<String>>): Set<String> {
+        val r = role.uppercase()
+        if (r == "OWNER") return setOf(ALL)
+        val own = explicit?.filter { it.isNotBlank() }?.toSet().orEmpty()
+        if (own.isNotEmpty()) return own
+        val byRole = matrix[r]?.filter { it.isNotBlank() }?.toSet().orEmpty()
+        if (byRole.isNotEmpty()) return byRole
+        return when (r) { "ADMIN" -> DEFAULT_ADMIN; "SUPERVISOR" -> DEFAULT_SUPERVISOR; else -> emptySet() }
+    }
+
+    fun hasAccess(perms: Set<String>, key: String): Boolean = ALL in perms || key in perms
+}
+```
+### تعديل `hasAdminTabAccess` (الاسم عندك)
+```kotlin
+// قبل (الخطأ):  if (perms.isEmpty()) return true
+// بعد:
+fun hasAdminTabAccess(tabKey: String): Boolean = AdminPermissionResolver.hasAccess(currentAdminPermissions, tabKey)
+```
+وفي `loginAdminSecure`: حمّل `settings/admin_permissions_matrix` مرة واحدة (مع كاش) ومرّر الصلاحيات المحسوبة من `resolve(...)` بدل القائمة الفارغة. وللمشرف ابحث بـ`id` **أو** `email` **أو** `phone` (نفس استعلامات الدخول المسموحة).
+### فرض الصلاحيات في الخادم (قواعد Firestore) — الحماية الحقيقية
+```
+function isAdmin()  { return request.auth != null && request.auth.token.admin == true; }
+function isStaff()  { return request.auth != null && (request.auth.token.admin == true || request.auth.token.supervisor == true); }
+match /settings/{doc}   { allow read: if request.auth != null; allow write: if isAdmin(); }
+match /join_requests/{id} { allow create: if request.auth != null; allow read, update: if isStaff() || (request.auth != null && resource.data.authUid == request.auth.uid); allow delete: if isAdmin(); }
+```
+الـclaims تُضبط بسكربت Admin SDK على حاسوبك مرة واحدة (مجاني): `setCustomUserClaims(uid, {admin:true})`. **بدونها تبقى الواجهة وحدها «حارساً» يمكن تجاوزه.**
+### تبويب ROLES_PERMISSIONS المكرّر
+اعرض **مكوّناً واحداً** (`AdminRolesPermissionsPanel`) واحذف المثبّت على "ADMIN" (`AdminPermissionsSelectorView` المفعّل لـ538 مفتاحاً تلقائياً)؛ وإن أردت إبقاءه فاجعله يستقبل الدور من المستخدم المحدد لا ثابتاً.
+
+---
+## B) اعتماد الطلبات (`approveRequest`) والتسجيل (حرج)
+**المشكلة المذكورة:** يُنشأ الكيان بـ`lat/lng = 0`، وصور فارغة، ويُجبر أي محافظة غير عدن/تعز/الحديدة على صنعاء `ye_san`، والصور المشفّرة تُرفع كما هي بلا فك تشفير ولا معاينة للأدمن، والتسجيل يختلق إحداثيات صنعاء ويعلن نجاحاً كاذباً.
+### B1) قاعدة: لا اعتماد بلا موقع صالح
+```kotlin
+// com/example/utils/ApprovalValidator.kt
+package com.example.utils
+
+object ApprovalValidator {
+    data class Problem(val field: String, val message: String)
+
+    fun validate(lat: Double?, lng: Double?, cityId: String?, name: String?, phone: String?): List<Problem> = buildList {
+        if (lat == null || lng == null || !LandmarkAddress.isValid(lat, lng)) add(Problem("location", "الموقع الجغرافي غير محدد؛ حدّده من الخريطة قبل الاعتماد"))
+        if (cityId.isNullOrBlank()) add(Problem("city", "المدينة/المحافظة غير محددة"))
+        if (name.isNullOrBlank()) add(Problem("name", "الاسم مطلوب"))
+        if (phone.isNullOrBlank()) add(Problem("phone", "الهاتف مطلوب"))
+    }
+}
+```
+في `approveRequest`: اجمع المشاكل؛ **إن وُجدت لا تنشئ الكيان**، وأظهر للأدمن حواراً بما ينقص مع زر «حدد الموقع من الخريطة» (`pickMode` من المستند 54) ثم أعد المحاولة. لا تكتب `0.0` ولا تفترض مدينة.
+### B2) المحافظة ← `cityId` بلا تحويل قسري إلى صنعاء
+```kotlin
+// com/example/utils/CityIdResolver.kt
+package com.example.utils
+
+object CityIdResolver {
+    /** يعيد معرّف المدينة النظامي من اسم المحافظة/المدينة، أو null إن لم يُعرف (لا افتراض صنعاء أبداً). */
+    fun resolve(rawName: String?, knownIds: Map<String, String>): String? {
+        val n = ArabicNormalizer.normalize(rawName.orEmpty())
+        if (n.length < 2) return null
+        knownIds[n]?.let { return it }
+        return knownIds.entries.firstOrNull { n.contains(it.key) || it.key.contains(n) }?.value
+    }
+}
+// knownIds: خريطة (اسم مطبَّع ← معرّف) تبنيها من CityAliases/OfflineMapManager عندك. مثال البناء:
+// val knownIds = OfflineMapManager.allCities().associate { ArabicNormalizer.normalize(it.nameAr) to it.id }  // عدّل حسب حقولك
+```
+إن عاد `null` ⇒ اعرض اختيار المحافظة للأدمن (قائمة) ولا تعتمد. وفي نافذة «التعديل السريع»: **اكتب اسم الحي في `localNeighborhood` فقط، ولا تلمس `cityId`** (السطر `cityId = trimmedArea` خطأ؛ احذفه).
+### B3) فك تشفير الصور ومعاينتها للأدمن قبل القبول
+```kotlin
+// com/example/utils/RequestImages.kt
+package com.example.utils
+
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.util.Base64
+
+object RequestImages {
+    /** يفكّ نصاً مشفّراً (من RegistrationHelper) إلى بايتات صورة، أو null. */
+    fun decryptToBytes(encrypted: String?): ByteArray? {
+        if (encrypted.isNullOrBlank()) return null
+        return try {
+            val plain = SecurityCryptoUtils.decrypt(encrypted)             // استعمل نفس الدالة المقابلة لـ encrypt عندك
+            val b64 = plain.substringAfter("base64,", plain)
+            Base64.decode(b64, Base64.DEFAULT)
+        } catch (e: Exception) { null }
+    }
+    fun toBitmap(bytes: ByteArray?, maxSide: Int = 1280): Bitmap? {
+        if (bytes == null) return null
+        return try {
+            val o = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, o)
+            var s = 1; while (maxOf(o.outWidth, o.outHeight) / s > maxSide * 2) s *= 2
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, BitmapFactory.Options().apply { inSampleSize = s })
+        } catch (e: Exception) { null }
+    }
+}
+```
+في `AdminRequestsPanel` استبدل النص «📷 تم إرفاق الصورة» بصورة مصغّرة قابلة للتكبير (`RequestImages.toBitmap(RequestImages.decryptToBytes(req.idImageEnc))?.asImageBitmap()`)، مع زرّي «اعتماد» و«رفض + سبب» (شرائح أسباب جاهزة). وعند **الاعتماد** ارفع `decryptToBytes(...)` (لا النص المشفّر) إلى Storage ثم احفظ الرابط في `profileImage`/`images`. **الأفضل:** بعد الاعتماد احذف الصور الشخصية الحساسة (بطاقة/سيلفي) من الطلب. (تذكير: Cloud Storage للمشاريع الجديدة قد يتطلب Blaze؛ تحقق من خطتك، وإلا فخزّن مصغّرات ≤150KB كما في المستند 62.)
+### B4) التسجيل: لا إحداثي مختلق ولا نجاح كاذب (`UnifiedRegistrationForm.fetchDeviceLocation`)
+```kotlin
+// com/example/utils/LocationCapture.kt
+package com.example.utils
+
+import android.annotation.SuppressLint
+import android.content.Context
+import android.location.Location
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import com.google.android.gms.tasks.CancellationTokenSource
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.coroutines.resume
+
+object LocationCapture {
+    /** موقع حيّ حديث (≤ accuracy م)، أو null عند الفشل/المهلة. يتطلب إذن الموقع الممنوح مسبقاً. */
+    @SuppressLint("MissingPermission")
+    suspend fun fresh(context: Context, timeoutMs: Long = 15_000L, maxAccuracyM: Float = 60f): Location? {
+        val client = LocationServices.getFusedLocationProviderClient(context.applicationContext)
+        val cts = CancellationTokenSource()
+        val loc = withTimeoutOrNull(timeoutMs) {
+            suspendCancellableCoroutine<Location?> { cont ->
+                client.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, cts.token)
+                    .addOnSuccessListener { if (cont.isActive) cont.resume(it) }
+                    .addOnFailureListener { if (cont.isActive) cont.resume(null) }
+                cont.invokeOnCancellation { cts.cancel() }
+            }
+        }
+        cts.cancel()
+        return loc?.takeIf { LandmarkAddress.isValid(it.latitude, it.longitude) && (!it.hasAccuracy() || it.accuracy <= maxAccuracyM) }
+    }
+}
+```
+استعمله في `fetchDeviceLocation`: عند `null` **لا تضع صنعاء ولا تعلن النجاح**؛ اعرض «تعذر تحديد موقعك. اختره من الخريطة» وافتح `LandmarkAddressScreen`-نمط اختيار نقطة. ولا تُفعّل زر «إرسال الطلب» حتى توجد إحداثيات صالحة (إلا لأنشطة بلا موقع).
+### B5) فقدان حقول التسجيل (`RegisterScreen/ProviderRegisterFormLayout/JobSeekerForm`)
+- `gpsCoords = ""` صراحةً ⇒ مرّر القيمة الفعلية (`"$lat,$lng"` أو الحقول الرقمية).
+- مرّر `workingHours/hasDelivery/hasEmergency/experienceYears/description` من `UnifiedRegistrationForm` إلى `RegisterScreen` ثم إلى الطلب (أضف الحقول لنموذج الطلب بقيم افتراضية).
+- اربط `cvUrlOrQualification` بمربع النص (`value = state.cv`, `onValueChange = { state.cv = it }`).
+- **سباق الإرسال:** لا تغلق الاستمارة ولا تحفظ الهاتف محلياً قبل نتيجة الخادم؛ حالة `Submitting → Success/Duplicate/Error` وزر معطّل أثناء الإرسال.
+- **معرّف الطلب المركب:** `requestDocId = "${cleanPhone}_${sectionType}"` (يسمح بنشاطين لرقم واحد) مع ترحيل: ابحث بالمعرّف الجديد ثم القديم.
+
+---
+## C) الهوية والدردشة وقواعد Firestore (حرج — بمراحل)
+**المشكلة:** التطبيق يدخل مجهولاً (UID عشوائي) بينما `participants/senderId` تحمل معرّفات تطبيقية (`user_xxx`, `prov.id`, `"ADMIN"`)، فعند تفعيل قواعد `request.auth.uid in participants` ستُرفض كل العمليات. **لا تفعّل القواعد قبل إكمال المراحل.**
+### المرحلة 1 (آمنة، بلا تغيير سلوك): هوية ثابتة بلا SMS ولا خادم
+Firebase **Email/Password** (مجاني) بعنوان اصطناعي مشتق من الهاتف يعطي **UID ثابتاً عبر الأجهزة**، ويربط الحساب المجهول الحالي به دون فقدان UID:
+```kotlin
+// com/example/security/AuthBridge.kt
+package com.example.security
+
+import com.google.firebase.auth.EmailAuthProvider
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseAuthInvalidUserException
+import com.google.firebase.auth.FirebaseAuthUserCollisionException
+import kotlinx.coroutines.tasks.await
+
+object AuthBridge {
+    private fun emailFor(phone: String) = "u${phone.filter { it.isDigit() }}@users.alyemen.app"      // عنوان اصطناعي لا يُستعمل للبريد
+
+    /** بعد التحقق المحلي من كلمة المرور، يضمن وجود UID ثابت ويعيده. كلمة المرور ≥ 6 (شرط Firebase). */
+    suspend fun ensureStableUid(phone: String, password: String): Result<String> {
+        if (password.length < 6) return Result.failure(IllegalArgumentException("كلمة المرور أقل من 6 أحرف"))
+        val auth = FirebaseAuth.getInstance()
+        val email = emailFor(phone)
+        return try {
+            val cur = auth.currentUser
+            val cred = EmailAuthProvider.getCredential(email, password)
+            val user = try {
+                when {
+                    cur != null && cur.isAnonymous -> try { cur.linkWithCredential(cred).await().user }       // يحتفظ بالـUID الحالي
+                        catch (e: FirebaseAuthUserCollisionException) { auth.signInWithCredential(cred).await().user }  // الحساب موجود من جهاز آخر
+                    else -> auth.signInWithCredential(cred).await().user
+                }
+            } catch (e: FirebaseAuthInvalidUserException) {
+                auth.createUserWithEmailAndPassword(email, password).await().user
+            }
+            Result.success(user?.uid ?: "")
+        } catch (e: Exception) { Result.failure(e) }
+    }
+}
+```
+نادِ `AuthBridge.ensureStableUid(phone, password)` بعد نجاح تسجيل الدخول/التسجيل الحالي، واحفظ الناتج في مستند المستخدم: `users/{legacyId}.authUid`. أضف علماً `NavConfig.USE_STABLE_AUTH_UID` (يبدأ `false`).
+### المرحلة 2 (إضافة حقول، بلا حذف): `participantUids`
+عند إنشاء/تحديث قناة دردشة: أضف `participantUids = participants.mapNotNull { uidOf(it) }` حيث `uidOf(legacyId)` تقرأ `users/{legacyId}.authUid`. وفي الرسائل أضف `senderUid`. **أبقِ** `participants/senderId` كما هي. اكتب سكربت ترحيل (Kotlin أو Node) يملأ `participantUids` للقنوات القديمة بدفعات (300 مستند).
+### المرحلة 3: القواعد (بعد اكتمال 1 و2 واختبارها بحساب تجريبي)
+```
+match /chat_channels/{cid} {
+  allow read: if request.auth != null && (request.auth.uid in resource.data.participantUids || isStaff());
+  allow create: if request.auth != null && request.auth.uid in request.resource.data.participantUids;
+  allow update: if request.auth != null && request.auth.uid in resource.data.participantUids
+                && request.resource.data.participantUids == resource.data.participantUids;
+  match /messages/{mid} {
+    allow read: if request.auth != null && (request.auth.uid in get(/databases/$(database)/documents/chat_channels/$(cid)).data.participantUids || isStaff());
+    allow create: if request.auth != null && request.resource.data.senderUid == request.auth.uid
+                  && request.auth.uid in get(/databases/$(database)/documents/chat_channels/$(cid)).data.participantUids;
+    allow delete: if request.auth != null && resource.data.senderUid == request.auth.uid;
+  }
+}
+```
+(كل `get()` داخل القاعدة تُحسب قراءة؛ هذا ثمن الأمان على Spark.) **اختبر القواعد في Firebase Emulator/«Rules Playground» قبل النشر.**
+### المرحلة 4: الاستعلامات
+غيّر `whereArrayContains("participants", cleanUserId)` إلى `whereArrayContains("participantUids", authUid)` خلف العلم، ثم احذف القديم بعد أسبوعين من الاستقرار.
+**HomeViewModel.openExternalDirections:** استبدل روابط `google.com/maps/dir` و`com.google.android.apps.maps` بفتح خريطة التطبيق/الملاحة (`state.startNavigation(...)`)، وأبقِ الخارجي كخيار ثانوي «فتح في تطبيق آخر» عبر `geo:` intent عام (بلا حزمة Google).
+
+---
+## اختبار هذه المرحلة
+1. أدمن بصلاحية «طلبات» فقط: لا يفتح «المستخدمون» (محلياً **وفي القواعد**).
+2. طلب تسجيل بلا موقع: لا يمكن اعتماده، ويظهر ما ينقص؛ بعد تحديد الموقع يُعتمد بإحداثياته.
+3. محافظة «حضرموت»: تُحفظ كحضرموت (لا صنعاء). 4. الأدمن يرى صورة السيلفي/البطاقة ويقبل أو يرفض بسبب.
+5. حساب مجهول ينتقل لـUID ثابت دون فقد القنوات؛ تسجيل الدخول من جهاز آخر يعيد الـUID نفسه.
+6. بعد تفعيل القواعد (في المحاكي أولاً): مستخدم عادي يقرأ قنواته فقط ولا يقرأ قنوات الآخرين.

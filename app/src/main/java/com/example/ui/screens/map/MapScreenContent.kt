@@ -102,7 +102,56 @@ fun MapScreenContent(
     val groupStore = remember { GroupStore(context) }
     var groupMembers by remember { mutableStateOf(groupStore.all()) }
 
-    LaunchedEffect(Unit) { MapPowerDataPrefs.init(context) }
+    val settingsState by viewModel.settings.collectAsState()
+    val adminRole by viewModel.adminRole.collectAsState()
+    val currentUserId by viewModel.currentUserId.collectAsState()
+    val currentUserPhone by viewModel.currentUserPhone.collectAsState()
+    val isAdminOrStaff = adminRole.trim().uppercase() in setOf("OWNER", "ADMIN", "SUPERVISOR", "SUPER_ADMIN", "MAIN_ADMIN")
+
+    if (!settingsState.isMapFeatureEnabled && !isAdminOrStaff) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color(0xFF0B0F19))
+                .padding(24.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Surface(
+                shape = RoundedCornerShape(22.dp),
+                color = Color(0xFF0F172A),
+                border = BorderStroke(1.dp, Color(0xFF334155))
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text("🗺️", fontSize = 42.sp)
+                    Text("خدمة الخرائط متوقفة مؤقتاً", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    Text(
+                        "أوقفت الإدارة ميزة الخرائط والملاحة مؤقتاً للصيانة أو التحديث.",
+                        color = Color(0xFF94A3B8),
+                        fontSize = 13.sp,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+                    Button(
+                        onClick = onBackClick,
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981))
+                    ) {
+                        Text("رجوع", fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+        return
+    }
+
+    LaunchedEffect(Unit) {
+        MapPowerDataPrefs.init(context)
+        if (settingsState.isEcoMapDefault) {
+            MapPowerDataPrefs.setEcoMode(context, true)
+        }
+    }
     val isEcoMode by MapPowerDataPrefs.ecoMode.collectAsState()
     val isManualLoc by viewModel.isManualLocationSet.collectAsState()
     var isPinPickMode by remember { mutableStateOf(false) }
@@ -323,25 +372,35 @@ fun MapScreenContent(
         }
     }
 
-    val filteredProviders = remember(providers, state.selectedCategory, state.selectedCity, state.searchQuery, companionFilter) {
-        var list = MapScreenFilters.filterProviders(providers, state.selectedCategory, state.selectedCity, state.searchQuery)
+    val isRegisteredUser = (currentUserId.isNotBlank() && currentUserId != "guest") || currentUserPhone.isNotBlank()
+    val isProviderUser = remember(isRegisteredUser, currentUserId, currentUserPhone, providers, stores, properties) {
+        isRegisteredUser && (
+            providers.any { it.id == currentUserId || (currentUserPhone.isNotBlank() && it.phone == currentUserPhone) } ||
+                stores.any { it.id == currentUserId || (currentUserPhone.isNotBlank() && it.phone == currentUserPhone) } ||
+                properties.any { it.ownerId == currentUserId || (currentUserPhone.isNotBlank() && it.phone == currentUserPhone) }
+            )
+    }
+    val selectedFilterLabel = ""
+
+    val filteredProviders = remember(providers, state.selectedCategory, state.selectedCity, state.searchQuery, companionFilter, selectedFilterLabel) {
+        var list = MapScreenFilters.filterProviders(providers, state.selectedCategory, state.selectedCity, state.searchQuery, selectedFilterLabel)
         if (companionFilter != null) {
             list = list.filter { it.specialization.contains(companionFilter!!) || it.profession.contains(companionFilter!!) }
         }
         list
     }
 
-    val filteredStores = remember(stores, state.selectedCategory, state.selectedCity, state.searchQuery, companionFilter) {
-        var list = MapScreenFilters.filterStores(stores, state.selectedCategory, state.selectedCity, state.searchQuery)
+    val filteredStores = remember(stores, state.selectedCategory, state.selectedCity, state.searchQuery, companionFilter, selectedFilterLabel) {
+        var list = MapScreenFilters.filterStores(stores, state.selectedCategory, state.selectedCity, state.searchQuery, selectedFilterLabel)
         if (companionFilter != null) {
             list = list.filter { it.name.contains(companionFilter!!) || it.description.contains(companionFilter!!) }
         }
         list
     }
 
-    val filteredProperties = remember(properties, state.selectedCategory, state.selectedCity, state.searchQuery, companionFilter) {
+    val filteredProperties = remember(properties, state.selectedCategory, state.selectedCity, state.searchQuery, companionFilter, selectedFilterLabel) {
         if (companionFilter != null) emptyList()
-        else MapScreenFilters.filterProperties(properties, state.selectedCategory, state.selectedCity, state.searchQuery)
+        else MapScreenFilters.filterProperties(properties, state.selectedCategory, state.selectedCity, state.searchQuery, selectedFilterLabel)
     }
 
     // 🏠 معالج «عنواني بالمعلم»
@@ -684,7 +743,11 @@ fun MapScreenContent(
                 onDismissMoreLayersSheet = { showMoreLayersSheet = false },
                 showZones = showZones,
                 onSetShowZones = { showZones = it },
-                onCoverageCleared = { coverageRefreshTick++ }
+                onCoverageCleared = { coverageRefreshTick++ },
+                adminRole = adminRole,
+                isRegisteredUser = isRegisteredUser,
+                isProvider = isProviderUser,
+                enableLiveTrafficByAdmin = settingsState.enableMapLiveTrafficReports
             )
         }
     }

@@ -171,13 +171,18 @@ fun DynamicPolymorphicProfileScreen(
         .filter { it.status.uppercase() in listOf("COMPLETED", "PAID", "CLOSED", "DELIVERED") }
         .sumOf { if (it.totalAmount > 0.0) it.totalAmount else it.price }
 
-    if (liveStore != null && !isOwner) {
+    var previewAsCustomer by remember { mutableStateOf(false) }
+
+    if (liveStore != null && (!isOwner || previewAsCustomer)) {
         StoreCustomerCatalogView(
             store = liveStore,
             products = products,
             viewModel = viewModel,
             themeColors = themeColors,
-            onBackClick = onBackClick
+            onBackClick = onBackClick,
+            isAdmin = adminRole != "GUEST",
+            isOwnerPreview = isOwner && previewAsCustomer,
+            onExitOwnerPreview = if (isOwner) { { previewAsCustomer = false } } else null
         )
         return
     }
@@ -307,29 +312,47 @@ fun DynamicPolymorphicProfileScreen(
                                 fontWeight = FontWeight.Bold,
                                 color = themeColors.accent
                             )
-                            Button(
-                                onClick = {
-                                    val destination = when (entityType) {
-                                        ProfileEntityType.TECHNICIAN -> "TECHNICIAN_DASHBOARD"
-                                        ProfileEntityType.STORE -> "STORE_DASHBOARD"
-                                        ProfileEntityType.RESTAURANT -> "RESTAURANT_DASHBOARD"
-                                        ProfileEntityType.MEDICAL -> "MEDICAL_DASHBOARD"
-                                        ProfileEntityType.REAL_ESTATE -> "PROPERTY_DASHBOARD"
-                                        ProfileEntityType.JOB -> "JOB_POSTER_DASHBOARD"
-                                        else -> "TECHNICIAN_DASHBOARD"
-                                    }
-                                    viewModel.navigateTo(destination)
-                                },
-                                colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
-                                shape = RoundedCornerShape(10.dp),
-                                modifier = Modifier.fillMaxWidth()
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Text(
-                                    text = "الدخول لوحة التحكم الرئيسية ⚙️",
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.Black
-                                )
+                                Button(
+                                    onClick = {
+                                        val destination = when (entityType) {
+                                            ProfileEntityType.TECHNICIAN -> "TECHNICIAN_DASHBOARD"
+                                            ProfileEntityType.STORE -> "STORE_DASHBOARD"
+                                            ProfileEntityType.RESTAURANT -> "RESTAURANT_DASHBOARD"
+                                            ProfileEntityType.MEDICAL -> "MEDICAL_DASHBOARD"
+                                            ProfileEntityType.REAL_ESTATE -> "PROPERTY_DASHBOARD"
+                                            ProfileEntityType.JOB -> "JOB_POSTER_DASHBOARD"
+                                            else -> "TECHNICIAN_DASHBOARD"
+                                        }
+                                        viewModel.navigateTo(destination)
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                                    shape = RoundedCornerShape(10.dp),
+                                    modifier = Modifier.weight(1.3f)
+                                ) {
+                                    Text(
+                                        text = "لوحة التحكم ⚙️",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.Black
+                                    )
+                                }
+                                OutlinedButton(
+                                    onClick = { previewAsCustomer = true },
+                                    shape = RoundedCornerShape(10.dp),
+                                    border = BorderStroke(1.dp, themeColors.accent),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text(
+                                        text = "معاينة كعميل 👁️",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = themeColors.accent
+                                    )
+                                }
                             }
                         }
                     }
