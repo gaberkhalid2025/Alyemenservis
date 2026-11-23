@@ -349,18 +349,19 @@ internal class ChatMessageDelegate(
                 // If field doesn't exist yet, ignore
             }
 
-            // Update status of incoming messages to READ (query unread only with batch limit)
-            val unreadSnapshot = channelRef.collection("messages")
-                .whereEqualTo("isRead", false)
-                .limit(30)
-                .get().await()
-            val unreadDocs = unreadSnapshot.documents.filter { doc ->
-                val senderId = doc.getString("senderId") ?: ""
-                senderId != currentUserId
-            }
+            // Update status of incoming messages to READ (bounded loop of batches of 30)
+            val now = System.currentTimeMillis()
+            for (batchIndex in 0 until 5) {
+                val unreadSnapshot = channelRef.collection("messages")
+                    .whereEqualTo("isRead", false)
+                    .limit(30)
+                    .get().await()
+                val unreadDocs = unreadSnapshot.documents.filter { doc ->
+                    val senderId = doc.getString("senderId") ?: ""
+                    senderId != currentUserId
+                }
+                if (unreadDocs.isEmpty()) break
 
-            if (unreadDocs.isNotEmpty()) {
-                val now = System.currentTimeMillis()
                 val batch = firestore.batch()
                 for (doc in unreadDocs) {
                     batch.update(
@@ -374,6 +375,7 @@ internal class ChatMessageDelegate(
                     )
                 }
                 batch.commit().await()
+                if (unreadSnapshot.documents.size < 30) break
             }
             AppResult.Success(Unit)
         } catch (e: Exception) {

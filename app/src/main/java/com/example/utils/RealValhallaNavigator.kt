@@ -520,7 +520,7 @@ object RealValhallaNavigator {
             }
 
         // القاموس الجغرافي اليمني الشامل (مدن، شوارع، جولات، صالات، مساجد، مدارس، مستشفيات، جامعات، مطارات)
-        local.addAll(OfflineYemenGazetteer.search(clean, refLat, refLng, limit = 16))
+        local.addAll(OfflineYemenGazetteer.search(clean, refLat, refLng, limit = 60))
 
         // المعالم المخصصة المضافة يدوياً + كاش نتائج البحث السابقة المحفوظ على القرص
         if (context != null) {
@@ -598,7 +598,7 @@ object RealValhallaNavigator {
                 compareByDescending<SearchAddressResult> { relevanceScore(it) }
                     .thenBy { HaversinePrecisionNavigator.calculateDistance(refLat, refLng, it.latitude, it.longitude) }
             )
-            .take(30)
+            .take(60)
 
         if (combined.isNotEmpty()) {
             lastSearchError = null

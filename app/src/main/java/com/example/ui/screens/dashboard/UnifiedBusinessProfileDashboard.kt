@@ -59,18 +59,27 @@ fun UnifiedBusinessProfileDashboard(
     }
 
     fun pickStoreForSection(sectionMatcher: (StoreEntity) -> Boolean): StoreEntity? {
-        return matchingStores.firstOrNull(sectionMatcher) ?: matchingStores.firstOrNull()
+        return matchingStores.firstOrNull(sectionMatcher)
     }
 
     val activeStore = remember(matchingStores, accountType) {
         when (accountType) {
             "RESTAURANT" -> pickStoreForSection {
                 it.sectionId.contains("restaurant", ignoreCase = true) ||
-                    it.categoryId.contains("rest", ignoreCase = true)
+                    it.categoryId.contains("rest", ignoreCase = true) ||
+                    it.categoryId.contains("مطعم")
             }
             "MEDICAL" -> pickStoreForSection {
                 it.sectionId.contains("medical", ignoreCase = true) ||
+                    it.categoryId.contains("طبي") ||
                     it.medicalLicenseNo.isNotBlank()
+            }
+            "MALL" -> pickStoreForSection {
+                it.sectionId.contains("mall", ignoreCase = true) ||
+                    it.categoryId.contains("مول") ||
+                    it.categoryId.contains("مركز تجاري") ||
+                    it.name.contains("مول") ||
+                    it.name.contains("مركز تجاري")
             }
             "STORE" -> pickStoreForSection {
                 !it.sectionId.contains("restaurant", ignoreCase = true) &&
@@ -96,7 +105,7 @@ fun UnifiedBusinessProfileDashboard(
                 val acc = UnifiedBusinessAccount.fromStore(activeStore, "restaurants")
                 RestaurantDashboard(account = acc, viewModel = viewModel, themeColors = themeColors, onBackClick = { viewModel.goBack() })
             } else {
-                LoadingOrEmptyDashboard("المطعم", themeColors = themeColors, onBackClick = { viewModel.goBack() })
+                LoadingOrEmptyDashboard("المطعم", themeColors = themeColors, onRetry = { viewModel.refreshData() }, onBackClick = { viewModel.goBack() })
             }
         }
         "MEDICAL" -> {
@@ -104,7 +113,15 @@ fun UnifiedBusinessProfileDashboard(
                 val acc = UnifiedBusinessAccount.fromStore(activeStore, "medical")
                 MedicalDashboard(account = acc, viewModel = viewModel, themeColors = themeColors, onBackClick = { viewModel.goBack() })
             } else {
-                LoadingOrEmptyDashboard("المركز الطبي", themeColors = themeColors, onBackClick = { viewModel.goBack() })
+                LoadingOrEmptyDashboard("المركز الطبي", themeColors = themeColors, onRetry = { viewModel.refreshData() }, onBackClick = { viewModel.goBack() })
+            }
+        }
+        "MALL" -> {
+            if (activeStore != null) {
+                val acc = UnifiedBusinessAccount.fromStore(activeStore, "stores")
+                StoreDashboard(account = acc, viewModel = viewModel, themeColors = themeColors, onBackClick = { viewModel.goBack() })
+            } else {
+                LoadingOrEmptyDashboard("المركز التجاري", themeColors = themeColors, onRetry = { viewModel.refreshData() }, onBackClick = { viewModel.goBack() })
             }
         }
         "STORE" -> {
@@ -112,7 +129,7 @@ fun UnifiedBusinessProfileDashboard(
                 val acc = UnifiedBusinessAccount.fromStore(activeStore, "stores")
                 StoreDashboard(account = acc, viewModel = viewModel, themeColors = themeColors, onBackClick = { viewModel.goBack() })
             } else {
-                LoadingOrEmptyDashboard("المتجر", themeColors = themeColors, onBackClick = { viewModel.goBack() })
+                LoadingOrEmptyDashboard("المتجر", themeColors = themeColors, onRetry = { viewModel.refreshData() }, onBackClick = { viewModel.goBack() })
             }
         }
         "REAL_ESTATE" -> {
@@ -120,7 +137,7 @@ fun UnifiedBusinessProfileDashboard(
                 val acc = UnifiedBusinessAccount.fromProperty(activeProperty)
                 PropertyDashboard(account = acc, viewModel = viewModel, themeColors = themeColors, onBackClick = { viewModel.goBack() })
             } else {
-                LoadingOrEmptyDashboard("العقارات", themeColors = themeColors, onBackClick = { viewModel.goBack() })
+                LoadingOrEmptyDashboard("العقارات", themeColors = themeColors, onRetry = { viewModel.refreshData() }, onBackClick = { viewModel.goBack() })
             }
         }
         "JOB_POSTER" -> {
@@ -141,7 +158,7 @@ fun UnifiedBusinessProfileDashboard(
                 val acc = UnifiedBusinessAccount.fromStore(activeStore, activeStore.sectionId.ifBlank { "stores" })
                 StoreDashboard(account = acc, viewModel = viewModel, themeColors = themeColors, onBackClick = { viewModel.goBack() })
             } else {
-                LoadingOrEmptyDashboard("مقدم الخدمة", themeColors = themeColors, onBackClick = { viewModel.goBack() })
+                LoadingOrEmptyDashboard("مقدم الخدمة", themeColors = themeColors, onRetry = { viewModel.refreshData() }, onBackClick = { viewModel.goBack() })
             }
         }
     }
@@ -151,6 +168,7 @@ fun UnifiedBusinessProfileDashboard(
 private fun LoadingOrEmptyDashboard(
     title: String,
     themeColors: VisualThemePalette,
+    onRetry: () -> Unit = {},
     onBackClick: () -> Unit
 ) {
     var timedOut by remember(title) { mutableStateOf(false) }
@@ -188,7 +206,10 @@ private fun LoadingOrEmptyDashboard(
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Button(
-                        onClick = { retryTick++ },
+                        onClick = {
+                            onRetry()
+                            retryTick++
+                        },
                         colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent)
                     ) {
                         Text("إعادة المحاولة 🔄", color = Color.Black, fontSize = 12.sp)

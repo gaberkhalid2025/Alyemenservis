@@ -142,16 +142,16 @@ object LandmarkFinder {
                 clauses.append("nwr(around:$radiusM,$la,$lo)[\"name\"~\"(صالة|قاعة|أفراح|افراح|أعراس|مناسبات)\",i];")
             }
             nq.contains("مسجد") || nq.contains("جامع") || nq.contains("مصلى") -> {
-                clauses.append("nwr(around:12000,$la,$lo)[\"amenity\"=\"place_of_worship\"][\"name\"];")
+                clauses.append("nwr(around:4000,$la,$lo)[\"amenity\"=\"place_of_worship\"][\"name\"];")
             }
             nq.contains("مدرسه") || nq.contains("ثانويه") || nq.contains("معهد") || nq.contains("جامعه") || nq.contains("كليه") -> {
-                clauses.append("nwr(around:12000,$la,$lo)[\"amenity\"~\"^(school|college|university|kindergarten)\$\"][\"name\"];")
+                clauses.append("nwr(around:4000,$la,$lo)[\"amenity\"~\"^(school|college|university|kindergarten)\$\"][\"name\"];")
             }
             nq.contains("شارع") || nq.contains("طريق") || nq.contains("دائري") || nq.contains("جوله") -> {
-                clauses.append("way(around:12000,$la,$lo)[\"highway\"][\"name\"];")
+                clauses.append("way(around:4000,$la,$lo)[\"highway\"][\"name\"];")
             }
             nq.contains("بيت") || nq.contains("منزل") || nq.contains("حاره") || nq.contains("حي") -> {
-                clauses.append("nwr(around:15000,$la,$lo)[\"place\"~\"^(neighbourhood|suburb|quarter|village|hamlet)\$\"][\"name\"];")
+                clauses.append("nwr(around:5000,$la,$lo)[\"place\"~\"^(neighbourhood|suburb|quarter|village|hamlet)\$\"][\"name\"];")
             }
         }
         if (clauses.isEmpty()) return@withContext emptyList()

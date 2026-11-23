@@ -204,7 +204,7 @@ class PushNotificationHandler(private val context: Context) {
 
     private fun saveAllNotifications(list: List<PushNotificationItem>) {
         val arr = JSONArray()
-        for (item in list) {
+        for (item in list.take(100)) {
             val obj = JSONObject()
             obj.put("id", item.id)
             obj.put("title", item.title)

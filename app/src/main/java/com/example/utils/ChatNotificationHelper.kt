@@ -11,9 +11,11 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.Person
-import androidx.core.app.RemoteInput
-import androidx.core.graphics.drawable.IconCompat
 import com.example.MainActivity
+import com.example.ui.AppScreens
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URL
@@ -101,12 +103,15 @@ object ChatNotificationHelper {
             else -> CHANNEL_MESSAGES
         }
 
-        // 1. Intent for opening app
+        // 1. Intent for opening direct chat screen in MainActivity
         val contentIntent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             putExtra(EXTRA_CHANNEL_ID, channelId)
             putExtra(EXTRA_SENDER_ID, senderId)
             putExtra(EXTRA_SENDER_NAME, senderName)
+            if (channelId.isNotBlank()) {
+                putExtra("openChatChannelId", channelId)
+            }
         }
 
         val contentPendingIntent = PendingIntent.getActivity(
@@ -116,32 +121,7 @@ object ChatNotificationHelper {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        // 2. Direct Reply Action with RemoteInput
-        val replyLabel = "رد سريع..."
-        val remoteInput = RemoteInput.Builder(KEY_TEXT_REPLY)
-            .setLabel(replyLabel)
-            .build()
-
-        val replyPendingIntent = PendingIntent.getBroadcast(
-            context,
-            notificationId + 1000,
-            Intent("com.example.ACTION_DIRECT_REPLY").apply {
-                setPackage(context.packageName)
-                putExtra(EXTRA_CHANNEL_ID, channelId)
-                putExtra(EXTRA_SENDER_ID, senderId)
-            },
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
-        )
-
-        val replyAction = NotificationCompat.Action.Builder(
-            android.R.drawable.ic_menu_send,
-            "رد",
-            replyPendingIntent
-        ).addRemoteInput(remoteInput)
-            .setAllowGeneratedReplies(true)
-            .build()
-
-        // 3. Person and MessagingStyle
+        // 2. Person and MessagingStyle
         val sender = Person.Builder()
             .setName(senderName.ifBlank { "مستخدم" })
             .setKey(senderId)
@@ -160,25 +140,29 @@ object ChatNotificationHelper {
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
-            .addAction(replyAction)
 
-        // Add BigPicture if image URL is available
+        val appContext = context.applicationContext
         if (mediaType.equals("IMAGE", ignoreCase = true) && !mediaUrl.isNullOrBlank()) {
-            val bitmap = downloadBitmap(mediaUrl)
-            if (bitmap != null) {
-                builder.setLargeIcon(bitmap)
-                    .setStyle(
-                        NotificationCompat.BigPictureStyle()
-                            .bigPicture(bitmap)
-                            .setSummaryText(messageText)
-                    )
+            CoroutineScope(Dispatchers.IO).launch {
+                val bitmap = downloadBitmap(mediaUrl)
+                if (bitmap != null) {
+                    builder.setLargeIcon(bitmap)
+                        .setStyle(
+                            NotificationCompat.BigPictureStyle()
+                                .bigPicture(bitmap)
+                                .setSummaryText(messageText)
+                        )
+                }
+                try {
+                    NotificationManagerCompat.from(appContext).notify(notificationId, builder.build())
+                } catch (_: SecurityException) {
+                }
             }
-        }
-
-        try {
-            NotificationManagerCompat.from(context).notify(notificationId, builder.build())
-        } catch (e: SecurityException) {
-            // Android 13+ POST_NOTIFICATIONS permission not granted
+        } else {
+            try {
+                NotificationManagerCompat.from(appContext).notify(notificationId, builder.build())
+            } catch (_: SecurityException) {
+            }
         }
     }
 
@@ -195,6 +179,10 @@ object ChatNotificationHelper {
 
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra("target_screen", AppScreens.INSTANT_REQUESTS_VIEW)
+            if (requestCode.isNotBlank()) {
+                putExtra("openUrgentRequestCode", requestCode)
+            }
             putExtra("EXTRA_NAV_TARGET", "instant_requests")
             putExtra("EXTRA_REQUEST_CODE", requestCode)
         }

@@ -31,6 +31,7 @@ fun UnifiedSettingsSection(
     themeColors: VisualThemePalette,
     onSaveProfile: (name: String, phone: String, cityArea: String, description: String, workingHours: String, isAvailable: Boolean) -> Unit,
     onSaveLocation: ((lat: Double, lng: Double) -> Unit)? = null,
+    onSaveProfileWithLocation: ((name: String, phone: String, cityArea: String, description: String, workingHours: String, isAvailable: Boolean, lat: Double?, lng: Double?) -> Unit)? = null,
     onChangePassword: (oldPass: String, newPass: String) -> Unit
 ) {
     var nameInput by remember(name) { mutableStateOf(name) }
@@ -39,6 +40,7 @@ fun UnifiedSettingsSection(
     var descInput by remember(description) { mutableStateOf(description) }
     var hoursInput by remember(workingHours) { mutableStateOf(workingHours) }
     var availableState by remember(isAvailable) { mutableStateOf(isAvailable) }
+    var phoneError by remember { mutableStateOf<String?>(null) }
 
     var pickedLat by remember(latitude) { mutableDoubleStateOf(latitude) }
     var pickedLng by remember(longitude) { mutableDoubleStateOf(longitude) }
@@ -76,8 +78,15 @@ fun UnifiedSettingsSection(
 
                 OutlinedTextField(
                     value = phoneInput,
-                    onValueChange = { phoneInput = it },
+                    onValueChange = {
+                        phoneInput = it
+                        phoneError = null
+                    },
                     label = { Text("رقم الهاتف للتواصل 📞", color = themeColors.textSecondary) },
+                    isError = phoneError != null,
+                    supportingText = phoneError?.let { err ->
+                        { Text(err, color = MaterialTheme.colorScheme.error, fontSize = 11.sp) }
+                    },
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = themeColors.accent,
@@ -100,7 +109,7 @@ fun UnifiedSettingsSection(
                     )
                 )
 
-                if (onSaveLocation != null) {
+                if (onSaveLocation != null || onSaveProfileWithLocation != null) {
                     Surface(
                         color = themeColors.background,
                         shape = RoundedCornerShape(10.dp),
@@ -182,9 +191,33 @@ fun UnifiedSettingsSection(
 
                 Button(
                     onClick = {
-                        onSaveProfile(nameInput, phoneInput, cityAreaInput, descInput, hoursInput, availableState)
-                        if (LandmarkAddress.isValid(pickedLat, pickedLng)) {
-                            onSaveLocation?.invoke(pickedLat, pickedLng)
+                        val normalizedInputPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(phoneInput)
+                        val normalizedInitialPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(phone)
+                        if (phoneInput.isNotBlank() &&
+                            normalizedInputPhone != normalizedInitialPhone &&
+                            !Regex("^(77|78|73|71|70)\\d{7}$").matches(normalizedInputPhone)
+                        ) {
+                            phoneError = "يرجى إدخال رقم هاتف يمني صحيح من 9 أرقام (77/78/73/71/70)"
+                            return@Button
+                        }
+                        val validLat = pickedLat.takeIf { LandmarkAddress.isValid(pickedLat, pickedLng) }
+                        val validLng = pickedLng.takeIf { LandmarkAddress.isValid(pickedLat, pickedLng) }
+                        if (onSaveProfileWithLocation != null) {
+                            onSaveProfileWithLocation(
+                                nameInput,
+                                phoneInput,
+                                cityAreaInput,
+                                descInput,
+                                hoursInput,
+                                availableState,
+                                validLat,
+                                validLng
+                            )
+                        } else {
+                            onSaveProfile(nameInput, phoneInput, cityAreaInput, descInput, hoursInput, availableState)
+                            if (validLat != null && validLng != null) {
+                                onSaveLocation?.invoke(validLat, validLng)
+                            }
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
@@ -273,7 +306,20 @@ fun UnifiedSettingsSection(
                 if (cityAreaInput.isBlank() && res.formattedAddress.isNotBlank()) {
                     cityAreaInput = res.formattedAddress
                 }
-                onSaveLocation?.invoke(res.latitude, res.longitude)
+                if (onSaveProfileWithLocation != null) {
+                    onSaveProfileWithLocation(
+                        nameInput,
+                        phoneInput,
+                        cityAreaInput,
+                        descInput,
+                        hoursInput,
+                        availableState,
+                        res.latitude,
+                        res.longitude
+                    )
+                } else {
+                    onSaveLocation?.invoke(res.latitude, res.longitude)
+                }
                 showMapPicker = false
             }
         )

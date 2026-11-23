@@ -507,7 +507,14 @@ fun ProfileOwnerAdminControlBar(
 
         var editName by remember { mutableStateOf(provider?.name ?: store?.name ?: property?.title ?: "") }
         var editPhone by remember { mutableStateOf(provider?.phone ?: store?.phone ?: property?.phone ?: "") }
-        var editArea by remember { mutableStateOf(provider?.area ?: store?.cityId ?: property?.cityId ?: "") }
+        var editArea by remember {
+            mutableStateOf(
+                provider?.localNeighborhood?.ifBlank { provider.area }
+                    ?: store?.localNeighborhood?.ifBlank { store.cityId }
+                    ?: property?.localNeighborhood?.ifBlank { property.cityId }
+                    ?: ""
+            )
+        }
         var editDesc by remember { mutableStateOf(provider?.profession ?: store?.description ?: property?.description ?: "") }
         var editLat by remember { mutableDoubleStateOf(provider?.latitude ?: store?.latitude ?: property?.latitude ?: 15.3694) }
         var editLng by remember { mutableDoubleStateOf(provider?.longitude ?: store?.longitude ?: property?.longitude ?: 44.1910) }
@@ -644,7 +651,7 @@ fun ProfileOwnerAdminControlBar(
                                     val updated = provider.copy(
                                         name = trimmedName,
                                         phone = trimmedPhone,
-                                        area = trimmedArea,
+                                        area = if (provider.area.startsWith("ye_")) provider.area else trimmedArea.ifBlank { provider.area },
                                         localNeighborhood = trimmedArea,
                                         profession = trimmedDesc,
                                         latitude = editLat,

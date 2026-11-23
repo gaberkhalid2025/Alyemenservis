@@ -104,7 +104,7 @@ internal fun BoxScope.MapScreenViewport(
     val poiLng = centerCoords?.second ?: safeUserLng
     val poiGridKey = remember(poiLat, poiLng) {
         if (LandmarkAddress.isValid(poiLat, poiLng)) {
-            java.lang.String.format(java.util.Locale.US, "%.2f_%.2f", poiLat, poiLng)
+            java.lang.String.format(java.util.Locale.US, "%.3f_%.3f", poiLat, poiLng)
         } else ""
     }
     LaunchedEffect(poiGridKey, hybridLabels, state.mapLayer, state.isRadarMode, state.currentMapMode) {
@@ -116,58 +116,125 @@ internal fun BoxScope.MapScreenViewport(
             osmPoisJson = null
             return@LaunchedEffect
         }
-        kotlinx.coroutines.delay(650L)
-        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager
-        val caps = cm?.getNetworkCapabilities(cm.activeNetwork)
-        val hasNet = caps?.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
-        if (!hasNet) return@LaunchedEffect
 
-        val (jsonStr, cacheItems) = withContext(Dispatchers.IO) {
-            val pois = LandmarkFinder.fetchViewportPois(poiLat, poiLng, radiusM = 1400)
-            if (pois.isEmpty()) return@withContext (null to emptyList<RealValhallaNavigator.SearchAddressResult>())
-            val arr = org.json.JSONArray()
-            val toCache = mutableListOf<RealValhallaNavigator.SearchAddressResult>()
-            pois.forEach { p ->
-                val (ic, col) = when (p.kind) {
-                    "مسجد" -> "🕌" to "#10B981"
-                    "مدرسة" -> "🏫" to "#3B82F6"
-                    "جامعة" -> "🎓" to "#2563EB"
-                    "صالة أفراح" -> "💒" to "#EC4899"
-                    "مستشفى", "عيادة" -> "🏥" to "#EF4444"
-                    "صيدلية" -> "💊" to "#DC2626"
-                    "مطعم" -> "🍴" to "#F97316"
-                    "كافيه" -> "☕" to "#D97706"
-                    "سوق" -> "🛒" to "#0EA5E9"
-                    "بنك" -> "🏦" to "#6366F1"
-                    "محطة وقود" -> "⛽" to "#EAB308"
-                    "فندق" -> "🏨" to "#8B5CF6"
-                    "حي" -> "🏘️" to "#14B8A6"
-                    else -> "📍" to "#64748B"
-                }
-                arr.put(org.json.JSONObject().apply {
-                    put("name", p.name)
-                    put("kind", p.kind)
-                    put("icon", ic)
-                    put("color", col)
-                    put("lat", p.lat)
-                    put("lng", p.lng)
-                })
-                toCache.add(
-                    RealValhallaNavigator.SearchAddressResult(
-                        displayName = "${p.name} (${p.kind})",
-                        shortName = p.name,
-                        latitude = p.lat,
-                        longitude = p.lng,
-                        type = "osm_poi",
-                        icon = ic
-                    )
-                )
+        // 1) تحميل المعالم المحلية فوراً (مساجد، صالات، مدارس، مستشفيات، شوارع) لتظهر فوراً على الخريطة حتى بدون إنترنت
+        withContext(Dispatchers.IO) {
+            val localArr = org.json.JSONArray()
+            val seenKeys = mutableSetOf<String>()
+
+            // معالم القاموس الجغرافي اليمني الشامل ضمن النطاق المرئي (حتى 20 كم)
+            val nearbyPlaces = OfflineYemenGazetteer.PLACES.filter { p ->
+                val dist = HaversinePrecisionNavigator.calculateDistance(poiLat, poiLng, p.latitude, p.longitude)
+                dist <= 20_000.0
             }
-            OfflineYemenGazetteer.cacheOnlineResults(context.applicationContext, toCache)
-            arr.toString() to toCache
-        }
-        if (jsonStr != null || cacheItems.isEmpty()) {
-            osmPoisJson = jsonStr
+            nearbyPlaces.forEach { p ->
+                val dedupeKey = "${p.name.trim()}_${java.lang.String.format(java.util.Locale.US, "%.3f_%.3f", p.latitude, p.longitude)}"
+                if (seenKeys.add(dedupeKey)) {
+                    val (ic, col) = when (p.category) {
+                        "جامع", "مسجد" -> "🕌" to "#10B981"
+                        "صالة أفراح" -> "💒" to "#EC4899"
+                        "مدرسة" -> "🏫" to "#3B82F6"
+                        "جامعة", "معهد" -> "🎓" to "#2563EB"
+                        "مستشفى", "عيادة" -> "🏥" to "#EF4444"
+                        "صيدلية" -> "💊" to "#DC2626"
+                        "سوق" -> "🛒" to "#0EA5E9"
+                        "صرافة", "بنك" -> "🏦" to "#6366F1"
+                        "حي" -> "🏘️" to "#14B8A6"
+                        "شارع" -> "🛣️" to "#38BDF8"
+                        "جولة" -> "🔄" to "#F59E0B"
+                        else -> p.icon to "#64748B"
+                    }
+                    localArr.put(org.json.JSONObject().apply {
+                        put("name", p.name)
+                        put("kind", p.category)
+                        put("icon", ic)
+                        put("color", col)
+                        put("lat", p.latitude)
+                        put("lng", p.longitude)
+                    })
+                }
+            }
+
+            // المعالم المخصصة المحفوظة محلياً
+            val custom = CustomLandmarkStore.nearby(context, poiLat, poiLng, maxDistanceM = 15_000.0)
+            custom.forEach { c ->
+                val dedupeKey = "${c.name.trim()}_${java.lang.String.format(java.util.Locale.US, "%.3f_%.3f", c.lat, c.lng)}"
+                if (seenKeys.add(dedupeKey)) {
+                    localArr.put(org.json.JSONObject().apply {
+                        put("name", c.name)
+                        put("kind", c.kind)
+                        put("icon", "📍")
+                        put("color", "#06B6D4")
+                        put("lat", c.lat)
+                        put("lng", c.lng)
+                    })
+                }
+            }
+
+            if (localArr.length() > 0) {
+                withContext(Dispatchers.Main) {
+                    osmPoisJson = localArr.toString()
+                }
+            }
+
+            // 2) إذا توفر الإنترنت، جلب المعالم الإضافية من Overpass في الخلفية ودمجها مع المعالم الحالية
+            val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager
+            val caps = cm?.getNetworkCapabilities(cm.activeNetwork)
+            val hasNet = caps?.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
+            if (hasNet) {
+                try {
+                    val remotePois = LandmarkFinder.fetchViewportPois(poiLat, poiLng, radiusM = 2200)
+                    if (remotePois.isNotEmpty()) {
+                        val mergedArr = org.json.JSONArray(localArr.toString())
+                        val toCache = mutableListOf<RealValhallaNavigator.SearchAddressResult>()
+                        remotePois.forEach { p ->
+                            val dedupeKey = "${p.name.trim()}_${java.lang.String.format(java.util.Locale.US, "%.3f_%.3f", p.lat, p.lng)}"
+                            if (seenKeys.add(dedupeKey)) {
+                                val (ic, col) = when (p.kind) {
+                                    "مسجد" -> "🕌" to "#10B981"
+                                    "مدرسة" -> "🏫" to "#3B82F6"
+                                    "جامعة" -> "🎓" to "#2563EB"
+                                    "صالة أفراح" -> "💒" to "#EC4899"
+                                    "مستشفى", "عيادة" -> "🏥" to "#EF4444"
+                                    "صيدلية" -> "💊" to "#DC2626"
+                                    "مطعم" -> "🍴" to "#F97316"
+                                    "كافيه" -> "☕" to "#D97706"
+                                    "سوق" -> "🛒" to "#0EA5E9"
+                                    "بنك" -> "🏦" to "#6366F1"
+                                    "محطة وقود" -> "⛽" to "#EAB308"
+                                    "فندق" -> "🏨" to "#8B5CF6"
+                                    "حي" -> "🏘️" to "#14B8A6"
+                                    else -> "📍" to "#64748B"
+                                }
+                                mergedArr.put(org.json.JSONObject().apply {
+                                    put("name", p.name)
+                                    put("kind", p.kind)
+                                    put("icon", ic)
+                                    put("color", col)
+                                    put("lat", p.lat)
+                                    put("lng", p.lng)
+                                })
+                                toCache.add(
+                                    RealValhallaNavigator.SearchAddressResult(
+                                        displayName = "${p.name} (${p.kind})",
+                                        shortName = p.name,
+                                        latitude = p.lat,
+                                        longitude = p.lng,
+                                        type = "osm_poi",
+                                        icon = ic
+                                    )
+                                )
+                            }
+                        }
+                        if (toCache.isNotEmpty()) {
+                            OfflineYemenGazetteer.cacheOnlineResults(context.applicationContext, toCache)
+                        }
+                        withContext(Dispatchers.Main) {
+                            osmPoisJson = mergedArr.toString()
+                        }
+                    }
+                } catch (_: Throwable) {}
+            }
         }
     }
     if (state.currentMapMode == MapMode.AR_VPS) {

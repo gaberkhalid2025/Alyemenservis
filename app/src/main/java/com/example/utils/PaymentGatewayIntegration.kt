@@ -122,9 +122,18 @@ class PaymentGatewayIntegration(private val context: Context? = null) {
         list.add(secureConfig)
         saveGatewaysList(safeCtx, list)
 
-        // Sync with Firestore collection securely
+        // Sync only non-secret gateway metadata with Firestore (keep encrypted keys strictly in local vault)
         try {
-            firestore.collection("payment_gateways").document(config.id).set(secureConfig)
+            val publicCloudMetadata = mapOf(
+                "id" to config.id,
+                "name" to config.name,
+                "isEnabled" to config.isEnabled,
+                "endpoint" to config.endpoint,
+                "description" to config.description,
+                "hasCredentials" to (config.apiKey.isNotBlank() && config.secret.isNotBlank()),
+                "updatedAt" to System.currentTimeMillis()
+            )
+            firestore.collection("payment_gateways").document(config.id).set(publicCloudMetadata)
         } catch (_: Exception) {}
     }
 

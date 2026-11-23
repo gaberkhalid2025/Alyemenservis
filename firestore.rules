@@ -140,8 +140,7 @@ service cloud.firestore {
       allow write: if isOwnerOrAdmin();
     }
     match /payment_gateways/{d} {
-      allow read: if true;
-      allow write: if isOwnerOrAdmin();
+      allow read, write: if isOwnerOrAdmin();
     }
     match /quick_service_settings/{d} {
       allow read: if true;
@@ -437,9 +436,19 @@ service cloud.firestore {
       }
     }
     match /chat_rooms/{roomId} {
-      allow read, write: if isSignedIn();
+      allow read: if isSignedIn() && (isStaff() || isChannelParticipant(resource.data));
+      allow create: if isSignedIn() && (isStaff() || isChannelParticipant(request.resource.data));
+      allow update, delete: if isChannelParticipant(resource.data);
       match /messages/{msgId} {
-        allow read, write: if isSignedIn();
+        allow read, create, update: if isChannelParticipant(
+          get(/databases/$(db)/documents/chat_rooms/$(roomId)).data
+        );
+        allow delete: if isStaff() || (
+          isSignedIn() && (
+            resource.data.senderId == request.auth.uid ||
+            isChannelParticipant(get(/databases/$(db)/documents/chat_rooms/$(roomId)).data)
+          )
+        );
       }
     }
     match /chats/{chatId} {
@@ -470,7 +479,7 @@ service cloud.firestore {
     }
     match /ratings/{d} {
       allow read: if true;
-      allow create: if true;
+      allow create: if isSignedIn();
       allow update, delete: if isSignedIn()
                 && (resource.data.userId == request.auth.uid
                     || isOwnerOrAdmin());

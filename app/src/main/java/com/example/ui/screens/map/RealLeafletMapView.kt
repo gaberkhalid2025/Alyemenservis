@@ -362,10 +362,10 @@ fun RealLeafletMapView(
         }
     }
 
-    LaunchedEffect(isMapReady, osmPoisJson, hybridLabels, offlineOnly) {
+    LaunchedEffect(isMapReady, osmPoisJson, hybridLabels) {
         if (!isMapReady || webViewRef == null) return@LaunchedEffect
         val json = osmPoisJson
-        if (!hybridLabels || offlineOnly || json.isNullOrBlank()) {
+        if (!hybridLabels || json.isNullOrBlank()) {
             webViewRef?.evaluateJavascript("if (window.clearOsmPois) { window.clearOsmPois(); }", null)
         } else {
             val b64 = Base64.encodeToString(json.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)

@@ -201,6 +201,12 @@ class WalletManager(private val context: Context? = null) {
             saveTransactionsToCache(currentList)
 
             Result.success(tx)
+        } catch (e: com.google.firebase.firestore.FirebaseFirestoreException) {
+            if (e.code == com.google.firebase.firestore.FirebaseFirestoreException.Code.PERMISSION_DENIED) {
+                Result.failure(IllegalStateException("يتطلب تحديث رصيد المحفظة اعتماد الإدارة أو استخدام طلب الشحن (Top-Up)."))
+            } else {
+                Result.failure(e)
+            }
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -295,6 +301,12 @@ class WalletManager(private val context: Context? = null) {
             saveTransactionsToCache(currentList)
 
             Result.success(tx)
+        } catch (e: com.google.firebase.firestore.FirebaseFirestoreException) {
+            if (e.code == com.google.firebase.firestore.FirebaseFirestoreException.Code.PERMISSION_DENIED) {
+                Result.failure(IllegalStateException("لا تملك صلاحية تعديل رصيد السحب مباشرة؛ يرجى التواصل مع الإدارة."))
+            } else {
+                Result.failure(e)
+            }
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -391,6 +403,12 @@ class WalletManager(private val context: Context? = null) {
             saveTransactionsToCache(currentList)
 
             Result.success(tx)
+        } catch (e: com.google.firebase.firestore.FirebaseFirestoreException) {
+            if (e.code == com.google.firebase.firestore.FirebaseFirestoreException.Code.PERMISSION_DENIED) {
+                Result.failure(IllegalStateException("التحويل المباشر بين المحافظ يتطلب تفعيل خادم الدفع أو موافقة الإدارة."))
+            } else {
+                Result.failure(e)
+            }
         } catch (e: Exception) {
             Result.failure(e)
         }

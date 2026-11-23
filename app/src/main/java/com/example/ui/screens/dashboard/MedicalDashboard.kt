@@ -374,6 +374,18 @@ fun MedicalDashboard(
                                     longitude = lng
                                 )
                             },
+                            onSaveProfileWithLocation = { name, editedPhone, city, desc, hours, available, lat, lng ->
+                                medicalViewModel.updateProfile(
+                                    name = name,
+                                    cityArea = city,
+                                    description = desc,
+                                    workingHours = hours,
+                                    isAvailable = available,
+                                    phone = editedPhone,
+                                    latitude = lat,
+                                    longitude = lng
+                                )
+                            },
                             onSaveProfile = { name, editedPhone, city, desc, hours, available ->
                                 medicalViewModel.updateProfile(name, city, desc, hours, available, phone = editedPhone)
                             },

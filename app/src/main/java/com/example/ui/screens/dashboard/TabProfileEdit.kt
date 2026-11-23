@@ -35,6 +35,7 @@ fun TabProfileEdit(
     onChangePhoto: ((String) -> Unit)? = null,
     onChangeCover: ((String) -> Unit)? = null,
     onSaveLocation: ((Double, Double) -> Unit)? = null,
+    onSaveProfileWithLocation: ((name: String, phone: String, cityArea: String, description: String, workingHours: String, isAvailable: Boolean, latitude: Double?, longitude: Double?) -> Unit)? = null,
     onSaveProfile: (name: String, phone: String, cityArea: String, description: String, workingHours: String, isAvailable: Boolean) -> Unit,
     onChangePassword: (oldPass: String, newPass: String) -> Unit
 ) {
@@ -85,6 +86,7 @@ fun TabProfileEdit(
             themeColors = themeColors,
             onSaveProfile = onSaveProfile,
             onSaveLocation = onSaveLocation,
+            onSaveProfileWithLocation = onSaveProfileWithLocation,
             onChangePassword = onChangePassword
         )
     }

@@ -16,6 +16,7 @@ import com.example.utils.SecureHasher
 import com.example.utils.SecurityCryptoUtils
 import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import java.util.UUID
 
 /**
@@ -82,18 +83,6 @@ internal class AdminRequestsAndUsersDelegate(
             }
         }
 
-        val clearPendingFromDbAndState = {
-            vm.db.collection("pending_providers").document(request.id).delete()
-            if (cleanPhone.isNotEmpty() && cleanPhone != request.id) {
-                vm.db.collection("pending_providers").document(cleanPhone).delete()
-            }
-            vm._pendingProviders.value = vm._pendingProviders.value.filter {
-                it.id != request.id
-            }
-        }
-
-        clearPendingFromDbAndState()
-
         val now = System.currentTimeMillis()
         val joinReqUpdates = mapOf(
             "status" to "APPROVED",
@@ -102,9 +91,31 @@ internal class AdminRequestsAndUsersDelegate(
             "approvedAt" to now,
             "updatedAt" to now
         )
-        vm.db.collection("join_requests").document(request.id).update(joinReqUpdates)
-        if (cleanPhone.isNotEmpty() && cleanPhone != request.id) {
-            vm.db.collection("join_requests").document(cleanPhone).update(joinReqUpdates)
+
+        suspend fun finalizeApprovalCleanup() {
+            try {
+                vm.db.collection("join_requests").document(request.id).update(joinReqUpdates).await()
+            } catch (_: Exception) {
+            }
+            if (cleanPhone.isNotEmpty() && cleanPhone != request.id) {
+                try {
+                    vm.db.collection("join_requests").document(cleanPhone).update(joinReqUpdates).await()
+                } catch (_: Exception) {
+                }
+            }
+            try {
+                vm.db.collection("pending_providers").document(request.id).delete().await()
+            } catch (_: Exception) {
+            }
+            if (cleanPhone.isNotEmpty() && cleanPhone != request.id) {
+                try {
+                    vm.db.collection("pending_providers").document(cleanPhone).delete().await()
+                } catch (_: Exception) {
+                }
+            }
+            vm._pendingProviders.value = vm._pendingProviders.value.filter {
+                it.id != request.id
+            }
         }
 
         if (request.profession == "STORE_OWNER" ||
@@ -124,89 +135,95 @@ internal class AdminRequestsAndUsersDelegate(
                 else -> "stores"
             }
             vm.viewModelScope.launch {
-                val resolvedStoreDocUrl = if (decryptedIdCard.isNotBlank()) {
-                    FirebaseStorageUploader.resolveBase64ToStorageUrl(
-                        decryptedIdCard,
-                        "stores/$storeId/verification_doc.pdf"
-                    )
-                } else ""
-                val resolvedLogoUrl = if (decryptedSelfie.isNotBlank()) {
-                    FirebaseStorageUploader.resolveBase64ToStorageUrl(
-                        decryptedSelfie,
-                        FirebaseStorageUploader.getStoreLogoPath(storeId)
-                    )
-                } else ""
-                val resolvedGallery = decryptedWorkPhotos.mapIndexed { idx, img ->
-                    FirebaseStorageUploader.resolveBase64ToStorageUrl(
-                        img,
-                        FirebaseStorageUploader.getStorePhotoPath(storeId, idx)
-                    )
-                }.filter { it.isNotBlank() }
+                try {
+                    val resolvedStoreDocUrl = if (decryptedIdCard.isNotBlank()) {
+                        FirebaseStorageUploader.resolveBase64ToStorageUrl(
+                            decryptedIdCard,
+                            "stores/$storeId/verification_doc.pdf"
+                        )
+                    } else ""
+                    val resolvedLogoUrl = if (decryptedSelfie.isNotBlank()) {
+                        FirebaseStorageUploader.resolveBase64ToStorageUrl(
+                            decryptedSelfie,
+                            FirebaseStorageUploader.getStoreLogoPath(storeId)
+                        )
+                    } else ""
+                    val resolvedGallery = decryptedWorkPhotos.mapIndexed { idx, img ->
+                        FirebaseStorageUploader.resolveBase64ToStorageUrl(
+                            img,
+                            FirebaseStorageUploader.getStorePhotoPath(storeId, idx)
+                        )
+                    }.filter { it.isNotBlank() }
 
-                val newStore = StoreEntity(
-                    id = storeId,
-                    name = request.name,
-                    description = request.description.ifBlank { request.specialization.ifBlank { "محل تجاري معتمد وموثق" } },
-                    ownerId = cleanPhone.ifBlank { request.phone },
-                    ownerName = request.name,
-                    phone = cleanPhone.ifBlank { request.phone },
-                    localNeighborhood = request.localNeighborhood,
-                    cityId = finalCityId,
-                    sectionId = resolvedSectionId,
-                    categoryId = resolvedCategory,
-                    coverImage = resolvedGallery.firstOrNull() ?: resolvedLogoUrl,
-                    logoImage = resolvedLogoUrl,
-                    workingHours = resolvedWorkingHours,
-                    latitude = resolvedLat,
-                    longitude = resolvedLng,
-                    images = resolvedGallery,
-                    isActive = true,
-                    isApproved = true,
-                    isVerified = true,
-                    isPinned = false,
-                    isDeleted = false,
-                    passwordHash = resolvedPasswordHash,
-                    pdfFileBase64 = resolvedStoreDocUrl,
-                    productAttachmentsJson = request.productAttachmentsJson
-                )
-                if (request.id != storeId) {
-                    vm.db.collection("stores").document(request.id).delete()
+                    val newStore = StoreEntity(
+                        id = storeId,
+                        name = request.name,
+                        description = request.description.ifBlank { request.specialization.ifBlank { "محل تجاري معتمد وموثق" } },
+                        ownerId = cleanPhone.ifBlank { request.phone },
+                        ownerName = request.name,
+                        phone = cleanPhone.ifBlank { request.phone },
+                        localNeighborhood = request.localNeighborhood,
+                        cityId = finalCityId,
+                        sectionId = resolvedSectionId,
+                        categoryId = resolvedCategory,
+                        coverImage = resolvedGallery.firstOrNull() ?: resolvedLogoUrl,
+                        logoImage = resolvedLogoUrl,
+                        workingHours = resolvedWorkingHours,
+                        latitude = resolvedLat,
+                        longitude = resolvedLng,
+                        images = resolvedGallery,
+                        isActive = true,
+                        isApproved = true,
+                        isVerified = true,
+                        isPinned = false,
+                        isDeleted = false,
+                        passwordHash = resolvedPasswordHash,
+                        pdfFileBase64 = resolvedStoreDocUrl,
+                        productAttachmentsJson = request.productAttachmentsJson
+                    )
+                    vm.db.collection("stores").document(storeId).set(newStore).await()
+                    if (request.id != storeId) {
+                        try { vm.db.collection("stores").document(request.id).delete().await() } catch (_: Exception) {}
+                    }
+                    if (cleanPhone.isNotEmpty() && cleanPhone != storeId) {
+                        try { vm.db.collection("stores").document(cleanPhone).delete().await() } catch (_: Exception) {}
+                    }
+
+                    vm._stores.value = vm._stores.value.filter {
+                        it.id != storeId && it.id != request.id && it.phone.trim().replace(" ", "").replace("+", "") != cleanPhone
+                    } + newStore
+
+                    finalizeApprovalCleanup()
+
+                    val (approvalTitle, approvalMsg, toastMsg) = when (request.categoryId.uppercase()) {
+                        "RESTAURANT" -> Triple(
+                            "🎉 تهانينا! تم تفعيل مطعمك / كافيهك بنجاح",
+                            "مرحباً بك، لقد تم مراجعة وتفعيل مطعمك '${request.name}' بنجاح في دليل المطاعم والكافيهات! يمكنك الآن إدارة قائمتك وحجوزاتك مباشرة من شاشة الانضمام.",
+                            "✅ تم تفعيل مطعم ${request.name}"
+                        )
+                        "MEDICAL" -> Triple(
+                            "🎉 تهانينا! تم تفعيل مركزك الطبي / عيادتك بنجاح",
+                            "مرحباً بك، لقد تم مراجعة وتفعيل مركزك الطبي/عيادتك '${request.name}' بنجاح في الدليل الطبي! يمكنك الآن استقبال حجوزات المواعيد وإدارتها مباشرة من شاشة الانضمام.",
+                            "✅ تم تفعيل المركز الطبي ${request.name}"
+                        )
+                        else -> Triple(
+                            "🎉 تهانينا! تم تفعيل متجرك بنجاح",
+                            "مرحباً بك يا غالي، لقد تم مراجعة وتفعيل متجرك/محلك '${request.name}' بنجاح في التطبيق! يمكنك الآن إضافة منتجاتك وإدارة متجرك مباشرة من شاشة الانضمام.",
+                            "✅ تم تفعيل متجر ${request.name}"
+                        )
+                    }
+
+                    vm.mainViewModel.addNotification(
+                        title = approvalTitle,
+                        message = approvalMsg,
+                        targetType = "USER",
+                        targetValue = request.phone
+                    )
+                    vm.mainViewModel.triggerNotification(toastMsg)
+                } catch (e: Exception) {
+                    vm.mainViewModel.triggerNotification("❌ تعذر اعتماد طلب ${request.name}: ${e.localizedMessage ?: "يرجى المحاولة مجدداً"}")
                 }
-                if (cleanPhone.isNotEmpty() && cleanPhone != storeId) {
-                    vm.db.collection("stores").document(cleanPhone).delete()
-                }
-                vm.db.collection("stores").document(storeId).set(newStore)
-
-                vm._stores.value = vm._stores.value.filter {
-                    it.id != storeId && it.id != request.id && it.phone.trim().replace(" ", "").replace("+", "") != cleanPhone
-                } + newStore
             }
-
-            val (approvalTitle, approvalMsg, toastMsg) = when (request.categoryId.uppercase()) {
-                "RESTAURANT" -> Triple(
-                    "🎉 تهانينا! تم تفعيل مطعمك / كافيهك بنجاح",
-                    "مرحباً بك، لقد تم مراجعة وتفعيل مطعمك '${request.name}' بنجاح في دليل المطاعم والكافيهات! يمكنك الآن إدارة قائمتك وحجوزاتك مباشرة من شاشة الانضمام.",
-                    "✅ تم تفعيل مطعم ${request.name}"
-                )
-                "MEDICAL" -> Triple(
-                    "🎉 تهانينا! تم تفعيل مركزك الطبي / عيادتك بنجاح",
-                    "مرحباً بك، لقد تم مراجعة وتفعيل مركزك الطبي/عيادتك '${request.name}' بنجاح في الدليل الطبي! يمكنك الآن استقبال حجوزات المواعيد وإدارتها مباشرة من شاشة الانضمام.",
-                    "✅ تم تفعيل المركز الطبي ${request.name}"
-                )
-                else -> Triple(
-                    "🎉 تهانينا! تم تفعيل متجرك بنجاح",
-                    "مرحباً بك يا غالي، لقد تم مراجعة وتفعيل متجرك/محلك '${request.name}' بنجاح في التطبيق! يمكنك الآن إضافة منتجاتك وإدارة متجرك مباشرة من شاشة الانضمام.",
-                    "✅ تم تفعيل متجر ${request.name}"
-                )
-            }
-
-            vm.mainViewModel.addNotification(
-                title = approvalTitle,
-                message = approvalMsg,
-                targetType = "USER",
-                targetValue = request.phone
-            )
-            vm.mainViewModel.triggerNotification(toastMsg)
         } else if (request.profession == "PROPERTY_OWNER" || request.categoryId.uppercase() == "PROPERTY") {
             val propId = "prop_" + cleanPhone
             val propPrice = try {
@@ -215,67 +232,73 @@ internal class AdminRequestsAndUsersDelegate(
                 0.0
             }
             vm.viewModelScope.launch {
-                val resolvedPropDocUrl = if (decryptedIdCard.isNotBlank()) {
-                    FirebaseStorageUploader.resolveBase64ToStorageUrl(
-                        decryptedIdCard,
-                        "properties/$propId/verification_doc.pdf"
-                    )
-                } else ""
-                val resolvedMainPhoto = if (decryptedSelfie.isNotBlank()) {
-                    FirebaseStorageUploader.resolveBase64ToStorageUrl(
-                        decryptedSelfie,
-                        FirebaseStorageUploader.getPropertyPhotoPath(propId, 0)
-                    )
-                } else ""
-                val resolvedPropGallery = (listOf(resolvedMainPhoto) + decryptedWorkPhotos.mapIndexed { idx, img ->
-                    FirebaseStorageUploader.resolveBase64ToStorageUrl(
-                        img,
-                        FirebaseStorageUploader.getPropertyPhotoPath(propId, idx + 1)
-                    )
-                }).filter { it.isNotBlank() }.distinct()
+                try {
+                    val resolvedPropDocUrl = if (decryptedIdCard.isNotBlank()) {
+                        FirebaseStorageUploader.resolveBase64ToStorageUrl(
+                            decryptedIdCard,
+                            "properties/$propId/verification_doc.pdf"
+                        )
+                    } else ""
+                    val resolvedMainPhoto = if (decryptedSelfie.isNotBlank()) {
+                        FirebaseStorageUploader.resolveBase64ToStorageUrl(
+                            decryptedSelfie,
+                            FirebaseStorageUploader.getPropertyPhotoPath(propId, 0)
+                        )
+                    } else ""
+                    val resolvedPropGallery = (listOf(resolvedMainPhoto) + decryptedWorkPhotos.mapIndexed { idx, img ->
+                        FirebaseStorageUploader.resolveBase64ToStorageUrl(
+                            img,
+                            FirebaseStorageUploader.getPropertyPhotoPath(propId, idx + 1)
+                        )
+                    }).filter { it.isNotBlank() }.distinct()
 
-                val newProp = PropertyEntity(
-                    id = propId,
-                    title = request.name,
-                    description = request.description.ifBlank { request.specialization.ifBlank { "عقار معلن وموثق" } },
-                    phone = cleanPhone.ifBlank { request.phone },
-                    ownerId = cleanPhone.ifBlank { request.phone },
-                    ownerName = request.name,
-                    localNeighborhood = request.localNeighborhood,
-                    cityId = finalCityId,
-                    latitude = resolvedLat,
-                    longitude = resolvedLng,
-                    images = resolvedPropGallery,
-                    isActive = true,
-                    isApproved = true,
-                    isVerified = true,
-                    isPinned = false,
-                    isDeleted = false,
-                    passwordHash = resolvedPasswordHash,
-                    price = propPrice,
-                    pdfFileBase64 = resolvedPropDocUrl,
-                    productAttachmentsJson = request.productAttachmentsJson
-                )
-                if (request.id != propId) {
-                    vm.db.collection("properties").document(request.id).delete()
-                }
-                if (cleanPhone.isNotEmpty() && cleanPhone != propId) {
-                    vm.db.collection("properties").document(cleanPhone).delete()
-                }
-                vm.db.collection("properties").document(propId).set(newProp)
+                    val newProp = PropertyEntity(
+                        id = propId,
+                        title = request.name,
+                        description = request.description.ifBlank { request.specialization.ifBlank { "عقار معلن وموثق" } },
+                        phone = cleanPhone.ifBlank { request.phone },
+                        ownerId = cleanPhone.ifBlank { request.phone },
+                        ownerName = request.name,
+                        localNeighborhood = request.localNeighborhood,
+                        cityId = finalCityId,
+                        latitude = resolvedLat,
+                        longitude = resolvedLng,
+                        images = resolvedPropGallery,
+                        isActive = true,
+                        isApproved = true,
+                        isVerified = true,
+                        isPinned = false,
+                        isDeleted = false,
+                        passwordHash = resolvedPasswordHash,
+                        price = propPrice,
+                        pdfFileBase64 = resolvedPropDocUrl,
+                        productAttachmentsJson = request.productAttachmentsJson
+                    )
+                    vm.db.collection("properties").document(propId).set(newProp).await()
+                    if (request.id != propId) {
+                        try { vm.db.collection("properties").document(request.id).delete().await() } catch (_: Exception) {}
+                    }
+                    if (cleanPhone.isNotEmpty() && cleanPhone != propId) {
+                        try { vm.db.collection("properties").document(cleanPhone).delete().await() } catch (_: Exception) {}
+                    }
 
-                vm._properties.value = vm._properties.value.filter {
-                    it.id != propId && it.id != request.id && it.phone.trim().replace(" ", "").replace("+", "") != cleanPhone
-                } + newProp
+                    vm._properties.value = vm._properties.value.filter {
+                        it.id != propId && it.id != request.id && it.phone.trim().replace(" ", "").replace("+", "") != cleanPhone
+                    } + newProp
+
+                    finalizeApprovalCleanup()
+
+                    vm.mainViewModel.addNotification(
+                        title = "🎉 تهانينا! تم تفعيل إعلان عقارك بنجاح",
+                        message = "مرحباً بك، لقد تم مراجعة وتفعيل عقارك '${request.name}' بنجاح في دليل العقارات المعتمد! يمكنك تعديله وإدارته ورؤية تعليقات العملاء مباشرة من شاشة الانضمام.",
+                        targetType = "USER",
+                        targetValue = request.phone
+                    )
+                    vm.mainViewModel.triggerNotification("✅ تم تفعيل عقار ${request.name}")
+                } catch (e: Exception) {
+                    vm.mainViewModel.triggerNotification("❌ تعذر اعتماد عقار ${request.name}: ${e.localizedMessage ?: "يرجى المحاولة مجدداً"}")
+                }
             }
-
-            vm.mainViewModel.addNotification(
-                title = "🎉 تهانينا! تم تفعيل إعلان عقارك بنجاح",
-                message = "مرحباً بك، لقد تم مراجعة وتفعيل عقارك '${request.name}' بنجاح في دليل العقارات المعتمد! يمكنك تعديله وإدارته ورؤية تعليقات العملاء مباشرة من شاشة الانضمام.",
-                targetType = "USER",
-                targetValue = request.phone
-            )
-            vm.mainViewModel.triggerNotification("✅ تم تفعيل عقار ${request.name}")
         } else if (request.profession == "JOB_POSTER" || request.categoryId.uppercase() == "JOB") {
             val jobId = "job_" + cleanPhone
             val newJob = JobEntity(
@@ -290,25 +313,33 @@ internal class AdminRequestsAndUsersDelegate(
                 isActive = true,
                 isApproved = true
             )
-            if (request.id != jobId) {
-                vm.db.collection("jobs").document(request.id).delete()
-            }
-            if (cleanPhone.isNotEmpty() && cleanPhone != jobId) {
-                vm.db.collection("jobs").document(cleanPhone).delete()
-            }
-            vm.db.collection("jobs").document(jobId).set(newJob)
+            vm.viewModelScope.launch {
+                try {
+                    vm.db.collection("jobs").document(jobId).set(newJob).await()
+                    if (request.id != jobId) {
+                        try { vm.db.collection("jobs").document(request.id).delete().await() } catch (_: Exception) {}
+                    }
+                    if (cleanPhone.isNotEmpty() && cleanPhone != jobId) {
+                        try { vm.db.collection("jobs").document(cleanPhone).delete().await() } catch (_: Exception) {}
+                    }
 
-            vm._jobs.value = vm._jobs.value.filter {
-                it.id != jobId && it.id != request.id && it.phone.trim().replace(" ", "").replace("+", "") != cleanPhone
-            } + newJob
+                    vm._jobs.value = vm._jobs.value.filter {
+                        it.id != jobId && it.id != request.id && it.phone.trim().replace(" ", "").replace("+", "") != cleanPhone
+                    } + newJob
 
-            vm.mainViewModel.addNotification(
-                title = "🎉 تهانينا! تم تفعيل إعلان وظيفتك بنجاح",
-                message = "مرحباً بك، لقد تم مراجعة ونشر إعلان وظيفتك '${request.name}' بنجاح! يمكنك إدارتها الآن مباشرة من شاشة الانضمام.",
-                targetType = "USER",
-                targetValue = request.phone
-            )
-            vm.mainViewModel.triggerNotification("✅ تم تفعيل إعلان وظيفة ${request.name}")
+                    finalizeApprovalCleanup()
+
+                    vm.mainViewModel.addNotification(
+                        title = "🎉 تهانينا! تم تفعيل إعلان وظيفتك بنجاح",
+                        message = "مرحباً بك، لقد تم مراجعة ونشر إعلان وظيفتك '${request.name}' بنجاح! يمكنك إدارتها الآن مباشرة من شاشة الانضمام.",
+                        targetType = "USER",
+                        targetValue = request.phone
+                    )
+                    vm.mainViewModel.triggerNotification("✅ تم تفعيل إعلان وظيفة ${request.name}")
+                } catch (e: Exception) {
+                    vm.mainViewModel.triggerNotification("❌ تعذر اعتماد إعلان وظيفة ${request.name}: ${e.localizedMessage ?: "يرجى المحاولة مجدداً"}")
+                }
+            }
         } else if (request.profession == "JOB_SEEKER" || request.categoryId.uppercase() == "JOB_SEEKER") {
             val seekerMap = mapOf(
                 "id" to request.id,
@@ -320,17 +351,24 @@ internal class AdminRequestsAndUsersDelegate(
                 "status" to "APPROVED",
                 "createdAt" to System.currentTimeMillis()
             )
-            vm.db.collection("job_seekers").document(request.id).set(seekerMap)
-            if (cleanPhone.isNotEmpty() && cleanPhone != request.id) {
-                vm.db.collection("job_seekers").document(cleanPhone).set(seekerMap)
+            vm.viewModelScope.launch {
+                try {
+                    vm.db.collection("job_seekers").document(request.id).set(seekerMap).await()
+                    if (cleanPhone.isNotEmpty() && cleanPhone != request.id) {
+                        vm.db.collection("job_seekers").document(cleanPhone).set(seekerMap).await()
+                    }
+                    finalizeApprovalCleanup()
+                    vm.mainViewModel.addNotification(
+                        title = "🎉 تهانينا! تم اعتماد ملفك كباحث عن عمل",
+                        message = "مرحباً بك يا غالي، تم اعتماد ملفك في قسم التوظيف والبحث عن عمل بنجاح!",
+                        targetType = "USER",
+                        targetValue = request.phone
+                    )
+                    vm.mainViewModel.triggerNotification("✅ تم اعتماد ملف المتقدم ${request.name}")
+                } catch (e: Exception) {
+                    vm.mainViewModel.triggerNotification("❌ تعذر اعتماد ملف المتقدم ${request.name}: ${e.localizedMessage ?: "يرجى المحاولة مجدداً"}")
+                }
             }
-            vm.mainViewModel.addNotification(
-                title = "🎉 تهانينا! تم اعتماد ملفك كباحث عن عمل",
-                message = "مرحباً بك يا غالي، تم اعتماد ملفك في قسم التوظيف والبحث عن عمل بنجاح!",
-                targetType = "USER",
-                targetValue = request.phone
-            )
-            vm.mainViewModel.triggerNotification("✅ تم اعتماد ملف المتقدم ${request.name}")
         } else if (request.profession == "CLIENT" || request.categoryId.uppercase() == "CLIENT") {
             val userMap = mutableMapOf<String, Any>(
                 "id" to cleanPhone.ifBlank { request.id },
@@ -343,77 +381,89 @@ internal class AdminRequestsAndUsersDelegate(
             if (resolvedPasswordHash.isNotBlank()) {
                 userMap["passwordHash"] = resolvedPasswordHash
             }
-            vm.db.collection("users").document(request.id).set(userMap, SetOptions.merge())
-            if (cleanPhone.isNotEmpty() && cleanPhone != request.id) {
-                vm.db.collection("users").document(cleanPhone).set(userMap, SetOptions.merge())
+            vm.viewModelScope.launch {
+                try {
+                    vm.db.collection("users").document(request.id).set(userMap, SetOptions.merge()).await()
+                    if (cleanPhone.isNotEmpty() && cleanPhone != request.id) {
+                        vm.db.collection("users").document(cleanPhone).set(userMap, SetOptions.merge()).await()
+                    }
+                    finalizeApprovalCleanup()
+                    vm.mainViewModel.addNotification(
+                        title = "🎉 تهانينا! تم تفعيل حسابك بنجاح",
+                        message = "مرحباً بك يا غالي، تم تفعيل حسابك كعميل مسجل بنجاح!",
+                        targetType = "USER",
+                        targetValue = request.phone
+                    )
+                    vm.mainViewModel.triggerNotification("✅ تم تفعيل حساب المستخدم ${request.name}")
+                } catch (e: Exception) {
+                    vm.mainViewModel.triggerNotification("❌ تعذر تفعيل حساب ${request.name}: ${e.localizedMessage ?: "يرجى المحاولة مجدداً"}")
+                }
             }
-
-            vm.mainViewModel.addNotification(
-                title = "🎉 تهانينا! تم تفعيل حسابك بنجاح",
-                message = "مرحباً بك يا غالي، تم تفعيل حسابك كعميل مسجل بنجاح!",
-                targetType = "USER",
-                targetValue = request.phone
-            )
-            vm.mainViewModel.triggerNotification("✅ تم تفعيل حساب المستخدم ${request.name}")
         } else {
             val providerId = "prov_" + cleanPhone
             vm.viewModelScope.launch {
-                val resolvedProfileUrl = if (decryptedSelfie.isNotBlank()) {
-                    FirebaseStorageUploader.resolveBase64ToStorageUrl(
-                        decryptedSelfie,
-                        FirebaseStorageUploader.getProviderProfilePath(providerId)
-                    )
-                } else ""
-                val resolvedWorkGallery = decryptedWorkPhotos.mapIndexed { idx, img ->
-                    FirebaseStorageUploader.resolveBase64ToStorageUrl(
-                        img,
-                        FirebaseStorageUploader.getProviderWorkPhotoPath(providerId, idx)
-                    )
-                }.filter { it.isNotBlank() }
+                try {
+                    val resolvedProfileUrl = if (decryptedSelfie.isNotBlank()) {
+                        FirebaseStorageUploader.resolveBase64ToStorageUrl(
+                            decryptedSelfie,
+                            FirebaseStorageUploader.getProviderProfilePath(providerId)
+                        )
+                    } else ""
+                    val resolvedWorkGallery = decryptedWorkPhotos.mapIndexed { idx, img ->
+                        FirebaseStorageUploader.resolveBase64ToStorageUrl(
+                            img,
+                            FirebaseStorageUploader.getProviderWorkPhotoPath(providerId, idx)
+                        )
+                    }.filter { it.isNotBlank() }
 
-                val approvedProvider = ProviderEntity(
-                    id = providerId,
-                    name = request.name,
-                    phone = cleanPhone.ifBlank { request.phone },
-                    categoryId = request.categoryId,
-                    area = request.area,
-                    isVip = false,
-                    subscriptionStatus = "APPROVED",
-                    isAvailable = true,
-                    cityId = finalCityId,
-                    localNeighborhood = request.localNeighborhood,
-                    rating = 5.0f,
-                    coverImage = resolvedWorkGallery.firstOrNull() ?: resolvedProfileUrl,
-                    profileImage = resolvedProfileUrl,
-                    latitude = resolvedLat,
-                    longitude = resolvedLng,
-                    workPhotosBase64 = resolvedWorkGallery,
-                    productAttachmentsJson = request.productAttachmentsJson,
-                    specialization = request.specialization.ifBlank { request.description },
-                    isBlocked = false,
-                    customCategoryName = request.customCategoryName,
-                    passwordHash = resolvedPasswordHash,
-                    isDeleted = false,
-                    deletedAt = null
-                )
-                vm.db.collection("providers").document(approvedProvider.id).set(approvedProvider)
+                    val approvedProvider = ProviderEntity(
+                        id = providerId,
+                        name = request.name,
+                        phone = cleanPhone.ifBlank { request.phone },
+                        categoryId = request.categoryId,
+                        area = request.area,
+                        isVip = false,
+                        subscriptionStatus = "APPROVED",
+                        isAvailable = true,
+                        cityId = finalCityId,
+                        localNeighborhood = request.localNeighborhood,
+                        rating = 5.0f,
+                        coverImage = resolvedWorkGallery.firstOrNull() ?: resolvedProfileUrl,
+                        profileImage = resolvedProfileUrl,
+                        latitude = resolvedLat,
+                        longitude = resolvedLng,
+                        workPhotosBase64 = resolvedWorkGallery,
+                        productAttachmentsJson = request.productAttachmentsJson,
+                        specialization = request.specialization.ifBlank { request.description },
+                        isBlocked = false,
+                        customCategoryName = request.customCategoryName,
+                        passwordHash = resolvedPasswordHash,
+                        isDeleted = false,
+                        deletedAt = null
+                    )
+                    vm.db.collection("providers").document(approvedProvider.id).set(approvedProvider).await()
 
-                val currentProviders = vm.mainViewModel.homeViewModel._providers.value.filter {
-                    it.id != approvedProvider.id && it.phone.trim().replace(" ", "").replace("+", "") != cleanPhone
-                }.toMutableList()
-                currentProviders.add(approvedProvider)
-                vm.mainViewModel.homeViewModel._providers.value = currentProviders
-                vm.mainViewModel.applyFilters()
+                    val currentProviders = vm.mainViewModel.homeViewModel._providers.value.filter {
+                        it.id != approvedProvider.id && it.phone.trim().replace(" ", "").replace("+", "") != cleanPhone
+                    }.toMutableList()
+                    currentProviders.add(approvedProvider)
+                    vm.mainViewModel.homeViewModel._providers.value = currentProviders
+                    vm.mainViewModel.applyFilters()
+
+                    finalizeApprovalCleanup()
+
+                    vm.mainViewModel.addNotification(
+                        title = "🎉 تهانينا! تم قبول انضمامك كفني معتمد",
+                        message = "مرحباً بك يا غالي، لقد تم قبول طلب انضمامك كمهني معتمد وأصبحت الآن نشطاً في دليل كل خدمات اليمن! حسابك يظهر الآن لجميع العملاء.",
+                        targetType = "USER",
+                        targetValue = request.phone
+                    )
+
+                    vm.mainViewModel.triggerNotification("✅ تم قبول طلب ${request.name}")
+                } catch (e: Exception) {
+                    vm.mainViewModel.triggerNotification("❌ تعذر اعتماد الفني ${request.name}: ${e.localizedMessage ?: "يرجى المحاولة مجدداً"}")
+                }
             }
-
-            vm.mainViewModel.addNotification(
-                title = "🎉 تهانينا! تم قبول انضمامك كفني معتمد",
-                message = "مرحباً بك يا غالي، لقد تم قبول طلب انضمامك كمهني معتمد وأصبحت الآن نشطاً في دليل كل خدمات اليمن! حسابك يظهر الآن لجميع العملاء.",
-                targetType = "USER",
-                targetValue = request.phone
-            )
-
-            vm.mainViewModel.triggerNotification("✅ تم قبول طلب ${request.name}")
         }
     }
 
@@ -600,36 +650,11 @@ internal class AdminRequestsAndUsersDelegate(
     }
 
     fun approvePendingProvider(pending: PendingProviderEntity) {
-        vm.db.collection("pending_providers").document(pending.id).delete()
-        val cleanPhone = ValidatePhoneUseCase.normalizePhone(pending.phone)
-            .ifBlank { pending.phone.trim().replace(" ", "").replace("+", "") }
-        val resolvedHash = when {
-            pending.passwordHash.isNotBlank() && SecureHasher.isValidHash(pending.passwordHash) -> pending.passwordHash
-            pending.passwordHash.isNotBlank() -> SecureHasher.hashPassword(pending.passwordHash.trim())
-            else -> ""
-        }
-        val provider = ProviderEntity(
-            id = if (pending.id.isNotBlank()) pending.id else "p_" + cleanPhone.ifBlank { pending.phone },
-            name = pending.name,
-            phone = cleanPhone.ifBlank { pending.phone },
-            categoryId = pending.categoryId,
-            area = pending.area,
-            localNeighborhood = pending.localNeighborhood,
-            subscriptionStatus = "APPROVED",
-            isAvailable = true,
-            profession = pending.profession,
-            specialization = pending.specialization,
-            customCategoryName = pending.customCategoryName,
-            passwordHash = resolvedHash,
-            providerType = pending.providerType
-        )
-        vm.db.collection("providers").document(provider.id).set(provider)
-        vm.mainViewModel.triggerNotification("✅ تم قبول وتعميم الفني: ${pending.name}")
+        approveRequest(pending)
     }
 
-    fun rejectPendingProvider(pending: PendingProviderEntity, @Suppress("UNUSED_PARAMETER") reason: String = "تم رفض الطلب") {
-        vm.db.collection("pending_providers").document(pending.id).delete()
-        vm.mainViewModel.triggerNotification("❌ تم رفض طلب انضمام: ${pending.name}")
+    fun rejectPendingProvider(pending: PendingProviderEntity, reason: String = "تم رفض الطلب") {
+        rejectRequest(pending, reason)
     }
 
     fun approveRegisteredUser(userId: String, userName: String = "") {
@@ -764,7 +789,8 @@ internal class AdminRequestsAndUsersDelegate(
                     longitude = snapshot.getDouble("longitude") ?: 0.0,
                     experienceYears = snapshot.getString("experienceYears") ?: "",
                     qualification = snapshot.getString("qualification") ?: "",
-                    description = snapshot.getString("description") ?: ""
+                    description = snapshot.getString("description") ?: "",
+                    productAttachmentsJson = snapshot.getString("productAttachmentsJson") ?: ""
                 )
                 approveRequest(pendingProvider)
                 loadPendingRequests()

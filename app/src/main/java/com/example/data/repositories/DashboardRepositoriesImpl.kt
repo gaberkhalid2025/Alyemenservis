@@ -112,6 +112,7 @@ class DashboardRepositoryImpl(
         if (name.isBlank()) return Result.failure(IllegalArgumentException("الاسم مطلوب"))
         return try {
             val collectionName = resolveCollection(role)
+            val docRef = firestore.collection(collectionName).document(cleanOwnerId)
             val updates = mutableMapOf<String, Any>(
                 "description" to description.trim(),
                 "workingHours" to workingHours.trim(),
@@ -119,8 +120,29 @@ class DashboardRepositoryImpl(
                 "isActive" to isAvailable,
                 "updatedAt" to System.currentTimeMillis()
             )
-            val cleanPhone = phone?.trim().orEmpty()
-            if (cleanPhone.isNotBlank()) {
+            val rawPhone = phone?.trim().orEmpty()
+            if (rawPhone.isNotBlank()) {
+                val cleanPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(rawPhone)
+                val existingSnap = try { docRef.get().await() } catch (_: Exception) { null }
+                val storedPhone = existingSnap?.getString("phone")?.let {
+                    com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(it)
+                }.orEmpty()
+                if (cleanPhone != storedPhone) {
+                    if (!Regex("^(77|78|73|71|70)\\d{7}$").matches(cleanPhone)) {
+                        return Result.failure(IllegalArgumentException("رقم الهاتف غير صالح (يجب أن يكون 9 أرقام يبدأ بـ 77 أو 78 أو 73 أو 71 أو 70)"))
+                    }
+                    val dupSnap = firestore.collection(collectionName)
+                        .whereEqualTo("phone", cleanPhone)
+                        .limit(2)
+                        .get()
+                        .await()
+                    val hasConflict = dupSnap.documents.any {
+                        it.id != cleanOwnerId && it.getBoolean("isDeleted") != true
+                    }
+                    if (hasConflict) {
+                        return Result.failure(IllegalArgumentException("رقم الهاتف مستخدم بالفعل في حساب آخر نشط"))
+                    }
+                }
                 updates["phone"] = cleanPhone
             }
             if (latitude != null && longitude != null &&
@@ -129,24 +151,28 @@ class DashboardRepositoryImpl(
                 updates["latitude"] = latitude
                 updates["longitude"] = longitude
             }
+            val cleanCityArea = cityArea.trim()
             when (collectionName) {
                 AppConstants.COL_PROVIDERS -> {
                     updates["name"] = name.trim()
-                    updates["localNeighborhood"] = cityArea.trim()
-                    updates["area"] = cityArea.trim()
+                    if (cleanCityArea.isNotBlank() && !cleanCityArea.startsWith("ye_")) {
+                        updates["localNeighborhood"] = cleanCityArea
+                    }
                     if (!photoUrl.isNullOrBlank()) updates["profileImage"] = photoUrl.trim()
                     if (!coverUrl.isNullOrBlank()) updates["coverImage"] = coverUrl.trim()
                 }
                 AppConstants.COL_PROPERTIES -> {
                     updates["title"] = name.trim()
-                    updates["localNeighborhood"] = cityArea.trim()
+                    if (cleanCityArea.isNotBlank() && !cleanCityArea.startsWith("ye_")) {
+                        updates["localNeighborhood"] = cleanCityArea
+                    }
                     val newImgs = listOfNotNull(
                         coverUrl?.trim()?.takeIf { it.isNotBlank() },
                         photoUrl?.trim()?.takeIf { it.isNotBlank() }
                     )
                     if (newImgs.isNotEmpty()) {
                         val existingSnap = try {
-                            firestore.collection(collectionName).document(cleanOwnerId).get().await()
+                            docRef.get().await()
                         } catch (_: Exception) { null }
                         @Suppress("UNCHECKED_CAST")
                         val existingImgs = (existingSnap?.get("images") as? List<String>)?.filter { it.isNotBlank() } ?: emptyList()
@@ -155,16 +181,18 @@ class DashboardRepositoryImpl(
                 }
                 AppConstants.COL_JOBS -> {
                     updates["companyName"] = name.trim()
-                    updates["address"] = cityArea.trim()
+                    updates["address"] = cleanCityArea
                 }
                 else -> {
                     updates["name"] = name.trim()
-                    updates["localNeighborhood"] = cityArea.trim()
+                    if (cleanCityArea.isNotBlank() && !cleanCityArea.startsWith("ye_")) {
+                        updates["localNeighborhood"] = cleanCityArea
+                    }
                     if (!photoUrl.isNullOrBlank()) updates["logoImage"] = photoUrl.trim()
                     if (!coverUrl.isNullOrBlank()) updates["coverImage"] = coverUrl.trim()
                 }
             }
-            firestore.collection(collectionName).document(cleanOwnerId).update(updates).await()
+            docRef.update(updates).await()
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
