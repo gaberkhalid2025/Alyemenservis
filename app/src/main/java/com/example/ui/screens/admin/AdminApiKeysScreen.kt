@@ -143,7 +143,7 @@ fun AdminApiKeysScreenContent(
                     visualTransformation = if (showGeminiKey) VisualTransformation.None else PasswordVisualTransformation(),
                     trailingIcon = {
                         IconButton(onClick = { showGeminiKey = !showGeminiKey }) {
-                            Icon(if (showGeminiKey) Icons.Default.Close else Icons.Default.Done, contentDescription = null, tint = Color.Gray)
+                            Icon(if (showGeminiKey) Icons.Default.VisibilityOff else Icons.Default.Visibility, contentDescription = "إظهار/إخفاء", tint = Color.Gray)
                         }
                     },
                     modifier = Modifier.fillMaxWidth(),

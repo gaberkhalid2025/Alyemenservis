@@ -132,6 +132,47 @@
             display: none !important;
         }
 
+        /* Compact OSM POI overlay markers */
+        .osm-poi-marker {
+            background: transparent !important;
+            border: none !important;
+            overflow: visible !important;
+        }
+        .osm-poi-wrap {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            pointer-events: auto;
+            cursor: pointer;
+            width: 112px;
+        }
+        .osm-poi-dot {
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            color: #ffffff;
+            border: 1.5px solid #ffffff;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.65);
+        }
+        .osm-poi-text {
+            margin-top: 1px;
+            font-size: 10px;
+            font-weight: 700;
+            color: #F8FAFC;
+            text-shadow: -1px -1px 0 #0B1120, 1px -1px 0 #0B1120, -1px 1px 0 #0B1120, 1px 1px 0 #0B1120, 0 2px 4px rgba(0,0,0,0.95);
+            white-space: nowrap;
+            max-width: 110px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            text-align: center;
+            pointer-events: none;
+        }
+
         .leaflet-control-zoom {
             display: none !important;
         }
@@ -287,24 +328,83 @@
         }
         window.setPickMode = setPickMode;
 
-        var labelsOverlay = null;
+        var labelsLayerGroup = null;
         function setHybridLabels(on) {
             if (!map) return;
             if (on) {
-                if (!labelsOverlay) {
+                if (!labelsLayerGroup) {
                     ensurePane('labelsPane', 250);
-                    labelsOverlay = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
-                        maxZoom: 24, maxNativeZoom: 19,
-                        pane: 'labelsPane',
-                        attribution: 'أسماء © <a href="https://www.esri.com">Esri</a>'
-                    });
+                    labelsLayerGroup = L.layerGroup([
+                        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}', {
+                            maxZoom: 24, maxNativeZoom: 19,
+                            pane: 'labelsPane',
+                            opacity: 0.92
+                        }),
+                        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
+                            maxZoom: 24, maxNativeZoom: 19,
+                            pane: 'labelsPane',
+                            opacity: 0.95
+                        }),
+                        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}.png', {
+                            maxZoom: 24, maxNativeZoom: 20,
+                            subdomains: ['a', 'b', 'c', 'd'],
+                            pane: 'labelsPane',
+                            opacity: 0.98,
+                            attribution: 'أسماء © <a href="https://carto.com">CARTO</a> / OSM'
+                        })
+                    ]);
                 }
-                if (!map.hasLayer(labelsOverlay)) labelsOverlay.addTo(map);
-            } else if (labelsOverlay && map.hasLayer(labelsOverlay)) {
-                map.removeLayer(labelsOverlay);
+                if (!map.hasLayer(labelsLayerGroup)) labelsLayerGroup.addTo(map);
+            } else if (labelsLayerGroup && map.hasLayer(labelsLayerGroup)) {
+                map.removeLayer(labelsLayerGroup);
             }
         }
         window.setHybridLabels = setHybridLabels;
+
+        var osmPoiLayer = null;
+        function clearOsmPois() {
+            if (map && osmPoiLayer) {
+                map.removeLayer(osmPoiLayer);
+                osmPoiLayer = null;
+            }
+        }
+        window.clearOsmPois = clearOsmPois;
+
+        function setOsmPoisBase64(b64) {
+            try {
+                if (!map) return;
+                clearOsmPois();
+                if (!b64) return;
+                var poiPane = ensurePane('osmPoiPane', 350);
+                if (poiPane) poiPane.style.pointerEvents = 'auto';
+                var jsonStr = decodeURIComponent(escape(window.atob(b64)));
+                var list = JSON.parse(jsonStr);
+                if (!Array.isArray(list) || list.length === 0) return;
+                osmPoiLayer = L.layerGroup();
+                list.forEach(function (p) {
+                    if (typeof p.lat !== 'number' || typeof p.lng !== 'number') return;
+                    var color = /^#[0-9A-Fa-f]{3,8}$/.test(p.color || '') ? p.color : '#2563EB';
+                    var iconTxt = p.icon || '📍';
+                    var name = p.name || p.kind || '';
+                    var kind = p.kind || '';
+                    var html = '<div class="osm-poi-wrap">' +
+                        '<div class="osm-poi-dot" style="background:' + color + ';">' + esc(iconTxt) + '</div>' +
+                        '<div class="osm-poi-text">' + esc(name) + '</div></div>';
+                    var icon = L.divIcon({ className: 'osm-poi-marker', html: html, iconSize: [112, 38], iconAnchor: [56, 11] });
+                    var mk = L.marker([p.lat, p.lng], { icon: icon, pane: 'osmPoiPane' });
+                    mk.on('click', function () {
+                        if (window.AndroidBridge && window.AndroidBridge.onOsmPoiClicked) {
+                            window.AndroidBridge.onOsmPoiClicked(String(name), String(kind), p.lat, p.lng);
+                        }
+                    });
+                    mk.addTo(osmPoiLayer);
+                });
+                osmPoiLayer.addTo(map);
+            } catch (e) {
+                console.error('setOsmPoisBase64 error', e);
+            }
+        }
+        window.setOsmPoisBase64 = setOsmPoisBase64;
 
         var GIBS_PRODUCTS = {
             'truecolor': {

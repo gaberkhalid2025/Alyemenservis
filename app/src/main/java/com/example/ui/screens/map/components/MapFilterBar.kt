@@ -83,8 +83,7 @@ fun MapFilterBar(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .statusBarsPadding()
-            .padding(horizontal = 20.dp, vertical = 8.dp)
+            .padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
         // Single Top Glassmorphism Capsule
         Surface(

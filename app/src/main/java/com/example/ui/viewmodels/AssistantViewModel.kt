@@ -254,18 +254,23 @@ class AssistantViewModel : ViewModel() {
         engineResp: AiResponse?
     ): AssistantMessage {
         if (engineResp == null) return localMsg
-        // إذا كان الرد المحلي من دليل الصيانة السريع أو سلامة HIGH أو عثر على نتائج من قاعدة البيانات
-        if (localMsg.safetyLevel.equals("HIGH", ignoreCase = true)) {
+        val localIsHigh = localMsg.safetyLevel.equals("HIGH", ignoreCase = true)
+        val engineIsHigh = engineResp.safetyLevel.equals("HIGH", ignoreCase = true)
+        // أولوية قصوى لتحذيرات السلامة العالية من أي مصدر مع الإبقاء على الفنيين المطابقين
+        if (localIsHigh) {
             return localMsg
         }
-        val engineHasRichGuide = engineResp.diySteps.isNotEmpty() ||
+        val engineHasSpecificAnswer = engineResp.title.startsWith("📋") ||
+            engineResp.title == "معلومات الخدمة المعتمدة"
+        val engineHasRichGuide = engineIsHigh ||
+            engineResp.diySteps.isNotEmpty() ||
             engineResp.immediateActions.isNotEmpty() ||
-            engineResp.safetyLevel.equals("HIGH", ignoreCase = true) ||
-            !engineResp.estimatedCost.isNullOrBlank()
+            !engineResp.estimatedCost.isNullOrBlank() ||
+            (engineHasSpecificAnswer && engineResp.message.isNotBlank())
         if (!engineHasRichGuide) return localMsg
 
         val sb = StringBuilder()
-        if (engineResp.safetyLevel.equals("HIGH", ignoreCase = true)) {
+        if (engineIsHigh) {
             sb.append("🚨 *${engineResp.title}*\n\n")
             engineResp.safetyWarning?.let { sb.append("⚠️ $it\n\n") }
             if (engineResp.immediateActions.isNotEmpty()) {

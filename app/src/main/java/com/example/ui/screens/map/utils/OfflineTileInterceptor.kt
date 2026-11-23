@@ -39,6 +39,9 @@ object OfflineTileInterceptor {
     private val SAT = Regex("^https://server\\.arcgisonline\\.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/(\\d+)/(\\d+)/(\\d+)$")
     private val SAT_CLARITY = Regex("^https://clarity\\.maptiles\\.arcgis\\.com/arcgis/rest/services/World_Imagery/MapServer/tile/(\\d+)/(\\d+)/(\\d+)$")
     private val VELA = Regex("^https://server\\.arcgisonline\\.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/(\\d+)/(\\d+)/(\\d+)$")
+    private val ESRI_LABELS = Regex("^https://server\\.arcgisonline\\.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/(\\d+)/(\\d+)/(\\d+)$")
+    private val ESRI_TRANS = Regex("^https://server\\.arcgisonline\\.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/(\\d+)/(\\d+)/(\\d+)$")
+    private val CARTO_LABELS = Regex("^https://[a-d]\\.basemaps\\.cartocdn\\.com/rastertiles/voyager_only_labels/(\\d+)/(\\d+)/(\\d+)(?:@2x)?\\.png$")
     private val EOX = Regex("^https://tiles\\.maps\\.eox\\.at/wmts/1\\.0\\.0/s2cloudless_3857/default/GoogleMapsCompatible/(\\d+)/(\\d+)/(\\d+)\\.jpg$")
     private val DEM_TERRARIUM = Regex("^https://s3\\.amazonaws\\.com/elevation-tiles-prod/terrarium/(\\d+)/(\\d+)/(\\d+)\\.png$")
 
@@ -50,17 +53,20 @@ object OfflineTileInterceptor {
         OSM.matchEntire(url)?.let { return Tile("osm", it.groupValues[1].toInt(), it.groupValues[2].toInt(), it.groupValues[3].toInt(), "png", "image/png") }
         HOT.matchEntire(url)?.let { return Tile("hot", it.groupValues[1].toInt(), it.groupValues[2].toInt(), it.groupValues[3].toInt(), "png", "image/png") }
         TOPO.matchEntire(url)?.let { return Tile("topo", it.groupValues[1].toInt(), it.groupValues[2].toInt(), it.groupValues[3].toInt(), "png", "image/png") }
+        CARTO_LABELS.matchEntire(url)?.let { return Tile("carto_labels", it.groupValues[1].toInt(), it.groupValues[2].toInt(), it.groupValues[3].toInt(), "png", "image/png") }
         DEM_TERRARIUM.matchEntire(url)?.let { return Tile("dem", it.groupValues[1].toInt(), it.groupValues[2].toInt(), it.groupValues[3].toInt(), "png", "image/png") }
-        // Esri & EOX: {z}/{y}/{x} (JPEG)
+        // Esri & EOX: {z}/{y}/{x}
         VELA.matchEntire(url)?.let { return Tile("vela_esri", it.groupValues[1].toInt(), it.groupValues[3].toInt(), it.groupValues[2].toInt(), "jpg", "image/jpeg") }
         SAT.matchEntire(url)?.let { return Tile("sat", it.groupValues[1].toInt(), it.groupValues[3].toInt(), it.groupValues[2].toInt(), "jpg", "image/jpeg") }
         SAT_CLARITY.matchEntire(url)?.let { return Tile("sat_clarity", it.groupValues[1].toInt(), it.groupValues[3].toInt(), it.groupValues[2].toInt(), "jpg", "image/jpeg") }
+        ESRI_LABELS.matchEntire(url)?.let { return Tile("esri_labels", it.groupValues[1].toInt(), it.groupValues[3].toInt(), it.groupValues[2].toInt(), "png", "image/png") }
+        ESRI_TRANS.matchEntire(url)?.let { return Tile("esri_trans", it.groupValues[1].toInt(), it.groupValues[3].toInt(), it.groupValues[2].toInt(), "png", "image/png") }
         EOX.matchEntire(url)?.let { return Tile("eox16", it.groupValues[1].toInt(), it.groupValues[3].toInt(), it.groupValues[2].toInt(), "jpg", "image/jpeg") }
         return null
     }
 
     private fun findFallbackCachedTile(context: Context, requested: Tile): Pair<ByteArray, String>? {
-        if (requested.source == "dem" || requested.source == "eox16") return null
+        if (requested.source in setOf("dem", "eox16", "esri_labels", "esri_trans", "carto_labels")) return null
         val fallbackOrder = listOf(
             "sat" to ("jpg" to "image/jpeg"),
             "sat_clarity" to ("jpg" to "image/jpeg"),

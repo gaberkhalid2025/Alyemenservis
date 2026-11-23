@@ -233,7 +233,7 @@ internal fun BoxScope.MapControlsDockHost(
             .align(Alignment.CenterEnd)
             .statusBarsPadding()
             .navigationBarsPadding()
-            .padding(end = 20.dp, top = 64.dp, bottom = 84.dp)
+            .padding(end = 16.dp, top = 74.dp, bottom = 92.dp)
     )
 }
 

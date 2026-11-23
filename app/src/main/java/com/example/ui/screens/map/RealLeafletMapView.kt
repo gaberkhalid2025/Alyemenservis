@@ -91,7 +91,9 @@ fun RealLeafletMapView(
     onMapLongPressed: ((lat: Double, lng: Double) -> Unit)? = null,
     onMapCenterChanged: ((lat: Double, lng: Double) -> Unit)? = null,
     ecoMode: Boolean = false,
-    hybridLabels: Boolean = false,
+    hybridLabels: Boolean = true,
+    osmPoisJson: String? = null,
+    onOsmPoiSelected: ((name: String, kind: String, lat: Double, lng: Double) -> Unit)? = null,
     nightMode: Boolean = false,
     gibsEnabled: Boolean = false,
     gibsProduct: String = "truecolor",
@@ -139,6 +141,7 @@ fun RealLeafletMapView(
     val onGibsStatusState by rememberUpdatedState(onGibsStatus)
     val onOverlayStatusState by rememberUpdatedState(onOverlayStatus)
     val offlineOnlyState by rememberUpdatedState(offlineOnly)
+    val onOsmPoiSelectedState by rememberUpdatedState(onOsmPoiSelected)
 
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner, webViewRef) {
@@ -359,6 +362,17 @@ fun RealLeafletMapView(
         }
     }
 
+    LaunchedEffect(isMapReady, osmPoisJson, hybridLabels, offlineOnly) {
+        if (!isMapReady || webViewRef == null) return@LaunchedEffect
+        val json = osmPoisJson
+        if (!hybridLabels || offlineOnly || json.isNullOrBlank()) {
+            webViewRef?.evaluateJavascript("if (window.clearOsmPois) { window.clearOsmPois(); }", null)
+        } else {
+            val b64 = Base64.encodeToString(json.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
+            webViewRef?.evaluateJavascript("if (window.setOsmPoisBase64) { window.setOsmPoisBase64('$b64'); }", null)
+        }
+    }
+
     LaunchedEffect(isMapReady, nightMode) {
         if (isMapReady && webViewRef != null) {
             webViewRef?.evaluateJavascript("if (window.setNightMode) { window.setNightMode($nightMode); }", null)
@@ -536,6 +550,11 @@ fun RealLeafletMapView(
                             }
 
                             @JavascriptInterface
+                            fun onOsmPoiClicked(name: String, kind: String, lat: Double, lng: Double) {
+                                mainHandler.post { onOsmPoiSelectedState?.invoke(name, kind, lat, lng) }
+                            }
+
+                            @JavascriptInterface
                             fun getAvailableLayers(): String {
                                 return "[\"OSM\",\"HOT\",\"TOPO\",\"VELA\",\"SATELLITE\",\"SATELLITE_CLARITY\",\"VELA_3D\"]"
                             }
@@ -548,6 +567,7 @@ fun RealLeafletMapView(
                                 "opentopomap.org",
                                 "www.esri.com",
                                 "carto.com",
+                                "basemaps.cartocdn.com",
                                 "earthdata.nasa.gov",
                                 "s2maps.eu",
                                 "realearth.ssec.wisc.edu",

@@ -172,6 +172,9 @@ fun DynamicPolymorphicProfileScreen(
         .sumOf { if (it.totalAmount > 0.0) it.totalAmount else it.price }
 
     var previewAsCustomer by remember { mutableStateOf(false) }
+    val isAdminUser = remember(adminRole) {
+        adminRole.isNotBlank() && !adminRole.equals("GUEST", ignoreCase = true)
+    }
 
     if (liveStore != null && (!isOwner || previewAsCustomer)) {
         StoreCustomerCatalogView(
@@ -180,7 +183,7 @@ fun DynamicPolymorphicProfileScreen(
             viewModel = viewModel,
             themeColors = themeColors,
             onBackClick = onBackClick,
-            isAdmin = adminRole != "GUEST",
+            isAdmin = isAdminUser,
             isOwnerPreview = isOwner && previewAsCustomer,
             onExitOwnerPreview = if (isOwner) { { previewAsCustomer = false } } else null
         )
@@ -360,7 +363,7 @@ fun DynamicPolymorphicProfileScreen(
             }
 
             // 3. OWNER CONTROL BAR
-            if (isOwner || adminRole != "GUEST") {
+            if (isOwner || isAdminUser) {
                 item {
                     ProfileOwnerAdminControlBar(
                         entityId = entityId,
@@ -370,7 +373,7 @@ fun DynamicPolymorphicProfileScreen(
                         property = liveProperty,
                         job = liveJob,
                         isOwner = isOwner,
-                        isAdmin = adminRole != "GUEST",
+                        isAdmin = isAdminUser,
                         viewModel = viewModel,
                         themeColors = themeColors
                     )

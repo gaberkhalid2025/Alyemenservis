@@ -32,11 +32,15 @@ class OffersViewModel @Inject constructor(
     private val _eventFlow = MutableSharedFlow<DashboardEvent>()
     val eventFlow: SharedFlow<DashboardEvent> = _eventFlow.asSharedFlow()
 
+    @Volatile
+    private var activeEntityId: String = ""
+
     init {
         loadOffers()
     }
 
     fun loadOffers() {
+        activeEntityId = ""
         viewModelScope.launch {
             _isLoading.value = true
             _error.value = null
@@ -49,11 +53,38 @@ class OffersViewModel @Inject constructor(
         }
     }
 
+    fun loadOffersForEntity(entityId: String) {
+        if (entityId.isBlank()) {
+            loadOffers()
+            return
+        }
+        activeEntityId = entityId
+        viewModelScope.launch {
+            _isLoading.value = true
+            _error.value = null
+            repository.getOffersForEntity(entityId).onSuccess {
+                _offers.value = it
+            }.onFailure {
+                _error.value = it.message
+            }
+            _isLoading.value = false
+        }
+    }
+
+    private fun reloadCurrentScope() {
+        val currentId = activeEntityId
+        if (currentId.isNotBlank()) {
+            loadOffersForEntity(currentId)
+        } else {
+            loadOffers()
+        }
+    }
+
     fun addOffer(offer: SpecialOfferEntity) {
         viewModelScope.launch {
             repository.addOffer(offer)
                 .onSuccess {
-                    loadOffers()
+                    reloadCurrentScope()
                     _eventFlow.emit(DashboardEvent.ShowToast("تمت إضافة العرض بنجاح ✅"))
                 }
                 .onFailure { e ->
@@ -67,7 +98,7 @@ class OffersViewModel @Inject constructor(
         viewModelScope.launch {
             repository.updateOffer(offer)
                 .onSuccess {
-                    loadOffers()
+                    reloadCurrentScope()
                     _eventFlow.emit(DashboardEvent.ShowToast("تم تحديث العرض بنجاح ✅"))
                 }
                 .onFailure { e ->
@@ -81,7 +112,7 @@ class OffersViewModel @Inject constructor(
         viewModelScope.launch {
             repository.deleteOffer(offerId)
                 .onSuccess {
-                    loadOffers()
+                    reloadCurrentScope()
                     _eventFlow.emit(DashboardEvent.ShowToast("تم حذف العرض بنجاح 🗑️"))
                 }
                 .onFailure { e ->

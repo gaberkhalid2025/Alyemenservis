@@ -284,7 +284,9 @@ fun MapScreenContent(
             nearbyStores = stores,
             userLat = if (hasRealLocation) safeUserLat else 0.0,
             userLng = if (hasRealLocation) safeUserLng else 0.0,
-            context = context
+            context = context,
+            nearbyProperties = properties,
+            biasCenter = centerCoords
         )
         searchMessage = if (searchResults.isEmpty()) (RealValhallaNavigator.lastSearchError ?: "لا توجد نتائج لـ «$q»") else null
         isSearching = false
@@ -301,7 +303,7 @@ fun MapScreenContent(
     val accuracyForBanner by viewModel.userLocationAccuracyM.collectAsState()
     val gpsWeak = hasRealLocation && accuracyForBanner > 50f && accuracyForBanner < Float.MAX_VALUE
 
-    var hybridLabels by remember { mutableStateOf(false) }
+    var hybridLabels by remember { mutableStateOf(true) }
     val is3DAvailable = remember { Map3D.isAvailable(context) }
     var map3dMessage by remember { mutableStateOf<String?>(null) }
     var use3DCssFallback by remember { mutableStateOf(false) }
@@ -520,6 +522,11 @@ fun MapScreenContent(
                 quakesJson = quakesJson,
                 rainUrl = rainUrl,
                 savedAddresses = savedAddresses,
+                sosPending = sosPending,
+                onSelectOsmPoi = { res ->
+                    searchedPlace = res
+                    state.selectedEntity = null
+                },
                 onOpenLandmarkAddress = { showLandmarkAddress = true },
                 onOpenSavedAddresses = { showSavedAddresses = true }
             )
@@ -586,27 +593,6 @@ fun MapScreenContent(
                 onCloseMoreLayersSheet = { showMoreLayersSheet = false },
                 onShowGroupTracking = { showGroupTracking = true }
             )
-
-            // 🚨 لافتة انتظار نداء الفزعة إن وجد طلب معلّق
-            if (sosPending) {
-                Surface(
-                    color = Color(0xFF7F1D1D),
-                    shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(1.dp, Color(0xFFEF4444)),
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .statusBarsPadding()
-                        .padding(top = 110.dp)
-                ) {
-                    Text(
-                        "🚨 نداء الفزعة محفوظ وقيد الإرسال تلقائياً…",
-                        color = Color.White,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
-                    )
-                }
-            }
 
             // 🌟 الشريط العائم الموحد (Glassmorphic Floating Bar)
             // يجمع: 1. الفزعة (الأيقونة الحمراء) + 2. خدمات الطريق + 3. زر الكأس (المكافآت) + 4. HUD ليلي

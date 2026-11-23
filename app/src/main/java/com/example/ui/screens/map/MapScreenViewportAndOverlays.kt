@@ -94,9 +94,82 @@ internal fun BoxScope.MapScreenViewport(
     quakesJson: String?,
     rainUrl: String?,
     savedAddresses: List<LandmarkAddress>,
+    sosPending: Boolean = false,
+    onSelectOsmPoi: (RealValhallaNavigator.SearchAddressResult) -> Unit = {},
     onOpenLandmarkAddress: () -> Unit,
     onOpenSavedAddresses: () -> Unit
 ) {
+    var osmPoisJson by remember { mutableStateOf<String?>(null) }
+    val poiLat = centerCoords?.first ?: safeUserLat
+    val poiLng = centerCoords?.second ?: safeUserLng
+    val poiGridKey = remember(poiLat, poiLng) {
+        if (LandmarkAddress.isValid(poiLat, poiLng)) {
+            java.lang.String.format(java.util.Locale.US, "%.2f_%.2f", poiLat, poiLng)
+        } else ""
+    }
+    LaunchedEffect(poiGridKey, hybridLabels, state.mapLayer, state.isRadarMode, state.currentMapMode) {
+        val showPois = hybridLabels &&
+            !state.isRadarMode &&
+            state.mapLayer != MapLayer.VALHALLA_OFFLINE &&
+            (state.currentMapMode == MapMode.SATELLITE || state.currentMapMode == MapMode.SATELLITE_CLARITY || state.currentMapMode == MapMode.VELA_3D)
+        if (!showPois || poiGridKey.isBlank()) {
+            osmPoisJson = null
+            return@LaunchedEffect
+        }
+        kotlinx.coroutines.delay(650L)
+        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager
+        val caps = cm?.getNetworkCapabilities(cm.activeNetwork)
+        val hasNet = caps?.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
+        if (!hasNet) return@LaunchedEffect
+
+        val (jsonStr, cacheItems) = withContext(Dispatchers.IO) {
+            val pois = LandmarkFinder.fetchViewportPois(poiLat, poiLng, radiusM = 1400)
+            if (pois.isEmpty()) return@withContext (null to emptyList<RealValhallaNavigator.SearchAddressResult>())
+            val arr = org.json.JSONArray()
+            val toCache = mutableListOf<RealValhallaNavigator.SearchAddressResult>()
+            pois.forEach { p ->
+                val (ic, col) = when (p.kind) {
+                    "مسجد" -> "🕌" to "#10B981"
+                    "مدرسة" -> "🏫" to "#3B82F6"
+                    "جامعة" -> "🎓" to "#2563EB"
+                    "صالة أفراح" -> "💒" to "#EC4899"
+                    "مستشفى", "عيادة" -> "🏥" to "#EF4444"
+                    "صيدلية" -> "💊" to "#DC2626"
+                    "مطعم" -> "🍴" to "#F97316"
+                    "كافيه" -> "☕" to "#D97706"
+                    "سوق" -> "🛒" to "#0EA5E9"
+                    "بنك" -> "🏦" to "#6366F1"
+                    "محطة وقود" -> "⛽" to "#EAB308"
+                    "فندق" -> "🏨" to "#8B5CF6"
+                    "حي" -> "🏘️" to "#14B8A6"
+                    else -> "📍" to "#64748B"
+                }
+                arr.put(org.json.JSONObject().apply {
+                    put("name", p.name)
+                    put("kind", p.kind)
+                    put("icon", ic)
+                    put("color", col)
+                    put("lat", p.lat)
+                    put("lng", p.lng)
+                })
+                toCache.add(
+                    RealValhallaNavigator.SearchAddressResult(
+                        displayName = "${p.name} (${p.kind})",
+                        shortName = p.name,
+                        latitude = p.lat,
+                        longitude = p.lng,
+                        type = "osm_poi",
+                        icon = ic
+                    )
+                )
+            }
+            OfflineYemenGazetteer.cacheOnlineResults(context.applicationContext, toCache)
+            arr.toString() to toCache
+        }
+        if (jsonStr != null || cacheItems.isEmpty()) {
+            osmPoisJson = jsonStr
+        }
+    }
     if (state.currentMapMode == MapMode.AR_VPS) {
         ArVpsCameraOverlay(
             nearbyProviders = filteredProviders,
@@ -210,6 +283,35 @@ internal fun BoxScope.MapScreenViewport(
             onSwitchToRadar = { state.isRadarMode = true },
             onTilesStatus = onTilesStatus,
             hybridLabels = hybridLabels,
+            osmPoisJson = osmPoisJson,
+            onOsmPoiSelected = { name, kind, lat, lng ->
+                val ic = when (kind) {
+                    "مسجد" -> "🕌"
+                    "مدرسة" -> "🏫"
+                    "جامعة" -> "🎓"
+                    "صالة أفراح" -> "💒"
+                    "مستشفى", "عيادة" -> "🏥"
+                    "صيدلية" -> "💊"
+                    "مطعم" -> "🍴"
+                    "كافيه" -> "☕"
+                    "سوق" -> "🛒"
+                    "بنك" -> "🏦"
+                    "محطة وقود" -> "⛽"
+                    "فندق" -> "🏨"
+                    "حي" -> "🏘️"
+                    else -> "📍"
+                }
+                onSelectOsmPoi(
+                    RealValhallaNavigator.SearchAddressResult(
+                        displayName = if (kind.isNotBlank()) "$name ($kind)" else name,
+                        shortName = name,
+                        latitude = lat,
+                        longitude = lng,
+                        type = "osm_poi",
+                        icon = ic
+                    )
+                )
+            },
             nightMode = state.nightMode,
             gibsEnabled = state.gibsEnabled,
             gibsProduct = state.gibsProduct,
@@ -295,86 +397,19 @@ internal fun BoxScope.MapScreenViewport(
             valhallaSizeMb = valhallaSizeMb,
             realTimeSatEnabled = state.realTimeSatEnabled,
             realTimeSatFeed = state.realTimeSatFeed,
-            bottomInsetDp = 110,
+            bottomInsetDp = 115,
             topInsetDp = 0,
             modifier = Modifier.fillMaxSize()
         )
 
-        if (areTilesFailing && !state.isRadarMode && state.mapLayer != MapLayer.VALHALLA_OFFLINE) {
-            Surface(
-                color = Color(0xDD7F1D1D),
-                shape = RoundedCornerShape(10.dp),
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 95.dp)
-                    .padding(horizontal = 16.dp)
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        Icons.Default.CloudOff,
-                        contentDescription = null,
-                        tint = Color(0xFFFCA5A5),
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        "تعذر جلب بلاطات الخريطة",
-                        color = Color.White,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium,
-                        modifier = Modifier.weight(1f)
-                    )
-                    TextButton(
-                        onClick = {
-                            onTilesStatus(false)
-                            state.reloadTilesTrigger += 1
-                        },
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
-                    ) {
-                        Text("إعادة المحاولة", color = Color(0xFF93C5FD), fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
-        }
-
-        // 🛰️ لافتة GPS الضعيف
-        if (gpsWeak) {
-            Surface(
-                color = Color(0xCC7C2D12),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .statusBarsPadding()
-                    .padding(top = 150.dp, start = 16.dp, end = 16.dp)
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        "إشارة GPS ضعيفة (±${accuracyForBanner.toInt()} م). لعنوان دقيق استخدم «عنواني بالمعلم».",
-                        color = Color.White,
-                        fontSize = 12.sp,
-                        modifier = Modifier.weight(1f)
-                    )
-                    TextButton(onClick = onOpenLandmarkAddress) {
-                        Text("فتح", color = Color(0xFF00E5FF), fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
-        }
-
-        // 🏷️ شريط الشارات والتبديل السريع
+        // 🏷️ شريط الشارات والتبديل السريع (موضع محكم أسفل كبسولة البحث دون تداخل مع قائمة التحكم الجانبية)
         Row(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .align(Alignment.TopStart)
                 .statusBarsPadding()
-                .padding(top = 100.dp, start = 16.dp, end = 86.dp)
+                .padding(top = 74.dp, start = 16.dp, end = 86.dp)
                 .horizontalScroll(rememberScrollState())
         ) {
             val isOfflineLayer = state.mapLayer == MapLayer.VALHALLA_OFFLINE
@@ -451,6 +486,94 @@ internal fun BoxScope.MapScreenViewport(
             }
         }
 
+        // ⚠️ حزمة تنبيهات الخريطة المكدسة بانتظام أسفل الشارات لمنع أي تداخل بصري
+        val showTilesBanner = areTilesFailing && !state.isRadarMode && state.mapLayer != MapLayer.VALHALLA_OFFLINE
+        if (showTilesBanner || gpsWeak || sosPending) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(top = 124.dp, start = 16.dp, end = 86.dp)
+            ) {
+                if (sosPending) {
+                    Surface(
+                        color = Color(0xFF7F1D1D),
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, Color(0xFFEF4444)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            "🚨 نداء الفزعة محفوظ وقيد الإرسال تلقائياً…",
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                        )
+                    }
+                }
+                if (showTilesBanner) {
+                    Surface(
+                        color = Color(0xDD7F1D1D),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.CloudOff,
+                                contentDescription = null,
+                                tint = Color(0xFFFCA5A5),
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                "تعذر جلب بلاطات الخريطة",
+                                color = Color.White,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium,
+                                modifier = Modifier.weight(1f)
+                            )
+                            TextButton(
+                                onClick = {
+                                    onTilesStatus(false)
+                                    state.reloadTilesTrigger += 1
+                                },
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                            ) {
+                                Text("إعادة المحاولة", color = Color(0xFF93C5FD), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+                if (gpsWeak) {
+                    Surface(
+                        color = Color(0xCC7C2D12),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                "إشارة GPS ضعيفة (±${accuracyForBanner.toInt()} م). لعنوان دقيق استخدم «عنواني بالمعلم».",
+                                color = Color.White,
+                                fontSize = 11.5.sp,
+                                modifier = Modifier.weight(1f)
+                            )
+                            TextButton(onClick = onOpenLandmarkAddress) {
+                                Text("فتح", color = Color(0xFF00E5FF), fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // 🎯 وضع تحديد نقطة بدبوس المنتصف أو النقر
         if (isPinPickMode) {
             Box(
@@ -508,7 +631,7 @@ internal fun BoxScope.MapScreenViewport(
             }
         }
 
-        // 🏠 زر «عنواني بالمعلم» (Glassmorphic)
+        // 🏠 زر «عنواني بالمعلم» (في الجانب المقابل لشريط الأدوات لتجنب التداخل)
         Surface(
             onClick = {
                 if (savedAddresses.isEmpty()) onOpenLandmarkAddress()
@@ -519,13 +642,13 @@ internal fun BoxScope.MapScreenViewport(
             border = BorderStroke(1.dp, Color.White.copy(alpha = 0.14f)),
             shadowElevation = 8.dp,
             modifier = Modifier
-                .align(Alignment.BottomEnd)
+                .align(Alignment.BottomStart)
                 .navigationBarsPadding()
-                .padding(end = 20.dp, bottom = 90.dp)
-                .size(44.dp)
+                .padding(start = 16.dp, bottom = 84.dp)
+                .size(48.dp)
         ) {
             Box(contentAlignment = Alignment.Center) {
-                Text("🏠", fontSize = 16.sp)
+                Text("🏠", fontSize = 17.sp)
             }
         }
     }

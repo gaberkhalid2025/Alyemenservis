@@ -122,6 +122,8 @@ fun AdminMaintenanceScreenContent(
                                     settingsState.copy(
                                         isMaintenanceActive = newStatus,
                                         chatDisabledAnnouncement = emergencyMessage,
+                                        supportPhone = emergencyPhone,
+                                        disableChatAll = emergencyLockoutChat,
                                         emergencyFreezeOrders = emergencyFreezeOrders,
                                         adminBypassActive = adminBypassActive,
                                         maintenanceDuration = selectedDuration
@@ -140,6 +142,8 @@ fun AdminMaintenanceScreenContent(
                                     settingsState.copy(
                                         isMaintenanceActive = checked,
                                         chatDisabledAnnouncement = emergencyMessage,
+                                        supportPhone = emergencyPhone,
+                                        disableChatAll = emergencyLockoutChat,
                                         emergencyFreezeOrders = emergencyFreezeOrders,
                                         adminBypassActive = adminBypassActive,
                                         maintenanceDuration = selectedDuration
@@ -175,6 +179,8 @@ fun AdminMaintenanceScreenContent(
                             settingsState.copy(
                                 isMaintenanceActive = newStatus,
                                 chatDisabledAnnouncement = emergencyMessage,
+                                supportPhone = emergencyPhone,
+                                disableChatAll = emergencyLockoutChat,
                                 emergencyFreezeOrders = emergencyFreezeOrders,
                                 adminBypassActive = adminBypassActive,
                                 maintenanceDuration = selectedDuration
@@ -295,7 +301,7 @@ fun AdminMaintenanceScreenContent(
 
                     Button(
                         onClick = {
-                            val lockChatNow = isMaint && emergencyLockoutChat
+                            val lockChatNow = emergencyLockoutChat
                             viewModel.saveCustomSettingsState(
                                 settingsState.copy(
                                     chatDisabledAnnouncement = emergencyMessage,

@@ -33,6 +33,11 @@ fun TabOffersCoupons(
     viewModel: OffersViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
+    LaunchedEffect(storeId) {
+        if (storeId.isNotBlank()) {
+            viewModel.loadOffersForEntity(storeId)
+        }
+    }
     val offersList by viewModel.offers.collectAsState()
     var showAddDialog by remember { mutableStateOf(false) }
     var itemToDelete by remember { mutableStateOf<SpecialOfferEntity?>(null) }
