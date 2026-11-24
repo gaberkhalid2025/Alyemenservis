@@ -163,7 +163,21 @@ fun MapControls(
 
             HorizontalDivider(modifier = Modifier.width(34.dp), color = Color.White.copy(alpha = 0.08f))
 
-            // 5. 🗺️ طبقات موحدة (نافذة الطبقات الموحدة)
+            // 5. 🎯 المعالم والأسماء (تصفية وإخفاء سريع)
+            DockButton(
+                icon = if (showLabelsOnMap) Icons.Default.Place else Icons.Default.VisibilityOff,
+                label = if (showLabelsOnMap) "المعالم" else "مخفية",
+                active = showLabelsOnMap,
+                activeColor = Color(0xFF00E5FF),
+                onClick = onOpenLandmarkFilter,
+                onLongClick = onToggleLabelsQuick,
+                testTag = "map_landmarks_filter_dock_btn",
+                contentDescription = "تصفية المعالم وأسماء الشوارع (اضغط مطولاً للإخفاء/الإظهار السريع)"
+            )
+
+            HorizontalDivider(modifier = Modifier.width(34.dp), color = Color.White.copy(alpha = 0.08f))
+
+            // 6. 🗺️ طبقات موحدة (نافذة الطبقات الموحدة)
             DockButton(
                 icon = Icons.Default.Layers,
                 label = "طبقات",
