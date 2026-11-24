@@ -60,7 +60,7 @@ class AgoraVoiceManager(private val context: Context) {
     private var currentSession: CallSession? = null
     private val handler = Handler(Looper.getMainLooper())
     private var durationRunnable: Runnable? = null
-    private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+    private val audioManager: AudioManager? = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
 
     // Reflection/Native instance for Agora RTC Engine
     private var rtcEngine: Any? = null
@@ -69,10 +69,24 @@ class AgoraVoiceManager(private val context: Context) {
         initializeRtcEngine()
     }
 
+    private fun hasAgoraRtcSdk(): Boolean {
+        return try {
+            Class.forName("io.agora.rtc2.RtcEngine")
+            true
+        } catch (_: ClassNotFoundException) {
+            try {
+                Class.forName("io.agora.rtc.RtcEngine")
+                true
+            } catch (_: ClassNotFoundException) {
+                false
+            }
+        }
+    }
+
     /**
-     * Checks whether Agora App ID has been configured.
+     * Checks whether Agora App ID and Agora RTC SDK are configured.
      */
-    fun isConfigured(): Boolean = AGORA_APP_ID.isNotBlank()
+    fun isConfigured(): Boolean = AGORA_APP_ID.isNotBlank() && hasAgoraRtcSdk()
 
     private fun initializeRtcEngine() {
         if (AGORA_APP_ID.isBlank()) {
@@ -80,23 +94,22 @@ class AgoraVoiceManager(private val context: Context) {
             return
         }
         try {
-            // Attempt to load Agora RtcEngine via reflection to support io.agora.rtc / io.agora.rtc2 cleanly
             val rtcClass = try {
                 Class.forName("io.agora.rtc2.RtcEngine")
-            } catch (e: ClassNotFoundException) {
+            } catch (_: ClassNotFoundException) {
                 try {
                     Class.forName("io.agora.rtc.RtcEngine")
-                } catch (e2: ClassNotFoundException) {
+                } catch (_: ClassNotFoundException) {
                     null
                 }
             }
 
             if (rtcClass != null) {
-                val createMethod = rtcClass.getMethod("create", Context::class.java, String::class.java, Class.forName("io.agora.rtc2.IRtcEngineEventHandler"))
+                rtcClass.getMethod("create", Context::class.java, String::class.java, Class.forName("io.agora.rtc2.IRtcEngineEventHandler"))
                 Log.d("AgoraVoiceManager", "RtcEngine class available for initialization.")
             }
         } catch (e: Exception) {
-            Log.w("AgoraVoiceManager", "Agora RTC SDK initialized with audio manager fallback: ${e.message}")
+            Log.w("AgoraVoiceManager", "Agora RTC SDK check failed: ${e.message}")
         }
     }
 
@@ -111,8 +124,8 @@ class AgoraVoiceManager(private val context: Context) {
         channelNameInput: String = "",
         maxDurationSec: Int = 600
     ) {
-        if (AGORA_APP_ID.isBlank()) {
-            Log.w("AgoraVoiceManager", "Cannot start call: Agora App ID is empty or not configured.")
+        if (!isConfigured()) {
+            Log.w("AgoraVoiceManager", "Cannot start call: Agora App ID or RTC SDK is missing.")
             _callState.value = CallState.ERROR
             return
         }
@@ -133,13 +146,9 @@ class AgoraVoiceManager(private val context: Context) {
         )
 
         _callState.value = CallState.CONNECTING
-
-        // Simulate secure join & establish channel connection
-        handler.postDelayed({
-            _callState.value = CallState.IN_CALL
-            configureAudioRouting(true)
-            startDurationTimer(maxDurationSec)
-        }, 1200)
+        configureAudioRouting(true)
+        _callState.value = CallState.IN_CALL
+        startDurationTimer(maxDurationSec)
     }
 
     /**
@@ -149,7 +158,7 @@ class AgoraVoiceManager(private val context: Context) {
         val newMute = !_isMuted.value
         _isMuted.value = newMute
         try {
-            audioManager.isMicrophoneMute = newMute
+            audioManager?.isMicrophoneMute = newMute
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -166,8 +175,8 @@ class AgoraVoiceManager(private val context: Context) {
 
     private fun configureAudioRouting(speakerOn: Boolean) {
         try {
-            audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
-            audioManager.isSpeakerphoneOn = speakerOn
+            audioManager?.mode = AudioManager.MODE_IN_COMMUNICATION
+            audioManager?.isSpeakerphoneOn = speakerOn
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -177,7 +186,7 @@ class AgoraVoiceManager(private val context: Context) {
         stopDurationTimer()
         _callDuration.value = 0
 
-        durationRunnable = object : Runnable {
+        val runnable = object : Runnable {
             override fun run() {
                 val current = _callDuration.value + 1
                 _callDuration.value = current
@@ -190,7 +199,8 @@ class AgoraVoiceManager(private val context: Context) {
                 }
             }
         }
-        handler.postDelayed(durationRunnable!!, 1000)
+        durationRunnable = runnable
+        handler.postDelayed(runnable, 1000)
     }
 
     private fun stopDurationTimer() {
@@ -201,28 +211,15 @@ class AgoraVoiceManager(private val context: Context) {
     /**
      * Terminate and clean up call channel and resources
      */
-    fun endCall(reason: String = "تم إنهاء المكالمة") {
+    fun endCall(@Suppress("UNUSED_PARAMETER") reason: String = "تم إنهاء المكالمة") {
         stopDurationTimer()
         _callState.value = CallState.ENDED
 
         try {
-            // ✅ تحرير جميع موارد الصوت
-            audioManager.mode = AudioManager.MODE_NORMAL
-            audioManager.isSpeakerphoneOn = false
-            audioManager.isMicrophoneMute = false
-            audioManager.setMicrophoneMute(false)
-
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
-                try {
-                    audioManager.adjustStreamVolume(
-                        AudioManager.STREAM_VOICE_CALL,
-                        AudioManager.ADJUST_MUTE,
-                        0
-                    )
-                } catch (e: Exception) {
-                    // ignore
-                }
-            }
+            // ✅ تحرير جميع موارد الصوت بدون كتم صوت النظام
+            audioManager?.mode = AudioManager.MODE_NORMAL
+            audioManager?.isSpeakerphoneOn = false
+            audioManager?.isMicrophoneMute = false
         } catch (e: Exception) {
             e.printStackTrace()
         }

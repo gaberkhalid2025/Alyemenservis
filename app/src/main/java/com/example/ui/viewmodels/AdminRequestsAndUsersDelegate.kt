@@ -9,8 +9,14 @@ import com.example.data.ProviderEntity
 import com.example.data.StoreEntity
 import com.example.data.isValid
 import com.example.data.models.JoinRequestEntity
+import com.example.data.repositories.MallRepository
+import com.example.domain.YemenCities
 import com.example.domain.usecases.ValidatePhoneUseCase
+import com.example.utils.ApprovalValidator
+import com.example.utils.ArabicNormalizer
+import com.example.utils.CityIdResolver
 import com.example.utils.FirebaseStorageUploader
+import com.example.utils.LandmarkAddress
 import com.example.utils.PasswordHasher
 import com.example.utils.SecureHasher
 import com.example.utils.SecurityCryptoUtils
@@ -47,14 +53,25 @@ internal class AdminRequestsAndUsersDelegate(
         }
     }
 
-    private fun parseCoordinates(request: PendingProviderEntity): Pair<Double, Double> {
+    private val knownCityIds: Map<String, String> by lazy {
+        YemenCities.list.associate { ArabicNormalizer.normalize(it) to YemenCities.resolveCityId(it) }
+    }
+
+    private fun parseCoordinates(request: PendingProviderEntity, resolvedCityId: String?): Pair<Double, Double>? {
         val parts = request.gpsCoords.split(",")
-        val cityFallback = com.example.ui.screens.map.utils.OfflineMapManager.getCityCoordinates(request.area)
         val parsedLat = request.latitude.takeIf { it != 0.0 } ?: parts.getOrNull(0)?.trim()?.toDoubleOrNull()
         val parsedLng = request.longitude.takeIf { it != 0.0 } ?: parts.getOrNull(1)?.trim()?.toDoubleOrNull()
-        val lat = parsedLat?.takeIf { it != 0.0 && !it.isNaN() } ?: cityFallback.latitude
-        val lng = parsedLng?.takeIf { it != 0.0 && !it.isNaN() } ?: cityFallback.longitude
-        return lat to lng
+        if (parsedLat != null && parsedLng != null && LandmarkAddress.isValid(parsedLat, parsedLng)) {
+            return parsedLat to parsedLng
+        }
+        if (!resolvedCityId.isNullOrBlank()) {
+            val cityName = YemenCities.getCityNameById(resolvedCityId)
+            val fallback = com.example.ui.screens.map.utils.OfflineMapManager.getCityCoordinates(cityName)
+            if (LandmarkAddress.isValid(fallback.latitude, fallback.longitude)) {
+                return fallback.latitude to fallback.longitude
+            }
+        }
+        return null
     }
 
     private fun parseWorkingHours(json: String): String {
@@ -65,15 +82,34 @@ internal class AdminRequestsAndUsersDelegate(
     }
 
     fun approveRequest(request: PendingProviderEntity) {
-        val finalCityId = com.example.domain.YemenCities.resolveCityId(request.area)
-        val (resolvedLat, resolvedLng) = parseCoordinates(request)
+        val finalCityId = CityIdResolver.resolve(request.area, knownCityIds)
+            ?: CityIdResolver.resolve(request.localNeighborhood, knownCityIds)
+            ?: request.area.trim().takeIf { it.startsWith("ye_") }
+        val coords = parseCoordinates(request, finalCityId)
+        val cleanPhone = ValidatePhoneUseCase.normalizePhone(request.phone)
+            .ifBlank { request.phone.trim().replace(" ", "").replace("+", "") }
+
+        val problems = ApprovalValidator.validate(
+            lat = coords?.first,
+            lng = coords?.second,
+            cityId = finalCityId,
+            name = request.name,
+            phone = cleanPhone.ifBlank { request.phone }
+        )
+        if (problems.isNotEmpty()) {
+            vm.mainViewModel.triggerNotification(
+                "❌ تعذر اعتماد ${request.name.ifBlank { "الطلب" }}: ${problems.joinToString(" • ") { it.message }}"
+            )
+            return
+        }
+
+        val resolvedCityId = finalCityId!!
+        val (resolvedLat, resolvedLng) = coords!!
         val resolvedWorkingHours = parseWorkingHours(request.productAttachmentsJson)
         val decryptedSelfie = decryptAttachmentSafe(request.selfiePhotoBase64)
         val decryptedIdCard = decryptAttachmentSafe(request.idPhotoBase64)
         val decryptedWorkPhotos = request.workPhotosBase64.map { decryptAttachmentSafe(it) }.filter { it.isNotBlank() }
 
-        val cleanPhone = ValidatePhoneUseCase.normalizePhone(request.phone)
-            .ifBlank { request.phone.trim().replace(" ", "").replace("+", "") }
         val resolvedPasswordHash = request.passwordHash.ifBlank { request.password }.let { rawOrHash ->
             val trimmed = rawOrHash.trim()
             if (trimmed.isNotBlank() && !trimmed.contains(":")) {
@@ -118,20 +154,27 @@ internal class AdminRequestsAndUsersDelegate(
             }
         }
 
-        if (request.profession == "STORE_OWNER" ||
-            request.categoryId.uppercase() == "STORE" ||
-            request.categoryId.uppercase() == "RESTAURANT" ||
-            request.categoryId.uppercase() == "MEDICAL"
+        val catUpper = request.categoryId.uppercase()
+        val profUpper = request.profession.uppercase()
+        if (profUpper == "STORE_OWNER" ||
+            profUpper == "MALL_OWNER" ||
+            catUpper == "STORE" ||
+            catUpper == "MALL" ||
+            catUpper == "RESTAURANT" ||
+            catUpper == "MEDICAL"
         ) {
+            val isMallReq = catUpper == "MALL" || profUpper == "MALL_OWNER"
             val storeId = "store_" + cleanPhone
-            val resolvedCategory = when (request.categoryId.uppercase()) {
-                "RESTAURANT" -> "مطاعم وكافيهات"
-                "MEDICAL" -> "مراكز طبية وعيادات"
+            val resolvedCategory = when {
+                isMallReq -> "مراكز تجارية ومولات"
+                catUpper == "RESTAURANT" -> "مطاعم وكافيهات"
+                catUpper == "MEDICAL" -> "مراكز طبية وعيادات"
                 else -> "محلات ومراكز تجارية"
             }
-            val resolvedSectionId = when (request.categoryId.uppercase()) {
-                "RESTAURANT" -> "restaurants"
-                "MEDICAL" -> "medical"
+            val resolvedSectionId = when {
+                isMallReq -> "malls"
+                catUpper == "RESTAURANT" -> "restaurants"
+                catUpper == "MEDICAL" -> "medical"
                 else -> "stores"
             }
             vm.viewModelScope.launch {
@@ -163,7 +206,7 @@ internal class AdminRequestsAndUsersDelegate(
                         ownerName = request.name,
                         phone = cleanPhone.ifBlank { request.phone },
                         localNeighborhood = request.localNeighborhood,
-                        cityId = finalCityId,
+                        cityId = resolvedCityId,
                         sectionId = resolvedSectionId,
                         categoryId = resolvedCategory,
                         coverImage = resolvedGallery.firstOrNull() ?: resolvedLogoUrl,
@@ -182,6 +225,10 @@ internal class AdminRequestsAndUsersDelegate(
                         productAttachmentsJson = request.productAttachmentsJson
                     )
                     vm.db.collection("stores").document(storeId).set(newStore).await()
+                    if (isMallReq) {
+                        val initialMall = MallRepository.defaultMallFromStore(newStore)
+                        vm.db.collection("malls").document(storeId).set(initialMall, SetOptions.merge()).await()
+                    }
                     if (request.id != storeId) {
                         try { vm.db.collection("stores").document(request.id).delete().await() } catch (_: Exception) {}
                     }
@@ -195,13 +242,18 @@ internal class AdminRequestsAndUsersDelegate(
 
                     finalizeApprovalCleanup()
 
-                    val (approvalTitle, approvalMsg, toastMsg) = when (request.categoryId.uppercase()) {
-                        "RESTAURANT" -> Triple(
+                    val (approvalTitle, approvalMsg, toastMsg) = when {
+                        isMallReq -> Triple(
+                            "🎉 تهانينا! تم تفعيل المركز التجاري بنجاح",
+                            "مرحباً بك، تم اعتماد وتفعيل المركز التجاري '${request.name}' بنجاح! يمكنك الآن إدارة الطوابق ودليل المحلات المستأجرة مباشرة من لوحة تحكم المول.",
+                            "✅ تم تفعيل المركز التجاري ${request.name}"
+                        )
+                        catUpper == "RESTAURANT" -> Triple(
                             "🎉 تهانينا! تم تفعيل مطعمك / كافيهك بنجاح",
                             "مرحباً بك، لقد تم مراجعة وتفعيل مطعمك '${request.name}' بنجاح في دليل المطاعم والكافيهات! يمكنك الآن إدارة قائمتك وحجوزاتك مباشرة من شاشة الانضمام.",
                             "✅ تم تفعيل مطعم ${request.name}"
                         )
-                        "MEDICAL" -> Triple(
+                        catUpper == "MEDICAL" -> Triple(
                             "🎉 تهانينا! تم تفعيل مركزك الطبي / عيادتك بنجاح",
                             "مرحباً بك، لقد تم مراجعة وتفعيل مركزك الطبي/عيادتك '${request.name}' بنجاح في الدليل الطبي! يمكنك الآن استقبال حجوزات المواعيد وإدارتها مباشرة من شاشة الانضمام.",
                             "✅ تم تفعيل المركز الطبي ${request.name}"
@@ -260,7 +312,7 @@ internal class AdminRequestsAndUsersDelegate(
                         ownerId = cleanPhone.ifBlank { request.phone },
                         ownerName = request.name,
                         localNeighborhood = request.localNeighborhood,
-                        cityId = finalCityId,
+                        cityId = resolvedCityId,
                         latitude = resolvedLat,
                         longitude = resolvedLng,
                         images = resolvedPropGallery,
@@ -306,7 +358,7 @@ internal class AdminRequestsAndUsersDelegate(
                 title = request.customCategoryName.ifBlank { "وظيفة - " + request.name },
                 companyName = request.name,
                 phone = cleanPhone.ifBlank { request.phone },
-                cityId = finalCityId,
+                cityId = resolvedCityId,
                 address = request.localNeighborhood,
                 description = request.description.ifBlank { request.specialization.ifBlank { "إعلان وظيفة معتمد وموثق" } },
                 requirements = request.qualification,
@@ -425,7 +477,7 @@ internal class AdminRequestsAndUsersDelegate(
                         isVip = false,
                         subscriptionStatus = "APPROVED",
                         isAvailable = true,
-                        cityId = finalCityId,
+                        cityId = resolvedCityId,
                         localNeighborhood = request.localNeighborhood,
                         rating = 5.0f,
                         coverImage = resolvedWorkGallery.firstOrNull() ?: resolvedProfileUrl,
@@ -468,7 +520,8 @@ internal class AdminRequestsAndUsersDelegate(
     }
 
     fun rejectRequest(request: PendingProviderEntity, reason: String) {
-        val cleanPhone = request.phone.trim().replace(" ", "").replace("+", "")
+        val cleanPhone = ValidatePhoneUseCase.normalizePhone(request.phone)
+            .ifBlank { request.phone.trim().replace(" ", "").replace("+", "") }
         val now = System.currentTimeMillis()
         val finalReason = reason.ifBlank { "لم تستوفِ المستندات أو الشروط المطلوبة" }
 
@@ -481,122 +534,49 @@ internal class AdminRequestsAndUsersDelegate(
             "rejectedBy" to "ADMIN",
             "updatedAt" to now
         )
-        vm.db.collection("join_requests").document(request.id).update(rejectUpdates)
-        if (cleanPhone.isNotEmpty() && cleanPhone != request.id && !request.id.contains("_")) {
-            vm.db.collection("join_requests").document(cleanPhone).update(rejectUpdates)
-        }
-
-        vm.db.collection("pending_providers").document(request.id).delete()
-        if (cleanPhone.isNotEmpty() && cleanPhone != request.id && !request.id.contains("_")) {
-            vm.db.collection("pending_providers").document(cleanPhone).delete()
-        }
         vm._pendingProviders.value = vm._pendingProviders.value.filter {
             it.id != request.id
         }
 
-        vm.mainViewModel.addNotification(
-            title = "❌ تنويه حول طلب انضمامك",
-            message = "للأسف لم يتم قبول طلب انضمامك للأسباب التالية: $finalReason. يمكنك تعديل البيانات وإعادة تقديم الطلب.",
-            targetType = "USER",
-            targetValue = request.phone
-        )
-
-        vm.mainViewModel.triggerNotification("❌ تم رفض طلب ${request.name} بسبب: $finalReason")
+        vm.viewModelScope.launch {
+            try {
+                vm.db.collection("join_requests").document(request.id).update(rejectUpdates).await()
+            } catch (_: Exception) {
+            }
+            if (cleanPhone.isNotEmpty() && cleanPhone != request.id) {
+                try {
+                    vm.db.collection("join_requests").document(cleanPhone).update(rejectUpdates).await()
+                } catch (_: Exception) {
+                }
+            }
+            try {
+                vm.db.collection("pending_providers").document(request.id).delete().await()
+            } catch (_: Exception) {
+            }
+            if (cleanPhone.isNotEmpty() && cleanPhone != request.id) {
+                try {
+                    vm.db.collection("pending_providers").document(cleanPhone).delete().await()
+                } catch (_: Exception) {
+                }
+            }
+            vm.mainViewModel.addNotification(
+                title = "❌ تنويه حول طلب انضمامك",
+                message = "للأسف لم يتم قبول طلب انضمامك للأسباب التالية: $finalReason. يمكنك تعديل البيانات وإعادة تقديم الطلب.",
+                targetType = "USER",
+                targetValue = request.phone
+            )
+            vm.mainViewModel.triggerNotification("❌ تم رفض طلب ${request.name} بسبب: $finalReason")
+        }
     }
 
     fun approveTechnician(providerId: String) {
-        val technician = vm._pendingProviders.value.find { it.id == providerId }
-        technician?.let {
-            vm._pendingProviders.value = vm._pendingProviders.value.filter { item -> item.id != providerId }
-            val finalCityId = com.example.domain.YemenCities.resolveCityId(it.area)
-            val (resolvedLat, resolvedLng) = parseCoordinates(it)
-            val decryptedSelfie = decryptAttachmentSafe(it.selfiePhotoBase64)
-            val decryptedWorkPhotos = it.workPhotosBase64.map { w -> decryptAttachmentSafe(w) }.filter { w -> w.isNotBlank() }
-            val cleanTechPhone = ValidatePhoneUseCase.normalizePhone(it.phone)
-                .ifBlank { it.phone.trim().replace(" ", "").replace("+", "") }
-            val finalId = "prov_" + cleanTechPhone
-            val resolvedTechHash = it.passwordHash.ifBlank { it.password }.let { rawOrHash ->
-                val trimmed = rawOrHash.trim()
-                if (trimmed.isNotBlank() && !trimmed.contains(":")) {
-                    PasswordHasher.hash(trimmed)
-                } else {
-                    trimmed
-                }
-            }
-            val p = ProviderEntity(
-                id = finalId,
-                name = it.name,
-                phone = cleanTechPhone.ifBlank { it.phone },
-                categoryId = it.categoryId,
-                area = it.area,
-                localNeighborhood = it.localNeighborhood,
-                cityId = finalCityId,
-                profileImage = decryptedSelfie,
-                coverImage = decryptedWorkPhotos.firstOrNull() ?: decryptedSelfie,
-                latitude = resolvedLat,
-                longitude = resolvedLng,
-                isVerified = true,
-                isRecommended = false,
-                subscriptionStatus = "APPROVED",
-                isVip = false,
-                isAvailable = true,
-                isBlocked = false,
-                rating = 5.0f,
-                subscriptionExpiry = System.currentTimeMillis() + (30L * 24 * 60 * 60 * 1000),
-                workPhotosBase64 = decryptedWorkPhotos,
-                productAttachmentsJson = it.productAttachmentsJson,
-                specialization = it.specialization.ifBlank { it.description },
-                passwordHash = resolvedTechHash,
-                isDeleted = false,
-                deletedAt = null
-            )
-
-            val notification = NotificationEntity(
-                id = UUID.randomUUID().toString(),
-                title = "🎉 تم قبول طلبك",
-                message = "تم قبول طلب انضمامك كـ ${it.name} بنجاح بالدليل اليمني",
-                targetType = "USER",
-                targetValue = it.phone,
-                timestamp = System.currentTimeMillis()
-            )
-            vm.mainViewModel._notifications.value = listOf(notification) + vm.mainViewModel._notifications.value
-
-            val currentProviders = vm.mainViewModel.homeViewModel._providers.value.filter { item -> item.id != finalId }.toMutableList()
-            currentProviders.add(p)
-            vm.mainViewModel.homeViewModel._providers.value = currentProviders
-            vm.mainViewModel.applyFilters()
-
-            try {
-                vm.db.collection("pending_providers").document(providerId).delete()
-                vm.db.collection("providers").document(finalId).set(p)
-                if (notification.isValid()) vm.db.collection("notifications").document(notification.id).set(notification)
-            } catch (e: Exception) {
-            }
-        }
+        val technician = vm._pendingProviders.value.find { it.id == providerId } ?: return
+        approveRequest(technician)
     }
 
     fun rejectTechnician(providerId: String, reason: String = "لم يستوفِ الشروط") {
-        val technician = vm._pendingProviders.value.find { it.id == providerId }
-        technician?.let {
-            val updated = it.copy(status = "REJECTED", reason = reason)
-            vm._pendingProviders.value = vm._pendingProviders.value.map { item -> if (item.id == providerId) updated else item }
-
-            val notification = NotificationEntity(
-                id = UUID.randomUUID().toString(),
-                title = "❌ تم رفض طلبك",
-                message = "تم رفض طلب انضمامك بسبب: $reason",
-                targetType = "USER",
-                targetValue = it.phone,
-                timestamp = System.currentTimeMillis()
-            )
-            vm.mainViewModel._notifications.value = listOf(notification) + vm.mainViewModel._notifications.value
-
-            try {
-                vm.db.collection("pending_providers").document(providerId).set(updated)
-                if (notification.isValid()) vm.db.collection("notifications").document(notification.id).set(notification)
-            } catch (e: Exception) {
-            }
-        }
+        val technician = vm._pendingProviders.value.find { it.id == providerId } ?: return
+        rejectRequest(technician, reason)
     }
 
     private var pendingTechListener: com.google.firebase.firestore.ListenerRegistration? = null

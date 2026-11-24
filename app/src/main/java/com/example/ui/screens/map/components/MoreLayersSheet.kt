@@ -92,19 +92,16 @@ fun MoreLayersSheet(
                 onCheckedChange = onToggleQuakes,
                 testTag = "layer_quakes_switch"
             )
-            LayerToggleRow(
-                icon = Icons.Default.Cloud,
-                title = "رادار الأمطار (RainViewer)",
-                subtitle = if (NavConfig.ENABLE_RAINVIEWER) {
-                    "تغطية السحب والأمطار الأخيرة"
-                } else {
-                    "معطّلة افتراضياً (بدون مفاتيح مدفوعة)"
-                },
-                checked = rainEnabled,
-                enabled = NavConfig.ENABLE_RAINVIEWER,
-                onCheckedChange = onToggleRain,
-                testTag = "layer_rain_switch"
-            )
+            if (NavConfig.ENABLE_RAINVIEWER) {
+                LayerToggleRow(
+                    icon = Icons.Default.Cloud,
+                    title = "رادار الأمطار (RainViewer)",
+                    subtitle = "تغطية السحب والأمطار الأخيرة",
+                    checked = rainEnabled,
+                    onCheckedChange = onToggleRain,
+                    testTag = "layer_rain_switch"
+                )
+            }
 
             // 🛰️ قمر صناعي مباشر مجاني (Meteosat عبر EUMETSAT)
             var eumetLayers by remember { mutableStateOf<List<com.example.utils.WmsLayerInfo>?>(null) }

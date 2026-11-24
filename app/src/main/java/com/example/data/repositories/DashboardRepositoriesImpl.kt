@@ -87,7 +87,7 @@ class DashboardRepositoryImpl(
 
     private fun resolveCollection(role: String): String = when (role.trim().uppercase()) {
         "PROVIDER", "TECHNICIAN" -> AppConstants.COL_PROVIDERS
-        "STORE", "STORE_OWNER", "RESTAURANT", "RESTAURANT_OWNER", "MEDICAL", "MEDICAL_CENTER" -> AppConstants.COL_STORES
+        "STORE", "STORE_OWNER", "MALL", "MALL_OWNER", "RESTAURANT", "RESTAURANT_OWNER", "MEDICAL", "MEDICAL_CENTER" -> AppConstants.COL_STORES
         "PROPERTY", "REAL_ESTATE", "PROPERTY_OWNER" -> AppConstants.COL_PROPERTIES
         "JOB", "JOB_POSTER" -> AppConstants.COL_JOBS
         else -> AppConstants.COL_USER_PROFILES
@@ -121,29 +121,41 @@ class DashboardRepositoryImpl(
                 "updatedAt" to System.currentTimeMillis()
             )
             val rawPhone = phone?.trim().orEmpty()
+            var previousPhoneForSync = ""
             if (rawPhone.isNotBlank()) {
                 val cleanPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(rawPhone)
                 val existingSnap = try { docRef.get().await() } catch (_: Exception) { null }
                 val storedPhone = existingSnap?.getString("phone")?.let {
                     com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(it)
                 }.orEmpty()
+                previousPhoneForSync = storedPhone
                 if (cleanPhone != storedPhone) {
                     if (!Regex("^(77|78|73|71|70)\\d{7}$").matches(cleanPhone)) {
                         return Result.failure(IllegalArgumentException("رقم الهاتف غير صالح (يجب أن يكون 9 أرقام يبدأ بـ 77 أو 78 أو 73 أو 71 أو 70)"))
                     }
-                    val dupSnap = firestore.collection(collectionName)
-                        .whereEqualTo("phone", cleanPhone)
-                        .limit(2)
-                        .get()
-                        .await()
-                    val hasConflict = dupSnap.documents.any {
-                        it.id != cleanOwnerId && it.getBoolean("isDeleted") != true
+                    val activeCollections = listOf(
+                        AppConstants.COL_PROVIDERS,
+                        AppConstants.COL_STORES,
+                        AppConstants.COL_PROPERTIES,
+                        AppConstants.COL_USER_PROFILES
+                    ).distinct()
+                    for (col in activeCollections) {
+                        val dupSnap = firestore.collection(col)
+                            .whereEqualTo("phone", cleanPhone)
+                            .limit(2)
+                            .get()
+                            .await()
+                        val hasConflict = dupSnap.documents.any { doc ->
+                            doc.id != cleanOwnerId &&
+                                (storedPhone.isBlank() || doc.id != storedPhone) &&
+                                doc.getBoolean("isDeleted") != true
+                        }
+                        if (hasConflict) {
+                            return Result.failure(IllegalArgumentException("رقم الهاتف مستخدم بالفعل في حساب آخر نشط"))
+                        }
                     }
-                    if (hasConflict) {
-                        return Result.failure(IllegalArgumentException("رقم الهاتف مستخدم بالفعل في حساب آخر نشط"))
-                    }
+                    updates["phone"] = cleanPhone
                 }
-                updates["phone"] = cleanPhone
             }
             if (latitude != null && longitude != null &&
                 com.example.utils.LandmarkAddress.isValid(latitude, longitude)
@@ -193,6 +205,22 @@ class DashboardRepositoryImpl(
                 }
             }
             docRef.update(updates).await()
+            val updatedPhone = updates["phone"] as? String
+            if (!updatedPhone.isNullOrBlank()) {
+                runCatching {
+                    val regCol = firestore.collection(AppConstants.COL_USER_PROFILES)
+                    val payload = mapOf("phone" to updatedPhone, "updatedAt" to System.currentTimeMillis())
+                    val targetRegDoc = regCol.document(cleanOwnerId).get().await()
+                    if (targetRegDoc.exists()) {
+                        targetRegDoc.reference.update(payload).await()
+                    } else if (previousPhoneForSync.isNotBlank()) {
+                        val prevRegDoc = regCol.document(previousPhoneForSync).get().await()
+                        if (prevRegDoc.exists()) {
+                            prevRegDoc.reference.update(payload).await()
+                        }
+                    }
+                }
+            }
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)

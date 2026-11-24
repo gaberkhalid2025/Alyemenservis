@@ -432,6 +432,7 @@ class MainActivity : ComponentActivity() {
                         val openUrgentCode = activeIntent.getStringExtra("openUrgentRequestCode")
                         val navigateTo = activeIntent.getStringExtra("navigate_to")
                         val targetScreen = activeIntent.getStringExtra("target_screen")
+                        val extraNavTarget = activeIntent.getStringExtra("EXTRA_NAV_TARGET")
 
                         when {
                             !openChatId.isNullOrBlank() -> {
@@ -442,9 +443,12 @@ class MainActivity : ComponentActivity() {
                                 viewModel.selectedRequestId = openUrgentCode
                                 viewModel.navigateToScreen(AppScreens.URGENT_REQUEST_DETAILS)
                             }
+                            extraNavTarget == "instant_requests" -> {
+                                viewModel.navigateToScreen(AppScreens.INSTANT_REQUESTS_VIEW)
+                            }
                             else -> {
                                 val isAdmin = viewModel.adminRole.value != "GUEST"
-                                ScreenRoutes.safeTarget(targetScreen ?: navigateTo, isAdmin)?.let { safe ->
+                                ScreenRoutes.safeTarget(targetScreen ?: navigateTo ?: extraNavTarget, isAdmin)?.let { safe ->
                                     viewModel.navigateToScreen(safe)
                                 }
                             }

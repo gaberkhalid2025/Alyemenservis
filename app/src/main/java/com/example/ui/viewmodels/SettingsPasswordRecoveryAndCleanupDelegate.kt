@@ -22,60 +22,50 @@ internal class SettingsPasswordRecoveryAndCleanupDelegate(private val vm: Settin
         val hashedPass = PasswordHasher.hash(newPass.trim())
         val passUpdate = mapOf("password" to hashedPass, "passwordHash" to hashedPass)
 
+        val normalized = ValidatePhoneUseCase.normalizePhone(phoneOrId).filter { it.isDigit() }
+        val targetPhone = normalized.ifBlank { cleanPhone }
+        val phoneVariants = listOf(targetPhone, "0$targetPhone", "+967$targetPhone", "967$targetPhone", "00967$targetPhone")
+            .filter { it.isNotBlank() }
+            .distinct()
+
+        fun updateByPhone(collectionName: String) {
+            for (ph in phoneVariants) {
+                vm.db.collection(collectionName)
+                    .whereEqualTo("phone", ph)
+                    .limit(5)
+                    .get()
+                    .addOnSuccessListener { qs ->
+                        qs.documents.forEach { doc ->
+                            vm.db.collection(collectionName).document(doc.id).update(passUpdate)
+                        }
+                    }
+            }
+            if (targetPhone.length >= 7) {
+                vm.db.collection(collectionName).document(targetPhone).get().addOnSuccessListener { doc ->
+                    if (doc != null && doc.exists()) {
+                        doc.reference.update(passUpdate)
+                    }
+                }
+            }
+        }
+
         when (entityType) {
             "PROVIDER", "TECHNICIAN", "TECH" -> {
-                vm.db.collection("providers").get().addOnSuccessListener { qs ->
-                    for (doc in qs.documents) {
-                        val p = doc.getString("phone") ?: ""
-                        if (p.contains(cleanPhone)) {
-                            vm.db.collection("providers").document(doc.id).update(passUpdate)
-                        }
-                    }
-                }
+                updateByPhone("providers")
                 vm.mainViewModel.homeViewModel._providers.value = vm.mainViewModel.homeViewModel._providers.value.map {
-                    if (it.phone.contains(cleanPhone)) it.copy(passwordHash = hashedPass) else it
+                    if (it.phone.contains(targetPhone)) it.copy(passwordHash = hashedPass) else it
                 }
             }
-            "STORE", "RESTAURANT", "MEDICAL", "CENTER" -> {
-                vm.db.collection("stores").get().addOnSuccessListener { qs ->
-                    for (doc in qs.documents) {
-                        val p = doc.getString("phone") ?: ""
-                        if (p.contains(cleanPhone)) {
-                            vm.db.collection("stores").document(doc.id).update(passUpdate)
-                        }
-                    }
-                }
+            "STORE", "RESTAURANT", "MEDICAL", "CENTER", "MALL" -> {
+                updateByPhone("stores")
                 vm.mainViewModel.adminViewModel._stores.value = vm.mainViewModel.adminViewModel._stores.value.map {
-                    if (it.phone.contains(cleanPhone)) it.copy(passwordHash = hashedPass) else it
+                    if (it.phone.contains(targetPhone)) it.copy(passwordHash = hashedPass) else it
                 }
             }
-            "JOB" -> {
-                vm.db.collection("jobs").get().addOnSuccessListener { qs ->
-                    for (doc in qs.documents) {
-                        val p = doc.getString("phone") ?: ""
-                        if (p.contains(cleanPhone)) {
-                            vm.db.collection("jobs").document(doc.id).update(passUpdate)
-                        }
-                    }
-                }
-            }
+            "JOB" -> updateByPhone("jobs")
             "USER" -> {
-                vm.db.collection("registered_users").get().addOnSuccessListener { qs ->
-                    for (doc in qs.documents) {
-                        val p = doc.getString("phone") ?: ""
-                        if (p.contains(cleanPhone)) {
-                            vm.db.collection("registered_users").document(doc.id).update(passUpdate)
-                        }
-                    }
-                }
-                vm.db.collection("users").get().addOnSuccessListener { qs ->
-                    for (doc in qs.documents) {
-                        val p = doc.getString("phone") ?: ""
-                        if (p.contains(cleanPhone)) {
-                            vm.db.collection("users").document(doc.id).update(passUpdate)
-                        }
-                    }
-                }
+                updateByPhone("registered_users")
+                updateByPhone("users")
             }
         }
 
@@ -316,7 +306,7 @@ internal class SettingsPasswordRecoveryAndCleanupDelegate(private val vm: Settin
                 "restaurants", AppConstants.COL_JOBS, "job_applications", "properties", "products", "reviews"
             )
             collections.forEach { col ->
-                vm.db.collection(col).get().addOnSuccessListener { snapshot ->
+                vm.db.collection(col).limit(300).get().addOnSuccessListener { snapshot ->
                     snapshot.documents.forEach { doc -> doc.reference.delete() }
                 }
             }
@@ -331,7 +321,7 @@ internal class SettingsPasswordRecoveryAndCleanupDelegate(private val vm: Settin
     fun wipeSelectedDatabaseData(password: String, selectedCollections: List<String>): Boolean {
         return if (vm.mainViewModel.verifyAdminOrOwnerPassword(password)) {
             selectedCollections.forEach { col ->
-                vm.db.collection(col).get().addOnSuccessListener { snapshot ->
+                vm.db.collection(col).limit(300).get().addOnSuccessListener { snapshot ->
                     snapshot.documents.forEach { doc ->
                         doc.reference.delete()
                     }
@@ -359,12 +349,12 @@ internal class SettingsPasswordRecoveryAndCleanupDelegate(private val vm: Settin
                 }
 
                 for (col in listOf("notifications", "chat_channels", "reports", "bookings", "providers")) {
-                    vm.db.collection(col).whereEqualTo("isMock", true).get().addOnSuccessListener { snapshot ->
+                    vm.db.collection(col).whereEqualTo("isMock", true).limit(300).get().addOnSuccessListener { snapshot ->
                         snapshot?.documents?.forEach { doc ->
                             if (isMockDoc(doc)) doc.reference.delete()
                         }
                     }
-                    vm.db.collection(col).whereEqualTo("isTest", true).get().addOnSuccessListener { snapshot ->
+                    vm.db.collection(col).whereEqualTo("isTest", true).limit(300).get().addOnSuccessListener { snapshot ->
                         snapshot?.documents?.forEach { doc ->
                             if (isMockDoc(doc)) doc.reference.delete()
                         }
@@ -390,7 +380,7 @@ internal class SettingsPasswordRecoveryAndCleanupDelegate(private val vm: Settin
         vm.viewModelScope.launch {
             try {
                 val cutoffTime = System.currentTimeMillis() - (daysToKeep * 24L * 60 * 60 * 1000)
-                vm.db.collection("notifications").whereLessThan("timestamp", cutoffTime).get()
+                vm.db.collection("notifications").whereLessThan("timestamp", cutoffTime).limit(300).get()
                     .addOnSuccessListener { snapshot ->
                         snapshot?.documents?.forEach { doc -> doc.reference.delete() }
                     }

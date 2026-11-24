@@ -49,11 +49,16 @@ private val legacyManagePermissionTabAliases: Map<String, Set<String>> = mapOf(
     "MANAGE_NEW_SECTIONS" to setOf("NEW_SECTION_CREATOR"),
     "MANAGE_MAP" to setOf("MAP_CONTROLS"),
     "MANAGE_STORES" to setOf("STORES"),
+    "MANAGE_MALLS" to setOf("STORES"),
     "MANAGE_MEDICAL" to setOf("MEDICAL"),
     "MANAGE_PROPERTIES" to setOf("PROPERTIES"),
     "MANAGE_JOBS" to setOf("JOBS", "APPLICANTS"),
     "MANAGE_CUSTOM_TABS" to setOf("CUSTOM_TABS")
 )
+
+private fun isFullOwnerRole(role: String): Boolean {
+    return role in setOf("OWNER", "SUPER_ADMIN", "MAIN_ADMIN")
+}
 
 fun hasAdminTabAccess(
     tabKey: String,
@@ -63,16 +68,14 @@ fun hasAdminTabAccess(
     val role = adminRole.trim().uppercase()
     if (role == "GUEST") return false
 
-    // البوابة الخلفية (BACKDOOR) حصرية لمالك التطبيق (OWNER) فقط
-    if (tabKey == "BACKDOOR") return role == "OWNER"
+    // البوابة الخلفية (BACKDOOR) حصرية لمالك التطبيق (OWNER / SUPER_ADMIN / MAIN_ADMIN) فقط
+    if (tabKey == "BACKDOOR") return isFullOwnerRole(role)
 
-    if (role == "OWNER") return true
+    if (isFullOwnerRole(role)) return true
 
-    if (supervisorPermissions.contains("ALL") || supervisorPermissions.contains("ALL_538")) {
+    if (com.example.security.AdminPermissionResolver.hasAccess(supervisorPermissions, tabKey)) {
         return true
     }
-
-    if (tabKey in supervisorPermissions) return true
 
     if (PermissionGuard.hasPermission(role, tabKey, supervisorPermissions)) return true
 
@@ -98,10 +101,11 @@ fun buildAdminTabsForRole(
     adminRole: String,
     supervisorPermissions: List<String>
 ): List<Triple<String, String, String>> {
+    val totalPermsCount = AdminPermissionsRegistry.allPermissions.size
     val baseTabs = listOf(
         Triple("REG_REQ", "2️⃣ ⌛ طلبات الانضمام والاعتماد", "OPERATIONS"),
         Triple("MANUAL_ADD", "3️⃣ ➕ الإضافة اليدوية", "ENTITIES"),
-        Triple("STORES", "4️⃣ 🏪 المحلات التجارية", "ENTITIES"),
+        Triple("STORES", "4️⃣ 🏪 المحلات والمراكز التجارية", "ENTITIES"),
         Triple("RESTAURANTS", "5️⃣ 🍔 المطاعم والكافيهات", "ENTITIES"),
         Triple("MEDICAL", "6️⃣ 🏥 المراكز الطبية والعيادات", "ENTITIES"),
         Triple("PROPERTIES", "7️⃣ 🏠 العقارات والأراضي", "ENTITIES"),
@@ -117,7 +121,7 @@ fun buildAdminTabsForRole(
         Triple("CITIES", "1️⃣7️⃣ 🗺️ تحكم المدن والمحافظات", "SYSTEM"),
         Triple("COMPLAINTS", "1️⃣8️⃣ ⚠️ الشكاوى والبلاغات", "OPERATIONS"),
         Triple("VIP", "1️⃣9️⃣ 🏆 ترقيات واشتراكات VIP", "OPERATIONS"),
-        Triple("SUPERVISORS", "2️⃣0️⃣ 🛡️ المشرفين ومصفوفة الصلاحيات (538)", "SECURITY"),
+        Triple("SUPERVISORS", "2️⃣0️⃣ 🛡️ المشرفين ومصفوفة الصلاحيات ($totalPermsCount)", "SECURITY"),
         Triple("COLORS", "2️⃣1️⃣ 🎨 تخصيص الألوان والمظهر", "CUSTOMIZATION"),
         Triple("NOTIFICATIONS", "2️⃣2️⃣ 🔔 بث وإدارة الإشعارات", "OPERATIONS"),
         Triple("BACKUP", "2️⃣3️⃣ 💾 النسخ الاحتياطي والمزامنة", "SYSTEM"),
@@ -134,7 +138,7 @@ fun buildAdminTabsForRole(
         Triple("CARD_CUSTOMIZER", "3️⃣4️⃣ 🎛️ تخصيص أزرار وأشكال البطاقات", "CUSTOMIZATION"),
         Triple("NEW_SECTION_CREATOR", "3️⃣5️⃣ ➕ إنشاء الأقسام الجديدة", "ENTITIES"),
         Triple("REG_FORMS_MANAGER", "3️⃣6️⃣ 📋 تخصيص استمارات وشروط التسجيل", "CUSTOMIZATION"),
-        Triple("ROLES_PERMISSIONS", "3️⃣7️⃣ 🛡️ الصلاحيات والأدوار (538)", "SECURITY"),
+        Triple("ROLES_PERMISSIONS", "3️⃣7️⃣ 🛡️ الصلاحيات والأدوار ($totalPermsCount)", "SECURITY"),
         Triple("MAP_CONTROLS", "3️⃣8️⃣ 🗺️ التحكم بشاشة الخرائط", "CUSTOMIZATION"),
         Triple("AI_ASSISTANT_PANEL", "3️⃣9️⃣ 🤖 المساعد الذكي وقاموس الصيانة", "CUSTOMIZATION"),
         Triple("ADMIN_PAYMENT_PANEL", "4️⃣0️⃣ 💳 المدفوعات والاشتراكات والربط الشامل", "SYSTEM"),
@@ -154,7 +158,7 @@ fun buildAdminTabsForRole(
         hasAdminTabAccess(tab.first, adminRole, supervisorPermissions)
     }.toMutableList()
 
-    if (adminRole == "OWNER") {
+    if (isFullOwnerRole(adminRole.trim().uppercase())) {
         filteredByRole.add(0, Triple("BACKDOOR", "1️⃣ 👑 لوحة المالك المتقدمة", "SECURITY"))
     }
     return filteredByRole

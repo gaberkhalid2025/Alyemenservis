@@ -525,34 +525,46 @@ internal class SettingsThemeAndColorSyncDelegate(private val vm: SettingsViewMod
 
     fun saveCustomPermissionsMatrixToFirestore(permissions: List<String>, role: String = "ADMIN") {
         val cleanRole = role.trim().uppercase().ifBlank { "ADMIN" }
+        val isOwnerRole = cleanRole in setOf("OWNER", "SUPER_ADMIN", "MAIN_ADMIN")
+        val totalRegistryCount = com.example.data.models.AdminPermissionsRegistry.allPermissions.size
+        val effectivePerms = if (isOwnerRole) listOf("ALL") else permissions.distinct()
+        if (isOwnerRole) {
+            if (vm.mainViewModel.adminViewModel.adminRole.value.uppercase() in setOf("OWNER", "SUPER_ADMIN", "MAIN_ADMIN")) {
+                vm.mainViewModel.adminViewModel._supervisorPermissions.value = listOf("ALL")
+            }
+            vm.mainViewModel.triggerNotification("👑 صلاحيات المالك محفوظة ومحصّنة بالكامل ($totalRegistryCount / $totalRegistryCount) ولا يمكن تقليصها.")
+            return
+        }
         try {
             val appCtx = com.example.MyApplication.instance
             val prefs = appCtx?.getSharedPreferences("admin_rbac_cache", Context.MODE_PRIVATE)
             prefs?.edit()
-                ?.putStringSet("role_perms_$cleanRole", permissions.toSet())
+                ?.putStringSet("role_perms_$cleanRole", effectivePerms.toSet())
                 ?.putBoolean("role_configured_$cleanRole", true)
                 ?.apply()
+            com.example.ui.screens.admin.permissions.AdminPermissionsViewModel
+                .updateCachedRoleOverride(cleanRole, effectivePerms.toSet())
             if (vm.mainViewModel.adminViewModel.adminRole.value.equals(cleanRole, ignoreCase = true)) {
-                vm.mainViewModel.adminViewModel._supervisorPermissions.value = permissions
+                vm.mainViewModel.adminViewModel._supervisorPermissions.value = effectivePerms
             }
         } catch (_: Exception) {}
         val payload = mapOf(
             "roles" to mapOf(
                 cleanRole to mapOf(
-                    "activePermissions" to permissions,
-                    "totalCount" to permissions.size,
+                    "activePermissions" to effectivePerms,
+                    "totalCount" to effectivePerms.size,
                     "updatedAt" to System.currentTimeMillis()
                 )
             ),
             "lastUpdatedRole" to cleanRole,
-            "activePermissions" to permissions,
-            "totalCount" to permissions.size,
+            "activePermissions" to effectivePerms,
+            "totalCount" to effectivePerms.size,
             "updatedAt" to System.currentTimeMillis()
         )
         vm.db.collection("settings").document("admin_permissions_matrix")
             .set(payload, SetOptions.merge())
             .addOnSuccessListener {
-                vm.mainViewModel.triggerNotification("💾 تم حفظ وتحديث مصفوفة الصلاحيات للدور $cleanRole (${permissions.size} / 538) في قاعدة بيانات Firestore بنجاح!")
+                vm.mainViewModel.triggerNotification("💾 تم حفظ وتحديث مصفوفة الصلاحيات للدور $cleanRole (${effectivePerms.size} / $totalRegistryCount) في قاعدة بيانات Firestore بنجاح!")
             }
             .addOnFailureListener {
                 vm.mainViewModel.triggerNotification("❌ تعذر حفظ مصفوفة الصلاحيات في Firestore: ${it.localizedMessage}")

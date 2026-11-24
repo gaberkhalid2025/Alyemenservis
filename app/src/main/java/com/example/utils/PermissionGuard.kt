@@ -43,9 +43,30 @@ object PermissionGuard {
     const val PERMISSION_JOBS = "MANAGE_JOBS"
     const val PERMISSION_CUSTOM_TABS = "MANAGE_CUSTOM_TABS"
 
+    private val legacyManageAliases: Map<String, Set<String>> = mapOf(
+        "MANAGE_REQUESTS" to setOf("REG_REQ"),
+        "MANAGE_PROVIDERS" to setOf("PROVIDERS", "MANUAL_ADD"),
+        "MANAGE_BOOKINGS" to setOf("BOOKINGS"),
+        "MANAGE_RESTAURANTS" to setOf("RESTAURANTS"),
+        "MANAGE_NOTIFICATIONS" to setOf("NOTIFICATIONS"),
+        "MANAGE_BANNERS" to setOf("BANNERS"),
+        "MANAGE_REG_FORMS" to setOf("REG_FORMS_MANAGER"),
+        "MANAGE_QUICK_SERVICE" to setOf("QUICK_SERVICE"),
+        "MANAGE_ADVANCED_CHAT" to setOf("ADVANCED_CHAT", "CHATS"),
+        "MANAGE_THEMES" to setOf("COLORS"),
+        "MANAGE_NEW_SECTIONS" to setOf("NEW_SECTION_CREATOR"),
+        "MANAGE_MAP" to setOf("MAP_CONTROLS"),
+        "MANAGE_STORES" to setOf("STORES"),
+        "MANAGE_MALLS" to setOf("STORES", "STORE_MALL_MANAGE", "STORE_MALL_TENANTS"),
+        "MANAGE_MEDICAL" to setOf("MEDICAL"),
+        "MANAGE_PROPERTIES" to setOf("PROPERTIES"),
+        "MANAGE_JOBS" to setOf("JOBS", "APPLICANTS"),
+        "MANAGE_CUSTOM_TABS" to setOf("CUSTOM_TABS")
+    )
+
     /**
      * Verifies if the role and assigned permission set has access to a specific permission key.
-     * Owner (Main Admin) has ALL 320 permissions automatically.
+     * Owner (Main Admin) has ALL permissions automatically and cannot be downgraded.
      */
     fun hasPermission(
         role: AdminRole,
@@ -55,16 +76,24 @@ object PermissionGuard {
         if (role == AdminRole.GUEST) return false
         if (role == AdminRole.OWNER || role == AdminRole.SUPER_ADMIN || role == AdminRole.MAIN_ADMIN) return true
 
-        if (supervisorGrantedPermissions.contains("ALL") || supervisorGrantedPermissions.contains("ALL_538")) return true
+        if (com.example.security.AdminPermissionResolver.hasAccess(supervisorGrantedPermissions, permission)) {
+            return true
+        }
 
-        // Explicit permission check for Supervisor or Admin
-        if (supervisorGrantedPermissions.contains(permission)) return true
-
-        // Category-level check (e.g. if supervisor has "MANAGE_BOOKINGS", they can access all booking permissions)
+        // Support legacy MANAGE_* grants mapping to tabKey or category permissions
         val permItem = AdminPermissionsRegistry.allPermissions.find { it.key == permission || it.id == permission }
-        if (permItem != null) {
-            val mainCatKey = permItem.category.tabKey
-            if (supervisorGrantedPermissions.contains(mainCatKey)) return true
+        val targetTab = permItem?.category?.tabKey ?: permission
+
+        val grantedViaLegacyAlias = supervisorGrantedPermissions.any { granted ->
+            legacyManageAliases[granted]?.let { targets ->
+                targetTab in targets || permission in targets
+            } == true
+        }
+        if (grantedViaLegacyAlias) return true
+
+        // Category-level check (e.g. if supervisor has "BOOKINGS", they can access all booking permissions)
+        if (permItem != null && supervisorGrantedPermissions.contains(permItem.category.tabKey)) {
+            return true
         }
 
         return false

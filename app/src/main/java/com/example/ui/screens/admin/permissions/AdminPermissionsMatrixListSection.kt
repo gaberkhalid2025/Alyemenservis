@@ -102,8 +102,9 @@ fun AdminPermissionsMatrixListSection(
                                 Text(category.iconEmoji, fontSize = 16.sp)
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Column {
+                                    val fullCatCount = AdminPermissionsRegistry.getByCategory(category).size
                                     Text(
-                                        text = "${category.arabicTitle} ($activeInCat / ${category.expectedCount})",
+                                        text = "${category.arabicTitle} ($activeInCat / $fullCatCount)",
                                         color = themeColors.textPrimary,
                                         fontSize = 12.sp,
                                         fontWeight = FontWeight.Bold,

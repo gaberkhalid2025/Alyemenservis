@@ -54,7 +54,8 @@ fun JobPosterDashboard(
     val myApplications = remember(allApplications, myJobIds, account.name) {
         allApplications.filter { app ->
             app.jobId in myJobIds ||
-                (account.name.isNotBlank() && app.companyName.equals(account.name, ignoreCase = true))
+                (app.jobId.isBlank() && account.name.isNotBlank() &&
+                    app.companyName.equals(account.name, ignoreCase = true))
         }
     }
 
@@ -91,7 +92,7 @@ fun JobPosterDashboard(
                 },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
-                        Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = themeColors.textPrimary)
+                        Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "رجوع", tint = themeColors.textPrimary)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = themeColors.surface)
@@ -307,7 +308,52 @@ fun JobPosterDashboard(
                             isAvailable = account.isActive,
                             rating = account.rating.toDouble(),
                             reviewCount = account.numReviews,
+                            latitude = account.latitude,
+                            longitude = account.longitude,
                             themeColors = themeColors,
+                            onChangePhoto = { url ->
+                                jobViewModel.updateProfile(
+                                    name = account.name,
+                                    cityArea = account.neighborhood.ifBlank { account.cityId },
+                                    description = account.description,
+                                    workingHours = account.workingHours,
+                                    isAvailable = account.isActive,
+                                    photoUrl = url
+                                )
+                            },
+                            onChangeCover = { url ->
+                                jobViewModel.updateProfile(
+                                    name = account.name,
+                                    cityArea = account.neighborhood.ifBlank { account.cityId },
+                                    description = account.description,
+                                    workingHours = account.workingHours,
+                                    isAvailable = account.isActive,
+                                    coverUrl = url
+                                )
+                            },
+                            onSaveLocation = { lat, lng ->
+                                jobViewModel.updateProfile(
+                                    name = account.name,
+                                    cityArea = account.neighborhood.ifBlank { account.cityId },
+                                    description = account.description,
+                                    workingHours = account.workingHours,
+                                    isAvailable = account.isActive,
+                                    latitude = lat,
+                                    longitude = lng
+                                )
+                            },
+                            onSaveProfileWithLocation = { name, editedPhone, city, desc, hours, available, lat, lng ->
+                                jobViewModel.updateProfile(
+                                    name = name,
+                                    cityArea = city,
+                                    description = desc,
+                                    workingHours = hours,
+                                    isAvailable = available,
+                                    phone = editedPhone,
+                                    latitude = lat,
+                                    longitude = lng
+                                )
+                            },
                             onSaveProfile = { name, editedPhone, city, desc, hours, available ->
                                 jobViewModel.updateProfile(name, city, desc, hours, available, phone = editedPhone)
                             },

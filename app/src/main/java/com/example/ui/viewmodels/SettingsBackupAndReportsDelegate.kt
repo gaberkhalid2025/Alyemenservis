@@ -387,7 +387,7 @@ internal class SettingsBackupAndReportsDelegate(private val vm: SettingsViewMode
             }
             var completedCount = 0
             selectedCollections.forEach { col ->
-                vm.db.collection(col).get().addOnSuccessListener { snapshot ->
+                vm.db.collection(col).limit(500).get().addOnSuccessListener { snapshot ->
                     val arr = JSONArray()
                     snapshot?.documents?.forEach { doc ->
                         val obj = JSONObject()

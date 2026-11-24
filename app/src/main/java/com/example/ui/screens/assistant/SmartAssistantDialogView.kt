@@ -260,7 +260,7 @@ fun SmartAssistantDialogView(
                                         Text(
                                             text = when {
                                                 voiceState.status == VoiceStatus.LISTENING && voiceState.partial.isNotBlank() -> voiceState.partial
-                                                voiceState.status == VoiceStatus.ERROR && !voiceState.message.isNullOrBlank() -> voiceState.message!!
+                                                voiceState.status == VoiceStatus.ERROR && !voiceState.message.isNullOrBlank() -> voiceState.message.orEmpty()
                                                 else -> "انقر للتحدث أو البحث بصوتك (دعم متعدد للهجات العربية)"
                                             },
                                             fontSize = 9.5.sp,

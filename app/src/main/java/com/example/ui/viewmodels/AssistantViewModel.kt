@@ -2,15 +2,13 @@ package com.example.ui.viewmodels
 
 import android.content.Context
 import androidx.lifecycle.ViewModel
-import com.example.ui.*
 import androidx.lifecycle.viewModelScope
 import com.example.data.AdminSettingsEntity
-import com.example.data.CategoryEntity
-import com.example.data.ProviderEntity
 import com.example.ui.MainViewModel
 import com.example.ui.screens.assistant.AssistantMessage
 import com.example.utils.AiAssistantEngine
-import com.example.utils.AiResponse
+import com.example.utils.AssistantDirectorySnapshot
+import com.example.utils.LocalGuideBrain
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,22 +18,33 @@ import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import okhttp3.RequestBody
+import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
-import java.util.Locale
 import java.util.concurrent.TimeUnit
 
 /**
  * 🤖 AssistantViewModel
- * إدارة المحادثة والمنطق البرمجي للمساعد الذكي لدليل خدمات اليمن.
- * يدعم الذكاء الاصطناعي التوليدي عبر Gemini API ومحرك الاستجابة المحلي بدون إنترنت.
+ * يدير جلسة المساعد الذكي بالكامل عبر المحرك الموحد [LocalGuideBrain] و[AiAssistantEngine]
+ * مجاناً وبلا حدود على حصة Spark أو مفاتيح مدفوعة، مع كاش محلي للردود المتكررة.
  */
 class AssistantViewModel : ViewModel() {
 
     private var cachedEngine: AiAssistantEngine? = null
-    private fun getOrCreateEngine(context: Context): AiAssistantEngine {
-        return cachedEngine ?: synchronized(this) {
-            cachedEngine ?: AiAssistantEngine(context.applicationContext).also { cachedEngine = it }
+    private var cachedBrain: LocalGuideBrain? = null
+
+    private fun getOrCreateBrain(context: Context?): LocalGuideBrain {
+        val currentBrain = cachedBrain
+        if (currentBrain != null && (cachedEngine != null || context == null)) {
+            return currentBrain
+        }
+        return synchronized(this) {
+            if (cachedEngine == null && context != null) {
+                cachedEngine = AiAssistantEngine(context.applicationContext)
+                cachedBrain = LocalGuideBrain(cachedEngine)
+            } else if (cachedBrain == null) {
+                cachedBrain = LocalGuideBrain(cachedEngine)
+            }
+            cachedBrain!!
         }
     }
 
@@ -63,64 +72,10 @@ class AssistantViewModel : ViewModel() {
         _typedText.value = text
     }
 
-    /**
-     * 🇾🇪 [تحسين مدمج] بحث محلي ذكي موسع يفهم اللهجة اليمنية ومناطقها ويترجمها لمصطلحات البحث القياسية
-     */
     fun searchLocalSmart(rawQuery: String): String {
-        val q = normalizeArabic(rawQuery)
-        val yemeniDialectMap = mapOf(
-            "ابغى" to "اريد",
-            "ابا" to "اريد",
-            "باغي" to "اريد",
-            "شتي" to "اريد",
-            "اشتيك" to "اريد",
-            "ايش" to "ما",
-            "ماهو" to "ما",
-            "فين" to "اين",
-            "وين" to "اين",
-            "بكم" to "ما سعر",
-            "بكام" to "ما سعر",
-            "ثلاجه" to "صيانه ثلاجات",
-            "غساله" to "صيانه غسالات",
-            "سخان" to "صيانه سخانات",
-            "مكيف" to "صيانه مكيفات",
-            "كهربا" to "كهربائي",
-            "سباك" to "سباك",
-            "بنشري" to "بنشري اطارات",
-            "ميكانيكي" to "ميكانيكي سيارات",
-            "سمكري" to "سمكري سيارات",
-            "نجار" to "نجار",
-            "دهان" to "دهان",
-            "مطعم" to "مطعم",
-            "صيدليه" to "صيدلية",
-            "دواء" to "صيدلية",
-            "علاج" to "صيدلية",
-            "دكتور" to "مركز طبي",
-            "مستشفى" to "مركز طبي",
-            "عياده" to "مركز طبي",
-            "شقه" to "شقة",
-            "بيت" to "منزل",
-            "عمارة" to "عقار",
-            "حوش" to "عقار",
-            "حده" to "صنعاء حدة",
-            "السبعين" to "صنعاء السبعين",
-            "شميله" to "صنعاء شميلة",
-            "التحرير" to "صنعاء التحرير",
-            "مذبح" to "صنعاء مذبح",
-            "الستين" to "صنعاء الستين"
-        )
-        var translated = q
-        yemeniDialectMap.forEach { (dialect, standard) ->
-            if (translated.contains(dialect)) {
-                translated = translated.replace(dialect, standard)
-            }
-        }
-        return translated
+        return getOrCreateBrain(null).translateDialect(rawQuery)
     }
 
-    /**
-     * 🌐 [تحسين مدمج] استدعاء الخادم الخارجي الاختياري (Ollama / خادم محلي) مع العودة الفورية للطبقة المحلية دون أخطاء
-     */
     fun callOptionalServerFallback(
         serverEndpoint: String?,
         prompt: String,
@@ -142,7 +97,7 @@ class AssistantViewModel : ViewModel() {
                 }
                 val request = Request.Builder()
                     .url(serverEndpoint)
-                    .post(RequestBody.create(mediaType, jsonBody.toString()))
+                    .post(jsonBody.toString().toRequestBody(mediaType))
                     .build()
 
                 sharedHttpClient.newCall(request).execute().use { response ->
@@ -162,7 +117,6 @@ class AssistantViewModel : ViewModel() {
                     withContext(Dispatchers.Main) { onFallbackToLocal() }
                 }
             } catch (_: Exception) {
-                // عند أي فشل في الاتصال بالخادم الخارجي، نعود للطبقة المحلية بدون إظهار أخطاء للمستخدم
                 withContext(Dispatchers.Main) { onFallbackToLocal() }
             }
         }
@@ -172,9 +126,6 @@ class AssistantViewModel : ViewModel() {
         _chatHistory.value = listOf(AssistantMessage(text = welcomeMsg.ifEmpty { defaultWelcome }, isUser = false))
     }
 
-    /**
-     * معالجة استفسار المستخدم وتوليد الرد.
-     */
     fun sendUserQuery(
         prompt: String,
         isOnline: Boolean,
@@ -186,7 +137,6 @@ class AssistantViewModel : ViewModel() {
     ) {
         if (prompt.isBlank() || _isGenerating.value) return
 
-        // فحص الكاش المحلي أولاً للرد السريع (آخر 40 سؤال)
         val cached = getCachedResponse(prompt)
         if (cached != null) {
             val userMsg = AssistantMessage(text = prompt.trim(), isUser = true)
@@ -211,20 +161,16 @@ class AssistantViewModel : ViewModel() {
 
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                var engineResp: AiResponse? = null
-                if (context != null) {
-                    val engine = getOrCreateEngine(context)
-                    engine.queryAssistant(
-                        prompt = prompt,
-                        currentCity = mainViewModel.homeViewModel.selectedCityName.value.ifBlank { "صنعاء" },
-                        isOnlineAvailable = isOnline
-                    ) { resp ->
-                        engineResp = resp
-                    }
-                }
-
-                val localMsg = generateLocalOfflineMessage(prompt, mainViewModel)
-                val responseMsg = mergeEngineWithLocalEntities(prompt, localMsg, engineResp)
+                val brain = getOrCreateBrain(context)
+                val snapshot = AssistantDirectorySnapshot(
+                    providers = mainViewModel.providers.value,
+                    stores = mainViewModel.stores.value,
+                    properties = mainViewModel.properties.value,
+                    categories = mainViewModel.categories.value,
+                    settings = settings,
+                    currentCityName = mainViewModel.homeViewModel.selectedCityName.value.ifBlank { "صنعاء" }
+                )
+                val responseMsg = brain.answer(prompt, isOnline, snapshot)
                 cacheResponse(prompt, responseMsg)
 
                 withContext(Dispatchers.Main) {
@@ -241,68 +187,12 @@ class AssistantViewModel : ViewModel() {
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
                     _isGenerating.value = false
-                    val errMsg = "حدث خطأ: ${e.localizedMessage}"
-                    onError?.invoke(errMsg)
+                    onError?.invoke("حدث خطأ: ${e.localizedMessage}")
                 }
             }
         }
     }
 
-    private fun mergeEngineWithLocalEntities(
-        prompt: String,
-        localMsg: AssistantMessage,
-        engineResp: AiResponse?
-    ): AssistantMessage {
-        if (engineResp == null) return localMsg
-        val localIsHigh = localMsg.safetyLevel.equals("HIGH", ignoreCase = true)
-        val engineIsHigh = engineResp.safetyLevel.equals("HIGH", ignoreCase = true)
-        // أولوية قصوى لتحذيرات السلامة العالية من أي مصدر مع الإبقاء على الفنيين المطابقين
-        if (localIsHigh) {
-            return localMsg
-        }
-        val engineHasSpecificAnswer = engineResp.title.startsWith("📋") ||
-            engineResp.title == "معلومات الخدمة المعتمدة"
-        val engineHasRichGuide = engineIsHigh ||
-            engineResp.diySteps.isNotEmpty() ||
-            engineResp.immediateActions.isNotEmpty() ||
-            !engineResp.estimatedCost.isNullOrBlank() ||
-            (engineHasSpecificAnswer && engineResp.message.isNotBlank())
-        if (!engineHasRichGuide) return localMsg
-
-        val sb = StringBuilder()
-        if (engineIsHigh) {
-            sb.append("🚨 *${engineResp.title}*\n\n")
-            engineResp.safetyWarning?.let { sb.append("⚠️ $it\n\n") }
-            if (engineResp.immediateActions.isNotEmpty()) {
-                sb.append("🛡️ خطوات الأمان الفورية:\n")
-                engineResp.immediateActions.forEachIndexed { idx, act -> sb.append("${idx + 1}. $act\n") }
-            }
-        } else {
-            sb.append("🤖 *${engineResp.title}*\n\n")
-            if (engineResp.message.isNotBlank()) {
-                sb.append("${engineResp.message}\n\n")
-            }
-            if (engineResp.diySteps.isNotEmpty()) {
-                sb.append("📋 خطوات الفحص السريع:\n")
-                engineResp.diySteps.forEachIndexed { idx, step -> sb.append("${idx + 1}. $step\n") }
-            }
-        }
-        engineResp.preventiveTips?.takeIf { it.isNotBlank() }?.let { sb.append("\n💡 نصيحة وقائية: $it\n") }
-        engineResp.estimatedCost?.takeIf { it.isNotBlank() }?.let { sb.append("\n💰 التكلفة التقديرية: $it\n") }
-        if (localMsg.matchedEntities.isNotEmpty()) {
-            sb.append("\n👇 عثرت لك على نتائج مطابقة في دليلك:")
-        }
-        return AssistantMessage(
-            text = sb.toString().trim(),
-            isUser = false,
-            matchedEntities = localMsg.matchedEntities,
-            safetyLevel = engineResp.safetyLevel,
-            safetyWarning = engineResp.safetyWarning,
-            immediateActions = engineResp.immediateActions
-        )
-    }
-
-    // كاش محلي يحتفظ بآخر 40 سؤال وجواب كحد أقصى
     private val cachedResponses = object : LinkedHashMap<String, AssistantMessage>(40, 0.75f, true) {
         override fun removeEldestEntry(eldest: Map.Entry<String, AssistantMessage>?): Boolean {
             return size > 40
@@ -311,122 +201,13 @@ class AssistantViewModel : ViewModel() {
 
     @Synchronized
     fun getCachedResponse(query: String): AssistantMessage? {
-        val normalized = normalizeArabic(query)
-        return cachedResponses[normalized]
+        return cachedResponses[normalizeArabic(query)]
     }
 
     @Synchronized
     fun cacheResponse(query: String, response: AssistantMessage) {
-        val normalized = normalizeArabic(query)
-        cachedResponses[normalized] = response
+        cachedResponses[normalizeArabic(query)] = response
     }
-
-    data class DiyGuide(
-        val keywords: List<String>,
-        val title: String,
-        val steps: List<String>,
-        val preventiveTip: String? = null,
-        val estimatedCost: String? = null,
-        val targetCategory: String = "سباكة",
-        val safetyLevel: String = "LOW",
-        val safetyWarning: String? = null,
-        val immediateActions: List<String> = emptyList()
-    )
-
-    private val diyGuides = listOf(
-        DiyGuide(
-            keywords = listOf("دينمو", "ماطور", "ماطور ماء", "دينمو يزن", "ما يرفعش ماء", "تنفيس"),
-            title = "حل مشكلة تنفيس ماطور الماء وعدم رفع المياه",
-            steps = listOf(
-                "افصل كهرباء الدينمو وتأكد من توقف المروحة تماماً.",
-                "افتح برغي التنفيس العلوي في رأس الطرمبة لتفريغ الهواء المحبوس.",
-                "اسكب ماء نظيف داخل فتحة التنفيس حتى يمتلئ بالكامل ثم أعد ربط البرغي بإحكام.",
-                "شغل الدينمو وتحقق من صوت سحب الماء وصعوده للخزان."
-            ),
-            preventiveTip = "احرص على تركيب صمام عدم رجوع (رداد/Check Valve) إيطالي أصلي عند مدخل السحب لتجنب تفريغ الماء.",
-            estimatedCost = "2,500 - 5,000 ريال يمني",
-            targetCategory = "سباكة"
-        ),
-        DiyGuide(
-            keywords = listOf("بزبوز", "حنفية", "صنبور", "يقطر", "تنقيط ماء", "جلبة", "واشر"),
-            title = "إصلاح تنقيط وتسريب البزبوز (الحنفية)",
-            steps = listOf(
-                "أغلق محبس الزاوية الموجود أسفل المغسلة.",
-                "فك غطاء مقبض البزبوز واستخرج البرغي الداخلي باستخدام مفك صليبة.",
-                "استخرج قلب الحنفية النحاسي وافحص الجلدة المطاطية (الواشر).",
-                "استبدل الواشر التالف بجديد مع لف شريط تفلون أبيض على السن."
-            ),
-            preventiveTip = "لا تبالغ في شد البزبوز بقوة عند الإغلاق لتجنب تلف الجلبة الداخلية بسرعة.",
-            estimatedCost = "1,500 - 3,000 ريال يمني",
-            targetCategory = "سباكة"
-        ),
-        DiyGuide(
-            keywords = listOf("عوامة", "عوامة الخزان", "الخزان يفيض", "السطح غرقان", "محبس العوامة"),
-            title = "علاج فيضان خزان السطح وعطل العوامة الميكانيكية والكهربائية",
-            steps = listOf(
-                "أغلق خط التغذية الصاعد للخزان فوراً لمنع هدر المياه.",
-                "افحص ذراع العوامة النحاسي أو البلاستيكي وتأكد من عدم ثقب الكرة العائمة.",
-                "إذا كانت العوامة كهربائية، تأكد من سلامة الثقالات والأسلاك المعزولة المقاومة للشمس.",
-                "قم بوزن مستوى الإيقاف ليكون أقل من فوهة الفايظ بـ 10 سم."
-            ),
-            preventiveTip = "استخدم عوامات نحاسية معتمدة مع حماية سلك العوامة الكهربائية بجرجور عازل.",
-            estimatedCost = "3,000 - 6,000 ريال يمني",
-            targetCategory = "سباكة"
-        ),
-        DiyGuide(
-            keywords = listOf("انسداد", "مجاري", "بالوعة", "تصريف مسدود", "مغسلة مسدودة", "ريحة مجاري"),
-            title = "تسليك انسداد بالوعة الحمام أو المطبخ",
-            steps = listOf(
-                "اسكب نصف كوب من بيكربونات الصوديوم متبوعاً بكوب خل أبيض داخل الفتحة.",
-                "اترك المزيج يتفاعل لمدة 15 دقيقة لتفكيك الدهون والرواسب.",
-                "اسكب كمية وافرة من الماء المغلي ببطء لطرد الرواسب خارج الماسورة.",
-                "استخدم سلك التسليك المرن (الزنبرك) إذا كان الانسداد عميقاً."
-            ),
-            preventiveTip = "تجنب سكب زيوت القلي أو الشحوم في أحواض الغسيل نهائياً واستخدم مصفاة شعر.",
-            estimatedCost = "3,000 - 7,000 ريال يمني",
-            targetCategory = "سباكة"
-        ),
-        DiyGuide(
-            keywords = listOf("مكيف", "تبريد", "ما يبردش", "حار", "كمبروسر", "فريون", "مكيف يقطر"),
-            title = "تشخيص ضعف التبريد وتسريب ماء المكيف",
-            steps = listOf(
-                "تأكد من ضبط الريموت على وضع التبريد (Cool ❄️) وحرارة بين 22-24.",
-                "فك فلاتر الهواء الأمامية واغسلها بالماء وجففها جيداً.",
-                "افحص مجرى تصريف الماء الخلفي وتأكد من عدم انسداده بالأتربة.",
-                "إذا استمر ضعف التبريد مع صوت ونين، قد يحتاج المكيف لإعادة تعبئة غاز الفريون."
-            ),
-            preventiveTip = "قم بتنظيف الفلاتر كل أسبوعين لتوفير استهلاك الكهرباء وإطالة عمر الكمبروسر.",
-            estimatedCost = "5,000 - 12,000 ريال يمني",
-            targetCategory = "تكييف"
-        ),
-        DiyGuide(
-            keywords = listOf("طاقة شمسية", "الواح", "انفرتر", "انفيرتر", "بطارية", "القاطع نزل", "التماس", "شورت", "كهرباء", "فيش محروق", "كابستر", "سخان", "لسعة", "صعقة", "فولتية"),
-            title = "تحذير أمان: أعطال الكهرباء والطاقة الشمسية والجهد العالي",
-            steps = listOf(),
-            preventiveTip = "استخدم قاطع الحماية التفاضلي (RCCB) وافحص التمديدات دورياً عبر فني معتمد.",
-            estimatedCost = "4,000 - 8,000 ريال يمني",
-            targetCategory = "كهرباء",
-            safetyLevel = "HIGH",
-            safetyWarning = "خطر صعق كهربائي أو حريق: لا تفتح لوحة التوزيع أو الإنفرتر أو غطاء المكثف بيدك ولا تلمس الأسلاك المكشوفة.",
-            immediateActions = listOf(
-                "افصل القاطع الرئيسي للكهرباء أو قاطع المنظومة فوراً.",
-                "أبعد الماء والأشخاص عن مصدر الشرارة أو التسريب الكهربائي.",
-                "اطلب فني كهرباء أو طاقة شمسية معتمد فوراً من الأسفل."
-            )
-        ),
-        DiyGuide(
-            keywords = listOf("بنشر", "تاير", "كفر", "بطارية سيارة", "ما تدقش سلف", "عطلان في الطريق", "ميكانيكي", "سطحة"),
-            title = "طوارئ السيارات والبنشر والشحن",
-            steps = listOf(
-                "أوقف المركبة في مسار آمن تماماً وشغل إشارات الانتظار الرباعية.",
-                "في حال البطارية، استخدم كابل اشتراك أصلي مع سيارة أخرى وتأكد من تطابق الأقطاب (+ مع +).",
-                "في حال البنشر، ارفع الهاندبريك وضع حجر خلف الإطار المعاكس قبل استخدام الرافعة (الجك)."
-            ),
-            preventiveTip = "تأكد دورياً من ضغط الهواء في الإطار الاحتياطي (السبير) وتوفر مفتاح العجل والجك.",
-            estimatedCost = "3,000 - 10,000 ريال يمني",
-            targetCategory = "سيارات"
-        )
-    )
 
     fun generateLocalOfflineResponse(prompt: String, viewModel: MainViewModel): Pair<String, List<Any>> {
         val msg = generateLocalOfflineMessage(prompt, viewModel)
@@ -434,173 +215,19 @@ class AssistantViewModel : ViewModel() {
     }
 
     fun generateLocalOfflineMessage(prompt: String, viewModel: MainViewModel): AssistantMessage {
-        val qNormalized = normalizeArabic(prompt)
-        val providers = viewModel.providers.value
-        val stores = viewModel.stores.value
-        val properties = viewModel.properties.value
-        val categories = viewModel.categories.value
-        val settings = viewModel.settings.value
-
-        // [المحور الرابع] فحص أدلة الصيانة الذكية مع أولوية سلامة الأعطال الخطرة
-        val matchedDiyGuide = diyGuides.firstOrNull { guide ->
-            guide.keywords.any { kw -> qNormalized.contains(normalizeArabic(kw)) }
-        }
-        if (matchedDiyGuide != null) {
-            val sb = StringBuilder()
-            val isHighRisk = matchedDiyGuide.safetyLevel.equals("HIGH", ignoreCase = true)
-            sb.append(if (isHighRisk) "🚨 *${matchedDiyGuide.title}*\n\n" else "🛠️ *${matchedDiyGuide.title}*\n\n")
-            if (isHighRisk) {
-                matchedDiyGuide.safetyWarning?.let { sb.append("⚠️ $it\n\n") }
-                if (matchedDiyGuide.immediateActions.isNotEmpty()) {
-                    sb.append("🛡️ خطوات الأمان الفورية:\n")
-                    matchedDiyGuide.immediateActions.forEachIndexed { i, act -> sb.append("${i + 1}. $act\n") }
-                }
-            } else {
-                sb.append("📋 خطوات الفحص والإصلاح السريع (DIY):\n")
-                matchedDiyGuide.steps.forEachIndexed { i, step -> sb.append("${i + 1}. $step\n") }
-            }
-            matchedDiyGuide.preventiveTip?.let { sb.append("\n💡 نصيحة وقائية: $it\n") }
-            matchedDiyGuide.estimatedCost?.let { sb.append("\n💰 التكلفة التقديرية: $it\n") }
-            sb.append("\nيمكنك طلب فني معتمد فوراً من القائمة أدناه 👇")
-
-            val relatedProviders = providers.filter { p ->
-                val pProf = normalizeArabic(p.profession)
-                val pSpec = normalizeArabic(p.specialization)
-                val cat = normalizeArabic(matchedDiyGuide.targetCategory)
-                pProf.contains(cat) || pSpec.contains(cat)
-            }.take(3)
-            return AssistantMessage(
-                text = sb.toString(),
-                isUser = false,
-                matchedEntities = relatedProviders,
-                safetyLevel = matchedDiyGuide.safetyLevel,
-                safetyWarning = matchedDiyGuide.safetyWarning,
-                immediateActions = matchedDiyGuide.immediateActions
-            )
-        }
-
-        val isSupportContact = qNormalized.contains("رقم") || qNormalized.contains("اتصال") || 
-                                qNormalized.contains("دعم") || qNormalized.contains("تواصل") || 
-                                qNormalized.contains("واتساب")
-
-        val isJoinRequest = qNormalized.contains("تسجيل") || qNormalized.contains("انضم") || qNormalized.contains("حساب")
-        val isPriceInfo = qNormalized.contains("سعر") || qNormalized.contains("رسوم") || qNormalized.contains("مجاني")
-        val isMapFeature = qNormalized.contains("خريطه") || qNormalized.contains("موقع") || qNormalized.contains("gps")
-
-        val matchedEntities = mutableListOf<Any>()
-
-        // 1. Search Providers
-        val professions = listOf("سباك", "كهربا", "دهان", "نجار", "حداد", "خياط", "سائق", "مصلح", "صيانه", "فني", "مهندس", "تكييف", "تبريد", "بناء", "مقاول", "طبيب", "تنظيف", "ميكانيك", "غساله", "غسالات")
-        val isProviderSearch = professions.any { qNormalized.contains(it) } || qNormalized.contains("فني")
-        val isWashingMachinePrice = (qNormalized.contains("غساله") || qNormalized.contains("غسالات")) && (qNormalized.contains("سعر") || qNormalized.contains("كم") || qNormalized.contains("تكلفه") || qNormalized.contains("صيانه"))
-
-        if (isProviderSearch) {
-            val provs = providers.filter { p ->
-                val pNameNorm = normalizeArabic(p.name)
-                val pProfNorm = normalizeArabic(p.profession)
-                val pSpecNorm = normalizeArabic(p.specialization)
-                pNameNorm.contains(qNormalized) || (pProfNorm.isNotBlank() && pProfNorm.contains(qNormalized)) || (pSpecNorm.isNotBlank() && pSpecNorm.contains(qNormalized)) || (pProfNorm.isNotBlank() && qNormalized.contains(pProfNorm)) ||
-                    (qNormalized.contains("سباك") && (pProfNorm.contains("سباك") || pSpecNorm.contains("سباك")))
-            }.take(3)
-            matchedEntities.addAll(provs)
-        }
-
-        // 2. Search Stores (Restaurants, Medical, Stores)
-        val storeKeywords = listOf("مطعم", "اكل", "غداء", "عشاء", "كافيه", "قهوه", "محل", "متجر", "سوبر", "صيدليه", "مستشفى", "عياده", "طبي")
-        if (storeKeywords.any { qNormalized.contains(it) } || qNormalized.contains("شراء")) {
-            val ms = stores.filter { s ->
-                val sNameNorm = normalizeArabic(s.name)
-                val sDescNorm = normalizeArabic(s.description)
-                sNameNorm.contains(qNormalized) || sDescNorm.contains(qNormalized)
-            }.take(3)
-            matchedEntities.addAll(ms)
-        }
-
-        // 3. Search Properties
-        if (qNormalized.contains("بيت") || qNormalized.contains("شقه") || qNormalized.contains("عقار") || qNormalized.contains("ايجار") || qNormalized.contains("بيع")) {
-            val mp = properties.filter { pr ->
-                val prTitleNorm = normalizeArabic(pr.title)
-                val prDescNorm = normalizeArabic(pr.description)
-                prTitleNorm.contains(qNormalized) || prDescNorm.contains(qNormalized)
-            }.take(3)
-            matchedEntities.addAll(mp)
-        }
-
-        if (isWashingMachinePrice) {
-            val priceText = "🧺 متوسط تكلفة معاينة وصيانة الغسالات في دليل خدمات اليمن يتراوح بين 4,000 إلى 9,000 ريال يمني (حسب نوع الغسالة والعطل وقطع الغيار). يمكنك طلب فني صيانة غسالات معتمد للمعاينة المباشرة!"
-            return AssistantMessage(text = priceText, isUser = false, matchedEntities = matchedEntities)
-        }
-
-        if (matchedEntities.isNotEmpty()) {
-            val sb = StringBuilder()
-            sb.append("🔍 عثرت لك على النتائج التالية في دليل خدمات اليمن:\n\n")
-            matchedEntities.forEachIndexed { index, ent ->
-                when (ent) {
-                    is com.example.data.ProviderEntity -> {
-                        val catName = categories.find { it.id == ent.categoryId }?.name ?: ent.profession
-                        sb.append("${index + 1}. *${ent.name}* (فني) | $catName\n")
-                        sb.append("   📍 ${ent.area} | ⭐ ${ent.rating} | ${if (ent.isAvailable) "🟢 متاح" else "🔴 مشغول"}\n\n")
-                    }
-                    is com.example.data.StoreEntity -> {
-                        sb.append("${index + 1}. *${ent.name}* (متجر/مطعم)\n")
-                        sb.append("   📍 ${ent.localNeighborhood} | ⭐ ${ent.rating}\n\n")
-                    }
-                    is com.example.data.PropertyEntity -> {
-                        sb.append("${index + 1}. *${ent.title}* (عقار)\n")
-                        sb.append("   📍 ${ent.localNeighborhood} | 💰 ${ent.price} ${ent.currency}\n\n")
-                    }
-                }
-            }
-            sb.append("💡 انقر على البطاقة بالأسفل لمزيد من التفاصيل!")
-            return AssistantMessage(text = sb.toString(), isUser = false, matchedEntities = matchedEntities)
-        }
-
-        val textResult = when {
-            qNormalized.contains("مرحبا") || qNormalized.contains("السلام") || qNormalized.contains("هلا") || qNormalized.contains("صباح") || qNormalized.contains("مساء") -> {
-                "أهلاً وسهلاً بك في دليل خدمات اليمن 🇾🇪! أنا مساعدك الذكي المدمج لمساعدتك في الوصول لأفضل الفنيين، المحلات، العيادات، والمطاعم في ثوانٍ معدودة. كيف يمكنني مساعدتك اليوم؟"
-            }
-            isSupportContact -> {
-                "📱 للتواصل المباشر والآمن مع الدعم الفني للدليل:\n- هاتف الإدارة: *${settings.supportPhone}*\n- واتساب الدعم الفني المباشر: *${settings.supportWhatsapp}*\nنحن هنا لخدمتك على مدار الساعة!"
-            }
-            isJoinRequest -> {
-                "📝 للانضمام كفني محترف أو صاحب متجر/خدمة في الدليل وعرض خدماتك مجاناً، يرجى فتح القائمة الجانبية للتطبيق واختيار 'طلب الانضمام كفني' وتعبئة البيانات!"
-            }
-            isPriceInfo || qNormalized.contains("سعر سباك") || qNormalized.contains("تكلفه") -> {
-                "💰 استخدام تطبيق دليل خدمات اليمن مجاني تماماً للبحث وتصفح الفنيين والمحلات. أسعار المعاينة والصيانة تبدأ من 3,000 ريال يمني وتحدد التكلفة الإجمالية للعمل بالتراضي المباشر بينك وبين مقدم الخدمة بكل شفافية."
-            }
-            isMapFeature || qNormalized.contains("رادار") -> {
-                "🗺️ يمكنك النقر على 'خريطة الخدمات' أو 'الرادار التفاعلي' لعرض مواقع مقدمي الخدمات القريبين منك جغرافياً في حيك ومحافظتك دون أي حاجة للإنترنت!"
-            }
-            qNormalized.contains("عدن") || qNormalized.contains("صنعاء") || qNormalized.contains("تعز") || qNormalized.contains("حضرموت") || qNormalized.contains("الحديده") || qNormalized.contains("اب") || qNormalized.contains("مارب") || qNormalized.contains("ذمار") -> {
-                "🇾🇪 دليل خدمات اليمن يغطي جميع المحافظات والمناطق اليمنية الرئيسية (صنعاء، عدن، تعز، حضرموت، إب، الحديدة، مأرب، ذمار، وغيرها) لتسهيل العثور على أقرب فني ومحل معتمد في منطقتك السكنية!"
-            }
-            qNormalized.contains("طوارئ") || qNormalized.contains("اسعاف") || qNormalized.contains("دفاع") || qNormalized.contains("حريق") || qNormalized.contains("شرطه") -> {
-                "🚨 أرقام الطوارئ العامة الهامة في اليمن:\n- الدفاع المدني والإطفاء: *191*\n- طوارئ الكهرباء: *195*\n- طوارئ المياه والصرف الصحي: *192*\n- إسعاف الهلال الأحمر والنجدة: *199*\n\nيرجى التواصل المباشر مع هذه الجهات الرسمية فوراً في حالات الطوارئ الحيوية!"
-            }
-            qNormalized.contains("دفع") || qNormalized.contains("كاش") || qNormalized.contains("فلوس") || qNormalized.contains("محفظه") -> {
-                "💳 يتيح تطبيقنا الدفع نقداً (كاش) مباشرة للفني، أو عبر المحافظ الإلكترونية اليمنية المعتمدة (مثل حاسب، جوال بي، كاش، الكريمي، وغيرها) بالتنسيق المباشر مع مقدم الخدمة."
-            }
-            qNormalized.contains("تقييم") || qNormalized.contains("شكوى") || qNormalized.contains("شكاوى") || qNormalized.contains("سيء") -> {
-                "⭐ نحن نهتم بجودة الخدمات جداً! يمكنك تقييم الفني بنجوم وتوضيح تجربتك بعد إتمام الطلب مباشرة من شاشة الحجوزات، وإذا واجهتك أي مشكلة تواصل معنا فوراً عبر زر الدعم الفني وسنتعامل مع الشكوى بحسم!"
-            }
-            isProviderSearch -> {
-                "🔧 طلبك واضح! يمكنك تصفح قسم الفنيين المختصين في التطبيق أو الضغط على زر '⚡ اطلب الآن' لإرسال طلب فوري وسريع لأقرب فني معتمد في حارتك."
-            }
-            else -> {
-                "عذراً، لم أتمكن من فهم استفسارك بدقة (\"$prompt\"). يمكنك كتابة اسم المهنة أو الخدمة المطلوبة بوضوح مثل: (أحتاج سباك، كهربائي، صيانة غسالة، مطعم، عقار، دكتور) أو الضغط على زر '⚡ اطلب الآن' لإرسال طلب فوري."
-            }
-        }
-        return AssistantMessage(text = textResult, isUser = false, matchedEntities = emptyList())
+        val brain = getOrCreateBrain(null)
+        val snapshot = AssistantDirectorySnapshot(
+            providers = viewModel.providers.value,
+            stores = viewModel.stores.value,
+            properties = viewModel.properties.value,
+            categories = viewModel.categories.value,
+            settings = viewModel.settings.value,
+            currentCityName = viewModel.homeViewModel.selectedCityName.value.ifBlank { "صنعاء" }
+        )
+        return brain.answerSync(prompt, isOnline = false, snapshot = snapshot)
     }
 
-    fun normalizeArabic(text: String): String {
-        var str = text.trim().lowercase(Locale.ROOT)
-        str = str.replace(Regex("[\\u064B-\\u0652]"), "")
-        str = str.replace(Regex("[أإآ]"), "ا")
-        str = str.replace("ى", "ي")
-        str = str.replace("ة", "ه")
-        return str
-    }
+    fun normalizeArabic(text: String): String = LocalGuideBrain.normalizeArabic(text)
 
     override fun onCleared() {
         super.onCleared()

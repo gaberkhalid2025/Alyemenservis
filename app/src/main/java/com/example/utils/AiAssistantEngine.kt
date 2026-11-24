@@ -55,18 +55,50 @@ class AiAssistantEngine(private val context: Context) {
     private val faqList = mutableListOf<Pair<List<String>, String>>()
     private val queryCache = ConcurrentHashMap<String, AiResponse>()
 
+    companion object {
+        private const val GUIDES_CACHE_TTL_MS = 6L * 60 * 60 * 1000L
+        @Volatile
+        private var lastGuidesFetchMs: Long = 0L
+        @Volatile
+        private var sharedRemoteGuides: List<TroubleshootingGuide> = emptyList()
+    }
+
     init {
         loadOfflineData()
         loadBuiltInYemeniGuides()
+        val cachedRemote = sharedRemoteGuides
+        if (cachedRemote.isNotEmpty()) {
+            synchronized(guidesList) {
+                guidesList.clear()
+                guidesList.addAll(cachedRemote)
+            }
+        }
     }
 
-    suspend fun refreshGuidesFromFirestore() {
+    suspend fun refreshGuidesFromFirestore(forceRefresh: Boolean = false) {
+        val now = System.currentTimeMillis()
+        if (!forceRefresh && lastGuidesFetchMs > 0L && (now - lastGuidesFetchMs) < GUIDES_CACHE_TTL_MS) {
+            val cachedRemote = sharedRemoteGuides
+            if (cachedRemote.isNotEmpty()) {
+                synchronized(guidesList) {
+                    guidesList.clear()
+                    guidesList.addAll(cachedRemote)
+                }
+            }
+            return
+        }
         try {
-            val snapshot = FirebaseFirestore.getInstance().collection("ai_guides").get().await()
+            val snapshot = FirebaseFirestore.getInstance()
+                .collection("ai_guides")
+                .limit(100)
+                .get()
+                .await()
+            lastGuidesFetchMs = System.currentTimeMillis()
             val newGuides = snapshot.documents.mapNotNull { doc ->
                 doc.toObject(TroubleshootingGuide::class.java)
             }
             if (newGuides.isNotEmpty()) {
+                sharedRemoteGuides = newGuides
                 synchronized(guidesList) {
                     guidesList.clear()
                     guidesList.addAll(newGuides)
@@ -75,7 +107,7 @@ class AiAssistantEngine(private val context: Context) {
                     queryCache.clear()
                 }
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             // Keep existing offline & built-in guides
         }
     }
@@ -287,6 +319,17 @@ class AiAssistantEngine(private val context: Context) {
         isOnlineAvailable: Boolean = false,
         onResult: (AiResponse) -> Unit
     ) {
+        val response = withContext(Dispatchers.Default) {
+            queryAssistantSync(prompt, currentCity, isOnlineAvailable)
+        }
+        onResult(response)
+    }
+
+    fun queryAssistantSync(
+        prompt: String,
+        currentCity: String = "صنعاء",
+        @Suppress("UNUSED_PARAMETER") isOnlineAvailable: Boolean = false
+    ): AiResponse {
         val queryLower = prompt.trim().lowercase(Locale.getDefault())
 
         synchronized(queryCache) {
@@ -297,24 +340,16 @@ class AiAssistantEngine(private val context: Context) {
         }
 
         if (queryLower.isBlank()) {
-            onResult(
-                AiResponse(
-                    title = "مساعد دليل خدمات اليمن الذكي 🇾🇪",
-                    message = "حياك الله! أنا مساعدك الشخصي للبحث عن الفنيين، المحلات، العقارات، حل الأعطال، والاستعلام عن طلباتك.",
-                    chipLabel = "🛠️ طلب خدمة جديدة",
-                    referralAction = "CREATE_SERVICE_ORDER"
-                )
+            return AiResponse(
+                title = "مساعد دليل خدمات اليمن الذكي 🇾🇪",
+                message = "حياك الله! أنا مساعدك الشخصي للبحث عن الفنيين، المحلات، العقارات، حل الأعطال، والاستعلام عن طلباتك.",
+                chipLabel = "🛠️ طلب خدمة جديدة",
+                referralAction = "CREATE_SERVICE_ORDER"
             )
-            return
         }
 
-        // Check in-memory cache safely
-        queryCache[queryLower]?.let { cachedResponse ->
-            onResult(cachedResponse)
-            return
-        }
+        queryCache[queryLower]?.let { return it }
 
-        // الاستعلام عن الحجوزات والطلبات السابقة
         if (queryLower.contains("حجز") || queryLower.contains("طلباتي") || queryLower.contains("حالة الطلب") || queryLower.contains("حجوزاتي") || queryLower.contains("وين وصل طلبي")) {
             val resp = AiResponse(
                 title = "📋 الاستعلام عن حالة الحجوزات والطلبات",
@@ -325,15 +360,14 @@ class AiAssistantEngine(private val context: Context) {
                 isOfflineMode = true
             )
             queryCache[queryLower] = resp
-            onResult(resp)
-            return
+            return resp
         }
 
-        // المطابقة الذكية مع أدلة الصيانة والمصطلحات
         var bestGuideMatch: TroubleshootingGuide? = null
         var maxScore = 0
+        val snapshotGuides = synchronized(guidesList) { guidesList.toList() }
 
-        for (guide in guidesList) {
+        for (guide in snapshotGuides) {
             var matchCount = 0
             for (kw in guide.keywords) {
                 val kwLower = kw.lowercase(Locale.getDefault())
@@ -373,11 +407,9 @@ class AiAssistantEngine(private val context: Context) {
                 immediateActions = bestGuideMatch.immediateActions
             )
             queryCache[queryLower] = resp
-            onResult(resp)
-            return
+            return resp
         }
 
-        // فحص الأسئلة الشائعة
         for ((kwList, answer) in faqList) {
             if (kwList.any { queryLower.contains(it.lowercase(Locale.getDefault())) }) {
                 val resp = AiResponse(
@@ -389,12 +421,10 @@ class AiAssistantEngine(private val context: Context) {
                     isOfflineMode = true
                 )
                 queryCache[queryLower] = resp
-                onResult(resp)
-                return
+                return resp
             }
         }
 
-        // الرد الافتراضي الذكي
         val defaultResp = AiResponse(
             title = "المساعد الذكي 🇾🇪",
             message = "فهمت استفسارك بخصوص: \"$prompt\" في مدينة $currentCity. يمكنك طلب فني معتمد أو البحث عبر الخريطة التفاعلية لاكتشاف أقرب مزودي الخدمات فوراً.",
@@ -404,10 +434,10 @@ class AiAssistantEngine(private val context: Context) {
             isOfflineMode = true
         )
         queryCache[queryLower] = defaultResp
-        onResult(defaultResp)
+        return defaultResp
     }
 
-    private suspend fun levenshteinDistance(lhs: CharSequence, rhs: CharSequence): Int = withContext(Dispatchers.Default) {
+    private fun levenshteinDistance(lhs: CharSequence, rhs: CharSequence): Int {
         val lhsLength = lhs.length
         val rhsLength = rhs.length
         var cost = IntArray(lhsLength + 1) { it }
@@ -426,6 +456,6 @@ class AiAssistantEngine(private val context: Context) {
             cost = newCost
             newCost = swap
         }
-        cost[lhsLength]
+        return cost[lhsLength]
     }
 }

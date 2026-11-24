@@ -25,6 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.data.models.AdminPermissionsRegistry
 import com.example.data.models.PermissionCategory
 import com.example.ui.MainViewModel
 import com.example.utils.VisualThemePalette
@@ -43,6 +44,9 @@ fun AdminPermissionsActionsSection(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val totalPerms = AdminPermissionsRegistry.allPermissions.size
+    val totalCategories = PermissionCategory.entries.size
+    val isOwnerRole = selectedRole.uppercase() in setOf("OWNER", "SUPER_ADMIN", "MAIN_ADMIN")
 
     Column(
         modifier = modifier.fillMaxWidth(),
@@ -71,13 +75,13 @@ fun AdminPermissionsActionsSection(
                         Spacer(modifier = Modifier.width(8.dp))
                         Column {
                             Text(
-                                text = "🛡️ مصفوفة الصلاحيات الشاملة (538 صلاحية)",
+                                text = "🛡️ مصفوفة الصلاحيات الشاملة ($totalPerms صلاحية)",
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = themeColors.textPrimary
                             )
                             Text(
-                                text = "38 مجالاً وقطاعاً إدارياً مفصلاً بدون أي اختصار",
+                                text = "$totalCategories مجالاً وقطاعاً إدارياً مفصلاً ومتزامناً",
                                 fontSize = 10.sp,
                                 color = themeColors.accent
                             )
@@ -91,12 +95,20 @@ fun AdminPermissionsActionsSection(
                             .padding(horizontal = 8.dp, vertical = 4.dp)
                     ) {
                         Text(
-                            text = "$activePermissionsCount / 538 نشطة",
+                            text = "$activePermissionsCount / $totalPerms نشطة",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color(0xFF34D399)
                         )
                     }
+                }
+                if (isOwnerRole) {
+                    Text(
+                        text = "👑 دور المالك محمي نظامياً بصلاحيات كاملة غير قابلة للإنقاص.",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFFBBF24)
+                    )
                 }
                 Text(
                     text = "تحكم دقيق ومفصل في كل إجراء إداري بالنظام: الإشعارات، البنرات، استمارات التسجيل، الحجوزات، المحادثات، الثيمات، الأقسام، الخرائط، المنشآت، الرقابة، والإدارة المالية.",
@@ -125,9 +137,9 @@ fun AdminPermissionsActionsSection(
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    ActionChipButton("✅ تفعيل الكل (538)", isPrimary = true) {
+                    ActionChipButton("✅ تفعيل الكل ($totalPerms)", isPrimary = true) {
                         permsViewModel.enableAllPermissions()
-                        Toast.makeText(context, "تم تفعيل جميع الـ 538 صلاحية بنجاح!", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "تم تفعيل جميع الـ $totalPerms صلاحية بنجاح!", Toast.LENGTH_SHORT).show()
                     }
                     ActionChipButton("🚫 تعطيل الكل", isPrimary = false) {
                         permsViewModel.disableAllPermissions()
@@ -186,7 +198,7 @@ fun AdminPermissionsActionsSection(
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     val levels = listOf(
-                        null to "الكل (538)",
+                        null to "الكل ($totalPerms)",
                         "BASIC" to "أساسي 🟢",
                         "MEDIUM" to "متوسط 🔵",
                         "ADVANCED" to "متقدم 🟡",
@@ -216,7 +228,7 @@ fun AdminPermissionsActionsSection(
                 }
 
                 // Category Quick Filter Scrollable Row
-                Text("تصفية سريعة حسب المجال (38 مجالاً):", fontSize = 10.sp, color = themeColors.textSecondary)
+                Text("تصفية سريعة حسب المجال ($totalCategories مجالاً):", fontSize = 10.sp, color = themeColors.textSecondary)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -227,7 +239,7 @@ fun AdminPermissionsActionsSection(
                     FilterChip(
                         selected = isAllCatSel,
                         onClick = { permsViewModel.setCategoryFilter(null) },
-                        label = { Text("🌟 الكل (38)", fontSize = 9.sp) },
+                        label = { Text("🌟 الكل ($totalCategories)", fontSize = 9.sp) },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = themeColors.accent,
                             selectedLabelColor = Color.Black,
@@ -235,12 +247,13 @@ fun AdminPermissionsActionsSection(
                             labelColor = Color.White
                         )
                     )
-                    PermissionCategory.values().forEach { cat ->
+                    PermissionCategory.entries.forEach { cat ->
                         val isCatSel = selectedCategoryFilter == cat.name
+                        val actualCatCount = AdminPermissionsRegistry.getByCategory(cat).size
                         FilterChip(
                             selected = isCatSel,
                             onClick = { permsViewModel.setCategoryFilter(if (isCatSel) null else cat.name) },
-                            label = { Text("${cat.iconEmoji} ${cat.arabicTitle} (${cat.expectedCount})", fontSize = 9.sp) },
+                            label = { Text("${cat.iconEmoji} ${cat.arabicTitle} ($actualCatCount)", fontSize = 9.sp) },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = themeColors.accent,
                                 selectedLabelColor = Color.Black,
@@ -264,6 +277,7 @@ fun AdminPermissionsSaveBar(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val totalPerms = AdminPermissionsRegistry.allPermissions.size
     Card(
         colors = CardDefaults.cardColors(containerColor = themeColors.surface),
         shape = RoundedCornerShape(12.dp),
@@ -284,7 +298,7 @@ fun AdminPermissionsSaveBar(
                         color = themeColors.textPrimary
                     )
                     Text(
-                        text = "الدور المحدد: $selectedRole | الصلاحيات الممنوحة: ${activePermissions.size} / 538",
+                        text = "الدور المحدد: $selectedRole | الصلاحيات الممنوحة: ${activePermissions.size} / $totalPerms",
                         fontSize = 10.sp,
                         color = themeColors.accent
                     )
@@ -293,7 +307,7 @@ fun AdminPermissionsSaveBar(
             Button(
                 onClick = {
                     viewModel.settingsViewModel.saveCustomPermissionsMatrixToFirestore(activePermissions.toList(), selectedRole)
-                    viewModel.triggerNotification("✅ تم حفظ ومزامنة مصفوفة الـ 538 صلاحية للدور $selectedRole بنجاح!")
+                    viewModel.triggerNotification("✅ تم حفظ ومزامنة مصفوفة الصلاحيات للدور $selectedRole بنجاح!")
                     Toast.makeText(
                         context,
                         "🚀 تم حفظ وتطبيق ${activePermissions.size} صلاحية للدور $selectedRole بنجاح!",

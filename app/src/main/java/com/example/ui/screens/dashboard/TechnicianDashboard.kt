@@ -22,6 +22,7 @@ import com.example.ui.screens.dashboard.components.UnifiedLoadingIndicator
 import com.example.ui.screens.dashboard.viewmodels.TechnicianDashboardViewModel
 import com.example.utils.BookingStatus
 import com.example.utils.VisualThemePalette
+import androidx.hilt.navigation.compose.hiltViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -30,12 +31,12 @@ fun TechnicianDashboard(
     viewModel: MainViewModel,
     themeColors: VisualThemePalette,
     onBackClick: () -> Unit,
-    initialTab: Int = 0
+    initialTab: Int = 0,
+    techViewModel: TechnicianDashboardViewModel = hiltViewModel()
 ) {
     BackHandler { onBackClick() }
 
     val context = LocalContext.current
-    val appContext = context.applicationContext
     var activeTab by remember(initialTab) { mutableIntStateOf(initialTab.coerceIn(0, 5)) }
 
     val providers by viewModel.providers.collectAsState()
@@ -45,18 +46,8 @@ fun TechnicianDashboard(
             ?: account
     }
 
-    val techViewModel = remember(liveAccount.id, appContext) {
-        TechnicianDashboardViewModel(
-            ownerId = liveAccount.id,
-            dashboardRepository = DashboardRepositoryImpl(appContext),
-            productsRepository = ProductsRepositoryImpl(appContext),
-            ratingsRepository = RatingsRepositoryImpl(appContext),
-            galleryRepository = GalleryRepositoryImpl(appContext)
-        )
-    }
-
-    DisposableEffect(techViewModel) {
-        onDispose { techViewModel.dispose() }
+    LaunchedEffect(liveAccount.id) {
+        techViewModel.initialize(liveAccount.id)
     }
 
     val uiState by techViewModel.uiState.collectAsState()

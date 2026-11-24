@@ -200,10 +200,11 @@ fun ChatInputBar(
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicture()
     ) { success ->
-        if (success && pendingCameraUri != null) {
-            val validation = ChatValidationUtils.validateFile(pendingCameraUri!!, context, true)
+        val cameraUri = pendingCameraUri
+        if (success && cameraUri != null) {
+            val validation = ChatValidationUtils.validateFile(cameraUri, context, true)
             if (validation.isValid) {
-                previewImageUri = pendingCameraUri
+                previewImageUri = cameraUri
                 imageCaption = ""
             } else {
                 Toast.makeText(context, validation.message, Toast.LENGTH_LONG).show()

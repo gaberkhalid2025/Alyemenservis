@@ -95,6 +95,7 @@ internal fun BoxScope.MapScreenViewport(
     rainUrl: String?,
     savedAddresses: List<LandmarkAddress>,
     sosPending: Boolean = false,
+    roadReports: List<RoadReportEntity> = emptyList(),
     onSelectOsmPoi: (RealValhallaNavigator.SearchAddressResult) -> Unit = {},
     onOpenLandmarkAddress: () -> Unit,
     onOpenSavedAddresses: () -> Unit
@@ -400,14 +401,18 @@ internal fun BoxScope.MapScreenViewport(
             onMapPicked = onMapPicked,
             onMapLongPressed = onMapPicked,
             onMapCenterChanged = onCenterChanged,
-            waypointMarkers = remember(groupMembers) {
-                groupMembers.mapNotNull { m ->
+            waypointMarkers = remember(groupMembers, roadReports) {
+                val memberMarkers = groupMembers.mapNotNull { m ->
                     val lat = m.lastLat
                     val lng = m.lastLng
                     if (!m.expired && lat != null && lng != null && LandmarkAddress.isValid(lat, lng)) {
                         Triple("👥 ${m.label}", lat, lng)
                     } else null
                 }
+                val reportMarkers = roadReports.map { r ->
+                    Triple(r.title.ifBlank { "🚧 بلاغ طريق" }, r.latitude, r.longitude)
+                }
+                memberMarkers + reportMarkers
             },
             zones = remember(
                 showZones,
@@ -418,7 +423,8 @@ internal fun BoxScope.MapScreenViewport(
                 coverageRefreshTick,
                 filteredProviders,
                 filteredStores,
-                bookings
+                bookings,
+                roadReports
             ) {
                 val combined = mutableListOf<MapZone>()
                 if (showZones || state.reliabilityEnabled) {
@@ -443,6 +449,9 @@ internal fun BoxScope.MapScreenViewport(
                 }
                 if (state.hazardEnabled) {
                     combined.addAll(HazardAlerts.roadDifficultyZones(filteredProviders))
+                }
+                if (roadReports.isNotEmpty()) {
+                    combined.addAll(roadReports.map { it.toMapZone() })
                 }
                 combined
             },

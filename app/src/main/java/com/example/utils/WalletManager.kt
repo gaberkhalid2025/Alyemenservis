@@ -8,6 +8,7 @@ import com.example.data.models.TransactionStatus
 import com.example.data.models.TransactionType
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
+import com.google.firebase.firestore.SetOptions
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.Types
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
@@ -63,16 +64,22 @@ class WalletManager(private val context: Context? = null) {
         // Clear out any legacy fake wallet_user_default cache if present
         sharedPrefs?.edit()?.remove("wallet_user_default")?.apply()
 
-        // Try load cached transactions
-        sharedPrefs?.getString("cached_txs_json", null)?.let { json ->
+        // Try load cached transactions (supports AES-GCM encrypted & legacy plain JSON)
+        sharedPrefs?.getString("cached_txs_json", null)?.let { raw ->
             try {
+                val json = if (raw.startsWith("gcm:") || raw.startsWith("gcmx:")) {
+                    SecurityCryptoUtils.decrypt(raw)
+                } else {
+                    raw
+                }
+                if (json.isBlank()) return@let
                 val type = Types.newParameterizedType(List::class.java, Transaction::class.java)
                 val adapter = moshi.adapter<List<Transaction>>(type)
                 val list = adapter.fromJson(json) ?: emptyList()
                 // Filter out any legacy dummy transactions
                 val cleanList = list.filterNot { it.id == "tx_101" || it.id == "tx_102" || it.userId == "user_default" }
                 _transactionsFlow.value = cleanList
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 // Ignore parse errors
             }
         }
@@ -83,8 +90,9 @@ class WalletManager(private val context: Context? = null) {
             val type = Types.newParameterizedType(List::class.java, Transaction::class.java)
             val adapter = moshi.adapter<List<Transaction>>(type)
             val json = adapter.toJson(list)
-            sharedPrefs?.edit()?.putString("cached_txs_json", json)?.apply()
-        } catch (ignored: Exception) {}
+            val encrypted = SecurityCryptoUtils.encrypt(json)
+            sharedPrefs?.edit()?.putString("cached_txs_json", encrypted)?.apply()
+        } catch (_: Exception) {}
     }
 
     /**
@@ -567,10 +575,20 @@ class WalletManager(private val context: Context? = null) {
 
     fun freezeWallet(walletId: String, reason: String = ""): Result<Boolean> {
         return try {
+            val now = System.currentTimeMillis()
             val wallet = getOrCreateWallet(walletId)
-            val updated = wallet.copy(status = "FROZEN", updatedAt = System.currentTimeMillis())
+            val updated = wallet.copy(status = "FROZEN", updatedAt = now)
             localWallets[wallet.id] = updated
             localWallets[wallet.userId] = updated
+            val payload = mutableMapOf<String, Any>(
+                "id" to wallet.id,
+                "status" to "FROZEN",
+                "updatedAt" to now
+            )
+            if (reason.isNotBlank()) payload["freezeReason"] = reason.trim()
+            try {
+                firestore.collection("wallets").document(wallet.id).set(payload, SetOptions.merge())
+            } catch (_: Exception) {}
             Result.success(true)
         } catch (e: Exception) {
             Result.failure(e)
@@ -579,10 +597,19 @@ class WalletManager(private val context: Context? = null) {
 
     fun unfreezeWallet(walletId: String): Result<Boolean> {
         return try {
+            val now = System.currentTimeMillis()
             val wallet = getOrCreateWallet(walletId)
-            val updated = wallet.copy(status = "ACTIVE", updatedAt = System.currentTimeMillis())
+            val updated = wallet.copy(status = "ACTIVE", updatedAt = now)
             localWallets[wallet.id] = updated
             localWallets[wallet.userId] = updated
+            val payload = mapOf(
+                "id" to wallet.id,
+                "status" to "ACTIVE",
+                "updatedAt" to now
+            )
+            try {
+                firestore.collection("wallets").document(wallet.id).set(payload, SetOptions.merge())
+            } catch (_: Exception) {}
             Result.success(true)
         } catch (e: Exception) {
             Result.failure(e)

@@ -7,6 +7,7 @@ import com.example.data.StoreEntity
 import com.example.data.PropertyEntity
 import com.example.ui.MainViewModel
 import com.example.ui.screens.entities.*
+import com.example.utils.ChatTypeResolver
 import com.example.utils.VisualThemePalette
 
 @Composable
@@ -35,7 +36,11 @@ fun EntityTabContent(
                             targetUserName = store.name,
                             targetUserPhoto = store.logoImage.ifBlank { store.coverImage },
                             relatedEntityId = store.id,
-                            relatedEntityType = "STORE"
+                            relatedEntityType = ChatTypeResolver.forStore(
+                                sectionId = store.sectionId,
+                                categoryId = store.categoryId,
+                                name = store.name
+                            )
                         )
                     }
                 },

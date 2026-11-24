@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.sp
 import com.example.data.StoreEntity
 import com.example.ui.*
 import com.example.ui.categories.AppCategoryTaxonomy
+import com.example.utils.ChatTypeResolver
 import com.example.utils.VisualThemePalette
 import java.util.Locale
 
@@ -416,7 +417,11 @@ fun StoreListItemCard(
                                     targetUserName = store.name,
                                     targetUserPhoto = store.logoImage,
                                     relatedEntityId = store.id,
-                                    relatedEntityType = "STORE"
+                                    relatedEntityType = ChatTypeResolver.forStore(
+                                        sectionId = store.sectionId,
+                                        categoryId = store.categoryId,
+                                        name = store.name
+                                    )
                                 )
                             }
                         },

@@ -84,43 +84,45 @@ fun OwnerBackdoorPanelLayout(viewModel: MainViewModel, themeColors: VisualThemeP
             OwnerBackdoorWipeMockDialog(state = state, viewModel = viewModel)
         }
 
-        Button(
-            onClick = { state.showRegistrationTestScreen = true },
-            colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
-            modifier = Modifier
-                .fillMaxWidth()
-                .testTag("owner_registration_test_btn")
-        ) {
-            Icon(
-                imageVector = Icons.Default.PlayArrow,
-                contentDescription = "تشغيل اختبار التسجيل",
-                tint = Color.Black,
-                modifier = Modifier.size(18.dp)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("🧪 تشغيل اختبار التسجيل الشامل للأقسام 8", color = Color.Black, fontWeight = FontWeight.Bold)
+        if (com.example.BuildConfig.DEBUG) {
+            Button(
+                onClick = { state.showRegistrationTestScreen = true },
+                colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("owner_registration_test_btn")
+            ) {
+                Icon(
+                    imageVector = Icons.Default.PlayArrow,
+                    contentDescription = "تشغيل اختبار التسجيل",
+                    tint = Color.Black,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("🧪 تشغيل اختبار التسجيل الشامل للأقسام 8", color = Color.Black, fontWeight = FontWeight.Bold)
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Button(
+                onClick = { state.showAssistantTestScreen = true },
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF06B6D4)),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("owner_assistant_test_btn")
+            ) {
+                Icon(
+                    imageVector = Icons.Default.PlayArrow,
+                    contentDescription = "اختبار المساعد الذكي",
+                    tint = Color.Black,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("🤖 اختبار المساعد الذكي", color = Color.Black, fontWeight = FontWeight.Bold)
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
         }
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        Button(
-            onClick = { state.showAssistantTestScreen = true },
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF06B6D4)),
-            modifier = Modifier
-                .fillMaxWidth()
-                .testTag("owner_assistant_test_btn")
-        ) {
-            Icon(
-                imageVector = Icons.Default.PlayArrow,
-                contentDescription = "اختبار المساعد الذكي",
-                tint = Color.Black,
-                modifier = Modifier.size(18.dp)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("🤖 اختبار المساعد الذكي", color = Color.Black, fontWeight = FontWeight.Bold)
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
 
         Button(
             onClick = { state.showWipeConfirmDialog = true },

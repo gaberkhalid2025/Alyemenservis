@@ -10,6 +10,7 @@ object ChatTypeResolver {
         return when {
             listOf("medical", "pharm", "clinic", "طبي", "صيدلية", "مستشفى").any { it in t } -> "MEDICAL"
             listOf("restaurant", "cafe", "مطعم", "كافيه", "بوفيه").any { it in t } -> "RESTAURANT"
+            listOf("mall", "مول", "مركز تجاري").any { it in t } -> "MALL"
             else -> "STORE"
         }
     }

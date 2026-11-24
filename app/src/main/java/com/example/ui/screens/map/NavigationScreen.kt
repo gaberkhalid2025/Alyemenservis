@@ -380,8 +380,9 @@ fun NavigationScreen(
     val totalMeters = tracker?.totalMeters ?: result?.totalDistanceMeters ?: 0.0
     val remainingMeters = trackerState?.remainingMeters ?: totalMeters
     val progress = trackerState?.progress ?: 0f
-    val baseSeconds = if (totalMeters > 1.0) (result?.totalDurationSeconds ?: 0.0) * (remainingMeters / totalMeters) else 0.0
-    val expectedKmh = if ((result?.totalDurationSeconds ?: 0.0) > 0) totalMeters / result!!.totalDurationSeconds * 3.6 else 0.0
+    val totalDurationSec = result?.totalDurationSeconds ?: 0.0
+    val baseSeconds = if (totalMeters > 1.0) totalDurationSec * (remainingMeters / totalMeters) else 0.0
+    val expectedKmh = if (totalDurationSec > 0) totalMeters / totalDurationSec * 3.6 else 0.0
     val speedFactor = if (!isApproximate && currentSpeedKmh >= 15 && expectedKmh > 0) (expectedKmh / currentSpeedKmh).coerceIn(0.7, 1.5) else 1.0
     val remainingSeconds = (baseSeconds * speedFactor) / vehicleProfile.speedFactor
     val currentStepIndex = run {

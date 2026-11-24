@@ -11,6 +11,7 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.Person
+import androidx.core.app.RemoteInput
 import com.example.MainActivity
 import com.example.ui.AppScreens
 import kotlinx.coroutines.CoroutineScope
@@ -131,6 +132,37 @@ object ChatNotificationHelper {
             .setConversationTitle(senderName)
             .addMessage(messageText, timestamp, sender)
 
+        val replyAction = if (channelId.isNotBlank()) {
+            val remoteInput = RemoteInput.Builder(KEY_TEXT_REPLY)
+                .setLabel("اكتب ردك هنا...")
+                .build()
+            val replyIntent = Intent(context, DirectReplyReceiver::class.java).apply {
+                action = DirectReplyReceiver.ACTION_DIRECT_REPLY
+                putExtra(EXTRA_CHANNEL_ID, channelId)
+                putExtra(EXTRA_SENDER_ID, senderId)
+                putExtra(EXTRA_SENDER_NAME, senderName)
+                putExtra(DirectReplyReceiver.EXTRA_NOTIFICATION_ID, notificationId)
+            }
+            val replyFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
+            } else {
+                PendingIntent.FLAG_UPDATE_CURRENT
+            }
+            val replyPendingIntent = PendingIntent.getBroadcast(
+                context,
+                notificationId + 1000,
+                replyIntent,
+                replyFlags
+            )
+            NotificationCompat.Action.Builder(
+                android.R.drawable.ic_menu_send,
+                "رد سريع",
+                replyPendingIntent
+            ).addRemoteInput(remoteInput)
+                .setAllowGeneratedReplies(true)
+                .build()
+        } else null
+
         val builder = NotificationCompat.Builder(context, targetChannel)
             .setSmallIcon(android.R.drawable.stat_notify_chat)
             .setContentTitle(senderName)
@@ -140,6 +172,9 @@ object ChatNotificationHelper {
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+            .apply {
+                if (replyAction != null) addAction(replyAction)
+            }
 
         val appContext = context.applicationContext
         if (mediaType.equals("IMAGE", ignoreCase = true) && !mediaUrl.isNullOrBlank()) {

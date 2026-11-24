@@ -23,7 +23,7 @@ class DataManagementRepositoryImpl(
         if (cleanCollection.isBlank()) return 0
         return try {
             val targetCol = if (cleanCollection == "restaurants" || cleanCollection == "medical") "stores" else cleanCollection
-            val snapshot = db.collection(targetCol).get().await()
+            val snapshot = db.collection(targetCol).limit(500).get().await()
             filterDocuments(snapshot, cleanCollection, sectionFilter).size
         } catch (e: Exception) {
             0
@@ -42,7 +42,7 @@ class DataManagementRepositoryImpl(
         }
         return try {
             val targetCol = if (cleanCollection == "restaurants" || cleanCollection == "medical") "stores" else cleanCollection
-            val snapshot = db.collection(targetCol).get().await()
+            val snapshot = db.collection(targetCol).limit(500).get().await()
             val docsToDelete = filterDocuments(snapshot, cleanCollection, sectionFilter)
             val total = docsToDelete.size
             var deletedCount = 0

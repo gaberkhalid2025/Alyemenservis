@@ -42,6 +42,7 @@ import com.example.ui.screens.register.RegisterScreen
 import com.example.ui.screens.status.StatusScreen
 import com.example.ui.screens.urgent.UrgentOffersList
 import com.example.ui.screens.urgent.UrgentRequestDetailsScreen
+import com.example.utils.ChatTypeResolver
 import com.example.utils.VisualThemePalette
 
 @Composable
@@ -133,13 +134,11 @@ fun AppNavigator(
                             } else {
                                 val foundStore = viewModel.stores.value.find { it.id == targetId }
                                 if (foundStore != null) {
-                                    val isMedical = foundStore.sectionId.contains("medical") || foundStore.categoryId.contains("medical") || foundStore.name.contains("طبي") || foundStore.name.contains("صيدلية")
-                                    val isRestaurant = !isMedical && (foundStore.sectionId.contains("restaurant") || foundStore.categoryId.contains("restaurant") || foundStore.name.contains("مطعم") || foundStore.name.contains("كافيه"))
-                                    val entityType = when {
-                                        isMedical -> "MEDICAL"
-                                        isRestaurant -> "RESTAURANT"
-                                        else -> "STORE"
-                                    }
+                                    val entityType = ChatTypeResolver.forStore(
+                                        sectionId = foundStore.sectionId,
+                                        categoryId = foundStore.categoryId,
+                                        name = foundStore.name
+                                    )
                                     viewModel.openDirectChat(
                                         targetUserId = foundStore.id,
                                         targetUserName = foundStore.name,
@@ -288,7 +287,11 @@ fun AppNavigator(
                             targetUserName = store.name,
                             targetUserPhoto = store.logoImage.ifBlank { store.coverImage },
                             relatedEntityId = store.id,
-                            relatedEntityType = "STORE"
+                            relatedEntityType = ChatTypeResolver.forStore(
+                                sectionId = store.sectionId,
+                                categoryId = store.categoryId,
+                                name = store.name
+                            )
                         )
                     },
                     onRequestServiceClick = { store ->

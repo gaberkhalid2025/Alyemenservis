@@ -424,12 +424,13 @@ fun QuickServiceRequestScreen(
 
                                     isSubmitting = true
                                     scope.launch {
-                                        val uploadedImages = if (attachedImageUri != null) {
+                                        val imgUri = attachedImageUri
+                                        val uploadedImages = if (imgUri != null) {
                                             val path = "urgent_requests/req_${System.currentTimeMillis()}_${UUID.randomUUID().toString().take(6)}.webp"
                                             val uploadRes = runCatching {
                                                 FirebaseStorageUploader.uploadImageUri(
                                                     context = context,
-                                                    uri = attachedImageUri!!,
+                                                    uri = imgUri,
                                                     storagePath = path,
                                                     maxDimension = 900,
                                                     maxSizeBytes = 350 * 1024L

@@ -60,6 +60,10 @@
             </intent-filter>
         </service>
 
+        <receiver
+            android:name=".utils.DirectReplyReceiver"
+            android:exported="false" />
+
         <!-- [FIX-CRITICAL] FileProvider لمشاركة الملفات -->
         <provider
             android:name="androidx.core.content.FileProvider"

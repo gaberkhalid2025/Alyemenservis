@@ -508,11 +508,11 @@ fun StoreCustomerCatalogView(
                                             targetUserName = store.name,
                                             targetUserPhoto = store.logoImage,
                                             relatedEntityId = store.id,
-                                            relatedEntityType = when {
-                                                isMedical -> "MEDICAL"
-                                                isRestaurant -> "RESTAURANT"
-                                                else -> "STORE"
-                                            }
+                                            relatedEntityType = com.example.utils.ChatTypeResolver.forStore(
+                                                store.sectionId,
+                                                store.categoryId,
+                                                store.name
+                                            )
                                         )
                                     }
                                 },
@@ -609,6 +609,12 @@ fun StoreCustomerCatalogView(
                             themeColors = themeColors
                         )
                     }
+                }
+            }
+
+            if (isMall) {
+                item {
+                    MallCatalogDirectorySection(store = store, themeColors = themeColors)
                 }
             }
 

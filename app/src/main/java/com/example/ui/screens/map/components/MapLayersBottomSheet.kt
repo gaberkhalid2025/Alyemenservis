@@ -555,16 +555,18 @@ fun SecondaryLayersBottomSheet(
                 accentColor = Color(0xFFF59E0B),
                 testTag = "layer_quakes_switch"
             )
-            SheetSwitchCard(
-                icon = Icons.Default.Cloud,
-                title = "رادار الأمطار (RainViewer)",
-                subtitle = if (NavConfig.ENABLE_RAINVIEWER) "تغطية السحب والأمطار الأخيرة" else "معطّلة افتراضياً (بدون مفاتيح مدفوعة)",
-                checked = rainEnabled,
-                enabled = NavConfig.ENABLE_RAINVIEWER,
-                onCheckedChange = { onToggleRain(it); onDismiss() },
-                accentColor = Color(0xFF38BDF8),
-                testTag = "layer_rain_switch"
-            )
+            if (NavConfig.ENABLE_RAINVIEWER) {
+                SheetSwitchCard(
+                    icon = Icons.Default.Cloud,
+                    title = "رادار الأمطار (RainViewer)",
+                    subtitle = "تغطية السحب والأمطار الأخيرة",
+                    checked = rainEnabled,
+                    enabled = true,
+                    onCheckedChange = { onToggleRain(it); onDismiss() },
+                    accentColor = Color(0xFF38BDF8),
+                    testTag = "layer_rain_switch"
+                )
+            }
             SheetSwitchCard(
                 icon = Icons.Default.PieChart,
                 title = "مناطق توفر وموثوقية الخدمات",
@@ -1029,12 +1031,12 @@ fun UnifiedLayersSheet(
                                         testTag = "unified_live_traffic_switch"
                                     )
                                 }
-                                "RAIN_RADAR" -> {
+                                "RAIN_RADAR" -> if (NavConfig.ENABLE_RAINVIEWER) {
                                     LayerRow(
                                         title = labelOf("RAIN_RADAR", "رادار الأمطار (RainViewer)"),
-                                        subtitle = if (NavConfig.ENABLE_RAINVIEWER) "تغطية السحب والأمطار الأخيرة" else "معطّلة افتراضياً",
+                                        subtitle = "تغطية السحب والأمطار الأخيرة",
                                         checked = rainEnabled,
-                                        enabled = NavConfig.ENABLE_RAINVIEWER,
+                                        enabled = true,
                                         onChange = { onToggleRain(it); onDismiss() },
                                         testTag = "unified_rain_switch"
                                     )

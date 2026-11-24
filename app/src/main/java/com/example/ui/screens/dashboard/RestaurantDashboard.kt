@@ -27,6 +27,7 @@ import com.example.ui.screens.dashboard.components.UnifiedLoadingIndicator
 import com.example.ui.screens.dashboard.viewmodels.RestaurantDashboardViewModel
 import com.example.utils.BookingStatus
 import com.example.utils.VisualThemePalette
+import androidx.hilt.navigation.compose.hiltViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -35,12 +36,12 @@ fun RestaurantDashboard(
     viewModel: MainViewModel,
     themeColors: VisualThemePalette,
     onBackClick: () -> Unit,
-    initialTab: Int = 0
+    initialTab: Int = 0,
+    restaurantViewModel: RestaurantDashboardViewModel = hiltViewModel()
 ) {
     BackHandler { onBackClick() }
 
     val context = LocalContext.current
-    val appContext = context.applicationContext
     var activeTab by remember(initialTab) { mutableIntStateOf(initialTab.coerceIn(0, 5)) }
     var activeMgmtSection by remember { mutableIntStateOf(0) }
 
@@ -51,17 +52,8 @@ fun RestaurantDashboard(
             ?: account
     }
 
-    val restaurantViewModel = remember(liveAccount.id, appContext) {
-        RestaurantDashboardViewModel(
-            ownerId = liveAccount.id,
-            dashboardRepository = DashboardRepositoryImpl(appContext),
-            productsRepository = ProductsRepositoryImpl(appContext),
-            ratingsRepository = RatingsRepositoryImpl(appContext)
-        )
-    }
-
-    DisposableEffect(restaurantViewModel) {
-        onDispose { restaurantViewModel.dispose() }
+    LaunchedEffect(liveAccount.id) {
+        restaurantViewModel.initialize(liveAccount.id)
     }
 
     val uiState by restaurantViewModel.uiState.collectAsState()

@@ -20,7 +20,7 @@ enum class PermissionCategory(
     OWNER_CONTROL("OWNER_CONTROL", "التحكم الكامل والمالك (OWNER_CONTROL)", "⚙️", 45),
     REG_REQ("REG_REQ", "طلبات الانضمام والاعتماد", "⌛", 18),
     MANUAL_ADD("MANUAL_ADD", "الإضافة اليدوية", "➕", 15),
-    STORES("STORES", "المحلات والمراكز التجارية", "🏪", 18),
+    STORES("STORES", "المحلات والمراكز التجارية", "🏪", 20),
     RESTAURANTS("RESTAURANTS", "المطاعم والكافيهات", "🍔", 18),
     MEDICAL("MEDICAL", "المراكز الطبية والعيادات", "🏥", 18),
     PROPERTIES("PROPERTIES", "العقارات والأراضي", "🏠", 18),
@@ -54,7 +54,19 @@ enum class PermissionCategory(
     NEW_SECTION_CREATOR("NEW_SECTION_CREATOR", "إنشاء الأقسام الجديدة", "➕", 10),
     REG_FORMS_MANAGER("REG_FORMS_MANAGER", "تخصيص استمارات التسجيل", "📋", 4),
     ROLES_PERMISSIONS("ROLES_PERMISSIONS", "الصلاحيات والأدوار", "🛡️", 6),
-    MAP_CONTROLS("MAP_CONTROLS", "التحكم بشاشة الخرائط", "🗺️", 28)
+    MAP_CONTROLS("MAP_CONTROLS", "التحكم بشاشة الخرائط", "🗺️", 28),
+    AI_ASSISTANT_PANEL("AI_ASSISTANT_PANEL", "المساعد الذكي وقاموس الصيانة", "🤖", 5),
+    ADMIN_PAYMENT_PANEL("ADMIN_PAYMENT_PANEL", "بوابات الدفع والاشتراكات", "💳", 6),
+    VOICE_CALLS_PANEL("VOICE_CALLS_PANEL", "إدارة المكالمات الصوتية", "🎙️", 4),
+    QUICK_SERVICE("QUICK_SERVICE", "الخدمات الفورية والفنيين", "⚡", 6),
+    FINANCIAL_REPORTS("FINANCIAL_REPORTS", "تقارير الأرباح والإيرادات", "📈", 5),
+    STORAGE_QUOTA("STORAGE_QUOTA", "سعة التخزين والكاش", "🗄️", 4),
+    SECURITY_AUDIT("SECURITY_AUDIT", "سجل التدقيق والأمان", "🛡️", 5),
+    SYSTEM_SETTINGS("SYSTEM_SETTINGS", "إعدادات النظام المتقدمة", "⚙️", 6),
+    AUTO_DISPATCH("AUTO_DISPATCH", "التوجيه التلقائي للطلبات", "🧭", 5),
+    API_MANAGEMENT("API_MANAGEMENT", "مفاتيح والربط البرمجي API", "🔌", 5),
+    MAINTENANCE_MODE("MAINTENANCE_MODE", "وضع الصيانة والطوارئ", "🚧", 4),
+    DATA_MANAGEMENT("DATA_MANAGEMENT", "الإدارة الشاملة للمنشآت", "🏢", 5)
 }
 
 @Keep
@@ -216,7 +228,9 @@ object AdminPermissionsRegistry {
                 "STORE_ENABLE_CHAT" to ("تفعيل الدردشة عن محل" to "تفعيل خاصية الدردشة والمراسلة لمحل معين"),
                 "STORE_DISABLE_NOTIF" to ("تعطيل الإشعارات عن محل" to "إيقاف الإشعارات التنبيهية عن محل معين"),
                 "STORE_ENABLE_NOTIF" to ("تفعيل الإشعارات عن محل" to "تفعيل الإشعارات التنبيهية لمحل معين"),
-                "STORE_PRODUCTS_MANAGE" to ("إدارة منتجات المحل" to "إضافة وتعديل وحذف المنتجات والسلع التابعة للمحل")
+                "STORE_PRODUCTS_MANAGE" to ("إدارة منتجات المحل" to "إضافة وتعديل وحذف المنتجات والسلع التابعة للمحل"),
+                "STORE_MALL_MANAGE" to ("إدارة المراكز التجارية والمولات" to "إضافة وتعديل واعتماد المراكز التجارية والمولات"),
+                "STORE_MALL_TENANTS" to ("إدارة طوابق ومحلات المول" to "إدارة المحلات المستأجرة وأقسام وطوابق المركز التجاري")
             )
         )
 
@@ -900,7 +914,7 @@ object AdminPermissionsRegistry {
                 "ROLE_CHANGE_USER_ROLE" to ("تغيير دور مستخدم" to "ترقية أو تعديل مسمى ودور أي مستخدم"),
                 "ROLE_VIEW_ROLE_PERMS" to ("عرض صلاحيات دور معين" to "مشاهدة حزمة الصلاحيات الممنوحة لدور معين"),
                 "ROLE_ADD_CUSTOM_ROLE" to ("إضافة دور مخصص جديد" to "إنشاء دور إداري جديد بحزمة صلاحيات مخصصة"),
-                "ROLE_SAVE_MATRIX_SYNC" to ("حفظ ومزامنة مصفوفة الصلاحيات" to "حفظ وتطبيق مصفوفة الـ 538 صلاحية في Firestore")
+                "ROLE_SAVE_MATRIX_SYNC" to ("حفظ ومزامنة مصفوفة الصلاحيات" to "حفظ وتطبيق مصفوفة الصلاحيات الشاملة في Firestore")
             )
         )
 
@@ -937,6 +951,162 @@ object AdminPermissionsRegistry {
                 "MAP_REMOVE_STORES_ALL" to ("إزالة جميع المحلات من الخريطة" to "إخفاء جميع المحلات التجارية من الخريطة"),
                 "MAP_REMOVE_REST_ALL" to ("إزالة جميع المطاعم من الخريطة" to "إخفاء جميع المطاعم والكافيهات من الخريطة"),
                 "MAP_REMOVE_MED_ALL" to ("إزالة جميع المراكز الطبية من الخريطة" to "إخفاء جميع المراكز الطبية من الخريطة")
+            )
+        )
+
+        // 39. المساعد الذكي وقاموس الصيانة (AI_ASSISTANT_PANEL) - 5 صلاحيات
+        addGroup(
+            PermissionCategory.AI_ASSISTANT_PANEL,
+            PermissionLevel.MEDIUM,
+            listOf(
+                "AI_PANEL_VIEW" to ("عرض لوحة المساعد الذكي" to "الاطلاع على إعدادات وإحصائيات المساعد الذكي"),
+                "AI_GUIDES_MANAGE" to ("إدارة أدلة الأعطال والصيانة" to "إضافة وتعديل أدلة الصيانة واللهجات اليمنية"),
+                "AI_FAQ_MANAGE" to ("إدارة الأسئلة الشائعة" to "تحديث ردود المساعد الفورية للأسئلة الشائعة"),
+                "AI_TTS_TOGGLE" to ("التحكم بالنطق الصوتي للمساعد" to "تفعيل أو تعطيل ميزة قراءة ردود المساعد صوتياً"),
+                "AI_SYNC_CLOUD" to ("مزامنة أدلة المساعد سحابياً" to "مزامنة قاموس الصيانة مع Firestore ضمن الحدود الآمنة")
+            )
+        )
+
+        // 40. بوابات الدفع والاشتراكات (ADMIN_PAYMENT_PANEL) - 6 صلاحيات
+        addGroup(
+            PermissionCategory.ADMIN_PAYMENT_PANEL,
+            PermissionLevel.SENSITIVE,
+            listOf(
+                "ADMPAY_VIEW" to ("عرض إعدادات البوابات المالية" to "مشاهدة حالة بوابات الدفع واشتراكات المنشآت"),
+                "ADMPAY_GATEWAYS_CONFIG" to ("ضبط إعدادات بوابات الدفع" to "تهيئة وتفعيل بوابات الدفع المعتمدة"),
+                "ADMPAY_WALLET_FREEZE" to ("تجميد وفك تجميد المحافظ" to "التحكم في حالة المحافظ الإلكترونية سحابياً"),
+                "ADMPAY_TOPUPS_APPROVE" to ("اعتماد ورفض طلبات الشحن" to "مراجعة طلبات شحن الرصيد وتنفيذ الاعتماد"),
+                "ADMPAY_SUBSCRIPTIONS" to ("إدارة باقات الاشتراكات" to "التحكم في رسوم الاشتراكات والباقات الشهرية"),
+                "ADMPAY_COMMISSION" to ("تعديل نسبة عمولة المنصة" to "ضبط نسبة العمولة المطبقة على العمليات")
+            )
+        )
+
+        // 41. إدارة المكالمات الصوتية (VOICE_CALLS_PANEL) - 4 صلاحيات
+        addGroup(
+            PermissionCategory.VOICE_CALLS_PANEL,
+            PermissionLevel.ADVANCED,
+            listOf(
+                "VOICE_PANEL_VIEW" to ("عرض إعدادات المكالمات الصوتية" to "مشاهدة حالة خدمة المكالمات وسجلات التشغيل"),
+                "VOICE_TOGGLE_SERVICE" to ("تفعيل/تعطيل المكالمات الصوتية" to "تشغيل أو إيقاف المكالمات الصوتية داخل التطبيق"),
+                "VOICE_DURATION_LIMIT" to ("ضبط الحد الأقصى للمكالمة" to "تحديد المدة القصوى المسموحة للمكالمات الصوتية"),
+                "VOICE_ENGINE_SETTINGS" to ("إعدادات جودة وبروتوكول الصوت" to "ضبط معايير الاتصال الصوتي")
+            )
+        )
+
+        // 42. الخدمات الفورية والفنيين (QUICK_SERVICE) - 6 صلاحيات
+        addGroup(
+            PermissionCategory.QUICK_SERVICE,
+            PermissionLevel.ADVANCED,
+            listOf(
+                "QS_VIEW_REQUESTS" to ("عرض الطلبات الفورية" to "مشاهدة كافة طلبات الخدمة الفورية والعاجلة"),
+                "QS_ASSIGN_TECH" to ("تعيين وتوجيه الفنيين" to "إسناد الطلب العاجل لفني مناسب يدوياً"),
+                "QS_CANCEL_REQUEST" to ("إلغاء أو إغلاق طلب فوري" to "إغلاق الطلبات المعلقة أو المتعثرة"),
+                "QS_OFFERS_MANAGE" to ("متابعة عروض أسعار الفنيين" to "مراجعة وتدقيق عروض الأسعار المقدمة على الطلبات"),
+                "QS_SETTINGS_EDIT" to ("تعديل إعدادات الطلب السريع" to "تعديل مهل الانتظار ونطاق الإشعار للفنيين"),
+                "QS_SLA_MONITOR" to ("مراقبة سرعة الاستجابة SLA" to "متابعة مؤشرات استجابة الفنيين للطلبات الطارئة")
+            )
+        )
+
+        // 43. تقارير الأرباح والإيرادات (FINANCIAL_REPORTS) - 5 صلاحيات
+        addGroup(
+            PermissionCategory.FINANCIAL_REPORTS,
+            PermissionLevel.SENSITIVE,
+            listOf(
+                "FIN_VIEW_SUMMARY" to ("عرض ملخص الأرباح والإيرادات" to "الاطلاع على إجمالي الإيرادات وعمولة المنصة"),
+                "FIN_VIEW_PAYOUTS" to ("متابعة مستحقات مقدمي الخدمات" to "مراجعة المبالغ المستحقة للتجار والفنيين"),
+                "FIN_FILTER_PERIOD" to ("تصفية التقارير حسب الفترة" to "عرض التقارير المالية اليومية والشهرية والسنوية"),
+                "FIN_EXPORT_CSV" to ("تصدير التقارير المالية CSV" to "تصدير ومشاركة تقارير الأرباح بصيغة CSV"),
+                "FIN_RECONCILE" to ("مطابقة وتسوية الحسابات" to "مراجعة ومطابقة الحجوزات والمدفوعات المكتملة")
+            )
+        )
+
+        // 44. سعة التخزين والكاش (STORAGE_QUOTA) - 4 صلاحيات
+        addGroup(
+            PermissionCategory.STORAGE_QUOTA,
+            PermissionLevel.MEDIUM,
+            listOf(
+                "STOR_QUOTA_VIEW" to ("عرض استهلاك التخزين والكاش" to "متابعة استهلاك الذاكرة المؤقتة وقواعد البيانات"),
+                "STOR_CLEAR_CACHE" to ("تفريغ الذاكرة المؤقتة" to "مسح الملفات المؤقتة لتحرير مساحة الجهاز"),
+                "STOR_MEDIA_POLICY" to ("ضبط حدود ضغط الصور والوسائط" to "تحديد الحجم الأقصى للصور والملفات المرفوعة"),
+                "STOR_SPARK_OPTIMIZE" to ("مراقبة استهلاك قراءة Firestore" to "ضبط حدود الجلب والتخزين المؤقت لحفظ الحصة المجانية")
+            )
+        )
+
+        // 45. سجل التدقيق والأمان (SECURITY_AUDIT) - 5 صلاحيات
+        addGroup(
+            PermissionCategory.SECURITY_AUDIT,
+            PermissionLevel.SENSITIVE,
+            listOf(
+                "AUDIT_VIEW_LOGS" to ("عرض سجل التدقيق الأمني" to "مراجعة كافة عمليات الدخول والتعديل الإدارية"),
+                "AUDIT_FILTER_EVENTS" to ("تصفية الأحداث الأمنية" to "البحث والفرز في سجل الأمان والعمليات الحساسة"),
+                "AUDIT_EXPORT_LOGS" to ("تصدير سجل الأمان" to "تصدير تقارير التدقيق بصيغة ملف نصي أو CSV"),
+                "AUDIT_SYSTEM_HEALTH" to ("فحص سلامة الجلسات والحماية" to "التحقق من حالة التشفير والجلسات الإدارية النشطة"),
+                "AUDIT_CLEAR_OLD" to ("أرشفة السجلات القديمة" to "تنظيف وأرشفة سجلات النظام المنتهية")
+            )
+        )
+
+        // 46. إعدادات النظام المتقدمة (SYSTEM_SETTINGS) - 6 صلاحيات
+        addGroup(
+            PermissionCategory.SYSTEM_SETTINGS,
+            PermissionLevel.SENSITIVE,
+            listOf(
+                "SYS_SET_VIEW" to ("عرض إعدادات النظام المتقدمة" to "مشاهدة التهيئة الأساسية والتكاملية للتطبيق"),
+                "SYS_SET_EDIT" to ("تعديل إعدادات النظام العامة" to "تحديث خيارات التشغيل وسياسات المنصة"),
+                "SYS_SYNC_ATOMIC" to ("المزامنة الذرية للإعدادات" to "حفظ الإعدادات سحابياً مع توثيق رقم الإصدار"),
+                "SYS_MAP_DEFAULTS" to ("ضبط إعدادات الخرائط والملاحة" to "تعديل محرك الخرائط الافتراضي ونطاق البحث"),
+                "SYS_CHAT_POLICY" to ("سياسات الدردشة والحماية" to "التحكم بقيود الوسائط وجدار حماية المحادثات"),
+                "SYS_SUPPORT_CHANNELS" to ("تحديث قنوات التواصل والدعم" to "ضبط أرقام الدعم الفني وروابط التواصل")
+            )
+        )
+
+        // 47. التوجيه التلقائي للطلبات (AUTO_DISPATCH) - 5 صلاحيات
+        addGroup(
+            PermissionCategory.AUTO_DISPATCH,
+            PermissionLevel.ADVANCED,
+            listOf(
+                "DISPATCH_VIEW" to ("عرض إعدادات التوجيه التلقائي" to "مشاهدة قواعد توزيع الطلبات على الفنيين"),
+                "DISPATCH_TOGGLE" to ("تفعيل/تعطيل التوجيه التلقائي" to "تشغيل أو إيقاف التوزيع الذكي للطلبات الفورية"),
+                "DISPATCH_RADIUS" to ("تحديد نطاق البحث الجغرافي" to "تحديد المسافة القصوى بالكيلومتر لتوجيه الطلب"),
+                "DISPATCH_PRIORITY" to ("تحديد أولوية الترشيح" to "ضبط أولوية التوجيه حسب التقييم أو الأقرب مسافة"),
+                "DISPATCH_SAVE_SYNC" to ("حفظ ومزامنة قواعد التوجيه" to "اعتماد قواعد التوجيه التلقائي سحابياً")
+            )
+        )
+
+        // 48. مفاتيح والربط البرمجي API (API_MANAGEMENT) - 5 صلاحيات
+        addGroup(
+            PermissionCategory.API_MANAGEMENT,
+            PermissionLevel.SENSITIVE,
+            listOf(
+                "API_VIEW_STATUS" to ("عرض حالة التكامل والمفاتيح" to "الاطلاع على حالة الخدمات الخارجية والواجهات"),
+                "API_TOGGLE_SERVICES" to ("تفعيل/تعطيل الخدمات التكاملية" to "تشغيل أو إيقاف خدمات الخرائط والطقس والملاحة"),
+                "API_WEBHOOK_CONFIG" to ("تهيئة روابط الربط الآمنة" to "تحديث عناوين الخادم الآمنة بدون مفاتيح مكشوفة"),
+                "API_RATE_LIMIT" to ("ضبط حدود الطلبات اليومية" to "حماية الحصة المجانية عبر تحديد معدل الاستعلامات"),
+                "API_DIAGNOSTICS" to ("اختبار جاهزية الاتصالات" to "فحص استجابة الخدمات والشبكة بأمان")
+            )
+        )
+
+        // 49. وضع الصيانة والطوارئ (MAINTENANCE_MODE) - 4 صلاحيات
+        addGroup(
+            PermissionCategory.MAINTENANCE_MODE,
+            PermissionLevel.SENSITIVE,
+            listOf(
+                "MAINT_VIEW" to ("عرض حالة وضع الصيانة" to "متابعة حالة التوقف المؤقت وتجميد الطلبات"),
+                "MAINT_TOGGLE_APP" to ("تفعيل/تعطيل وضع الصيانة العام" to "إغلاق التطبيق مؤقتاً أمام المستخدمين للصيانة"),
+                "MAINT_FREEZE_ORDERS" to ("تجميد استقبال الطلبات والحجوزات" to "إيقاف إنشاء طلبات أو حجوزات جديدة مؤقتاً"),
+                "MAINT_EDIT_MESSAGE" to ("تعديل رسالة إعلان الصيانة" to "كتابة الرسالة التوضيحية التي تظهر للزوار أثناء الصيانة")
+            )
+        )
+
+        // 50. الإدارة الشاملة للمنشآت (DATA_MANAGEMENT) - 5 صلاحيات
+        addGroup(
+            PermissionCategory.DATA_MANAGEMENT,
+            PermissionLevel.SENSITIVE,
+            listOf(
+                "DM_VIEW_COLLECTIONS" to ("عرض إحصاءات المجموعات" to "استعراض أعداد السجلات لكل قطاع في قاعدة البيانات"),
+                "DM_FILTER_SECTION" to ("تصفية المنشآت حسب القطاع" to "فرز المتاجر والمطاعم والمراكز الطبية والمولات"),
+                "DM_EXPORT_SECTION" to ("تصدير بيانات قطاع محدد" to "نسخ وتصدير سجلات القطاع ضمن الحدود الآمنة"),
+                "DM_BATCH_DELETE" to ("تنظيف دفعي لسجلات قطاع" to "حذف دفعي آمن مع تسجيل العملية في سجل التدقيق"),
+                "DM_SYNC_INDEX" to ("مزامنة وتحديث الفهارس" to "تحديث حالة عرض البيانات بين التطبيق والسحابة")
             )
         )
 

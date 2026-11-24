@@ -254,6 +254,7 @@ class AssistantTestRunner(private val context: Context) {
             onProgress("☁️ [11/14] اختبار حفظ محادثة الاختبار في Firebase Firestore والتحقق من استرجاعها...")
             val conversationPayload = mapOf(
                 "sessionId" to testSessionId,
+                "userId" to (com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid ?: ""),
                 "userQuery1" to "أحتاج سباك",
                 "assistantReply1" to (plumberEngineResponse?.title ?: ""),
                 "userQuery2" to "كم سعر صيانة الغسالة؟",

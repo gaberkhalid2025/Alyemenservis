@@ -39,6 +39,7 @@ import com.example.data.PropertyEntity
 import com.example.data.ProviderEntity
 import com.example.data.StoreEntity
 import com.example.ui.MainViewModel
+import com.example.ui.screens.map.components.RoadReportDialog
 import com.example.ui.screens.map.utils.OfflineMapManager
 import com.example.utils.*
 import kotlinx.coroutines.Dispatchers
@@ -96,6 +97,8 @@ fun MapScreenContent(
     var showDestinationPicker by remember { mutableStateOf(false) }
     var showMoreLayersSheet by remember { mutableStateOf(false) }
     var showGroupTracking by remember { mutableStateOf(false) }
+    var showRoadReportDialog by remember { mutableStateOf(false) }
+    var roadReports by remember { mutableStateOf<List<RoadReportEntity>>(emptyList()) }
     var coverageRefreshTick by remember { mutableIntStateOf(0) }
     var quakesJson by remember { mutableStateOf<String?>(null) }
     var rainUrl by remember { mutableStateOf<String?>(null) }
@@ -386,16 +389,18 @@ fun MapScreenContent(
 
     val filteredProviders = remember(providers, state.selectedCategory, state.selectedCity, state.searchQuery, companionFilter, selectedFilterLabel) {
         var list = MapScreenFilters.filterProviders(providers, state.selectedCategory, state.selectedCity, state.searchQuery, selectedFilterLabel)
-        if (companionFilter != null) {
-            list = list.filter { it.specialization.contains(companionFilter!!) || it.profession.contains(companionFilter!!) }
+        val filter = companionFilter
+        if (!filter.isNullOrBlank()) {
+            list = list.filter { it.specialization.contains(filter) || it.profession.contains(filter) }
         }
         list
     }
 
     val filteredStores = remember(stores, state.selectedCategory, state.selectedCity, state.searchQuery, companionFilter, selectedFilterLabel) {
         var list = MapScreenFilters.filterStores(stores, state.selectedCategory, state.selectedCity, state.searchQuery, selectedFilterLabel)
-        if (companionFilter != null) {
-            list = list.filter { it.name.contains(companionFilter!!) || it.description.contains(companionFilter!!) }
+        val filter = companionFilter
+        if (!filter.isNullOrBlank()) {
+            list = list.filter { it.name.contains(filter) || it.description.contains(filter) }
         }
         list
     }
@@ -433,8 +438,8 @@ fun MapScreenContent(
             viewModel.startNavigationTracking()
             onDispose { viewModel.stopNavigationTracking() }
         }
-        val hazardZones = remember(filteredProviders) {
-            HazardAlerts.roadDifficultyZones(filteredProviders)
+        val hazardZones = remember(filteredProviders, roadReports) {
+            HazardAlerts.roadDifficultyZones(filteredProviders) + roadReports.map { it.toMapZone() }
         }
         NavigationScreen(
             targetEntity = null,
@@ -449,6 +454,18 @@ fun MapScreenContent(
             hazardZones = hazardZones
         )
         return
+    }
+
+    val roadReportCellKey = remember(safeUserLat, safeUserLng, hasRealLocation) {
+        if (hasRealLocation && LandmarkAddress.isValid(safeUserLat, safeUserLng)) {
+            RoadReportRepository.computeCellId(safeUserLat, safeUserLng)
+        } else ""
+    }
+    LaunchedEffect(roadReportCellKey, settingsState.enableMapLiveTrafficReports) {
+        if (settingsState.enableMapLiveTrafficReports && roadReportCellKey.isNotBlank()) {
+            RoadReportRepository.fetchNearbyReports(safeUserLat, safeUserLng)
+                .onSuccess { roadReports = it }
+        }
     }
 
     Scaffold(
@@ -523,6 +540,7 @@ fun MapScreenContent(
                 rainUrl = rainUrl,
                 savedAddresses = savedAddresses,
                 sosPending = sosPending,
+                roadReports = roadReports,
                 onSelectOsmPoi = { res ->
                     searchedPlace = res
                     state.selectedEntity = null
@@ -678,6 +696,37 @@ fun MapScreenContent(
                                 )
                             }
                         }
+
+                        if (settingsState.enableMapLiveTrafficReports) {
+                            VerticalDivider(
+                                modifier = Modifier.height(26.dp),
+                                color = Color.White.copy(alpha = 0.10f)
+                            )
+
+                            Surface(
+                                onClick = { showRoadReportDialog = true },
+                                shape = RoundedCornerShape(14.dp),
+                                color = Color(0xFFF59E0B).copy(alpha = 0.14f),
+                                border = BorderStroke(1.dp, Color(0xFFF59E0B).copy(alpha = 0.35f)),
+                                modifier = Modifier
+                                    .height(42.dp)
+                                    .testTag("map_road_report_btn")
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                                ) {
+                                    Text("🚧", fontSize = 14.sp)
+                                    Text(
+                                        text = if (roadReports.isNotEmpty()) "بلاغ (${roadReports.size})" else "بلاغ",
+                                        color = Color(0xFFFDE68A),
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -817,6 +866,20 @@ fun MapScreenContent(
             onOpenSettings = {
                 VoiceSearchHelper.openVoiceSettings(context)
             }
+        )
+    }
+
+    if (showRoadReportDialog) {
+        val reportLat = pinnedPoint?.first ?: centerCoords?.first ?: safeUserLat
+        val reportLng = pinnedPoint?.second ?: centerCoords?.second ?: safeUserLng
+        RoadReportDialog(
+            targetLat = reportLat,
+            targetLng = reportLng,
+            hasValidLocation = LandmarkAddress.isValid(reportLat, reportLng),
+            reports = roadReports,
+            onReportsUpdated = { roadReports = it },
+            onFeedback = { msg -> coroutineScope.launch { snackbarHostState.showSnackbar(msg) } },
+            onDismiss = { showRoadReportDialog = false }
         )
     }
 }

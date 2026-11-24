@@ -94,8 +94,14 @@ class PaymentGatewayIntegration(private val context: Context? = null) {
     fun getGateways(ctx: Context? = context): List<GatewayConfig> {
         val safeCtx = ctx ?: return emptyList()
         val sharedPrefs = safeCtx.getSharedPreferences("yemen_gateway_secure_vault", Context.MODE_PRIVATE)
-        val json = sharedPrefs.getString("gateways_list_v1", null) ?: return getDefaultGateways()
+        val raw = sharedPrefs.getString("gateways_list_v1", null) ?: return getDefaultGateways()
         return try {
+            val json = if (raw.startsWith("gcm:") || raw.startsWith("gcmx:")) {
+                SecurityCryptoUtils.decrypt(raw)
+            } else {
+                raw
+            }
+            if (json.isBlank()) return getDefaultGateways()
             val type = Types.newParameterizedType(List::class.java, GatewayConfig::class.java)
             val adapter = moshi.adapter<List<GatewayConfig>>(type)
             adapter.fromJson(json) ?: getDefaultGateways()
@@ -157,7 +163,8 @@ class PaymentGatewayIntegration(private val context: Context? = null) {
             val type = Types.newParameterizedType(List::class.java, GatewayConfig::class.java)
             val adapter = moshi.adapter<List<GatewayConfig>>(type)
             val json = adapter.toJson(list)
-            sharedPrefs.edit().putString("gateways_list_v1", json).apply()
+            val encrypted = SecurityCryptoUtils.encrypt(json)
+            sharedPrefs.edit().putString("gateways_list_v1", encrypted).apply()
         } catch (_: Exception) {}
     }
 
@@ -299,17 +306,36 @@ class PaymentGatewayIntegration(private val context: Context? = null) {
     /**
      * تأكيد استلام المبلغ وإصدار إيصال السداد
      */
-    fun confirmPayment(transactionId: String, settings: AdminSettingsEntity? = null): Result<PaymentConfirmation> {
+    fun confirmPayment(transactionId: String, @Suppress("UNUSED_PARAMETER") settings: AdminSettingsEntity? = null): Result<PaymentConfirmation> {
         return try {
-            if (transactionId.isBlank()) {
+            val cleanTxId = transactionId.trim()
+            if (cleanTxId.isBlank()) {
                 return Result.failure(IllegalArgumentException("رقم المعاملة المالية مطلوب."))
             }
+            val payment = activeTransactions[cleanTxId]
+                ?: return Result.failure(IllegalArgumentException("لم يتم العثور على المعاملة المالية: $cleanTxId"))
+            if (!payment.amount.isFinite() || payment.amount <= 0.0) {
+                return Result.failure(IllegalArgumentException("مبلغ المعاملة غير صالح للتأكيد: $cleanTxId"))
+            }
+            val now = System.currentTimeMillis()
+            val confCode = "CONF-${UUID.randomUUID().toString().take(6).uppercase()}"
+            try {
+                firestore.collection("payment_transactions").document(cleanTxId)
+                    .set(
+                        mapOf(
+                            "status" to "CONFIRMED",
+                            "confirmationCode" to confCode,
+                            "confirmedAt" to now
+                        ),
+                        com.google.firebase.firestore.SetOptions.merge()
+                    )
+            } catch (_: Exception) {}
             val confirmation = PaymentConfirmation(
-                transactionId = transactionId,
+                transactionId = cleanTxId,
                 isConfirmed = true,
                 confirmedBy = "SYSTEM_HYBRID",
-                confirmationCode = "CONF-${UUID.randomUUID().toString().take(6).uppercase()}",
-                confirmedAt = System.currentTimeMillis()
+                confirmationCode = confCode,
+                confirmedAt = now
             )
             Result.success(confirmation)
         } catch (e: Exception) {
@@ -320,13 +346,23 @@ class PaymentGatewayIntegration(private val context: Context? = null) {
     /**
      * إلغاء عملية الدفع
      */
-    fun cancelPayment(transactionId: String, reason: String): Result<Boolean> {
+    fun cancelPayment(transactionId: String, @Suppress("UNUSED_PARAMETER") reason: String): Result<Boolean> {
         val cleanTxId = transactionId.trim()
         if (cleanTxId.isBlank()) {
             return Result.failure(IllegalArgumentException("رقم المعاملة المالية مطلوب."))
         }
         return try {
             activeTransactions.remove(cleanTxId)
+            try {
+                firestore.collection("payment_transactions").document(cleanTxId)
+                    .set(
+                        mapOf(
+                            "status" to "CANCELLED",
+                            "cancelledAt" to System.currentTimeMillis()
+                        ),
+                        com.google.firebase.firestore.SetOptions.merge()
+                    )
+            } catch (_: Exception) {}
             Result.success(true)
         } catch (e: Exception) {
             Result.failure(e)
@@ -337,11 +373,31 @@ class PaymentGatewayIntegration(private val context: Context? = null) {
      * استرداد المبلغ
      */
     fun refundPayment(transactionId: String, amount: Double): Result<Boolean> {
-        if (transactionId.isBlank() || !amount.isFinite() || amount <= 0.0) {
+        val cleanTxId = transactionId.trim()
+        if (cleanTxId.isBlank() || !amount.isFinite() || amount <= 0.0) {
             return Result.failure(IllegalArgumentException("بيانات الاسترداد غير صالحة."))
         }
+        val payment = activeTransactions[cleanTxId]
+            ?: return Result.failure(IllegalArgumentException("لم يتم العثور على المعاملة المالية للاسترداد: $cleanTxId"))
+        if (amount > payment.amount) {
+            return Result.failure(IllegalArgumentException("مبلغ الاسترداد ($amount) يتجاوز مبلغ العملية الأصلي (${payment.amount})."))
+        }
         return try {
-            // Processing refund securely
+            val isFullRefund = amount >= payment.amount
+            if (isFullRefund) {
+                activeTransactions.remove(cleanTxId)
+            }
+            try {
+                firestore.collection("payment_transactions").document(cleanTxId)
+                    .set(
+                        mapOf(
+                            "status" to if (isFullRefund) "REFUNDED" else "PARTIAL_REFUND",
+                            "refundedAmount" to amount,
+                            "refundedAt" to System.currentTimeMillis()
+                        ),
+                        com.google.firebase.firestore.SetOptions.merge()
+                    )
+            } catch (_: Exception) {}
             Result.success(true)
         } catch (e: Exception) {
             Result.failure(e)

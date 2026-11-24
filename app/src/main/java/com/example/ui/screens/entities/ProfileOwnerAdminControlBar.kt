@@ -509,9 +509,16 @@ fun ProfileOwnerAdminControlBar(
         var editPhone by remember { mutableStateOf(provider?.phone ?: store?.phone ?: property?.phone ?: "") }
         var editArea by remember {
             mutableStateOf(
-                provider?.localNeighborhood?.ifBlank { provider.area }
-                    ?: store?.localNeighborhood?.ifBlank { store.cityId }
-                    ?: property?.localNeighborhood?.ifBlank { property.cityId }
+                provider?.localNeighborhood?.ifBlank {
+                    provider.area.takeUnless { it.startsWith("ye_") }
+                        ?: com.example.domain.YemenCities.getCityNameById(provider.cityId.ifBlank { provider.area })
+                }
+                    ?: store?.localNeighborhood?.ifBlank {
+                        if (store.cityId.isNotBlank()) com.example.domain.YemenCities.getCityNameById(store.cityId) else ""
+                    }
+                    ?: property?.localNeighborhood?.ifBlank {
+                        if (property.cityId.isNotBlank()) com.example.domain.YemenCities.getCityNameById(property.cityId) else ""
+                    }
                     ?: ""
             )
         }
@@ -647,11 +654,16 @@ fun ProfileOwnerAdminControlBar(
                                     Toast.makeText(context, "يرجى إدخال رقم الهاتف", Toast.LENGTH_SHORT).show()
                                     return@Button
                                 }
+                                val knownCityIds = com.example.domain.YemenCities.list.associate {
+                                    com.example.utils.ArabicNormalizer.normalize(it) to com.example.domain.YemenCities.resolveCityId(it)
+                                }
+                                val detectedCityId = com.example.utils.CityIdResolver.resolve(trimmedArea, knownCityIds)
                                 if (provider != null) {
                                     val updated = provider.copy(
                                         name = trimmedName,
                                         phone = trimmedPhone,
-                                        area = if (provider.area.startsWith("ye_")) provider.area else trimmedArea.ifBlank { provider.area },
+                                        cityId = detectedCityId ?: provider.cityId,
+                                        area = if (provider.area.startsWith("ye_")) (detectedCityId ?: provider.area) else trimmedArea.ifBlank { provider.area },
                                         localNeighborhood = trimmedArea,
                                         profession = trimmedDesc,
                                         latitude = editLat,
@@ -662,7 +674,7 @@ fun ProfileOwnerAdminControlBar(
                                     val updated = store.copy(
                                         name = trimmedName,
                                         phone = trimmedPhone,
-                                        cityId = store.cityId,
+                                        cityId = detectedCityId ?: store.cityId,
                                         localNeighborhood = trimmedArea,
                                         description = trimmedDesc,
                                         latitude = editLat,
@@ -673,7 +685,7 @@ fun ProfileOwnerAdminControlBar(
                                     val updated = property.copy(
                                         title = trimmedName,
                                         phone = trimmedPhone,
-                                        cityId = property.cityId,
+                                        cityId = detectedCityId ?: property.cityId,
                                         localNeighborhood = trimmedArea,
                                         description = trimmedDesc,
                                         latitude = editLat,
@@ -774,6 +786,12 @@ fun ProfileOwnerAdminControlBar(
                                 focusedLabelColor = themeColors.accent,
                                 unfocusedLabelColor = themeColors.textSecondary
                             )
+                        )
+                    } else {
+                        Text(
+                            text = "💡 لتعديل أسعار المنتجات الفردية افتح لوحة إدارة المتجر؛ وهنا يمكنك تحديث العرض العام للنشاط.",
+                            fontSize = 11.sp,
+                            color = themeColors.textSecondary
                         )
                     }
 

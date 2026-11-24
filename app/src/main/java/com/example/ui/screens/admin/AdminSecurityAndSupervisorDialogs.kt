@@ -253,7 +253,7 @@ internal fun AdminSecurityAndSupervisorDialogs(
             }
         }
 
-        var newPasswordInput by remember(notif.id) { mutableStateOf("123456") }
+        var newPasswordInput by remember(notif.id) { mutableStateOf("") }
         var notifyActionChoice by remember(notif.id) { mutableStateOf("DIRECT_PASSWORD") }
 
         AlertDialog(

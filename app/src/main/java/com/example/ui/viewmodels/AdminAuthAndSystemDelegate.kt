@@ -27,31 +27,35 @@ internal class AdminAuthAndSystemDelegate(
 ) {
     private var passwordRecoveryListenerRegistration: ListenerRegistration? = null
 
+    private val fullAccessRoles = setOf("OWNER", "SUPER_ADMIN", "MAIN_ADMIN")
+    private val staffRoles = setOf("OWNER", "SUPER_ADMIN", "MAIN_ADMIN", "ADMIN", "SUPERVISOR", "AUDITOR", "SUPPORT", "OPERATIONS")
+
     fun initSessionAndRecoveryListener() {
-        listenToPasswordRecoveryRequests()
         try {
             val session = vm.secureStorage.getAdminSession()
             if (session != null) {
                 val isExpired = System.currentTimeMillis() - session.loginTime > 30L * 24 * 60 * 60 * 1000
-                if (!isExpired && session.role in listOf("OWNER", "ADMIN", "SUPERVISOR")) {
-                    vm._adminRole.value = session.role
-                    val initialPerms = resolveCachedRolePermissions(session.role, session.permissions)
+                val cleanRole = session.role.trim().uppercase()
+                if (!isExpired && cleanRole in staffRoles) {
+                    vm._adminRole.value = cleanRole
+                    val initialPerms = resolveCachedRolePermissions(cleanRole, session.permissions)
                     vm._supervisorPermissions.value = initialPerms
-                    if (session.role == "ADMIN") {
-                        refreshAdminMatrixPermissionsFromFirestore()
+                    ensurePasswordRecoveryListenerIfStaff(cleanRole)
+                    if (cleanRole !in fullAccessRoles) {
+                        refreshAdminMatrixPermissionsFromFirestore(cleanRole, session.permissions)
                     }
                 }
             } else {
                 val user = FirebaseAuth.getInstance().currentUser
                 if (user != null) {
                     user.getIdToken(false).addOnSuccessListener { token ->
-                        val role = token?.claims?.get("role") as? String
-                        if (role != null && role.uppercase() in listOf("OWNER", "ADMIN", "SUPERVISOR")) {
-                            val upper = role.uppercase()
-                            vm._adminRole.value = upper
-                            vm._supervisorPermissions.value = resolveCachedRolePermissions(upper, emptyList())
-                            if (upper == "ADMIN") {
-                                refreshAdminMatrixPermissionsFromFirestore()
+                        val role = (token?.claims?.get("role") as? String)?.trim()?.uppercase()
+                        if (role != null && role in staffRoles) {
+                            vm._adminRole.value = role
+                            vm._supervisorPermissions.value = resolveCachedRolePermissions(role, emptyList())
+                            ensurePasswordRecoveryListenerIfStaff(role)
+                            if (role !in fullAccessRoles) {
+                                refreshAdminMatrixPermissionsFromFirestore(role, emptyList())
                             }
                         }
                     }
@@ -61,44 +65,68 @@ internal class AdminAuthAndSystemDelegate(
         }
     }
 
+    private fun ensurePasswordRecoveryListenerIfStaff(role: String = vm._adminRole.value) {
+        val cleanRole = role.trim().uppercase()
+        if (cleanRole in staffRoles) {
+            if (passwordRecoveryListenerRegistration == null) {
+                listenToPasswordRecoveryRequests()
+            }
+        } else {
+            cleanup()
+        }
+    }
+
     private fun resolveCachedRolePermissions(role: String, sessionPerms: List<String>): List<String> {
         val cleanRole = role.trim().uppercase()
-        if (cleanRole == "OWNER") return listOf("ALL")
+        if (cleanRole in fullAccessRoles) return listOf("ALL")
         return try {
             val prefs = vm.application.getSharedPreferences("admin_rbac_cache", Context.MODE_PRIVATE)
-            if (prefs.getBoolean("role_configured_$cleanRole", false)) {
-                prefs.getStringSet("role_perms_$cleanRole", emptySet())?.toList() ?: emptyList()
-            } else if (sessionPerms.isNotEmpty()) {
-                sessionPerms
-            } else if (cleanRole == "ADMIN") {
-                listOf("ALL")
-            } else {
-                sessionPerms
-            }
+            val cachedSet = if (prefs.getBoolean("role_configured_$cleanRole", false)) {
+                prefs.getStringSet("role_perms_$cleanRole", emptySet())?.toList().orEmpty()
+            } else emptyList()
+            val matrixMap = if (cachedSet.isNotEmpty()) mapOf(cleanRole to cachedSet) else emptyMap()
+            com.example.security.AdminPermissionResolver.resolve(
+                role = cleanRole,
+                explicit = sessionPerms,
+                matrix = matrixMap
+            ).toList()
         } catch (_: Exception) {
             if (cleanRole == "ADMIN" && sessionPerms.isEmpty()) listOf("ALL") else sessionPerms
         }
     }
 
-    private fun refreshAdminMatrixPermissionsFromFirestore() {
+    private fun refreshAdminMatrixPermissionsFromFirestore(
+        targetRole: String = vm._adminRole.value,
+        explicitPerms: List<String> = emptyList()
+    ) {
+        val cleanRole = targetRole.trim().uppercase()
+        if (cleanRole in fullAccessRoles || cleanRole !in staffRoles) return
         try {
             vm.db.collection("settings").document("admin_permissions_matrix").get()
                 .addOnSuccessListener { doc ->
-                    if (doc != null && doc.exists() && vm._adminRole.value.equals("ADMIN", ignoreCase = true)) {
-                        val rolesRaw = doc.get("roles") as? Map<*, *> ?: return@addOnSuccessListener
-                        val adminMap = rolesRaw["ADMIN"] as? Map<*, *> ?: return@addOnSuccessListener
-                        val perms = (adminMap["activePermissions"] as? List<*>)
-                            ?.mapNotNull { it?.toString() }
-                            ?: return@addOnSuccessListener
-                        vm._supervisorPermissions.value = perms
-                        try {
-                            vm.application.getSharedPreferences("admin_rbac_cache", Context.MODE_PRIVATE)
-                                .edit()
-                                .putStringSet("role_perms_ADMIN", perms.toSet())
-                                .putBoolean("role_configured_ADMIN", true)
-                                .apply()
-                        } catch (_: Exception) {}
-                    }
+                    if (doc == null || !doc.exists()) return@addOnSuccessListener
+                    val currentRole = vm._adminRole.value.trim().uppercase()
+                    if (!currentRole.equals(cleanRole, ignoreCase = true)) return@addOnSuccessListener
+                    val rolesRaw = doc.get("roles") as? Map<*, *> ?: return@addOnSuccessListener
+                    val roleMap = rolesRaw[cleanRole] as? Map<*, *> ?: return@addOnSuccessListener
+                    val perms = (roleMap["activePermissions"] as? List<*>)
+                        ?.mapNotNull { it?.toString()?.takeIf(String::isNotBlank) }
+                        ?: return@addOnSuccessListener
+                    try {
+                        vm.application.getSharedPreferences("admin_rbac_cache", Context.MODE_PRIVATE)
+                            .edit()
+                            .putStringSet("role_perms_$cleanRole", perms.toSet())
+                            .putBoolean("role_configured_$cleanRole", true)
+                            .apply()
+                        com.example.ui.screens.admin.permissions.AdminPermissionsViewModel
+                            .updateCachedRoleOverride(cleanRole, perms.toSet())
+                    } catch (_: Exception) {}
+                    val resolved = com.example.security.AdminPermissionResolver.resolve(
+                        role = cleanRole,
+                        explicit = explicitPerms,
+                        matrix = mapOf(cleanRole to perms)
+                    ).toList()
+                    vm._supervisorPermissions.value = resolved
                 }
         } catch (_: Exception) {}
     }
@@ -131,17 +159,14 @@ internal class AdminAuthAndSystemDelegate(
                     preferredRole = "ADMIN"
                 )
 
-                if (verifiedRole == "ADMIN" || verifiedRole == "OWNER") {
-                    val assignedRole = verifiedRole
+                if (verifiedRole != null && (verifiedRole == "ADMIN" || verifiedRole in fullAccessRoles)) {
+                    val assignedRole: String = verifiedRole
                     val perms = resolveCachedRolePermissions(assignedRole, emptyList())
-                    if (assignedRole == "ADMIN") {
-                        refreshAdminMatrixPermissionsFromFirestore()
-                    }
 
                     SecureAdminStorage.storeCredentials(
                         context = vm.application,
-                        ownerEmail = if (assignedRole == "OWNER") trimmedEmail else null,
-                        ownerPassword = if (assignedRole == "OWNER") trimmedPass else null,
+                        ownerEmail = if (assignedRole in fullAccessRoles) trimmedEmail else null,
+                        ownerPassword = if (assignedRole in fullAccessRoles) trimmedPass else null,
                         adminEmail = if (assignedRole == "ADMIN") trimmedEmail else null,
                         adminPassword = if (assignedRole == "ADMIN") trimmedPass else null
                     )
@@ -160,6 +185,10 @@ internal class AdminAuthAndSystemDelegate(
                     }
                     vm._adminRole.value = assignedRole
                     vm._supervisorPermissions.value = perms
+                    ensurePasswordRecoveryListenerIfStaff(assignedRole)
+                    if (assignedRole !in fullAccessRoles) {
+                        refreshAdminMatrixPermissionsFromFirestore(assignedRole, emptyList())
+                    }
                     vm._isLoadingState.value = false
                     onResult(true, null)
                     return@launch
@@ -218,6 +247,7 @@ internal class AdminAuthAndSystemDelegate(
                     }
                     vm._adminRole.value = "OWNER"
                     vm._supervisorPermissions.value = listOf("ALL")
+                    ensurePasswordRecoveryListenerIfStaff("OWNER")
                     vm._isLoadingState.value = false
                     onResult(true, null)
                     return@launch
@@ -260,9 +290,10 @@ internal class AdminAuthAndSystemDelegate(
                         it.id.equals(trimmedUser, ignoreCase = true) ||
                             it.name.trim().equals(trimmedUser, ignoreCase = true)
                     }
-                    val perms = matchingSup?.permissions?.ifEmpty {
-                        resolveCachedRolePermissions(verifiedRole, listOf("MANAGE_PROVIDERS", "MANAGE_BOOKINGS", "MANAGE_REQUESTS"))
-                    } ?: resolveCachedRolePermissions(verifiedRole, emptyList())
+                    val perms = resolveCachedRolePermissions(
+                        role = verifiedRole,
+                        sessionPerms = matchingSup?.permissions.orEmpty()
+                    )
 
                     if (rememberMe) {
                         vm.secureStorage.saveAdminSession(
@@ -279,6 +310,10 @@ internal class AdminAuthAndSystemDelegate(
 
                     vm._adminRole.value = verifiedRole
                     vm._supervisorPermissions.value = perms
+                    ensurePasswordRecoveryListenerIfStaff(verifiedRole)
+                    if (verifiedRole.uppercase() !in fullAccessRoles) {
+                        refreshAdminMatrixPermissionsFromFirestore(verifiedRole, matchingSup?.permissions.orEmpty())
+                    }
                     vm._isLoadingState.value = false
                     onResult(true, null)
                     return@launch
@@ -296,6 +331,7 @@ internal class AdminAuthAndSystemDelegate(
     fun logoutAdmin() {
         vm.viewModelScope.launch {
             try {
+                cleanup()
                 vm.secureStorage.clearAdminSession()
                 FirebaseAuth.getInstance().signOut()
                 vm._adminRole.value = "GUEST"
@@ -656,6 +692,7 @@ internal class AdminAuthAndSystemDelegate(
     private fun listenToPasswordRecoveryRequests() {
         passwordRecoveryListenerRegistration?.remove()
         passwordRecoveryListenerRegistration = vm.db.collection("password_recovery_requests")
+            .limit(50)
             .addSnapshotListener { snap, err ->
                 if (err == null && snap != null) {
                     try {

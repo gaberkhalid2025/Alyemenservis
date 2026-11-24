@@ -14,20 +14,29 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.data.PropertyEntity
+import com.example.data.ProviderEntity
 import com.example.data.StoreEntity
 import com.example.data.UnifiedBusinessAccount
 import com.example.ui.MainViewModel
 import com.example.ui.goBack
 import com.example.ui.helpers.AppPreferenceHelper
+import com.example.utils.AppConstants
 import com.example.utils.VisualThemePalette
-import kotlinx.coroutines.delay
+import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withTimeoutOrNull
+
+private enum class DashboardLookupState { LOADING, NOT_FOUND, NETWORK_ERROR }
 
 /**
- * 🏢 Dedicated Profile/Dashboard Router delegating to the 6 Specialized Dashboards
+ * 🏢 Dedicated Profile/Dashboard Router delegating to Specialized Dashboards
+ * يدعم التوجيه الدقيق لجميع القطاعات (بما في ذلك المراكز التجارية MallDashboard)
+ * مع جلب أحادي مباشر من Firestore بدلاً من الانتظار الأعمى لتوفير الحصة وتسريع الفتح.
  */
 @Composable
 fun UnifiedBusinessProfileDashboard(
-    accountType: String, // "TECHNICIAN", "STORE", "RESTAURANT", "MEDICAL", "REAL_ESTATE", "JOB_POSTER"
+    accountType: String, // "TECHNICIAN", "STORE", "MALL", "RESTAURANT", "MEDICAL", "REAL_ESTATE", "JOB_POSTER"
     providerId: String,
     viewModel: MainViewModel,
     themeColors: VisualThemePalette
@@ -38,24 +47,29 @@ fun UnifiedBusinessProfileDashboard(
     val stores by viewModel.stores.collectAsState()
     val properties by viewModel.properties.collectAsState()
 
+    var directProvider by remember(providerId) { mutableStateOf<ProviderEntity?>(null) }
+    var directStore by remember(providerId) { mutableStateOf<StoreEntity?>(null) }
+    var directProperty by remember(providerId) { mutableStateOf<PropertyEntity?>(null) }
+
     val cleanId = remember(providerId) {
         AppPreferenceHelper.normalizePhoneNumber(providerId)
     }
 
-    val activeProvider = remember(providers, providerId, cleanId) {
+    val activeProvider = remember(providers, directProvider, providerId, cleanId) {
         providers.find { p ->
             p.id == providerId ||
                 (cleanId.isNotBlank() && AppPreferenceHelper.normalizePhoneNumber(p.phone) == cleanId)
-        }
+        } ?: directProvider
     }
 
-    val matchingStores = remember(stores, providerId, cleanId) {
-        stores.filter { s ->
+    val matchingStores = remember(stores, directStore, providerId, cleanId) {
+        val fromList = stores.filter { s ->
             s.id == providerId ||
                 s.ownerId == providerId ||
                 (cleanId.isNotBlank() && AppPreferenceHelper.normalizePhoneNumber(s.phone) == cleanId) ||
                 (cleanId.isNotBlank() && AppPreferenceHelper.normalizePhoneNumber(s.ownerId) == cleanId)
         }
+        if (fromList.isNotEmpty()) fromList else listOfNotNull(directStore)
     }
 
     fun pickStoreForSection(sectionMatcher: (StoreEntity) -> Boolean): StoreEntity? {
@@ -84,19 +98,20 @@ fun UnifiedBusinessProfileDashboard(
             "STORE" -> pickStoreForSection {
                 !it.sectionId.contains("restaurant", ignoreCase = true) &&
                     !it.sectionId.contains("medical", ignoreCase = true) &&
+                    !it.sectionId.contains("mall", ignoreCase = true) &&
                     it.medicalLicenseNo.isBlank()
             }
             else -> matchingStores.firstOrNull()
         }
     }
 
-    val activeProperty = remember(properties, providerId, cleanId) {
+    val activeProperty = remember(properties, directProperty, providerId, cleanId) {
         properties.find { p ->
             p.id == providerId ||
                 p.ownerId == providerId ||
                 (cleanId.isNotBlank() && AppPreferenceHelper.normalizePhoneNumber(p.phone) == cleanId) ||
                 (cleanId.isNotBlank() && AppPreferenceHelper.normalizePhoneNumber(p.ownerId) == cleanId)
-        }
+        } ?: directProperty
     }
 
     when (accountType) {
@@ -105,7 +120,16 @@ fun UnifiedBusinessProfileDashboard(
                 val acc = UnifiedBusinessAccount.fromStore(activeStore, "restaurants")
                 RestaurantDashboard(account = acc, viewModel = viewModel, themeColors = themeColors, onBackClick = { viewModel.goBack() })
             } else {
-                LoadingOrEmptyDashboard("المطعم", themeColors = themeColors, onRetry = { viewModel.refreshData() }, onBackClick = { viewModel.goBack() })
+                LoadingOrEmptyDashboard(
+                    title = "المطعم",
+                    accountType = accountType,
+                    providerId = providerId,
+                    cleanId = cleanId,
+                    themeColors = themeColors,
+                    onStoreResolved = { directStore = it },
+                    onRefreshFallback = { viewModel.refreshData() },
+                    onBackClick = { viewModel.goBack() }
+                )
             }
         }
         "MEDICAL" -> {
@@ -113,15 +137,33 @@ fun UnifiedBusinessProfileDashboard(
                 val acc = UnifiedBusinessAccount.fromStore(activeStore, "medical")
                 MedicalDashboard(account = acc, viewModel = viewModel, themeColors = themeColors, onBackClick = { viewModel.goBack() })
             } else {
-                LoadingOrEmptyDashboard("المركز الطبي", themeColors = themeColors, onRetry = { viewModel.refreshData() }, onBackClick = { viewModel.goBack() })
+                LoadingOrEmptyDashboard(
+                    title = "المركز الطبي",
+                    accountType = accountType,
+                    providerId = providerId,
+                    cleanId = cleanId,
+                    themeColors = themeColors,
+                    onStoreResolved = { directStore = it },
+                    onRefreshFallback = { viewModel.refreshData() },
+                    onBackClick = { viewModel.goBack() }
+                )
             }
         }
         "MALL" -> {
             if (activeStore != null) {
-                val acc = UnifiedBusinessAccount.fromStore(activeStore, "stores")
-                StoreDashboard(account = acc, viewModel = viewModel, themeColors = themeColors, onBackClick = { viewModel.goBack() })
+                val acc = UnifiedBusinessAccount.fromStore(activeStore, "malls")
+                MallDashboard(account = acc, viewModel = viewModel, themeColors = themeColors, onBackClick = { viewModel.goBack() })
             } else {
-                LoadingOrEmptyDashboard("المركز التجاري", themeColors = themeColors, onRetry = { viewModel.refreshData() }, onBackClick = { viewModel.goBack() })
+                LoadingOrEmptyDashboard(
+                    title = "المركز التجاري",
+                    accountType = accountType,
+                    providerId = providerId,
+                    cleanId = cleanId,
+                    themeColors = themeColors,
+                    onStoreResolved = { directStore = it },
+                    onRefreshFallback = { viewModel.refreshData() },
+                    onBackClick = { viewModel.goBack() }
+                )
             }
         }
         "STORE" -> {
@@ -129,7 +171,16 @@ fun UnifiedBusinessProfileDashboard(
                 val acc = UnifiedBusinessAccount.fromStore(activeStore, "stores")
                 StoreDashboard(account = acc, viewModel = viewModel, themeColors = themeColors, onBackClick = { viewModel.goBack() })
             } else {
-                LoadingOrEmptyDashboard("المتجر", themeColors = themeColors, onRetry = { viewModel.refreshData() }, onBackClick = { viewModel.goBack() })
+                LoadingOrEmptyDashboard(
+                    title = "المتجر",
+                    accountType = accountType,
+                    providerId = providerId,
+                    cleanId = cleanId,
+                    themeColors = themeColors,
+                    onStoreResolved = { directStore = it },
+                    onRefreshFallback = { viewModel.refreshData() },
+                    onBackClick = { viewModel.goBack() }
+                )
             }
         }
         "REAL_ESTATE" -> {
@@ -137,7 +188,16 @@ fun UnifiedBusinessProfileDashboard(
                 val acc = UnifiedBusinessAccount.fromProperty(activeProperty)
                 PropertyDashboard(account = acc, viewModel = viewModel, themeColors = themeColors, onBackClick = { viewModel.goBack() })
             } else {
-                LoadingOrEmptyDashboard("العقارات", themeColors = themeColors, onRetry = { viewModel.refreshData() }, onBackClick = { viewModel.goBack() })
+                LoadingOrEmptyDashboard(
+                    title = "العقارات",
+                    accountType = accountType,
+                    providerId = providerId,
+                    cleanId = cleanId,
+                    themeColors = themeColors,
+                    onPropertyResolved = { directProperty = it },
+                    onRefreshFallback = { viewModel.refreshData() },
+                    onBackClick = { viewModel.goBack() }
+                )
             }
         }
         "JOB_POSTER" -> {
@@ -155,10 +215,24 @@ fun UnifiedBusinessProfileDashboard(
                 val acc = UnifiedBusinessAccount.fromProvider(activeProvider)
                 TechnicianDashboard(account = acc, viewModel = viewModel, themeColors = themeColors, onBackClick = { viewModel.goBack() })
             } else if (activeStore != null) {
-                val acc = UnifiedBusinessAccount.fromStore(activeStore, activeStore.sectionId.ifBlank { "stores" })
-                StoreDashboard(account = acc, viewModel = viewModel, themeColors = themeColors, onBackClick = { viewModel.goBack() })
+                val sec = activeStore.sectionId.ifBlank { "stores" }
+                val acc = UnifiedBusinessAccount.fromStore(activeStore, sec)
+                if (sec.contains("mall", ignoreCase = true)) {
+                    MallDashboard(account = acc, viewModel = viewModel, themeColors = themeColors, onBackClick = { viewModel.goBack() })
+                } else {
+                    StoreDashboard(account = acc, viewModel = viewModel, themeColors = themeColors, onBackClick = { viewModel.goBack() })
+                }
             } else {
-                LoadingOrEmptyDashboard("مقدم الخدمة", themeColors = themeColors, onRetry = { viewModel.refreshData() }, onBackClick = { viewModel.goBack() })
+                LoadingOrEmptyDashboard(
+                    title = "مقدم الخدمة",
+                    accountType = accountType,
+                    providerId = providerId,
+                    cleanId = cleanId,
+                    themeColors = themeColors,
+                    onProviderResolved = { directProvider = it },
+                    onRefreshFallback = { viewModel.refreshData() },
+                    onBackClick = { viewModel.goBack() }
+                )
             }
         }
     }
@@ -167,17 +241,124 @@ fun UnifiedBusinessProfileDashboard(
 @Composable
 private fun LoadingOrEmptyDashboard(
     title: String,
+    accountType: String,
+    providerId: String,
+    cleanId: String,
     themeColors: VisualThemePalette,
-    onRetry: () -> Unit = {},
+    onProviderResolved: (ProviderEntity) -> Unit = {},
+    onStoreResolved: (StoreEntity) -> Unit = {},
+    onPropertyResolved: (PropertyEntity) -> Unit = {},
+    onRefreshFallback: () -> Unit = {},
     onBackClick: () -> Unit
 ) {
-    var timedOut by remember(title) { mutableStateOf(false) }
+    var lookupState by remember(title, providerId) { mutableStateOf(DashboardLookupState.LOADING) }
     var retryTick by remember { mutableIntStateOf(0) }
 
-    LaunchedEffect(title, retryTick) {
-        timedOut = false
-        delay(6000)
-        timedOut = true
+    LaunchedEffect(accountType, providerId, retryTick) {
+        lookupState = DashboardLookupState.LOADING
+        val outcome = withTimeoutOrNull(8000L) {
+            try {
+                val db = FirebaseFirestore.getInstance()
+                when (accountType) {
+                    "RESTAURANT", "MEDICAL", "MALL", "STORE" -> {
+                        val candidateIds = listOf(providerId, "store_$cleanId")
+                            .map { it.trim() }
+                            .filter { it.isNotBlank() }
+                            .distinct()
+                        var found: StoreEntity? = null
+                        for (docId in candidateIds) {
+                            val snap = db.collection(AppConstants.COL_STORES).document(docId).get().await()
+                            val parsed = snap.toObject(StoreEntity::class.java)?.copy(id = snap.id)
+                            if (parsed != null && !parsed.isDeleted) {
+                                found = parsed
+                                break
+                            }
+                        }
+                        if (found == null && cleanId.isNotBlank()) {
+                            val q = db.collection(AppConstants.COL_STORES)
+                                .whereEqualTo("phone", cleanId)
+                                .limit(1)
+                                .get()
+                                .await()
+                            val doc = q.documents.firstOrNull()
+                            val parsed = doc?.toObject(StoreEntity::class.java)?.copy(id = doc.id)
+                            if (parsed != null && !parsed.isDeleted) found = parsed
+                        }
+                        if (found != null) {
+                            onStoreResolved(found)
+                            DashboardLookupState.LOADING
+                        } else {
+                            DashboardLookupState.NOT_FOUND
+                        }
+                    }
+                    "REAL_ESTATE" -> {
+                        val candidateIds = listOf(providerId, "prop_$cleanId")
+                            .map { it.trim() }
+                            .filter { it.isNotBlank() }
+                            .distinct()
+                        var found: PropertyEntity? = null
+                        for (docId in candidateIds) {
+                            val snap = db.collection(AppConstants.COL_PROPERTIES).document(docId).get().await()
+                            val parsed = snap.toObject(PropertyEntity::class.java)?.copy(id = snap.id)
+                            if (parsed != null && !parsed.isDeleted) {
+                                found = parsed
+                                break
+                            }
+                        }
+                        if (found == null && cleanId.isNotBlank()) {
+                            val q = db.collection(AppConstants.COL_PROPERTIES)
+                                .whereEqualTo("phone", cleanId)
+                                .limit(1)
+                                .get()
+                                .await()
+                            val doc = q.documents.firstOrNull()
+                            val parsed = doc?.toObject(PropertyEntity::class.java)?.copy(id = doc.id)
+                            if (parsed != null && !parsed.isDeleted) found = parsed
+                        }
+                        if (found != null) {
+                            onPropertyResolved(found)
+                            DashboardLookupState.LOADING
+                        } else {
+                            DashboardLookupState.NOT_FOUND
+                        }
+                    }
+                    else -> {
+                        val candidateIds = listOf(providerId, "prov_$cleanId")
+                            .map { it.trim() }
+                            .filter { it.isNotBlank() }
+                            .distinct()
+                        var found: ProviderEntity? = null
+                        for (docId in candidateIds) {
+                            val snap = db.collection(AppConstants.COL_PROVIDERS).document(docId).get().await()
+                            val parsed = snap.toObject(ProviderEntity::class.java)?.copy(id = snap.id)
+                            if (parsed != null && !parsed.isDeleted) {
+                                found = parsed
+                                break
+                            }
+                        }
+                        if (found == null && cleanId.isNotBlank()) {
+                            val q = db.collection(AppConstants.COL_PROVIDERS)
+                                .whereEqualTo("phone", cleanId)
+                                .limit(1)
+                                .get()
+                                .await()
+                            val doc = q.documents.firstOrNull()
+                            val parsed = doc?.toObject(ProviderEntity::class.java)?.copy(id = doc.id)
+                            if (parsed != null && !parsed.isDeleted) found = parsed
+                        }
+                        if (found != null) {
+                            onProviderResolved(found)
+                            DashboardLookupState.LOADING
+                        } else {
+                            DashboardLookupState.NOT_FOUND
+                        }
+                    }
+                }
+            } catch (_: Exception) {
+                DashboardLookupState.NETWORK_ERROR
+            }
+        }
+        lookupState = outcome ?: DashboardLookupState.NETWORK_ERROR
     }
 
     Box(
@@ -191,31 +372,55 @@ private fun LoadingOrEmptyDashboard(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            if (!timedOut) {
-                CircularProgressIndicator(color = themeColors.accent)
-                Text(
-                    text = "جاري تحميل بيانات $title...",
-                    color = themeColors.textPrimary,
-                    fontSize = 14.sp
-                )
-            } else {
-                Text(
-                    text = "تعذر العثور على بيانات $title أو قد يكون بانتظار المزامنة.",
-                    color = themeColors.textPrimary,
-                    fontSize = 14.sp
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Button(
-                        onClick = {
-                            onRetry()
-                            retryTick++
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent)
-                    ) {
-                        Text("إعادة المحاولة 🔄", color = Color.Black, fontSize = 12.sp)
+            when (lookupState) {
+                DashboardLookupState.LOADING -> {
+                    CircularProgressIndicator(color = themeColors.accent)
+                    Text(
+                        text = "جاري جلب بيانات $title...",
+                        color = themeColors.textPrimary,
+                        fontSize = 14.sp
+                    )
+                }
+                DashboardLookupState.NETWORK_ERROR -> {
+                    Text(
+                        text = "تعذر الاتصال بالخادم لجلب بيانات $title. تحقق من الشبكة وأعد المحاولة.",
+                        color = themeColors.textPrimary,
+                        fontSize = 14.sp
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Button(
+                            onClick = {
+                                onRefreshFallback()
+                                retryTick++
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent)
+                        ) {
+                            Text("إعادة المحاولة 🔄", color = Color.Black, fontSize = 12.sp)
+                        }
+                        OutlinedButton(onClick = onBackClick) {
+                            Text("رجوع", color = themeColors.textPrimary, fontSize = 12.sp)
+                        }
                     }
-                    OutlinedButton(onClick = onBackClick) {
-                        Text("رجوع", color = themeColors.textPrimary, fontSize = 12.sp)
+                }
+                DashboardLookupState.NOT_FOUND -> {
+                    Text(
+                        text = "لم يتم العثور على سجل نشط لـ $title لهذا الحساب أو قد يكون بانتظار التفعيل.",
+                        color = themeColors.textPrimary,
+                        fontSize = 14.sp
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Button(
+                            onClick = {
+                                onRefreshFallback()
+                                retryTick++
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent)
+                        ) {
+                            Text("تحديث الآن 🔄", color = Color.Black, fontSize = 12.sp)
+                        }
+                        OutlinedButton(onClick = onBackClick) {
+                            Text("رجوع", color = themeColors.textPrimary, fontSize = 12.sp)
+                        }
                     }
                 }
             }

@@ -162,8 +162,9 @@ internal fun LazyListScope.adminSupervisorsAndThemesSection(
                                     else -> r.trim()
                                 }
                             }.joinToString(" + ")
+                            val totalRegistryCount = AdminPermissionsRegistry.allPermissions.size
                             Text(
-                                "الصلاحيات الممنوحة: $displayRoles (${if (sup.permissions.isEmpty()) "كاملة/افتراضية" else "${sup.permissions.size}/538 مخصصة"})",
+                                "الصلاحيات الممنوحة: $displayRoles (${if (sup.permissions.isEmpty()) "كاملة/افتراضية" else "${sup.permissions.size}/$totalRegistryCount مخصصة"})",
                                 fontSize = 10.sp,
                                 color = themeColors.accent
                             )
@@ -201,12 +202,16 @@ internal fun LazyListScope.adminSupervisorsAndThemesSection(
     }
 
     item {
+        val totalPermissionsCount = AdminPermissionsRegistry.allPermissions.size
+        val totalCategoriesCount = PermissionCategory.entries.size
         Spacer(modifier = Modifier.height(10.dp))
-        Text("🛡️ مصفوفة الصلاحيات الشاملة للنظام (538 صلاحية موزعة على 18 مجالاً)", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+        Text("🛡️ مصفوفة الصلاحيات الشاملة للنظام ($totalPermissionsCount صلاحية موزعة على $totalCategoriesCount مجالاً)", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
         Spacer(modifier = Modifier.height(4.dp))
     }
 
     item {
+        val totalPermissionsCount = AdminPermissionsRegistry.allPermissions.size
+        val totalCategoriesCount = PermissionCategory.entries.size
         var showAll538Matrix by rememberSaveable { mutableStateOf(false) }
         var matrixSearchQuery by rememberSaveable { mutableStateOf("") }
 
@@ -231,7 +236,7 @@ internal fun LazyListScope.adminSupervisorsAndThemesSection(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            "538 صلاحية أمنية معتمدة ومتزامنة",
+                            "$totalPermissionsCount صلاحية أمنية معتمدة ومتزامنة",
                             color = Color.White,
                             fontWeight = FontWeight.Bold,
                             fontSize = 12.sp
@@ -245,7 +250,7 @@ internal fun LazyListScope.adminSupervisorsAndThemesSection(
                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
                     ) {
                         Text(
-                            text = if (showAll538Matrix) "إخفاء المصفوفة ▲" else "عرض الكل (538) ▼",
+                            text = if (showAll538Matrix) "إخفاء المصفوفة ▲" else "عرض الكل ($totalPermissionsCount) ▼",
                             color = if (showAll538Matrix) Color.White else Color.Black,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold
@@ -254,7 +259,7 @@ internal fun LazyListScope.adminSupervisorsAndThemesSection(
                 }
 
                 Text(
-                    text = "تغطي المنظومة 38 مجالاً وقطاعاً إدارياً شاملاً يضم 538 صلاحية دقيقة ومفصلة: البوابة الخلفية، طلبات الانضمام، الإضافة اليدوية، المحلات، المطاعم، المراكز الطبية، العقارات، الوظائف، المتقدمين، الإحصائيات، الحجوزات، المحادثات، أعضاء الدليل، كلمات المرور، البنرات، الأقسام، المدن، الشكاوى، ترقيات VIP، المشرفين، الألوان، الإشعارات، النسخ الاحتياطي، تنظيف البيانات، التقييمات، المكالمات، الكوبونات، المحظورين، المحذوفات، المدفوعات، التبويبات المخصصة، الأيقونات الذهبية، الدردشات المتقدمة، تخصيص البطاقات، منشئ الأقسام، استمارات التسجيل، الصلاحيات والأدوار، وتحكم الخرائط.",
+                    text = "تغطي المنظومة $totalCategoriesCount مجالاً وقطاعاً إدارياً شاملاً يضم $totalPermissionsCount صلاحية دقيقة ومفصلة: البوابة الخلفية، طلبات الانضمام، الإضافة اليدوية، المحلات والمراكز التجارية، المطاعم، المراكز الطبية، العقارات، الوظائف، المتقدمين، الإحصائيات، الحجوزات، المحادثات، أعضاء الدليل، كلمات المرور، البنرات، الأقسام، المدن، الشكاوى، ترقيات VIP، المشرفين، الألوان، الإشعارات، النسخ الاحتياطي، تنظيف البيانات، التقييمات، المكالمات، الكوبونات، المحظورين، المحذوفات، المدفوعات، المساعد الذكي، التبويبات المخصصة، الأيقونات الذهبية، الدردشات المتقدمة، تخصيص البطاقات، منشئ الأقسام، استمارات التسجيل، الصلاحيات والأدوار، الأمان والتدقيق، التوجيه التلقائي، الصيانة، وتحكم الخرائط.",
                     color = themeColors.textSecondary,
                     fontSize = 10.sp,
                     lineHeight = 14.sp

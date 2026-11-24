@@ -8,17 +8,22 @@ import com.example.data.repositories.IProductsRepository
 import com.example.data.repositories.IRatingsRepository
 import com.example.domain.entities.ProductItemEntity
 import com.example.ui.screens.dashboard.DashboardEvent
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.flow.catch
+import javax.inject.Inject
 
-class RestaurantDashboardViewModel(
-    private val ownerId: String,
+@HiltViewModel
+class RestaurantDashboardViewModel @Inject constructor(
     private val dashboardRepository: IDashboardRepository,
     private val productsRepository: IProductsRepository,
     private val ratingsRepository: IRatingsRepository
 ) : ViewModel() {
+
+    private var ownerId: String = ""
 
     private val _uiState = MutableStateFlow(DashboardUiState())
     val uiState: StateFlow<DashboardUiState> = _uiState.asStateFlow()
@@ -26,7 +31,12 @@ class RestaurantDashboardViewModel(
     private val _eventFlow = MutableSharedFlow<DashboardEvent>()
     val eventFlow: SharedFlow<DashboardEvent> = _eventFlow.asSharedFlow()
 
-    init {
+    private var loadJob: Job? = null
+
+    fun initialize(id: String) {
+        val cleanId = id.trim()
+        if (cleanId.isBlank() || ownerId == cleanId) return
+        ownerId = cleanId
         loadDashboardData()
     }
 
@@ -35,7 +45,9 @@ class RestaurantDashboardViewModel(
     }
 
     fun loadDashboardData() {
-        viewModelScope.launch {
+        if (ownerId.isBlank()) return
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
             
             supervisorScope {
@@ -179,5 +191,11 @@ class RestaurantDashboardViewModel(
 
     fun dispose() {
         onCleared()
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        loadJob?.cancel()
+        loadJob = null
     }
 }

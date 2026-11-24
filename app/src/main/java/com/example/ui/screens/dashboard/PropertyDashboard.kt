@@ -22,6 +22,7 @@ import com.example.ui.screens.dashboard.components.UnifiedLoadingIndicator
 import com.example.ui.screens.dashboard.viewmodels.PropertyDashboardViewModel
 import com.example.utils.BookingStatus
 import com.example.utils.VisualThemePalette
+import androidx.hilt.navigation.compose.hiltViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -30,12 +31,12 @@ fun PropertyDashboard(
     viewModel: MainViewModel,
     themeColors: VisualThemePalette,
     onBackClick: () -> Unit,
-    initialTab: Int = 0
+    initialTab: Int = 0,
+    propertyViewModel: PropertyDashboardViewModel = hiltViewModel()
 ) {
     BackHandler { onBackClick() }
 
     val context = LocalContext.current
-    val appContext = context.applicationContext
     var activeTab by remember(initialTab) { mutableIntStateOf(initialTab.coerceIn(0, 4)) }
 
     val properties by viewModel.properties.collectAsState()
@@ -45,17 +46,8 @@ fun PropertyDashboard(
             ?: account
     }
 
-    val propertyViewModel = remember(liveAccount.id, appContext) {
-        PropertyDashboardViewModel(
-            ownerId = liveAccount.id,
-            dashboardRepository = DashboardRepositoryImpl(appContext),
-            productsRepository = ProductsRepositoryImpl(appContext),
-            ratingsRepository = RatingsRepositoryImpl(appContext)
-        )
-    }
-
-    DisposableEffect(propertyViewModel) {
-        onDispose { propertyViewModel.dispose() }
+    LaunchedEffect(liveAccount.id) {
+        propertyViewModel.initialize(liveAccount.id)
     }
 
     val uiState by propertyViewModel.uiState.collectAsState()

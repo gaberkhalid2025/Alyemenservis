@@ -15,6 +15,7 @@ import com.example.ui.screens.dashboard.RestaurantDashboard
 import com.example.ui.screens.dashboard.StoreDashboard
 import com.example.ui.screens.dashboard.TechnicianDashboard
 import com.example.ui.screens.dashboard.JobPosterDashboard
+import com.example.ui.screens.dashboard.MallDashboard
 import com.example.ui.screens.dashboard.ClientPersonalAccountDashboard
 import com.example.utils.VisualThemePalette
 import kotlinx.coroutines.CoroutineScope
@@ -46,6 +47,12 @@ object JoinStatusRouter {
                         onBackClick = { viewModel.goBack() }
                     )
                     "medical" -> MedicalDashboard(
+                        account = acc,
+                        viewModel = viewModel,
+                        themeColors = themeColors,
+                        onBackClick = { viewModel.goBack() }
+                    )
+                    "malls" -> MallDashboard(
                         account = acc,
                         viewModel = viewModel,
                         themeColors = themeColors,
