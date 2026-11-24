@@ -8,6 +8,7 @@ package com.example.ui.screens.map
 import android.content.Context
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
@@ -108,14 +109,27 @@ internal fun BoxScope.MapScreenViewport(
             java.lang.String.format(java.util.Locale.US, "%.3f_%.3f", poiLat, poiLng)
         } else ""
     }
-    LaunchedEffect(poiGridKey, hybridLabels, state.mapLayer, state.isRadarMode, state.currentMapMode) {
-        val showPois = hybridLabels &&
-            !state.isRadarMode &&
-            state.mapLayer != MapLayer.VALHALLA_OFFLINE &&
-            (state.currentMapMode == MapMode.SATELLITE || state.currentMapMode == MapMode.SATELLITE_CLARITY || state.currentMapMode == MapMode.VELA_3D)
+    LaunchedEffect(poiGridKey, hybridLabels, state.mapLayer, state.isRadarMode, state.currentMapMode, state.visibleLandmarkFilters) {
+        val showPois = !state.isRadarMode &&
+            state.currentMapMode != MapMode.AR_VPS &&
+            state.mapLayer != MapLayer.VALHALLA_OFFLINE
         if (!showPois || poiGridKey.isBlank()) {
             osmPoisJson = null
             return@LaunchedEffect
+        }
+
+        fun isCategoryAllowed(kind: String): Boolean {
+            val filters = state.visibleLandmarkFilters
+            return when {
+                kind == "شارع" -> filters.contains(MapLandmarkFilter.STREETS)
+                kind in listOf("جامع", "مسجد", "دار عبادة") -> filters.contains(MapLandmarkFilter.MOSQUES)
+                kind in listOf("مدرسة", "جامعة", "معهد", "كلية") -> filters.contains(MapLandmarkFilter.SCHOOLS)
+                kind in listOf("صالة أفراح", "قاعة") -> filters.contains(MapLandmarkFilter.HALLS)
+                kind in listOf("مطعم", "كافيه", "بوفيه") -> filters.contains(MapLandmarkFilter.RESTAURANTS)
+                kind in listOf("سوق", "مول") -> filters.contains(MapLandmarkFilter.STORES)
+                kind in listOf("مستشفى", "عيادة", "صيدلية") -> filters.contains(MapLandmarkFilter.MEDICAL)
+                else -> filters.contains(MapLandmarkFilter.PROVIDERS)
+            }
         }
 
         // 1) تحميل المعالم المحلية فوراً (مساجد، صالات، مدارس، مستشفيات، شوارع) لتظهر فوراً على الخريطة حتى بدون إنترنت
@@ -126,7 +140,7 @@ internal fun BoxScope.MapScreenViewport(
             // معالم القاموس الجغرافي اليمني الشامل ضمن النطاق المرئي (حتى 20 كم)
             val nearbyPlaces = OfflineYemenGazetteer.PLACES.filter { p ->
                 val dist = HaversinePrecisionNavigator.calculateDistance(poiLat, poiLng, p.latitude, p.longitude)
-                dist <= 20_000.0
+                dist <= 20_000.0 && isCategoryAllowed(p.category)
             }
             nearbyPlaces.forEach { p ->
                 val dedupeKey = "${p.name.trim()}_${java.lang.String.format(java.util.Locale.US, "%.3f_%.3f", p.latitude, p.longitude)}"
@@ -157,7 +171,7 @@ internal fun BoxScope.MapScreenViewport(
             }
 
             // المعالم المخصصة المحفوظة محلياً
-            val custom = CustomLandmarkStore.nearby(context, poiLat, poiLng, maxDistanceM = 15_000.0)
+            val custom = CustomLandmarkStore.nearby(context, poiLat, poiLng, maxDistanceM = 15_000.0).filter { isCategoryAllowed(it.kind) }
             custom.forEach { c ->
                 val dedupeKey = "${c.name.trim()}_${java.lang.String.format(java.util.Locale.US, "%.3f_%.3f", c.lat, c.lng)}"
                 if (seenKeys.add(dedupeKey)) {
@@ -184,7 +198,7 @@ internal fun BoxScope.MapScreenViewport(
             val hasNet = caps?.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
             if (hasNet) {
                 try {
-                    val remotePois = LandmarkFinder.fetchViewportPois(poiLat, poiLng, radiusM = 2200)
+                    val remotePois = LandmarkFinder.fetchViewportPois(poiLat, poiLng, radiusM = 2500).filter { isCategoryAllowed(it.kind) }
                     if (remotePois.isNotEmpty()) {
                         val mergedArr = org.json.JSONArray(localArr.toString())
                         val toCache = mutableListOf<RealValhallaNavigator.SearchAddressResult>()
@@ -473,91 +487,184 @@ internal fun BoxScope.MapScreenViewport(
             valhallaSizeMb = valhallaSizeMb,
             realTimeSatEnabled = state.realTimeSatEnabled,
             realTimeSatFeed = state.realTimeSatFeed,
-            bottomInsetDp = 115,
+            showLabelsOnMap = state.showLabelsOnMap,
+            recenterTick = state.recenterTick,
+            bottomInsetDp = 24,
             topInsetDp = 0,
             modifier = Modifier.fillMaxSize()
         )
 
-        // 🏷️ شريط الشارات والتبديل السريع (موضع محكم أسفل كبسولة البحث دون تداخل مع قائمة التحكم الجانبية)
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically,
+        // 🌐 زر أنيق وصغير لنمط الخريطة (قياسي / قمر صناعي / تضاريس / أوفلاين) مع قائمة منسدلة
+        var showMapTypeDropdown by remember { mutableStateOf(false) }
+        Box(
             modifier = Modifier
-                .align(Alignment.TopStart)
+                .align(Alignment.TopEnd)
                 .statusBarsPadding()
-                .padding(top = 74.dp, start = 16.dp, end = 86.dp)
-                .horizontalScroll(rememberScrollState())
+                .padding(top = 74.dp, end = 16.dp)
         ) {
-            val isOfflineLayer = state.mapLayer == MapLayer.VALHALLA_OFFLINE
-            FilterChip(
-                selected = isOfflineLayer,
-                onClick = {
-                    val next = if (isOfflineLayer) MapLayer.STANDARD else MapLayer.VALHALLA_OFFLINE
-                    state.mapLayer = next
-                    onTilesStatus(false)
-                    coroutineScope.launch {
-                        snackbarHostState.showSnackbar(
-                            if (next == MapLayer.VALHALLA_OFFLINE) {
-                                if (isTilesDownloaded) "📦 وضع أوفلاين Valhalla مفعّل (${valhallaSizeMb} MB) — بدون إنترنت"
-                                else "📦 وضع الكاش الأوفلاين مفعّل (يمكنك تحميل حزمة Valhalla من زر الطبقات)"
-                            } else {
-                                "🌐 تم العودة إلى وضع الخريطة القياسي"
-                            }
-                        )
-                    }
-                },
-                label = {
-                    Text(
-                        text = if (isOfflineLayer) "📦 أوفلاين Valhalla" else "🌐 قياسي",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (isOfflineLayer) Color(0xFF10B981) else Color.White
+            Surface(
+                onClick = { showMapTypeDropdown = true },
+                shape = CircleShape,
+                color = Color(0xFF0F172A).copy(alpha = 0.92f),
+                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.16f)),
+                shadowElevation = 8.dp,
+                modifier = Modifier
+                    .size(40.dp)
+                    .testTag("map_type_dropdown_btn")
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = when (state.currentMapMode) {
+                            MapMode.SATELLITE, MapMode.SATELLITE_CLARITY -> Icons.Default.SatelliteAlt
+                            MapMode.TOPO -> Icons.Default.Terrain
+                            else -> Icons.Default.Public
+                        },
+                        contentDescription = "نمط الخريطة",
+                        tint = when (state.currentMapMode) {
+                            MapMode.SATELLITE, MapMode.SATELLITE_CLARITY -> Color(0xFF38BDF8)
+                            MapMode.TOPO -> Color(0xFFF59E0B)
+                            else -> Color(0xFF10B981)
+                        },
+                        modifier = Modifier.size(20.dp)
                     )
-                },
-                colors = FilterChipDefaults.filterChipColors(
-                    containerColor = Color(0xCC0F172A),
-                    selectedContainerColor = Color(0xCC064E3B)
-                ),
-                modifier = Modifier.testTag("map_valhalla_offline_toggle_btn")
-            )
+                }
+            }
 
-            if (state.currentMapMode == MapMode.SATELLITE || state.currentMapMode == MapMode.SATELLITE_CLARITY || state.currentMapMode == MapMode.VELA_3D) {
-                FilterChip(
-                    selected = hybridLabels,
-                    onClick = onToggleHybridLabels,
-                    label = { Text("أسماء الشوارع", fontSize = 11.sp, color = if (hybridLabels) Color(0xFF00E5FF) else Color.White) },
-                    colors = FilterChipDefaults.filterChipColors(
-                        containerColor = Color(0xCC0F172A),
-                        selectedContainerColor = Color(0xFF1E293B)
-                    )
-                )
-            }
-            if (isEcoMode) {
-                FilterChip(
-                    selected = true,
-                    onClick = {
-                        MapPowerDataPrefs.setEcoMode(context, false)
-                        viewModel.startLocationUpdates()
-                        coroutineScope.launch { snackbarHostState.showSnackbar("تم إيقاف وضع توفير البطارية والنت") }
+            DropdownMenu(
+                expanded = showMapTypeDropdown,
+                onDismissRequest = { showMapTypeDropdown = false },
+                containerColor = Color(0xFF0F172A),
+                modifier = Modifier
+                    .border(1.dp, Color.White.copy(alpha = 0.14f), RoundedCornerShape(14.dp))
+                    .widthIn(min = 200.dp)
+            ) {
+                // 1. خريطة قياسية (شوارع)
+                val isStandard = (state.currentMapMode == MapMode.OSM || state.currentMapMode == MapMode.VELA) && state.mapLayer != MapLayer.VALHALLA_OFFLINE
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            "🌐 خريطة قياسية (شوارع)",
+                            fontWeight = if (isStandard) FontWeight.Bold else FontWeight.Normal,
+                            color = if (isStandard) Color(0xFF10B981) else Color.White
+                        )
                     },
-                    label = { Text("🔋 توفير", fontSize = 11.sp, color = Color(0xFF10B981)) },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = Color(0xCC064E3B)
-                    )
-                )
-            }
-            if (isManualLoc) {
-                FilterChip(
-                    selected = true,
-                    onClick = {
-                        viewModel.clearManualUserLocation()
-                        viewModel.startLocationUpdates()
-                        coroutineScope.launch { snackbarHostState.showSnackbar("تمت العودة لتحديد الموقع عبر GPS") }
+                    leadingIcon = {
+                        Icon(Icons.Default.Public, contentDescription = null, tint = if (isStandard) Color(0xFF10B981) else Color(0xFF94A3B8))
                     },
-                    label = { Text("📍 موقع يدوي ×", fontSize = 10.5.sp, color = Color(0xFF00E5FF)) },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = Color(0xCC0F172A)
-                    )
+                    trailingIcon = if (isStandard) {
+                        { Icon(Icons.Default.Check, contentDescription = null, tint = Color(0xFF10B981), modifier = Modifier.size(16.dp)) }
+                    } else null,
+                    onClick = {
+                        state.currentMapMode = MapMode.OSM
+                        state.mapLayer = MapLayer.STANDARD
+                        showMapTypeDropdown = false
+                    }
+                )
+
+                // 2. قمر صناعي
+                val isSat = state.currentMapMode == MapMode.SATELLITE || state.currentMapMode == MapMode.SATELLITE_CLARITY
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            "🛰️ قمر صناعي (أقمار حقيقية)",
+                            fontWeight = if (isSat) FontWeight.Bold else FontWeight.Normal,
+                            color = if (isSat) Color(0xFF38BDF8) else Color.White
+                        )
+                    },
+                    leadingIcon = {
+                        Icon(Icons.Default.SatelliteAlt, contentDescription = null, tint = if (isSat) Color(0xFF38BDF8) else Color(0xFF94A3B8))
+                    },
+                    trailingIcon = if (isSat) {
+                        { Icon(Icons.Default.Check, contentDescription = null, tint = Color(0xFF38BDF8), modifier = Modifier.size(16.dp)) }
+                    } else null,
+                    onClick = {
+                        state.currentMapMode = MapMode.SATELLITE
+                        showMapTypeDropdown = false
+                    }
+                )
+
+                // 3. تضاريس ومرتفعات
+                val isTopo = state.currentMapMode == MapMode.TOPO
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            "⛰️ خريطة تضاريس (Topo)",
+                            fontWeight = if (isTopo) FontWeight.Bold else FontWeight.Normal,
+                            color = if (isTopo) Color(0xFFF59E0B) else Color.White
+                        )
+                    },
+                    leadingIcon = {
+                        Icon(Icons.Default.Terrain, contentDescription = null, tint = if (isTopo) Color(0xFFF59E0B) else Color(0xFF94A3B8))
+                    },
+                    trailingIcon = if (isTopo) {
+                        { Icon(Icons.Default.Check, contentDescription = null, tint = Color(0xFFF59E0B), modifier = Modifier.size(16.dp)) }
+                    } else null,
+                    onClick = {
+                        state.currentMapMode = MapMode.TOPO
+                        showMapTypeDropdown = false
+                    }
+                )
+
+                // 4. وضع أوفلاين
+                val isOffline = state.mapLayer == MapLayer.VALHALLA_OFFLINE
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            "📦 وضع أوفلاين بدون إنترنت",
+                            fontWeight = if (isOffline) FontWeight.Bold else FontWeight.Normal,
+                            color = if (isOffline) Color(0xFF10B981) else Color.White
+                        )
+                    },
+                    leadingIcon = {
+                        Icon(Icons.Default.CloudOff, contentDescription = null, tint = if (isOffline) Color(0xFF10B981) else Color(0xFF94A3B8))
+                    },
+                    trailingIcon = if (isOffline) {
+                        { Icon(Icons.Default.Check, contentDescription = null, tint = Color(0xFF10B981), modifier = Modifier.size(16.dp)) }
+                    } else null,
+                    onClick = {
+                        state.mapLayer = if (isOffline) MapLayer.STANDARD else MapLayer.VALHALLA_OFFLINE
+                        showMapTypeDropdown = false
+                    }
+                )
+
+                HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+
+                // 5. إظهار/إخفاء الأسماء
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            if (state.showLabelsOnMap) "🙈 إخفاء أسماء الشوارع" else "👁️ إظهار أسماء الشوارع",
+                            color = Color.White
+                        )
+                    },
+                    leadingIcon = {
+                        Icon(
+                            if (state.showLabelsOnMap) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                            contentDescription = null,
+                            tint = Color(0xFF00E5FF)
+                        )
+                    },
+                    onClick = {
+                        state.showLabelsOnMap = !state.showLabelsOnMap
+                        showMapTypeDropdown = false
+                    }
+                )
+
+                // 6. تصفية المعالم
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            "🎯 تصفية معالم الخريطة",
+                            color = Color.White
+                        )
+                    },
+                    leadingIcon = {
+                        Icon(Icons.Default.Place, contentDescription = null, tint = Color(0xFF00E5FF))
+                    },
+                    onClick = {
+                        state.showLandmarkFilterSheet = true
+                        showMapTypeDropdown = false
+                    }
                 )
             }
         }
@@ -833,7 +940,10 @@ internal fun BoxScope.MapScreenTopSearchAndResults(
     searchResults: List<RealValhallaNavigator.SearchAddressResult>,
     searchMessage: String?,
     onSelectSearchResult: (RealValhallaNavigator.SearchAddressResult) -> Unit,
-    focusTick: Int = 0
+    focusTick: Int = 0,
+    safeUserLat: Double = 15.3694,
+    safeUserLng: Double = 44.1910,
+    hasRealLocation: Boolean = false
 ) {
     Box(
         modifier = Modifier
@@ -913,6 +1023,9 @@ internal fun BoxScope.MapScreenTopSearchAndResults(
                     }
                     LazyColumn {
                         items(searchResults) { res ->
+                            val distM = if (hasRealLocation) {
+                                HaversinePrecisionNavigator.calculateDistance(safeUserLat, safeUserLng, res.latitude, res.longitude)
+                            } else null
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -943,6 +1056,21 @@ internal fun BoxScope.MapScreenTopSearchAndResults(
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
+                                }
+                                if (distM != null) {
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = Color(0xFF1E293B),
+                                        border = BorderStroke(1.dp, Color(0xFF334155))
+                                    ) {
+                                        Text(
+                                            text = MapDistanceCalculator.formatDistance(distM),
+                                            color = Color(0xFF00E5FF),
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                                        )
+                                    }
                                 }
                             }
                             HorizontalDivider(color = Color.White.copy(alpha = 0.06f))

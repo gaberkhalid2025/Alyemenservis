@@ -34,8 +34,11 @@ object OfflineTileInterceptor {
     )
 
     private val OSM = Regex("^https://(?:[a-c]\\.)?tile\\.openstreetmap\\.org/(\\d+)/(\\d+)/(\\d+)\\.png$")
+    private val OSM_DE = Regex("^https://tile\\.openstreetmap\\.de/(\\d+)/(\\d+)/(\\d+)\\.png$")
     private val HOT = Regex("^https://[a-c]\\.tile\\.openstreetmap\\.fr/hot/(\\d+)/(\\d+)/(\\d+)\\.png$")
     private val TOPO = Regex("^https://[a-c]\\.tile\\.opentopomap\\.org/(\\d+)/(\\d+)/(\\d+)\\.png$")
+    private val ESRI_TOPO = Regex("^https://server\\.arcgisonline\\.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/(\\d+)/(\\d+)/(\\d+)$")
+    private val CARTO_VOYAGER = Regex("^https://[a-d]\\.basemaps\\.cartocdn\\.com/rastertiles/voyager/(\\d+)/(\\d+)/(\\d+)(?:@2x)?\\.png$")
     private val SAT = Regex("^https://server\\.arcgisonline\\.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/(\\d+)/(\\d+)/(\\d+)$")
     private val SAT_CLARITY = Regex("^https://clarity\\.maptiles\\.arcgis\\.com/arcgis/rest/services/World_Imagery/MapServer/tile/(\\d+)/(\\d+)/(\\d+)$")
     private val VELA = Regex("^https://server\\.arcgisonline\\.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/(\\d+)/(\\d+)/(\\d+)$")
@@ -51,11 +54,14 @@ object OfflineTileInterceptor {
 
     private fun parse(url: String): Tile? {
         OSM.matchEntire(url)?.let { return Tile("osm", it.groupValues[1].toInt(), it.groupValues[2].toInt(), it.groupValues[3].toInt(), "png", "image/png") }
+        OSM_DE.matchEntire(url)?.let { return Tile("osm_de", it.groupValues[1].toInt(), it.groupValues[2].toInt(), it.groupValues[3].toInt(), "png", "image/png") }
         HOT.matchEntire(url)?.let { return Tile("hot", it.groupValues[1].toInt(), it.groupValues[2].toInt(), it.groupValues[3].toInt(), "png", "image/png") }
         TOPO.matchEntire(url)?.let { return Tile("topo", it.groupValues[1].toInt(), it.groupValues[2].toInt(), it.groupValues[3].toInt(), "png", "image/png") }
+        CARTO_VOYAGER.matchEntire(url)?.let { return Tile("carto_voyager", it.groupValues[1].toInt(), it.groupValues[2].toInt(), it.groupValues[3].toInt(), "png", "image/png") }
         CARTO_LABELS.matchEntire(url)?.let { return Tile("carto_labels", it.groupValues[1].toInt(), it.groupValues[2].toInt(), it.groupValues[3].toInt(), "png", "image/png") }
         DEM_TERRARIUM.matchEntire(url)?.let { return Tile("dem", it.groupValues[1].toInt(), it.groupValues[2].toInt(), it.groupValues[3].toInt(), "png", "image/png") }
         // Esri & EOX: {z}/{y}/{x}
+        ESRI_TOPO.matchEntire(url)?.let { return Tile("esri_topo", it.groupValues[1].toInt(), it.groupValues[3].toInt(), it.groupValues[2].toInt(), "jpg", "image/jpeg") }
         VELA.matchEntire(url)?.let { return Tile("vela_esri", it.groupValues[1].toInt(), it.groupValues[3].toInt(), it.groupValues[2].toInt(), "jpg", "image/jpeg") }
         SAT.matchEntire(url)?.let { return Tile("sat", it.groupValues[1].toInt(), it.groupValues[3].toInt(), it.groupValues[2].toInt(), "jpg", "image/jpeg") }
         SAT_CLARITY.matchEntire(url)?.let { return Tile("sat_clarity", it.groupValues[1].toInt(), it.groupValues[3].toInt(), it.groupValues[2].toInt(), "jpg", "image/jpeg") }
@@ -65,12 +71,33 @@ object OfflineTileInterceptor {
         return null
     }
 
+    private fun mirrorUrls(t: Tile): List<Pair<String, String>> = when (t.source) {
+        "topo" -> listOf(
+            "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/${t.z}/${t.y}/${t.x}" to "image/jpeg",
+            "https://a.basemaps.cartocdn.com/rastertiles/voyager/${t.z}/${t.x}/${t.y}.png" to "image/png"
+        )
+        "osm", "osm_de", "hot" -> listOf(
+            "https://a.basemaps.cartocdn.com/rastertiles/voyager/${t.z}/${t.x}/${t.y}.png" to "image/png",
+            "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/${t.z}/${t.y}/${t.x}" to "image/jpeg"
+        )
+        "sat_clarity" -> listOf(
+            "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${t.z}/${t.y}/${t.x}" to "image/jpeg"
+        )
+        "vela_esri", "carto_voyager" -> listOf(
+            "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/${t.z}/${t.y}/${t.x}" to "image/jpeg",
+            "https://tile.openstreetmap.org/${t.z}/${t.x}/${t.y}.png" to "image/png"
+        )
+        else -> emptyList()
+    }
+
     private fun findFallbackCachedTile(context: Context, requested: Tile): Pair<ByteArray, String>? {
         if (requested.source in setOf("dem", "eox16", "esri_labels", "esri_trans", "carto_labels")) return null
         val fallbackOrder = listOf(
             "sat" to ("jpg" to "image/jpeg"),
             "sat_clarity" to ("jpg" to "image/jpeg"),
             "vela_esri" to ("jpg" to "image/jpeg"),
+            "carto_voyager" to ("png" to "image/png"),
+            "esri_topo" to ("jpg" to "image/jpeg"),
             "osm" to ("png" to "image/png"),
             "hot" to ("png" to "image/png"),
             "topo" to ("png" to "image/png")
@@ -124,7 +151,19 @@ object OfflineTileInterceptor {
             return WebResourceResponse("text/plain", "utf-8", 404, "Not Cached", CORS_HEADERS, ByteArrayInputStream(ByteArray(0)))
         }
 
-        val bytes = download(url) ?: run {
+        val downloaded = download(url)?.let { it to tile.mime } ?: run {
+            var mirrorResult: Pair<ByteArray, String>? = null
+            for ((mirrorUrl, mirrorMime) in mirrorUrls(tile)) {
+                val mBytes = download(mirrorUrl)
+                if (mBytes != null) {
+                    mirrorResult = mBytes to mirrorMime
+                    break
+                }
+            }
+            mirrorResult
+        }
+
+        if (downloaded == null) {
             // إذا فشل الاتصال نعيد النسخة المخزنة حتى لو قديمة أو بديل متوفر محلياً
             if (cache.exists() && cache.length() > 0) {
                 val old = cache.readBytes()
@@ -138,14 +177,17 @@ object OfflineTileInterceptor {
             return WebResourceResponse("text/plain", "utf-8", 504, "Offline", CORS_HEADERS, ByteArrayInputStream(ByteArray(0)))
         }
 
-        memoryCache.put(tile.key, CachedTile(bytes, tile.mime))
-        try {
-            writeAtomically(cache, bytes)
-            maybePruneDiskCache(context)
-        } catch (t: Throwable) {
-            Log.w(TAG, "cache write failed: ${t.message}")
+        val (bytes, mime) = downloaded
+        memoryCache.put(tile.key, CachedTile(bytes, mime))
+        if (mime == tile.mime) {
+            try {
+                writeAtomically(cache, bytes)
+                maybePruneDiskCache(context)
+            } catch (t: Throwable) {
+                Log.w(TAG, "cache write failed: ${t.message}")
+            }
         }
-        return tileResponse(bytes, tile.mime)
+        return tileResponse(bytes, mime)
     }
 
     private fun tileResponse(bytes: ByteArray, mime: String) =
@@ -182,7 +224,7 @@ object OfflineTileInterceptor {
         var c: HttpURLConnection? = null
         return try {
             c = (URL(url).openConnection() as HttpURLConnection).apply {
-                connectTimeout = 4_000; readTimeout = 6_000
+                connectTimeout = 3_000; readTimeout = 4_500
                 useCaches = true
                 setRequestProperty("User-Agent", USER_AGENT)
             }

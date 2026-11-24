@@ -90,21 +90,44 @@ object LandmarkFinder {
         combined
     }
 
-    suspend fun fetchViewportPois(lat: Double, lng: Double, radiusM: Int = 1400): List<LandmarkCandidate> = withContext(Dispatchers.IO) {
+    private fun toArabicRegex(clean: String): String {
+        val stripped = clean
+            .replace(Regex("[\\u064B-\\u0652\\u0640]"), "")
+            .replace("\\", "")
+            .replace("\"", "")
+            .replace(Regex("[.*+?^\${}()|\\[\\]]"), "")
+            .trim()
+        val sb = StringBuilder(stripped.length * 4)
+        for (ch in stripped) {
+            when (ch) {
+                'ا', 'أ', 'إ', 'آ', 'ٱ' -> sb.append("[اأإآٱ]")
+                'ه', 'ة' -> sb.append("[هة]")
+                'ي', 'ى', 'ئ' -> sb.append("[يىئ]")
+                'و', 'ؤ' -> sb.append("[وؤ]")
+                else -> sb.append(ch)
+            }
+        }
+        return sb.toString()
+    }
+
+    suspend fun fetchViewportPois(lat: Double, lng: Double, radiusM: Int = 2500): List<LandmarkCandidate> = withContext(Dispatchers.IO) {
         lastError = null
         if (!LandmarkAddress.isValid(lat, lng)) return@withContext emptyList()
-        val key = String.format(Locale.US, "vp_%.2f_%.2f_%d", lat, lng, radiusM)
+        val key = String.format(Locale.US, "vp2_%.2f_%.2f_%d", lat, lng, radiusM)
         cache[key]?.let { (t, v) -> if (System.currentTimeMillis() - t < 10 * 60_000L) return@withContext v }
 
         val la = String.format(Locale.US, "%.5f", lat)
         val lo = String.format(Locale.US, "%.5f", lng)
+        val streetRadius = radiusM.coerceAtMost(1800)
         val q = "[out:json][timeout:14];(" +
-            "nwr(around:$radiusM,$la,$lo)[\"amenity\"~\"^(place_of_worship|school|university|college|hospital|clinic|pharmacy|restaurant|cafe|fast_food|bank|fuel|marketplace|events_venue|community_centre)\$\"][\"name\"];" +
-            "nwr(around:$radiusM,$la,$lo)[\"shop\"~\"^(supermarket|mall|bakery)\$\"][\"name\"];" +
+            "nwr(around:$radiusM,$la,$lo)[\"amenity\"~\"^(place_of_worship|school|university|college|kindergarten|hospital|clinic|pharmacy|restaurant|cafe|fast_food|bank|fuel|marketplace|events_venue|community_centre|conference_centre|social_centre|banquet_hall)\$\"][\"name\"];" +
+            "nwr(around:$radiusM,$la,$lo)[\"shop\"~\"^(supermarket|mall|department_store|bakery|clothes|electronics)\$\"][\"name\"];" +
+            "nwr(around:$radiusM,$la,$lo)[\"building\"~\"^(mosque|school|hall|events_venue)\$\"][\"name\"];" +
             "nwr(around:$radiusM,$la,$lo)[\"place\"~\"^(neighbourhood|suburb|quarter)\$\"][\"name\"];" +
-            ");out center 60;"
+            "way(around:$streetRadius,$la,$lo)[\"highway\"~\"^(trunk|primary|secondary|tertiary)\$\"][\"name\"];" +
+            ");out center 90;"
 
-        val result = postOverpass(q, lat, lng, maxResults = 40, kindOf = ::classifyOsmTags)
+        val result = postOverpass(q, lat, lng, maxResults = 60, kindOf = ::classifyOsmTags)
         if (result.isNotEmpty()) {
             cache[key] = System.currentTimeMillis() to result
         }
@@ -115,48 +138,54 @@ object LandmarkFinder {
         query: String,
         centerLat: Double,
         centerLng: Double,
-        radiusM: Int = 18000
+        radiusM: Int = 20000
     ): List<LandmarkCandidate> = withContext(Dispatchers.IO) {
         val clean = query.trim()
         if (clean.length < 2 || !LandmarkAddress.isValid(centerLat, centerLng)) return@withContext emptyList()
         val nq = ArabicNormalizer.normalize(clean)
-        val cacheKey = String.format(Locale.US, "q_%s_%.2f_%.2f", nq, centerLat, centerLng)
+        val cacheKey = String.format(Locale.US, "q2_%s_%.2f_%.2f", nq, centerLat, centerLng)
         cache[cacheKey]?.let { (t, v) -> if (System.currentTimeMillis() - t < 5 * 60_000L) return@withContext v }
 
         val la = String.format(Locale.US, "%.5f", centerLat)
         val lo = String.format(Locale.US, "%.5f", centerLng)
-        val safeRegex = clean
-            .replace("\\", "")
-            .replace("\"", "")
-            .replace(Regex("[.*+?^\${}()|\\[\\]]"), "")
-            .trim()
+        val arRegex = toArabicRegex(clean)
 
         val clauses = StringBuilder()
-        if (safeRegex.length >= 2) {
-            clauses.append("nwr(around:$radiusM,$la,$lo)[\"name\"~\"$safeRegex\",i];")
-            clauses.append("nwr(around:$radiusM,$la,$lo)[\"name:ar\"~\"$safeRegex\",i];")
+        if (arRegex.length >= 2) {
+            clauses.append("nwr(around:$radiusM,$la,$lo)[\"name\"~\"$arRegex\",i];")
+            clauses.append("nwr(around:$radiusM,$la,$lo)[\"name:ar\"~\"$arRegex\",i];")
         }
         when {
             nq.contains("صاله") || nq.contains("قاعه") || nq.contains("افراح") || nq.contains("اعراس") || nq.contains("مناسبات") -> {
-                clauses.append("nwr(around:$radiusM,$la,$lo)[\"amenity\"~\"^(events_venue|community_centre|conference_centre)\$\"][\"name\"];")
-                clauses.append("nwr(around:$radiusM,$la,$lo)[\"name\"~\"(صالة|قاعة|أفراح|افراح|أعراس|مناسبات)\",i];")
+                clauses.append("nwr(around:$radiusM,$la,$lo)[\"amenity\"~\"^(events_venue|community_centre|conference_centre|social_centre|banquet_hall)\$\"][\"name\"];")
+                clauses.append("nwr(around:$radiusM,$la,$lo)[\"building\"~\"^(hall|events_venue)\$\"][\"name\"];")
+                clauses.append("nwr(around:$radiusM,$la,$lo)[\"name\"~\"([صق]ال[ةه]|[أا]فراح|[أا]عراس|مناسبات|قصر)\",i];")
             }
-            nq.contains("مسجد") || nq.contains("جامع") || nq.contains("مصلى") -> {
-                clauses.append("nwr(around:4000,$la,$lo)[\"amenity\"=\"place_of_worship\"][\"name\"];")
+            nq.contains("مسجد") || nq.contains("جامع") || nq.contains("مصلي") -> {
+                clauses.append("nwr(around:$radiusM,$la,$lo)[\"amenity\"=\"place_of_worship\"][\"name\"];")
+                clauses.append("nwr(around:$radiusM,$la,$lo)[\"building\"=\"mosque\"][\"name\"];")
             }
-            nq.contains("مدرسه") || nq.contains("ثانويه") || nq.contains("معهد") || nq.contains("جامعه") || nq.contains("كليه") -> {
-                clauses.append("nwr(around:4000,$la,$lo)[\"amenity\"~\"^(school|college|university|kindergarten)\$\"][\"name\"];")
+            nq.contains("مدرسه") || nq.contains("مدارس") || nq.contains("ثانويه") || nq.contains("معهد") || nq.contains("جامعه") || nq.contains("كليه") || nq.contains("روضه") -> {
+                clauses.append("nwr(around:$radiusM,$la,$lo)[\"amenity\"~\"^(school|college|university|kindergarten)\$\"][\"name\"];")
+                clauses.append("nwr(around:$radiusM,$la,$lo)[\"building\"=\"school\"][\"name\"];")
             }
-            nq.contains("شارع") || nq.contains("طريق") || nq.contains("دائري") || nq.contains("جوله") -> {
-                clauses.append("way(around:4000,$la,$lo)[\"highway\"][\"name\"];")
+            nq.contains("مطعم") || nq.contains("كافيه") || nq.contains("مقهي") || nq.contains("بوفيه") -> {
+                clauses.append("nwr(around:$radiusM,$la,$lo)[\"amenity\"~\"^(restaurant|fast_food|cafe)\$\"][\"name\"];")
+            }
+            nq.contains("مول") || nq.contains("سوق") || nq.contains("متجر") || nq.contains("محل") -> {
+                clauses.append("nwr(around:$radiusM,$la,$lo)[\"shop\"~\"^(supermarket|mall|department_store|clothes|electronics|bakery)\$\"][\"name\"];")
+                clauses.append("nwr(around:$radiusM,$la,$lo)[\"amenity\"=\"marketplace\"][\"name\"];")
+            }
+            nq.contains("شارع") || nq.contains("طريق") || nq.contains("دائري") || nq.contains("جوله") || nq.contains("خط") -> {
+                clauses.append("way(around:$radiusM,$la,$lo)[\"highway\"][\"name\"];")
             }
             nq.contains("بيت") || nq.contains("منزل") || nq.contains("حاره") || nq.contains("حي") -> {
-                clauses.append("nwr(around:5000,$la,$lo)[\"place\"~\"^(neighbourhood|suburb|quarter|village|hamlet)\$\"][\"name\"];")
+                clauses.append("nwr(around:$radiusM,$la,$lo)[\"place\"~\"^(neighbourhood|suburb|quarter|village|hamlet)\$\"][\"name\"];")
             }
         }
         if (clauses.isEmpty()) return@withContext emptyList()
-        val q = "[out:json][timeout:12];(${clauses});out center 50;"
-        val result = postOverpass(q, centerLat, centerLng, maxResults = 30, kindOf = ::classifyOsmTags)
+        val q = "[out:json][timeout:14];(${clauses});out center 60;"
+        val result = postOverpass(q, centerLat, centerLng, maxResults = 35, kindOf = ::classifyOsmTags)
         if (result.isNotEmpty()) {
             cache[cacheKey] = System.currentTimeMillis() to result
         }
@@ -168,12 +197,14 @@ object LandmarkFinder {
         val shop = tags.optString("shop")
         val place = tags.optString("place")
         val tourism = tags.optString("tourism")
+        val building = tags.optString("building")
         return when {
             tourism in listOf("hotel", "guest_house", "motel") -> "فندق"
             tags.optString("junction") == "roundabout" -> "جولة"
-            amenity in listOf("events_venue", "community_centre", "conference_centre") -> "صالة أفراح"
-            amenity == "place_of_worship" -> "مسجد"
-            amenity == "school" || amenity == "kindergarten" -> "مدرسة"
+            amenity in listOf("events_venue", "community_centre", "conference_centre", "social_centre", "banquet_hall") ||
+                building in listOf("hall", "events_venue") -> "صالة أفراح"
+            amenity == "place_of_worship" || building == "mosque" -> "مسجد"
+            amenity == "school" || amenity == "kindergarten" || building == "school" -> "مدرسة"
             amenity == "university" || amenity == "college" -> "جامعة"
             amenity == "hospital" -> "مستشفى"
             amenity == "clinic" -> "عيادة"
@@ -182,7 +213,7 @@ object LandmarkFinder {
             amenity == "cafe" -> "كافيه"
             amenity == "bank" -> "بنك"
             amenity == "fuel" -> "محطة وقود"
-            amenity == "marketplace" || shop in listOf("supermarket", "mall", "bakery") -> "سوق"
+            amenity == "marketplace" || shop in listOf("supermarket", "mall", "department_store", "bakery", "clothes", "electronics") -> "سوق"
             place in listOf("neighbourhood", "suburb", "quarter", "village", "hamlet") -> "حي"
             tags.has("highway") && !tags.has("amenity") -> "شارع"
             tags.has("building") -> "مبنى"

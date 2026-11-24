@@ -575,6 +575,12 @@ object RealValhallaNavigator {
             emptyList()
         }
 
+        val explicitOtherCity = listOf(
+            "صنعاء", "عدن", "تعز", "الحديده", "اب", "المكلا", "حضرموت", "مارب",
+            "ذمار", "سيئون", "صعده", "حجه", "شبوه", "المهره", "ابين", "لحج",
+            "الضالع", "البيضاء", "عمران", "المحويت", "ريمه", "الجوف", "سقطري"
+        ).any { nq.contains(it) }
+
         fun relevanceScore(r: SearchAddressResult): Int {
             val sn = normalizeArabic(r.shortName)
             val dn = normalizeArabic(r.displayName)
@@ -589,6 +595,16 @@ object RealValhallaNavigator {
                 else -> 40
             }
             if (r.type in setOf("saved_landmark", "provider", "store", "property")) s += 10
+            if (hasRef && !explicitOtherCity) {
+                val distKm = HaversinePrecisionNavigator.calculateDistance(refLat, refLng, r.latitude, r.longitude) / 1000.0
+                s += when {
+                    distKm <= 10.0 -> 38
+                    distKm <= 30.0 -> 24
+                    distKm <= 75.0 -> 10
+                    distKm > 150.0 -> -35
+                    else -> 0
+                }
+            }
             return s
         }
 
@@ -648,7 +664,7 @@ object RealValhallaNavigator {
         return try {
             val encoded = URLEncoder.encode(q, "UTF-8")
             val bias = if (hasBias) "&lat=$lat&lon=$lng" else ""
-            val url = URL("https://photon.komoot.io/api/?q=$encoded&limit=12$bias")
+            val url = URL("https://photon.komoot.io/api/?q=$encoded&limit=20$bias")
             c = (url.openConnection() as HttpURLConnection).apply {
                 connectTimeout = 2_500; readTimeout = 3_500; requestMethod = "GET"
                 setRequestProperty("User-Agent", "AlYemenServicesApp/1.0 (Android; Photon)")
@@ -697,8 +713,8 @@ object RealValhallaNavigator {
         var c: HttpURLConnection? = null
         return try {
             val encoded = URLEncoder.encode(q, "UTF-8")
-            val viewbox = if (hasUser) "&viewbox=${lng - 1.0},${lat + 1.0},${lng + 1.0},${lat - 1.0}&bounded=0" else ""
-            val url = URL("${NavConfig.NOMINATIM_BASE_URL}?format=jsonv2&q=$encoded&countrycodes=ye&accept-language=ar&limit=12$viewbox")
+            val viewbox = if (hasUser) "&viewbox=${lng - 1.5},${lat + 1.5},${lng + 1.5},${lat - 1.5}&bounded=0" else ""
+            val url = URL("${NavConfig.NOMINATIM_BASE_URL}?format=jsonv2&q=$encoded&countrycodes=ye&accept-language=ar&limit=25$viewbox")
             c = (url.openConnection() as HttpURLConnection).apply {
                 connectTimeout = 2_500; readTimeout = 3_500; requestMethod = "GET"
                 setRequestProperty("User-Agent", "AlYemenServicesApp/1.0 (Android; Nominatim)")

@@ -47,8 +47,8 @@ fun MapControls(
     onToggleRadarMode: () -> Unit,
     isHeatmapActive: Boolean,
     onToggleHeatmap: () -> Unit,
-    onZoomIn: () -> Unit,
-    onZoomOut: () -> Unit,
+    onZoomIn: () -> Unit = {},
+    onZoomOut: () -> Unit = {},
     onRecenterLocation: () -> Unit,
     onOpenLayerDialog: () -> Unit,
     isNavigationActive: Boolean,
@@ -81,7 +81,13 @@ fun MapControls(
     hasMoreLayersActive: Boolean = false,
     hasLayerOverlayActive: Boolean = false,
     onOpenMoreLayers: () -> Unit = {},
-    onOpenGroupTracking: () -> Unit = {}
+    onOpenGroupTracking: () -> Unit = {},
+    showLabelsOnMap: Boolean = true,
+    onOpenLandmarkFilter: () -> Unit = {},
+    onToggleLabelsQuick: () -> Unit = {},
+    onOpenSos: (() -> Unit)? = null,
+    onOpenServicesSheet: (() -> Unit)? = null,
+    onOpenRoadReports: (() -> Unit)? = null
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "gps_pulse")
     val gpsPulseAlpha by infiniteTransition.animateFloat(
@@ -133,23 +139,25 @@ fun MapControls(
 
             HorizontalDivider(modifier = Modifier.width(34.dp), color = Color.White.copy(alpha = 0.08f))
 
-            // 3. ➕ تكبير مباشر
+            // 3. ➕ تكبير الخريطة
             DockButton(
                 icon = Icons.Default.Add,
                 label = "تكبير",
                 active = false,
                 onClick = onZoomIn,
-                testTag = "map_zoom_in_btn",
+                testTag = "zoom_in_btn",
                 contentDescription = "تكبير الخريطة"
             )
 
-            // 4. ➖ تصغير مباشر
+            HorizontalDivider(modifier = Modifier.width(34.dp), color = Color.White.copy(alpha = 0.08f))
+
+            // 4. ➖ تصغير الخريطة
             DockButton(
                 icon = Icons.Default.Remove,
                 label = "تصغير",
                 active = false,
                 onClick = onZoomOut,
-                testTag = "map_zoom_out_btn",
+                testTag = "zoom_out_btn",
                 contentDescription = "تصغير الخريطة"
             )
 
@@ -186,6 +194,51 @@ fun MapControls(
                     containerColor = Color(0xFF0F172A),
                     modifier = Modifier.border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(12.dp))
                 ) {
+                    // أسماء الشوارع والمعالم
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                if (showLabelsOnMap) "🙈 إخفاء أسماء الشوارع والمعالم" else "👁️ إظهار أسماء الشوارع والمعالم",
+                                color = if (showLabelsOnMap) Color(0xFF10B981) else Color.White
+                            )
+                        },
+                        leadingIcon = {
+                            Icon(
+                                if (showLabelsOnMap) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                contentDescription = null,
+                                tint = if (showLabelsOnMap) Color(0xFF10B981) else Color.White
+                            )
+                        },
+                        onClick = { onToggleLabelsQuick(); showMoreTools = false }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("🎯 تصفية معالم الخريطة", color = Color(0xFF00E5FF)) },
+                        leadingIcon = { Icon(Icons.Default.Place, contentDescription = null, tint = Color(0xFF00E5FF)) },
+                        onClick = { onOpenLandmarkFilter(); showMoreTools = false }
+                    )
+                    onOpenSos?.let { sosAction ->
+                        DropdownMenuItem(
+                            text = { Text("🚨 فزعة طوارئ", color = Color(0xFFFCA5A5), fontWeight = FontWeight.Bold) },
+                            leadingIcon = { Icon(Icons.Default.Emergency, contentDescription = null, tint = Color(0xFFEF4444)) },
+                            onClick = { sosAction(); showMoreTools = false }
+                        )
+                    }
+                    onOpenServicesSheet?.let { servicesAction ->
+                        DropdownMenuItem(
+                            text = { Text("🚚 خدمات الطريق السريع", color = Color(0xFF10B981)) },
+                            leadingIcon = { Icon(Icons.Default.LocalShipping, contentDescription = null, tint = Color(0xFF10B981)) },
+                            onClick = { servicesAction(); showMoreTools = false }
+                        )
+                    }
+                    onOpenRoadReports?.let { reportAction ->
+                        DropdownMenuItem(
+                            text = { Text("🚧 بلاغات الطرق", color = Color(0xFFFBBF24)) },
+                            leadingIcon = { Icon(Icons.Default.Warning, contentDescription = null, tint = Color(0xFFFBBF24)) },
+                            onClick = { reportAction(); showMoreTools = false }
+                        )
+                    }
+                    HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+
                     // 1. VELA AR
                     DropdownMenuItem(
                         text = { Text("📷 الواقع المعزز (VELA AR)", color = if (currentMapMode == MapMode.AR_VPS) Color(0xFF10B981) else Color.White) },

@@ -4,8 +4,10 @@ import android.content.Context
 import android.os.SystemClock
 import android.util.Log
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material3.*
@@ -15,10 +17,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.data.ProviderEntity
 import com.example.data.StoreEntity
 import com.example.ui.screens.map.components.HudMirrorOverlay
+import com.example.ui.screens.map.components.PrimaryLayersBottomSheet
+import com.example.ui.screens.map.components.RouteStreetsBottomSheet
+import com.example.ui.screens.map.components.RouteStreetsHelper
 import com.example.ui.screens.map.utils.MapDistanceCalculator
 import com.example.utils.*
 import kotlinx.coroutines.CancellationException
@@ -162,6 +170,12 @@ fun NavigationScreen(
     var pendingStop by remember { mutableStateOf<NavWaypoint?>(null) }
     var showAddStopDialog by remember { mutableStateOf(false) }
     var showDownloadDialog by remember { mutableStateOf(false) }
+    var showStreetsSheet by remember { mutableStateOf(false) }
+    var showNavLayersSheet by remember { mutableStateOf(false) }
+    var focusRoutePoint by remember { mutableStateOf<Pair<Double, Double>?>(null) }
+    var focusRouteTick by remember { mutableIntStateOf(0) }
+    var navRecenterTick by remember { mutableIntStateOf(0) }
+    var showLabelsOnMap by remember { mutableStateOf(true) }
 
     val speedEstimator = remember { SpeedEstimator() }
     val offRoute = remember { OffRouteDetector(NavConfig.OFF_ROUTE_THRESHOLD_METERS) }
@@ -363,16 +377,11 @@ fun NavigationScreen(
             onFinishNavigation()
         }
     }
-    // العودة التلقائية لوضع التتبع بعد 8 ثوانٍ من سحب الخريطة
-    LaunchedEffect(followUser) {
-        if (!followUser) {
-            delay(8_000L)
-            followUser = true
-        }
-    }
 
     // ───────── مشتقات العرض ─────────
     val steps = remember(result) { result?.getAllSteps() ?: emptyList() }
+    val routeStreets = remember(result) { RouteStreetsHelper.extractRouteStreets(result) }
+    val routeStreetsJson = remember(routeStreets) { RouteStreetsHelper.routeStreetsToJson(routeStreets) }
     val stepStarts = remember(steps) {
         DoubleArray(steps.size).also { arr -> var acc = 0.0; steps.forEachIndexed { i, s -> arr[i] = acc; acc += s.distanceMeters } }
     }
@@ -475,6 +484,12 @@ fun NavigationScreen(
             followUser = followUser,
             onUserPanned = { followUser = false },
             navZoom = smartZoom,
+            routeStreetsJson = routeStreetsJson,
+            focusRoutePoint = focusRoutePoint,
+            focusRouteTick = focusRouteTick,
+            showLabelsOnMap = showLabelsOnMap,
+            recenterTick = navRecenterTick,
+            tilt = 0f,
             modifier = Modifier.fillMaxSize()
         )
 
@@ -515,15 +530,36 @@ fun NavigationScreen(
                     snackbarHostState.showSnackbar("${next.emoji} وضع المركبة: ${next.labelAr}")
                 }
             },
+            streetCount = routeStreets.size,
+            onOpenStreets = { showStreetsSheet = true },
+            onOpenLayersSheet = { showNavLayersSheet = true },
             modifier = Modifier.align(Alignment.TopCenter)
         )
 
         if (!followUser) {
-            FloatingActionButton(
-                onClick = { followUser = true },
-                containerColor = Color(0xFF0F172A),
-                modifier = Modifier.align(Alignment.CenterEnd).padding(end = 12.dp).size(46.dp)
-            ) { Icon(Icons.Default.MyLocation, contentDescription = "موقعي", tint = Color(0xFF00E5FF)) }
+            Surface(
+                onClick = {
+                    followUser = true
+                    navRecenterTick++
+                },
+                shape = RoundedCornerShape(20.dp),
+                color = Color(0xFF0F172A).copy(alpha = 0.95f),
+                border = BorderStroke(1.dp, Color(0xFF00E5FF)),
+                shadowElevation = 8.dp,
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .padding(end = 12.dp)
+                    .testTag("nav_recenter_pill")
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Icon(Icons.Default.MyLocation, contentDescription = "موقعي", tint = Color(0xFF00E5FF), modifier = Modifier.size(18.dp))
+                    Text("موقعي", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+            }
         }
 
         SnackbarHost(
@@ -614,5 +650,46 @@ fun NavigationScreen(
                 routeVersion++
             }
         )
+
+        if (showStreetsSheet) {
+            RouteStreetsBottomSheet(
+                streets = routeStreets,
+                currentStreetIndex = currentStepIndex,
+                onSelectStreet = { lat, lng, name ->
+                    showStreetsSheet = false
+                    followUser = false
+                    focusRoutePoint = Pair(lat, lng)
+                    focusRouteTick++
+                },
+                onDismiss = { showStreetsSheet = false }
+            )
+        }
+
+        if (showNavLayersSheet) {
+            PrimaryLayersBottomSheet(
+                mapLayer = if (isTilesDownloaded) MapLayer.VALHALLA_OFFLINE else MapLayer.STANDARD,
+                onToggleMapLayer = { layer ->
+                    if (layer == MapLayer.VALHALLA_OFFLINE && !isTilesDownloaded) {
+                        showNavLayersSheet = false
+                        showDownloadDialog = true
+                    }
+                },
+                isValhallaDownloaded = isTilesDownloaded,
+                valhallaSizeMb = ValhallaTileDownloader.EXPECTED_INSTALLED_MB,
+                onOpenValhallaDownload = {
+                    showNavLayersSheet = false
+                    showDownloadDialog = true
+                },
+                currentMapMode = mapMode,
+                onSelectMapMode = { mode ->
+                    mapMode = mode
+                    showNavLayersSheet = false
+                },
+                is3DAvailable = false,
+                is3DTerrainEnabled = false,
+                onToggle3DTerrain = {},
+                onDismiss = { showNavLayersSheet = false }
+            )
+        }
     }
 }

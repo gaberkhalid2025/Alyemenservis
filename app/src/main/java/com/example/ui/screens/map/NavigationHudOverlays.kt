@@ -64,6 +64,9 @@ internal fun NavigationTopOverlay(
     onOpenVoiceSetup: () -> Unit,
     vehicleProfile: NavVehicleProfile = NavVehicleProfile.SEDAN,
     onCycleVehicleProfile: () -> Unit = {},
+    streetCount: Int = 0,
+    onOpenStreets: () -> Unit = {},
+    onOpenLayersSheet: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -84,7 +87,7 @@ internal fun NavigationTopOverlay(
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Box(Modifier.size(8.dp).clip(CircleShape).background(if (isApproximate) Color(0xFFF59E0B) else Color(0xFF10B981)))
                     Text(engineLabel, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
@@ -100,11 +103,34 @@ internal fun NavigationTopOverlay(
                             color = Color(0xFF00E5FF),
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp)
                         )
                     }
-                    IconButton(onClick = onToggleMapMode, modifier = Modifier.size(30.dp)) {
-                        Icon(Icons.Default.Layers, contentDescription = "الطبقة", tint = Color(0xFF38BDF8), modifier = Modifier.size(18.dp))
+                    if (streetCount > 0) {
+                        Surface(
+                            onClick = onOpenStreets,
+                            shape = RoundedCornerShape(8.dp),
+                            color = Color(0xFF0284C7).copy(alpha = 0.85f),
+                            border = BorderStroke(1.dp, Color(0xFF38BDF8)),
+                            modifier = Modifier.testTag("nav_streets_btn")
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(3.dp)
+                            ) {
+                                Text("🛣️", fontSize = 10.sp)
+                                Text(
+                                    text = "$streetCount",
+                                    color = Color.White,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                    IconButton(onClick = onOpenLayersSheet, modifier = Modifier.size(30.dp).testTag("nav_layers_btn")) {
+                        Icon(Icons.Default.Layers, contentDescription = "الطبقات", tint = Color(0xFF38BDF8), modifier = Modifier.size(18.dp))
                     }
                     IconButton(onClick = onOpenAddStop, modifier = Modifier.size(30.dp)) {
                         Icon(Icons.Default.Add, contentDescription = "إضافة محطة", tint = Color(0xFF10B981), modifier = Modifier.size(20.dp))
@@ -112,9 +138,9 @@ internal fun NavigationTopOverlay(
                     if (!isTilesDownloaded || nativeError != null) {
                         IconButton(
                             onClick = onOpenDownloadDialog,
-                            modifier = Modifier.size(48.dp).testTag("nav_download_offline_button")
+                            modifier = Modifier.size(30.dp).testTag("nav_download_offline_button")
                         ) {
-                            Icon(Icons.Default.CloudDownload, contentDescription = "تحميل أو إصلاح خرائط الأوفلاين", tint = Color(0xFF0284C7), modifier = Modifier.size(20.dp))
+                            Icon(Icons.Default.CloudDownload, contentDescription = "تحميل أو إصلاح خرائط الأوفلاين", tint = Color(0xFF0284C7), modifier = Modifier.size(18.dp))
                         }
                     }
                 }
@@ -199,14 +225,37 @@ internal fun NavigationTopOverlay(
                                     else Icon(maneuverIcon(if (isApproximate) null else upcoming?.maneuverType), contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp))
                                 }
                             }
-                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                                val maneuverDistancePrompt = if (!isApproximate && upcoming != null) " · بعد ${MapDistanceCalculator.formatDistance(distToManeuver)}" else ""
-                                Text(
-                                    text = (if (voiceEnabled) "🔊" else "🔇") + " · $currentSpeedKmh كم/س" + maneuverDistancePrompt,
-                                    color = Color(0xFF00E5FF),
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.ExtraBold
-                                )
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Text(
+                                        text = "${if (voiceEnabled) "🔊" else "🔇"} $currentSpeedKmh كم/س",
+                                        color = Color(0xFF00E5FF),
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        maxLines = 1,
+                                        softWrap = false
+                                    )
+                                    if (!isApproximate && upcoming != null) {
+                                        Surface(
+                                            shape = RoundedCornerShape(6.dp),
+                                            color = Color(0xFF0284C7).copy(alpha = 0.35f),
+                                            border = BorderStroke(0.5.dp, Color(0xFF38BDF8).copy(alpha = 0.7f))
+                                        ) {
+                                            Text(
+                                                text = "بعد ${MapDistanceCalculator.formatDistance(distToManeuver)}",
+                                                color = Color(0xFF38BDF8),
+                                                fontSize = 10.5.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                maxLines = 1,
+                                                softWrap = false,
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                            )
+                                        }
+                                    }
+                                }
                                 Text(instructionText, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
                             }
 

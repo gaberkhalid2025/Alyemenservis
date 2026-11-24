@@ -78,10 +78,13 @@ fun RealLeafletMapView(
     onMapLoadFailed: (() -> Unit)? = null,
     onTilesStatus: ((failing: Boolean) -> Unit)? = null,
     reloadTilesKey: Int = 0,
-    tilt: Float = 35f,
+    tilt: Float = 0f,
     rotation: Float = 0f,
     routeCoordinates: List<Pair<Double, Double>> = emptyList(),
     routeKey: Int = 0,
+    routeStreetsJson: String? = null,
+    focusRoutePoint: Pair<Double, Double>? = null,
+    focusRouteTick: Int = 0,
     waypointMarkers: List<Triple<String, Double, Double>> = emptyList(),
     followUser: Boolean = false,
     onUserPanned: (() -> Unit)? = null,
@@ -92,6 +95,7 @@ fun RealLeafletMapView(
     onMapCenterChanged: ((lat: Double, lng: Double) -> Unit)? = null,
     ecoMode: Boolean = false,
     hybridLabels: Boolean = true,
+    showLabelsOnMap: Boolean = true,
     osmPoisJson: String? = null,
     onOsmPoiSelected: ((name: String, kind: String, lat: Double, lng: Double) -> Unit)? = null,
     nightMode: Boolean = false,
@@ -100,6 +104,7 @@ fun RealLeafletMapView(
     onGibsStatus: ((Boolean) -> Unit)? = null,
     zoomInTick: Int = 0,
     zoomOutTick: Int = 0,
+    recenterTick: Int = 0,
     useZoomTicks: Boolean = false,
     navZoom: Int? = null,
     zones: List<MapZone> = emptyList(),
@@ -282,10 +287,17 @@ fun RealLeafletMapView(
         webViewRef?.evaluateJavascript("if (window.setZonesBase64) { window.setZonesBase64('$b64'); }", null)
     }
 
-    // إعادة التمركز إلى موقع المستخدم
-    LaunchedEffect(panOffset) {
-        if (isMapReady && webViewRef != null && panOffset == Offset.Zero) {
+    // إعادة التمركز الصريحة فقط عبر recenterTick (حتى لا يتداخل مع التكبير أو استعراض المسار)
+    LaunchedEffect(recenterTick) {
+        if (isMapReady && webViewRef != null && recenterTick > 0) {
             webViewRef?.evaluateJavascript("if (window.recenterUser) { window.recenterUser(); }", null)
+        }
+    }
+
+    LaunchedEffect(focusRouteTick, focusRoutePoint) {
+        val pt = focusRoutePoint
+        if (isMapReady && webViewRef != null && focusRouteTick > 0 && pt != null) {
+            webViewRef?.evaluateJavascript("if (window.focusRoutePoint) { window.focusRoutePoint(${pt.first}, ${pt.second}, 16); }", null)
         }
     }
 
@@ -355,6 +367,17 @@ fun RealLeafletMapView(
         }
     }
 
+    LaunchedEffect(isMapReady, routeStreetsJson) {
+        if (!isMapReady || webViewRef == null) return@LaunchedEffect
+        val json = routeStreetsJson
+        if (json.isNullOrBlank()) {
+            webViewRef?.evaluateJavascript("if (window.setRouteStreetsBase64) { window.setRouteStreetsBase64(''); }", null)
+        } else {
+            val b64 = Base64.encodeToString(json.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
+            webViewRef?.evaluateJavascript("if (window.setRouteStreetsBase64) { window.setRouteStreetsBase64('$b64'); }", null)
+        }
+    }
+
     LaunchedEffect(isMapReady, hybridLabels, currentMapMode) {
         if (isMapReady && webViewRef != null) {
             val on = hybridLabels && (currentMapMode == MapMode.SATELLITE || currentMapMode == MapMode.SATELLITE_CLARITY || currentMapMode == MapMode.VELA_3D)
@@ -362,10 +385,16 @@ fun RealLeafletMapView(
         }
     }
 
-    LaunchedEffect(isMapReady, osmPoisJson, hybridLabels) {
+    LaunchedEffect(isMapReady, showLabelsOnMap) {
+        if (isMapReady && webViewRef != null) {
+            webViewRef?.evaluateJavascript("if (window.setLabelsVisible) { window.setLabelsVisible($showLabelsOnMap); }", null)
+        }
+    }
+
+    LaunchedEffect(isMapReady, osmPoisJson) {
         if (!isMapReady || webViewRef == null) return@LaunchedEffect
         val json = osmPoisJson
-        if (!hybridLabels || json.isNullOrBlank()) {
+        if (json.isNullOrBlank()) {
             webViewRef?.evaluateJavascript("if (window.clearOsmPois) { window.clearOsmPois(); }", null)
         } else {
             val b64 = Base64.encodeToString(json.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
@@ -455,6 +484,7 @@ fun RealLeafletMapView(
                             ViewGroup.LayoutParams.MATCH_PARENT,
                             ViewGroup.LayoutParams.MATCH_PARENT
                         )
+                        setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
                         setBackgroundColor(android.graphics.Color.parseColor("#0F172A"))
                         settings.apply {
                             javaScriptEnabled = true
@@ -465,8 +495,8 @@ fun RealLeafletMapView(
                             setSupportZoom(true)
                             builtInZoomControls = false
                             displayZoomControls = false
-                            loadWithOverviewMode = true
-                            useWideViewPort = true
+                            loadWithOverviewMode = false
+                            useWideViewPort = false
                             allowFileAccess = false
                             allowContentAccess = false
                             javaScriptCanOpenWindowsAutomatically = false

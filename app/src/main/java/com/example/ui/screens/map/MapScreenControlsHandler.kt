@@ -64,7 +64,10 @@ internal fun BoxScope.MapControlsDockHost(
     onShowCoordinateDialog: () -> Unit,
     onOpenMoreLayersSheet: () -> Unit,
     onCloseMoreLayersSheet: () -> Unit,
-    onShowGroupTracking: () -> Unit
+    onShowGroupTracking: () -> Unit,
+    onOpenSos: (() -> Unit)? = null,
+    onOpenServicesSheet: (() -> Unit)? = null,
+    onOpenRoadReports: (() -> Unit)? = null
 ) {
     MapControls(
         isRadarMode = state.isRadarMode,
@@ -73,6 +76,18 @@ internal fun BoxScope.MapControlsDockHost(
         onToggleHeatmap = { state.isHeatmapActive = !state.isHeatmapActive },
         onZoomIn = { state.zoomInTick++ },
         onZoomOut = { state.zoomOutTick++ },
+        showLabelsOnMap = state.showLabelsOnMap,
+        onOpenLandmarkFilter = { state.showLandmarkFilterSheet = true },
+        onToggleLabelsQuick = {
+            val next = !state.showLabelsOnMap
+            state.showLabelsOnMap = next
+            coroutineScope.launch {
+                snackbarHostState.showSnackbar(
+                    if (next) "👁️ تم إظهار أسماء الشوارع والمعالم"
+                    else "🙈 تم إخفاء أسماء الشوارع والمعالم لتخفيف الازدحام"
+                )
+            }
+        },
         onRecenterLocation = {
             state.panOffset = Offset.Zero
             state.zoomScale = 1.0f
@@ -229,6 +244,9 @@ internal fun BoxScope.MapControlsDockHost(
             onOpenMoreLayersSheet()
         },
         onOpenGroupTracking = onShowGroupTracking,
+        onOpenSos = onOpenSos,
+        onOpenServicesSheet = onOpenServicesSheet,
+        onOpenRoadReports = onOpenRoadReports,
         modifier = Modifier
             .align(Alignment.CenterEnd)
             .statusBarsPadding()

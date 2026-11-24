@@ -121,15 +121,40 @@ object OnlineOsrmNavigator {
 
                                 val legSteps = mutableListOf<NavStep>()
                                 val steps = leg.optJSONArray("steps")
+                                var searchStartIdx = 0
                                 if (steps != null) {
                                     for (stepIdx in 0 until steps.length()) {
                                         val stepObj = steps.optJSONObject(stepIdx) ?: continue
                                         val stepDist = stepObj.optDouble("distance", 0.0)
                                         val stepDur = stepObj.optDouble("duration", 0.0)
-                                        val streetName = stepObj.optString("name", "").trim()
+                                        val rawName = stepObj.optString("name", "").trim()
+                                        val rawRef = stepObj.optString("ref", "").trim()
+                                        val streetName = rawName.ifBlank { rawRef }
                                         val maneuver = stepObj.optJSONObject("maneuver")
                                         val type = maneuver?.optString("type", "") ?: ""
                                         val modifier = maneuver?.optString("modifier", "") ?: ""
+
+                                        var matchedPolyIdx = searchStartIdx
+                                        val locArr = maneuver?.optJSONArray("location")
+                                        if (locArr != null && locArr.length() >= 2 && coordsList.isNotEmpty()) {
+                                            val mLng = locArr.optDouble(0, Double.NaN)
+                                            val mLat = locArr.optDouble(1, Double.NaN)
+                                            if (!mLat.isNaN() && !mLng.isNaN()) {
+                                                var bestDist = Double.MAX_VALUE
+                                                for (cIdx in searchStartIdx until coordsList.size) {
+                                                    val c = coordsList[cIdx]
+                                                    val dLat = c.first - mLat
+                                                    val dLng = c.second - mLng
+                                                    val dSq = dLat * dLat + dLng * dLng
+                                                    if (dSq < bestDist) {
+                                                        bestDist = dSq
+                                                        matchedPolyIdx = cIdx
+                                                        if (dSq < 1e-10) break
+                                                    }
+                                                }
+                                                searchStartIdx = matchedPolyIdx
+                                            }
+                                        }
 
                                         val exitNum = maneuver?.optInt("exit", 0)?.takeIf { it > 0 }
                                         val mType = mapManeuver(type, modifier)
@@ -145,7 +170,8 @@ object OnlineOsrmNavigator {
                                                 distanceMeters = stepDist,
                                                 durationSeconds = stepDur,
                                                 maneuverType = mType,
-                                                streetName = streetName
+                                                streetName = streetName,
+                                                polylineIndex = matchedPolyIdx
                                             )
                                         )
                                     }

@@ -577,7 +577,10 @@ fun MapScreenContent(
                     searchedPlace = res
                     state.selectedEntity = null
                 },
-                focusTick = searchFocusTick
+                focusTick = searchFocusTick,
+                safeUserLat = safeUserLat,
+                safeUserLng = safeUserLng,
+                hasRealLocation = hasRealLocation
             )
 
             MapControlsDockHost(
@@ -609,127 +612,11 @@ fun MapScreenContent(
                 onShowCoordinateDialog = { showCoordinateDialog = true },
                 onOpenMoreLayersSheet = { showMoreLayersSheet = true },
                 onCloseMoreLayersSheet = { showMoreLayersSheet = false },
-                onShowGroupTracking = { showGroupTracking = true }
+                onShowGroupTracking = { showGroupTracking = true },
+                onOpenSos = { showSosDialog = true },
+                onOpenServicesSheet = { showServicesSheet = true },
+                onOpenRoadReports = { showRoadReportDialog = true }
             )
-
-            // 🌟 الشريط العائم الموحد (Glassmorphic Floating Bar)
-            // يجمع: 1. الفزعة (الأيقونة الحمراء) + 2. خدمات الطريق + 3. زر الكأس (المكافآت) + 4. HUD ليلي
-            if (state.selectedEntity == null) {
-                Surface(
-                    shape = RoundedCornerShape(26.dp),
-                    color = Color(0xFF0F172A).copy(alpha = 0.92f),
-                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.14f)),
-                    shadowElevation = 14.dp,
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .navigationBarsPadding()
-                        .padding(bottom = 20.dp, start = 16.dp, end = 16.dp)
-                        .testTag("map_bottom_floating_bar")
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .padding(horizontal = 8.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        // 1. 🚨 الأيقونة الحمراء (فزعة طوارئ)
-                        Surface(
-                            onClick = { showSosDialog = true },
-                            shape = RoundedCornerShape(14.dp),
-                            color = Color(0xFFEF4444).copy(alpha = 0.14f),
-                            border = BorderStroke(1.dp, Color(0xFFEF4444).copy(alpha = 0.35f)),
-                            modifier = Modifier
-                                .height(42.dp)
-                                .testTag("map_sos_btn")
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 10.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Emergency,
-                                    contentDescription = "فزعة طوارئ",
-                                    tint = Color(0xFFEF4444),
-                                    modifier = Modifier.size(20.dp)
-                                )
-                                Text(
-                                    text = "فزعة",
-                                    color = Color(0xFFFCA5A5),
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-
-                        VerticalDivider(
-                            modifier = Modifier.height(26.dp),
-                            color = Color.White.copy(alpha = 0.10f)
-                        )
-
-                        // 2. 🚚 خدمات الطريق
-                        Surface(
-                            onClick = { showServicesSheet = true },
-                            shape = RoundedCornerShape(14.dp),
-                            color = if (companionFilter != null) Color(0xFF10B981).copy(alpha = 0.16f) else Color.Transparent,
-                            border = if (companionFilter != null) BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.40f)) else null,
-                            modifier = Modifier
-                                .height(42.dp)
-                                .testTag("map_services_sheet_btn")
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.LocalShipping,
-                                    contentDescription = "خدمات الطريق",
-                                    tint = Color(0xFF10B981),
-                                    modifier = Modifier.size(20.dp)
-                                )
-                                Text(
-                                    text = "خدمات الطريق",
-                                    color = Color.White,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-
-                        if (settingsState.enableMapLiveTrafficReports) {
-                            VerticalDivider(
-                                modifier = Modifier.height(26.dp),
-                                color = Color.White.copy(alpha = 0.10f)
-                            )
-
-                            Surface(
-                                onClick = { showRoadReportDialog = true },
-                                shape = RoundedCornerShape(14.dp),
-                                color = Color(0xFFF59E0B).copy(alpha = 0.14f),
-                                border = BorderStroke(1.dp, Color(0xFFF59E0B).copy(alpha = 0.35f)),
-                                modifier = Modifier
-                                    .height(42.dp)
-                                    .testTag("map_road_report_btn")
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 10.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(5.dp)
-                                ) {
-                                    Text("🚧", fontSize = 14.sp)
-                                    Text(
-                                        text = if (roadReports.isNotEmpty()) "بلاغ (${roadReports.size})" else "بلاغ",
-                                        color = Color(0xFFFDE68A),
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
 
             MapWaypointsAndBottomCards(
                 context = context,
@@ -785,6 +672,34 @@ fun MapScreenContent(
                 enableLiveTrafficByAdmin = settingsState.enableMapLiveTrafficReports
             )
         }
+    }
+
+    if (state.showLandmarkFilterSheet) {
+        com.example.ui.screens.map.components.MapLandmarkFilterSheet(
+            showLabelsOnMap = state.showLabelsOnMap,
+            onToggleLabelsOnMap = { enabled ->
+                state.showLabelsOnMap = enabled
+                coroutineScope.launch {
+                    snackbarHostState.showSnackbar(
+                        if (enabled) "👁️ تم إظهار أسماء الشوارع والمعالم"
+                        else "🙈 تم إخفاء أسماء الشوارع والمعالم لتخفيف الازدحام"
+                    )
+                }
+            },
+            visibleFilters = state.visibleLandmarkFilters,
+            onToggleFilter = { filter ->
+                val current = state.visibleLandmarkFilters.toMutableSet()
+                if (current.contains(filter)) current.remove(filter) else current.add(filter)
+                state.visibleLandmarkFilters = current
+            },
+            onSelectAll = {
+                state.visibleLandmarkFilters = com.example.ui.screens.map.components.MapLandmarkFilter.entries.toSet()
+            },
+            onClearAll = {
+                state.visibleLandmarkFilters = emptySet()
+            },
+            onDismiss = { state.showLandmarkFilterSheet = false }
+        )
     }
 
     MapScreenDialogsHost(
