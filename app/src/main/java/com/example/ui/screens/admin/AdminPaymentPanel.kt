@@ -421,6 +421,7 @@ fun AdminPaymentPanel(
                     }
                 }
             }
+    }
 
     if (showOverrideDialog) {
         AlertDialog(
@@ -447,8 +448,13 @@ fun AdminPaymentPanel(
             confirmButton = {
                 Button(
                     onClick = {
-                        val amt = overrideAmount.toDoubleOrNull() ?: 0.0
-                        onAdminOverride?.invoke(overrideTargetId, amt)
+                        val cleanTarget = overrideTargetId.trim()
+                        val amt = overrideAmount.trim().toDoubleOrNull()
+                        if (cleanTarget.isBlank() || amt == null || !amt.isFinite() || amt == 0.0) {
+                            Toast.makeText(context, "يرجى إدخال معرف المحفظة ومبلغ صالح غير صفري", Toast.LENGTH_SHORT).show()
+                            return@Button
+                        }
+                        onAdminOverride?.invoke(cleanTarget, amt)
                         Toast.makeText(context, "تم تسجيل التعديل الإداري بنجاح: $amt ر.ي", Toast.LENGTH_SHORT).show()
                         showOverrideDialog = false
                     }
@@ -464,11 +470,11 @@ fun AdminPaymentPanel(
         )
     }
 
-    if (showEditGatewayDialog && editingGateway != null) {
-        val gateway = editingGateway!!
-        AlertDialog(
-            onDismissRequest = { showEditGatewayDialog = false },
-            title = { Text("تعديل إعدادات بوابة ${gateway.name}") },
+    if (showEditGatewayDialog) {
+        editingGateway?.let { gateway ->
+            AlertDialog(
+                onDismissRequest = { showEditGatewayDialog = false },
+                title = { Text("تعديل إعدادات بوابة ${gateway.name}") },
             text = {
                 Column(
                     verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -535,7 +541,7 @@ fun AdminPaymentPanel(
             }
         )
     }
-}
+    }
 }
 
 @Composable

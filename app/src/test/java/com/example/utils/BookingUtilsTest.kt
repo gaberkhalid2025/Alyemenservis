@@ -70,6 +70,19 @@ class BookingUtilsTest {
         val pastTime = System.currentTimeMillis() - TimeUnit.HOURS.toMillis(1)
         assertFalse(BookingUtils.canModifyOrCancelBooking(pastTime))
     }
+
+    @Test
+    fun `enforces 8h cutoff via dateString and timeString when scheduledAtTimestamp is 0L`() {
+        val soonMs = System.currentTimeMillis() + TimeUnit.HOURS.toMillis(3)
+        val soonDate = DateFormatter.formatDateDashUs(soonMs)
+        val soonTime = DateFormatter.formatCustom(soonMs, "HH:mm")
+        assertFalse(BookingUtils.canModifyOrCancelBooking(0L, soonDate, soonTime))
+
+        val laterMs = System.currentTimeMillis() + TimeUnit.HOURS.toMillis(12)
+        val laterDate = DateFormatter.formatDateDashUs(laterMs)
+        val laterTime = DateFormatter.formatCustom(laterMs, "HH:mm")
+        assertTrue(BookingUtils.canModifyOrCancelBooking(0L, laterDate, laterTime))
+    }
     
     // ============================================
     // 4. اختبارات isValidYemeniPhone

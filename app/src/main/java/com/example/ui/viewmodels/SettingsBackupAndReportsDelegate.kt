@@ -1,11 +1,17 @@
 package com.example.ui.viewmodels
 
+import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
-import android.graphics.Paint
 import android.graphics.pdf.PdfDocument
+import android.os.Build
 import android.os.Environment
+import android.provider.MediaStore
+import android.text.Layout
+import android.text.StaticLayout
+import android.text.TextDirectionHeuristics
+import android.text.TextPaint
 import androidx.core.content.FileProvider
 import androidx.lifecycle.viewModelScope
 import com.example.utils.DateFormatter
@@ -77,29 +83,61 @@ internal class SettingsBackupAndReportsDelegate(private val vm: SettingsViewMode
                 val ts = DateFormatter.formatCustom(System.currentTimeMillis(), "yyyyMMdd_HHmmss")
                 val file = File(exportDir, "Complaints_Report_$ts.pdf")
                 val pdfDoc = PdfDocument()
-                val titlePaint = Paint().apply { textSize = 15f; isFakeBoldText = true; color = Color.BLACK }
-                val bodyPaint = Paint().apply { textSize = 11f; color = Color.DKGRAY }
-                val itemsPerPage = 18
-                val chunks = if (reportsList.isEmpty()) listOf(emptyList()) else reportsList.chunked(itemsPerPage)
-                chunks.forEachIndexed { pageIdx, chunk ->
-                    val page = pdfDoc.startPage(PdfDocument.PageInfo.Builder(595, 842, pageIdx + 1).create())
-                    val canvas = page.canvas
-                    var y = 50f
-                    canvas.drawText("تقرير البلاغات والشكاوى - صفحة ${pageIdx + 1}", 40f, y, titlePaint)
-                    y += 28f
-                    if (chunk.isEmpty()) {
-                        canvas.drawText("لا توجد بلاغات مسجلة حالياً.", 40f, y, bodyPaint)
-                    } else {
-                        chunk.forEachIndexed { idx, r ->
-                            val detailsText = r.explanation.ifBlank { r.content }.ifBlank { r.reason }.take(65)
-                            val typeLabel = r.targetType.ifBlank { r.reason }
-                            val line = "${pageIdx * itemsPerPage + idx + 1}. [${r.status}] $typeLabel - ${r.reporterName} (${r.reporterPhone}): $detailsText"
-                            canvas.drawText(line, 40f, y, bodyPaint)
-                            y += 36f
-                        }
-                    }
-                    pdfDoc.finishPage(page)
+                val titlePaint = TextPaint(TextPaint.ANTI_ALIAS_FLAG).apply {
+                    textSize = 15f
+                    isFakeBoldText = true
+                    color = Color.BLACK
                 }
+                val bodyPaint = TextPaint(TextPaint.ANTI_ALIAS_FLAG).apply {
+                    textSize = 11f
+                    color = Color.DKGRAY
+                }
+                val contentWidth = 515
+                var pageNumber = 1
+                var page = pdfDoc.startPage(PdfDocument.PageInfo.Builder(595, 842, pageNumber).create())
+                var y = 44f
+
+                fun drawRtlBlock(canvas: android.graphics.Canvas, text: String, paint: TextPaint, topY: Float): Float {
+                    val layout = StaticLayout.Builder.obtain(text, 0, text.length, paint, contentWidth)
+                        .setAlignment(Layout.Alignment.ALIGN_NORMAL)
+                        .setTextDirection(TextDirectionHeuristics.RTL)
+                        .setLineSpacing(2f, 1.15f)
+                        .build()
+                    canvas.save()
+                    canvas.translate(40f, topY)
+                    layout.draw(canvas)
+                    canvas.restore()
+                    return layout.height.toFloat()
+                }
+
+                y += drawRtlBlock(page.canvas, "تقرير البلاغات والشكاوى - صفحة $pageNumber", titlePaint, y) + 14f
+                if (reportsList.isEmpty()) {
+                    drawRtlBlock(page.canvas, "لا توجد بلاغات مسجلة حالياً.", bodyPaint, y)
+                } else {
+                    reportsList.forEachIndexed { idx, r ->
+                        val detailsText = r.explanation.ifBlank { r.content }.ifBlank { r.reason }.take(120)
+                        val typeLabel = r.targetType.ifBlank { r.reason }
+                        val line = "${idx + 1}. [${r.status}] $typeLabel - ${r.reporterName} (${r.reporterPhone}): $detailsText"
+                        val blockLayout = StaticLayout.Builder.obtain(line, 0, line.length, bodyPaint, contentWidth)
+                            .setAlignment(Layout.Alignment.ALIGN_NORMAL)
+                            .setTextDirection(TextDirectionHeuristics.RTL)
+                            .setLineSpacing(2f, 1.15f)
+                            .build()
+                        if (y + blockLayout.height > 790f) {
+                            pdfDoc.finishPage(page)
+                            pageNumber++
+                            page = pdfDoc.startPage(PdfDocument.PageInfo.Builder(595, 842, pageNumber).create())
+                            y = 44f
+                            y += drawRtlBlock(page.canvas, "تقرير البلاغات والشكاوى - صفحة $pageNumber", titlePaint, y) + 14f
+                        }
+                        page.canvas.save()
+                        page.canvas.translate(40f, y)
+                        blockLayout.draw(page.canvas)
+                        page.canvas.restore()
+                        y += blockLayout.height + 10f
+                    }
+                }
+                pdfDoc.finishPage(page)
                 file.outputStream().use { pdfDoc.writeTo(it) }
                 pdfDoc.close()
                 withContext(Dispatchers.Main) {
@@ -137,15 +175,35 @@ internal class SettingsBackupAndReportsDelegate(private val vm: SettingsViewMode
                 val ts = DateFormatter.formatCustom(System.currentTimeMillis(), "yyyyMMdd_HHmmss")
                 val file = File(exportDir, "Performance_Report_$ts.pdf")
                 val pdfDoc = PdfDocument()
-                val titlePaint = Paint().apply { textSize = 16f; isFakeBoldText = true; color = Color.BLACK }
-                val bodyPaint = Paint().apply { textSize = 12f; color = Color.DKGRAY }
+                val titlePaint = TextPaint(TextPaint.ANTI_ALIAS_FLAG).apply {
+                    textSize = 16f
+                    isFakeBoldText = true
+                    color = Color.BLACK
+                }
+                val bodyPaint = TextPaint(TextPaint.ANTI_ALIAS_FLAG).apply {
+                    textSize = 12f
+                    color = Color.DKGRAY
+                }
                 val page = pdfDoc.startPage(PdfDocument.PageInfo.Builder(595, 842, 1).create())
                 val canvas = page.canvas
-                canvas.drawText("تقرير أداء شبكة الفنيين والمنصة - دليل خدمات اليمن", 40f, 55f, titlePaint)
-                canvas.drawText("التاريخ: ${DateFormatter.formatDateTime(System.currentTimeMillis())}", 40f, 85f, bodyPaint)
-                canvas.drawText("إجمالي مقدمي الخدمات: $provCount", 40f, 120f, bodyPaint)
-                canvas.drawText("إجمالي المتاجر والمنشآت: $storeCount", 40f, 150f, bodyPaint)
-                canvas.drawText("إجمالي الحجوزات: ${bookingList.size} | المكتملة: $completedCount", 40f, 180f, bodyPaint)
+                var y = 48f
+                fun drawRtlLine(text: String, paint: TextPaint, gap: Float) {
+                    val layout = StaticLayout.Builder.obtain(text, 0, text.length, paint, 515)
+                        .setAlignment(Layout.Alignment.ALIGN_NORMAL)
+                        .setTextDirection(TextDirectionHeuristics.RTL)
+                        .setLineSpacing(2f, 1.2f)
+                        .build()
+                    canvas.save()
+                    canvas.translate(40f, y)
+                    layout.draw(canvas)
+                    canvas.restore()
+                    y += layout.height + gap
+                }
+                drawRtlLine("تقرير أداء شبكة الفنيين والمنصة - دليل خدمات اليمن", titlePaint, 16f)
+                drawRtlLine("التاريخ: ${DateFormatter.formatDateTime(System.currentTimeMillis())}", bodyPaint, 10f)
+                drawRtlLine("إجمالي مقدمي الخدمات: $provCount", bodyPaint, 10f)
+                drawRtlLine("إجمالي المتاجر والمنشآت: $storeCount", bodyPaint, 10f)
+                drawRtlLine("إجمالي الحجوزات: ${bookingList.size} | المكتملة: $completedCount", bodyPaint, 10f)
                 pdfDoc.finishPage(page)
                 file.outputStream().use { pdfDoc.writeTo(it) }
                 pdfDoc.close()
@@ -415,23 +473,32 @@ internal class SettingsBackupAndReportsDelegate(private val vm: SettingsViewMode
     }
 
     fun saveBackupToLocalStorage(context: Context, jsonStr: String, fileName: String): String {
-        return try {
-            val downloadDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-            val backupFolder = File(downloadDir, "YemenServicesBackups")
-            if (!backupFolder.exists()) {
-                backupFolder.mkdirs()
+        val safeName = if (fileName.endsWith(".json")) fileName else "$fileName.json"
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            try {
+                val values = ContentValues().apply {
+                    put(MediaStore.Downloads.DISPLAY_NAME, safeName)
+                    put(MediaStore.Downloads.MIME_TYPE, "application/json")
+                    put(MediaStore.Downloads.RELATIVE_PATH, "${Environment.DIRECTORY_DOWNLOADS}/YemenServicesBackups")
+                }
+                val uri = context.contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                if (uri != null) {
+                    context.contentResolver.openOutputStream(uri)?.use { out ->
+                        out.write(jsonStr.toByteArray(Charsets.UTF_8))
+                    }
+                    return "${Environment.DIRECTORY_DOWNLOADS}/YemenServicesBackups/$safeName"
+                }
+            } catch (_: Exception) {
             }
-            val targetFile = File(backupFolder, if (fileName.endsWith(".json")) fileName else "$fileName.json")
+        }
+        return try {
+            val baseDir = context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS) ?: context.filesDir
+            val backupFolder = File(baseDir, "YemenServicesBackups").apply { mkdirs() }
+            val targetFile = File(backupFolder, safeName)
             targetFile.writeText(jsonStr, Charsets.UTF_8)
             targetFile.absolutePath
         } catch (_: Exception) {
-            try {
-                val targetFile = File(context.getExternalFilesDir(null), fileName)
-                targetFile.writeText(jsonStr, Charsets.UTF_8)
-                targetFile.absolutePath
-            } catch (_: Exception) {
-                ""
-            }
+            ""
         }
     }
 

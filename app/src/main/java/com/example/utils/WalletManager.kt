@@ -330,8 +330,11 @@ class WalletManager(private val context: Context? = null) {
         currency: String = "YER"
     ): Result<Transaction> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
         try {
-            if (amount <= 0) return@withContext Result.failure(IllegalArgumentException("مبلغ التحويل غير صالح"))
-            
+            if (!amount.isFinite() || amount <= 0) return@withContext Result.failure(IllegalArgumentException("مبلغ التحويل غير صالح"))
+            if (fromWalletId.isBlank() || toWalletId.isBlank() || fromWalletId == toWalletId) {
+                return@withContext Result.failure(IllegalArgumentException("معرفات المحافظ للتحويل غير صالحة"))
+            }
+
             val cur = currency.uppercase()
             val senderRef = firestore.collection("wallets").document(fromWalletId)
             val receiverRef = firestore.collection("wallets").document(toWalletId)
@@ -339,9 +342,19 @@ class WalletManager(private val context: Context? = null) {
             val txResult = firestore.runTransaction { transaction ->
                 val senderSnap = transaction.get(senderRef)
                 val receiverSnap = transaction.get(receiverRef)
-                
-                val sender = if (senderSnap.exists()) senderSnap.toObject(Wallet::class.java)!! else Wallet(id = fromWalletId, userId = fromWalletId.replace("wallet_", ""))
-                val receiver = if (receiverSnap.exists()) receiverSnap.toObject(Wallet::class.java)!! else Wallet(id = toWalletId, userId = toWalletId.replace("wallet_", ""))
+
+                val sender = if (senderSnap.exists()) {
+                    senderSnap.toObject(Wallet::class.java)
+                        ?: Wallet(id = fromWalletId, userId = fromWalletId.replace("wallet_", ""))
+                } else {
+                    Wallet(id = fromWalletId, userId = fromWalletId.replace("wallet_", ""))
+                }
+                val receiver = if (receiverSnap.exists()) {
+                    receiverSnap.toObject(Wallet::class.java)
+                        ?: Wallet(id = toWalletId, userId = toWalletId.replace("wallet_", ""))
+                } else {
+                    Wallet(id = toWalletId, userId = toWalletId.replace("wallet_", ""))
+                }
 
                 if (sender.status == "FROZEN" || receiver.status == "FROZEN") {
                     throw IllegalStateException("إحدى المحافظ مجمدة")

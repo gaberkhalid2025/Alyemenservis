@@ -161,7 +161,6 @@ internal class SettingsThemeAndColorSyncDelegate(private val vm: SettingsViewMod
                 "adminUsername" to adminUsername.trim(),
                 "adminPasswordHash" to hashedAdmin
             )
-            vm.db.collection("settings").document("main_settings").set(credUpdates, SetOptions.merge())
             vm.db.collection("admin_secrets").document("credentials").set(credUpdates, SetOptions.merge())
         }
         vm.db.collection("settings").document("main_settings").set(updated, SetOptions.merge())

@@ -88,28 +88,7 @@ fun BookingsScreenLayout(
                     viewModel.updateBookingImpl(updatedBooking)
                 },
                 onStatusChange = { booking, newStatus ->
-                    val updated = booking.copy(status = newStatus)
-                    viewModel.updateBookingImpl(updated)
-                    if (newStatus == "APPROVED") {
-                        // Automatically open chat when accepted
-                        val otherId = booking.clientId.ifEmpty { booking.clientPhone.ifEmpty { "CUSTOMER" } }
-                        val otherName = booking.customerName.ifEmpty { booking.clientName.ifEmpty { "العميل" } }
-                        val otherPhone = booking.clientPhone.ifEmpty { booking.customerPhone }
-                        viewModel.openOrCreateChatChannel(
-                            targetId = otherId,
-                            targetType = "BOOKING",
-                            targetName = otherName,
-                            targetPhone = otherPhone,
-                            targetCategory = booking.category,
-                            relatedEntityId = booking.id,
-                            relatedEntityType = "BOOKING"
-                        ) { createdCh ->
-                            if (createdCh != null && createdCh.id.isNotEmpty()) {
-                                viewModel.updateBookingRelatedChatChannel(booking.id, createdCh.id)
-                            }
-                        }
-                    }
-                    Toast.makeText(context, "تم تحديث حالة الحجز إلى: $newStatus", Toast.LENGTH_SHORT).show()
+                    viewModel.updateBookingStatus(booking.id, newStatus)
                 },
                 onCancelBooking = { booking, reason, password ->
                     val cancelledByStr = if (isAdmin) "ADMIN" else if (viewModel.isProviderUser) "PROVIDER" else "USER"
@@ -127,7 +106,10 @@ fun BookingsScreenLayout(
                 },
                 onOpenChatClick = { booking ->
                     // توجيه المحادثة من بطاقة الحجز بشكل دقيق مع تمرير مرجع الحجز والأطراف الصحيحة
-                    val isCurrentClient = currentUserId.isNotBlank() && (booking.customerId == currentUserId || booking.clientId == currentUserId)
+                    val cleanUserP = com.example.ui.helpers.AppPreferenceHelper.normalizePhoneNumber(currentUserPhone)
+                    val cleanBookingCustP = com.example.ui.helpers.AppPreferenceHelper.normalizePhoneNumber(booking.effectiveCustomerPhone)
+                    val isCurrentClient = (currentUserId.isNotBlank() && (booking.customerId == currentUserId || booking.clientId == currentUserId)) ||
+                        (cleanUserP.isNotBlank() && cleanUserP == cleanBookingCustP)
                     val targetUserId = if (isCurrentClient) booking.providerId.ifBlank { booking.providerPhone } else booking.clientId.ifBlank { booking.customerId.ifBlank { booking.customerPhone } }
                     val targetUserName = if (isCurrentClient) booking.providerName.ifBlank { "مقدم الخدمة" } else booking.customerName.ifBlank { booking.clientName.ifBlank { "العميل" } }
 

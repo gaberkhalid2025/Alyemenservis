@@ -131,9 +131,9 @@ object OfflineTileInterceptor {
             }
         }
 
-        // 2) قص البلاطة الأم (z-1 أو z-2) من نفس العائلة لمنع المربعات السوداء نهائياً
+        // 2) قص البلاطة الأم (z-1 إلى z-4) من نفس العائلة لمنع المربعات السوداء نهائياً
         val sourcesToCheck = listOf(requested.source to (requested.ext to requested.mime)) + fallbackOrder
-        for (dz in 1..2) {
+        for (dz in 1..4) {
             if (requested.z - dz < 2) break
             val pz = requested.z - dz
             val scale = 1 shl dz
@@ -317,7 +317,7 @@ object OfflineTileInterceptor {
         var c: HttpURLConnection? = null
         return try {
             c = (URL(url).openConnection() as HttpURLConnection).apply {
-                connectTimeout = 2_500; readTimeout = 4_000
+                connectTimeout = 6_000; readTimeout = 9_000
                 instanceFollowRedirects = true
                 useCaches = true
                 setRequestProperty("User-Agent", USER_AGENT)

@@ -262,11 +262,14 @@ class FCMService : FirebaseMessagingService() {
                 val now = System.currentTimeMillis()
 
                 // 1. تحديث fcm_tokens بشكل مستقل وآمن باستخدام merge لضمان عدم فشل العملية
-                val tokenData = mapOf(
-                    "token" to token,
-                    "role" to resolvedRole,
-                    "updatedAt" to now
-                )
+                val tokenData = buildMap<String, Any> {
+                    put("token", token)
+                    put("userId", userId)
+                    put("isActive", true)
+                    put("role", resolvedRole)
+                    put("updatedAt", now)
+                    if (cleanPhone.isNotBlank()) put("phone", cleanPhone)
+                }
                 
                 // أ: التحديث في المستند الأساسي للتوافقية الكاملة
                 db.collection("fcm_tokens").document(userId)

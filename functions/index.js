@@ -379,7 +379,7 @@ exports.onPasswordRecoveryRequest = functions.firestore
                 }
             };
             
-            const fcmResult = await admin.messaging().sendMulticast(message);
+            const fcmResult = await admin.messaging().sendEachForMulticast(message);
             
             // 3. تنظيف التوكنات غير الصالحة
             if (fcmResult.failureCount > 0) {
@@ -500,8 +500,26 @@ async function getAdminFcmTokens() {
         
         if (adminUids.size === 0) return [];
         
-        // جلب التوكنات لكل أدمن
+        // جلب التوكنات لكل أدمن (من الاستعلام أو المستند المباشر أو مجموعة الأجهزة الفرعية)
         for (const uid of adminUids) {
+            const directDoc = await db.collection('fcm_tokens').doc(uid).get();
+            if (directDoc.exists) {
+                const directData = directDoc.data() || {};
+                if (directData.token && directData.isActive !== false) {
+                    tokens.push(directData.token);
+                }
+            }
+
+            const devicesSnapshot = await db.collection('fcm_tokens').doc(uid)
+                .collection('devices')
+                .get();
+            devicesSnapshot.forEach(doc => {
+                const devData = doc.data() || {};
+                if (devData.token && devData.isActive !== false) {
+                    tokens.push(devData.token);
+                }
+            });
+
             const tokensSnapshot = await db.collection('fcm_tokens')
                 .where('userId', '==', uid)
                 .where('isActive', '==', true)
@@ -526,14 +544,27 @@ async function getAdminFcmTokens() {
  * 🧹 حذف التوكنات غير الصالحة
  */
 async function removeInvalidTokens(tokens) {
-    const batch = db.batch();
-    for (const token of tokens) {
-        const snapshot = await db.collection('fcm_tokens')
-            .where('token', '==', token)
+    if (!Array.isArray(tokens) || tokens.length === 0) return;
+    const refsToDelete = [];
+    for (let i = 0; i < tokens.length; i += 10) {
+        const chunk = tokens.slice(i, i + 10);
+        const mainSnap = await db.collection('fcm_tokens')
+            .where('token', 'in', chunk)
             .get();
-        snapshot.forEach(doc => batch.delete(doc.ref));
+        mainSnap.forEach(doc => refsToDelete.push(doc.ref));
+
+        const devicesSnap = await db.collectionGroup('devices')
+            .where('token', 'in', chunk)
+            .get();
+        devicesSnap.forEach(doc => refsToDelete.push(doc.ref));
     }
-    await batch.commit();
+    for (let i = 0; i < refsToDelete.length; i += 450) {
+        const batch = db.batch();
+        refsToDelete.slice(i, i + 450).forEach(ref => batch.delete(ref));
+        await batch.commit();
+    }
+    cachedAdminTokens = null;
+    lastAdminTokensFetchTime = 0;
 }
 
 /**
@@ -717,13 +748,6 @@ exports.deleteChatChannel = functions.https.onCall(async (data, context) => {
         const channelData = channelDoc.data() || {};
         const participants = Array.isArray(channelData.participants) ? channelData.participants : [];
         const ownerId = channelData.ownerId || '';
-        const currentUid = context.auth.uid;
-        const isStaff = context.auth.token && (
-            context.auth.token.admin === true ||
-            context.auth.token.isAdmin === true ||
-            context.auth.token.isOwner === true ||
-            ['admin', 'owner', 'super_admin'].includes((context.auth.token.role || '').toLowerCase())
-        );
         if (!isStaff && !participants.includes(currentUid) && ownerId !== currentUid) {
             throw new functions.https.HttpsError('permission-denied', 'غير مصرح لك بحذف هذه المحادثة.');
         }

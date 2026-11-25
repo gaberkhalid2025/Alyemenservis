@@ -93,6 +93,46 @@ class DashboardRepositoryImpl(
         else -> AppConstants.COL_USER_PROFILES
     }
 
+    private suspend fun resolveEntityDocRef(
+        collectionName: String,
+        ownerIdOrPhone: String
+    ): Pair<com.google.firebase.firestore.DocumentReference, com.google.firebase.firestore.DocumentSnapshot>? {
+        val cleanId = ownerIdOrPhone.trim()
+        if (cleanId.isBlank()) return null
+        val normPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(cleanId)
+        val candidateIds = buildList {
+            add(cleanId)
+            if (normPhone.isNotBlank()) {
+                add(normPhone)
+                when (collectionName) {
+                    AppConstants.COL_PROVIDERS -> add("prov_$normPhone")
+                    AppConstants.COL_STORES -> add("store_$normPhone")
+                    AppConstants.COL_PROPERTIES -> add("prop_$normPhone")
+                    AppConstants.COL_JOBS -> add("job_$normPhone")
+                }
+            }
+        }.distinct()
+        for (cid in candidateIds) {
+            val ref = firestore.collection(collectionName).document(cid)
+            val snap = runCatching { ref.get().await() }.getOrNull()
+            if (snap != null && snap.exists() && snap.getBoolean("isDeleted") != true) {
+                return ref to snap
+            }
+        }
+        if (normPhone.isNotBlank()) {
+            val phoneVariants = listOf(normPhone, "0$normPhone", "+967$normPhone", "00967$normPhone").distinct()
+            val byPhone = runCatching {
+                firestore.collection(collectionName).whereIn("phone", phoneVariants).limit(5).get().await()
+            }.getOrNull()?.documents?.firstOrNull { it.getBoolean("isDeleted") != true }
+            if (byPhone != null) return byPhone.reference to byPhone
+        }
+        val byOwnerId = runCatching {
+            firestore.collection(collectionName).whereEqualTo("ownerId", cleanId).limit(5).get().await()
+        }.getOrNull()?.documents?.firstOrNull { it.getBoolean("isDeleted") != true }
+        if (byOwnerId != null) return byOwnerId.reference to byOwnerId
+        return null
+    }
+
     override suspend fun updateBusinessProfile(
         ownerId: String,
         role: String,
@@ -112,7 +152,9 @@ class DashboardRepositoryImpl(
         if (name.isBlank()) return Result.failure(IllegalArgumentException("الاسم مطلوب"))
         return try {
             val collectionName = resolveCollection(role)
-            val docRef = firestore.collection(collectionName).document(cleanOwnerId)
+            val resolved = resolveEntityDocRef(collectionName, cleanOwnerId)
+            val docRef = resolved?.first ?: firestore.collection(collectionName).document(cleanOwnerId)
+            val resolvedSnap = resolved?.second
             val updates = mutableMapOf<String, Any>(
                 "description" to description.trim(),
                 "workingHours" to workingHours.trim(),
@@ -124,7 +166,7 @@ class DashboardRepositoryImpl(
             var previousPhoneForSync = ""
             if (rawPhone.isNotBlank()) {
                 val cleanPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(rawPhone)
-                val existingSnap = try { docRef.get().await() } catch (_: Exception) { null }
+                val existingSnap = resolvedSnap ?: try { docRef.get().await() } catch (_: Exception) { null }
                 val storedPhone = existingSnap?.getString("phone")?.let {
                     com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(it)
                 }.orEmpty()
@@ -246,11 +288,10 @@ class DashboardRepositoryImpl(
         }
         return try {
             val collectionName = resolveCollection(role)
-            val docRef = firestore.collection(collectionName).document(cleanOwnerId)
-            val snapshot = docRef.get().await()
-            if (!snapshot.exists()) {
-                return Result.failure(IllegalStateException("لم يتم العثور على سجل الحساب"))
-            }
+            val resolved = resolveEntityDocRef(collectionName, cleanOwnerId)
+                ?: return Result.failure(IllegalStateException("لم يتم العثور على سجل الحساب"))
+            val docRef = resolved.first
+            val snapshot = resolved.second
             val storedHash = snapshot.getString("passwordHash")?.takeIf { it.isNotBlank() }
                 ?: snapshot.getString("password")
                 ?: ""
@@ -264,13 +305,37 @@ class DashboardRepositoryImpl(
                 return Result.failure(IllegalArgumentException("كلمة المرور الحالية غير صحيحة ❌"))
             }
             val newHash = com.example.utils.PasswordHasher.hash(cleanNew)
-            docRef.update(
-                mapOf(
-                    "passwordHash" to newHash,
-                    "password" to "",
-                    "updatedAt" to System.currentTimeMillis()
-                )
-            ).await()
+            val passwordPayload = mapOf(
+                "passwordHash" to newHash,
+                "password" to "",
+                "updatedAt" to System.currentTimeMillis()
+            )
+            docRef.update(passwordPayload).await()
+
+            val phoneVal = snapshot.getString("phone").orEmpty()
+            val normPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(phoneVal.ifBlank { cleanOwnerId })
+            val syncIds = listOfNotNull(
+                cleanOwnerId.takeIf { it.isNotBlank() },
+                docRef.id.takeIf { it.isNotBlank() },
+                normPhone.takeIf { it.isNotBlank() }
+            ).distinct()
+            for (col in listOf(AppConstants.COL_USER_PROFILES, "users")) {
+                for (sid in syncIds) {
+                    runCatching {
+                        val sRef = firestore.collection(col).document(sid)
+                        if (sRef.get().await().exists()) {
+                            sRef.update(passwordPayload).await()
+                        }
+                    }
+                }
+                if (normPhone.isNotBlank()) {
+                    val phoneVariants = listOf(normPhone, "0$normPhone", "+967$normPhone", "00967$normPhone").distinct()
+                    runCatching {
+                        val matches = firestore.collection(col).whereIn("phone", phoneVariants).limit(5).get().await()
+                        matches.documents.forEach { d -> runCatching { d.reference.update(passwordPayload) } }
+                    }
+                }
+            }
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
@@ -590,7 +655,10 @@ class RatingsRepositoryImpl(
                         rating = doc.getDouble("rating") ?: entity?.rating?.toDouble() ?: 5.0,
                         comment = doc.getString("comment") ?: doc.getString("review") ?: entity?.comment ?: "",
                         dateTimestamp = doc.getLong("timestamp") ?: doc.getLong("dateTimestamp") ?: entity?.timestamp ?: System.currentTimeMillis(),
-                        ownerReply = doc.getString("ownerReply") ?: doc.getString("replyText") ?: ""
+                        ownerReply = doc.getString("ownerReply")
+                            ?: doc.getString("replyText")
+                            ?: doc.getString("reply")
+                            ?: ""
                     )
                 }
                 trySend(list)

@@ -11,7 +11,6 @@
         <domain includeSubdomains="true">openstreetmap.org</domain>
         <domain includeSubdomains="true">openstreetmap.fr</domain>
         <domain includeSubdomains="true">arcgisonline.com</domain>
-        <domain includeSubdomains="true">cartocdn.com</domain>
         <domain includeSubdomains="true">firebasestorage.googleapis.com</domain>
         <domain includeSubdomains="true">firestore.googleapis.com</domain>
         <domain includeSubdomains="true">identitytoolkit.googleapis.com</domain>

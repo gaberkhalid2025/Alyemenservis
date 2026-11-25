@@ -174,7 +174,7 @@ fun AdvancedAnalyticsDashboardComposable(
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(
                         onClick = {
-                            val currentDate = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date())
+                            val currentDate = DateFormatter.formatDateDashUs(System.currentTimeMillis())
                             val headers = listOf("المعيار", "القيمة", "التاريخ")
                             val rows = listOf(
                                 listOf("الحجوزات", "${businessMetrics.totalBookingsThisMonth}", currentDate),

@@ -32,7 +32,10 @@ class JobManagementViewModel @Inject constructor(
         val finalJob = if (job.id.isBlank()) job.copy(id = targetId) else job
         viewModelScope.launch {
             crud.saveEntity("jobs", targetId, finalJob,
-                onSuccess = { onTriggerNotification?.invoke("✅ تم حفظ الوظيفة بنجاح") },
+                onSuccess = {
+                    _jobs.value = _jobs.value.filterNot { it.id == targetId } + finalJob
+                    onTriggerNotification?.invoke("✅ تم حفظ الوظيفة بنجاح")
+                },
                 onError = { onTriggerNotification?.invoke("❌ فشل حفظ الوظيفة: ${it.message}") }
             )
         }
@@ -41,7 +44,10 @@ class JobManagementViewModel @Inject constructor(
     fun deleteJob(jobId: String) {
         viewModelScope.launch {
             crud.deleteEntity("jobs", jobId, softDelete = true,
-                onSuccess = { onTriggerNotification?.invoke("🗑️ تم نقل الوظيفة للمهملات") },
+                onSuccess = {
+                    _jobs.value = _jobs.value.map { if (it.id == jobId) it.copy(isDeleted = true) else it }
+                    onTriggerNotification?.invoke("🗑️ تم نقل الوظيفة للمهملات")
+                },
                 onError = { onTriggerNotification?.invoke("❌ فشل الحذف: ${it.message}") }
             )
         }
@@ -50,7 +56,10 @@ class JobManagementViewModel @Inject constructor(
     fun restoreJob(jobId: String) {
         viewModelScope.launch {
             crud.updateFields("jobs", jobId, mapOf("isDeleted" to false, "deletedAt" to null),
-                onSuccess = { onTriggerNotification?.invoke("♻️ تم استعادة الوظيفة بنجاح") }
+                onSuccess = {
+                    _jobs.value = _jobs.value.map { if (it.id == jobId) it.copy(isDeleted = false) else it }
+                    onTriggerNotification?.invoke("♻️ تم استعادة الوظيفة بنجاح")
+                }
             )
         }
     }
@@ -58,7 +67,10 @@ class JobManagementViewModel @Inject constructor(
     fun deleteJobPermanently(jobId: String) {
         viewModelScope.launch {
             crud.deleteEntity("jobs", jobId, softDelete = false,
-                onSuccess = { onTriggerNotification?.invoke("🗑️ تم حذف الوظيفة نهائياً") }
+                onSuccess = {
+                    _jobs.value = _jobs.value.filterNot { it.id == jobId }
+                    onTriggerNotification?.invoke("🗑️ تم حذف الوظيفة نهائياً")
+                }
             )
         }
     }
@@ -98,7 +110,10 @@ class JobManagementViewModel @Inject constructor(
         val finalApp = if (application.id.isBlank()) application.copy(id = targetId) else application
         viewModelScope.launch {
             crud.saveEntity("job_applications", targetId, finalApp,
-                onSuccess = { onTriggerNotification?.invoke("📨 تم تقديم طلب التوظيف بنجاح") },
+                onSuccess = {
+                    _jobApplications.value = _jobApplications.value.filterNot { it.id == targetId } + finalApp
+                    onTriggerNotification?.invoke("📨 تم تقديم طلب التوظيف بنجاح")
+                },
                 onError = { onTriggerNotification?.invoke("❌ فشل التقديم: ${it.message}") }
             )
         }
@@ -107,7 +122,12 @@ class JobManagementViewModel @Inject constructor(
     fun updateJobApplicationStatus(appId: String, status: String, reason: String = "") {
         viewModelScope.launch {
             crud.updateFields("job_applications", appId, mapOf("status" to status, "statusReason" to reason),
-                onSuccess = { onTriggerNotification?.invoke("تم تحديث حالة طلب التوظيف إلى $status") }
+                onSuccess = {
+                    _jobApplications.value = _jobApplications.value.map {
+                        if (it.id == appId) it.copy(status = status) else it
+                    }
+                    onTriggerNotification?.invoke("تم تحديث حالة طلب التوظيف إلى $status")
+                }
             )
         }
     }
@@ -123,7 +143,10 @@ class JobManagementViewModel @Inject constructor(
     fun deleteJobApplication(appId: String) {
         viewModelScope.launch {
             crud.deleteEntity("job_applications", appId, softDelete = false,
-                onSuccess = { onTriggerNotification?.invoke("🗑️ تم حذف طلب التوظيف") }
+                onSuccess = {
+                    _jobApplications.value = _jobApplications.value.filterNot { it.id == appId }
+                    onTriggerNotification?.invoke("🗑️ تم حذف طلب التوظيف")
+                }
             )
         }
     }

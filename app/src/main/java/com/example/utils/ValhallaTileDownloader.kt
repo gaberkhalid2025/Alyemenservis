@@ -2,6 +2,7 @@ package com.example.utils
 
 import android.content.Context
 import android.net.Uri
+import android.os.Build
 import android.os.Environment
 import android.util.Log
 import kotlinx.coroutines.CancellationException
@@ -221,6 +222,12 @@ object ValhallaTileDownloader {
     @Deprecated("استخدم importFromUri")
     suspend fun importLocalTiles(context: Context, onProgress: (Float, String) -> Unit = { _, _ -> }): Result<Boolean> =
         withContext(Dispatchers.IO) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                return@withContext Result.failure(
+                    IOException("في أندرويد 10 وما فوق يرجى اختيار ملف $LOCAL_ZIP_NAME عبر منتقي الملفات (importFromUri).")
+                )
+            }
+            @Suppress("DEPRECATION")
             val zipFile = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), LOCAL_ZIP_NAME)
             if (!zipFile.exists()) {
                 return@withContext Result.failure(IOException("الملف $LOCAL_ZIP_NAME غير موجود."))

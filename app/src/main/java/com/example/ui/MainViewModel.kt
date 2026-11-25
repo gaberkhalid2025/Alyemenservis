@@ -319,10 +319,7 @@ class MainViewModel @Inject constructor(
 
     private fun checkInitializationComplete() {
         if (isSettingsLoaded && isCategoriesLoaded && isCitiesLoaded && isProvidersLoaded) {
-            viewModelScope.launch {
-                kotlinx.coroutines.delay(1000)
-                _isInitialized.value = true
-            }
+            _isInitialized.value = true
         }
     }
 
@@ -475,22 +472,20 @@ class MainViewModel @Inject constructor(
                 .setMinUpdateDistanceMeters(minDistM)
                 .build()
 
-            if (locationCallback == null) {
-                locationCallback = object : com.google.android.gms.location.LocationCallback() {
-                    override fun onLocationResult(result: com.google.android.gms.location.LocationResult) {
-                        if (navTrackingJob?.isActive == true || _isManualLocationSet.value) return
-                        val loc = result.lastLocation ?: return
-                        val isMock = if (android.os.Build.VERSION.SDK_INT >= 31) loc.isMock else @Suppress("DEPRECATION") loc.isFromMockProvider
-                        val real = !isMock && isFresh(loc, 30_000L) && (!loc.hasAccuracy() || loc.accuracy <= 150f)
-                        if (real) {
-                            updateUserLocation(loc.latitude, loc.longitude)
-                            _userLocationAccuracyM.value = loc.accuracy
-                            markFix()
-                        }
+            val cb = locationCallback ?: object : com.google.android.gms.location.LocationCallback() {
+                override fun onLocationResult(result: com.google.android.gms.location.LocationResult) {
+                    if (navTrackingJob?.isActive == true || _isManualLocationSet.value) return
+                    val loc = result.lastLocation ?: return
+                    val isMock = if (android.os.Build.VERSION.SDK_INT >= 31) loc.isMock else @Suppress("DEPRECATION") loc.isFromMockProvider
+                    val real = !isMock && isFresh(loc, 30_000L) && (!loc.hasAccuracy() || loc.accuracy <= 150f)
+                    if (real) {
+                        updateUserLocation(loc.latitude, loc.longitude)
+                        _userLocationAccuracyM.value = loc.accuracy
+                        markFix()
                     }
                 }
-            }
-            fusedClient.requestLocationUpdates(request, locationCallback!!, android.os.Looper.getMainLooper())
+            }.also { locationCallback = it }
+            fusedClient.requestLocationUpdates(request, cb, android.os.Looper.getMainLooper())
                 .addOnSuccessListener { _isGpsTrackingActive.value = true }
                 .addOnFailureListener { _isGpsTrackingActive.value = false }
             startFreshnessWatchdog()

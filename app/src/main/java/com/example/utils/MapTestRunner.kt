@@ -2,9 +2,8 @@ package com.example.utils
 
 import android.content.Context
 import com.example.ui.screens.map.utils.OfflineMapManager
+import com.example.ui.screens.map.utils.OfflineTileInterceptor
 import java.io.File
-import java.text.SimpleDateFormat
-import java.util.Date
 import java.util.Locale
 
 data class MapStepReport(
@@ -35,7 +34,7 @@ class MapTestRunner(private val context: Context) {
         onComplete: (MapFullReport) -> Unit
     ) {
         val stepsList = mutableListOf<MapStepReport>()
-        val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date())
+        val timestamp = DateFormatter.formatCustom(System.currentTimeMillis(), "yyyy-MM-dd HH:mm")
 
         fun addStep(name: String, desc: String): MapStepReport {
             val step = MapStepReport(name, desc)
@@ -80,17 +79,27 @@ class MapTestRunner(private val context: Context) {
                 step2.notes = "خطأ في حساب المسافة: $dist كم"
             }
 
-            // 3. فحص أصول Leaflet
-            onProgress("📁 فحص 3/10: فحص أصول خريطة Leaflet (map.html, leaflet.js)...")
+            // 3. فحص أصول Leaflet + خلوها من Carto المدفوع + حظر Carto في OfflineTileInterceptor
+            onProgress("📁 فحص 3/10: فحص أصول Leaflet وحظر مصادر API KEY REQUIRED...")
             val assetList = context.assets.list("")?.toSet() ?: emptySet()
             val leafletOk = assetList.contains("map.html") && assetList.contains("leaflet.js") && assetList.contains("leaflet.css")
-            if (leafletOk) {
+            val mapHtmlClean = if (leafletOk) {
+                runCatching {
+                    val html = context.assets.open("map.html").bufferedReader().use { it.readText() }
+                    !html.contains("cartocdn.com", ignoreCase = true) && !html.contains("carto.com/basemaps", ignoreCase = true)
+                }.getOrDefault(false)
+            } else false
+            val cartoBlocked = OfflineTileInterceptor.intercept(
+                context,
+                "https://a.basemaps.cartocdn.com/light_all/15/10/10.png"
+            )?.statusCode == 404
+            if (leafletOk && mapHtmlClean && cartoBlocked) {
                 step3.status = "SUCCESS"
                 step3.verified = true
-                step3.notes = "ملفات Leaflet موجودة في الأصول وجاهزة للعرض."
+                step3.notes = "ملفات Leaflet مكتملة وخالية من Carto مع تأكيد حظر البلاطات المدفوعة."
             } else {
                 step3.status = "FAILED"
-                step3.notes = "نقص في ملفات Leaflet الأساسية داخل assets."
+                step3.notes = "نقص في Leaflet أو وجود رابط Carto غير محظور (leaflet=$leafletOk, clean=$mapHtmlClean, blocked=$cartoBlocked)."
             }
 
             // 4. فحص أصول 3D
@@ -109,15 +118,21 @@ class MapTestRunner(private val context: Context) {
             onProgress("🔍 فحص 5-9/10: إجراء تشخيص ميداني لمحرك الملاحة، الكاش، والصوت...")
             val diagItems = MapDiagnostics.run(context, hasRealLocation = false, accuracyM = null)
 
-            // 5: حزمة الملاحة Valhalla
+            // 5: حزمة الملاحة Valhalla + صلاحية بنية valhalla.json
+            val testValhallaCfg = ValhallaTileDownloader.buildConfigJsonString(
+                tileDirPath = "/tmp/valhalla",
+                tileExtractPath = "/tmp/valhalla/yemen.tar"
+            )
+            val cfgValid = ValhallaTileDownloader.isValhallaConfigJsonValid(testValhallaCfg, "/tmp/valhalla", "/tmp/valhalla/yemen.tar")
+            val invalidCfgRejected = !ValhallaTileDownloader.isValhallaConfigJsonValid("{\"mjolnir\":{\"tile_dir\":\"/custom_files/\"}}", "/tmp/valhalla", "/tmp/valhalla/yemen.tar")
             val tilesDiag = diagItems.find { it.title.contains("حزمة الملاحة") }
-            if (tilesDiag != null && tilesDiag.status == DiagStatus.OK) {
+            if (tilesDiag != null && tilesDiag.status == DiagStatus.OK && cfgValid && invalidCfgRejected) {
                 step5.status = "SUCCESS"
                 step5.verified = true
-                step5.notes = tilesDiag.detail
+                step5.notes = "${tilesDiag.detail} (بنية valhalla.json سليمة ومحققة)"
             } else {
                 step5.status = "FAILED"
-                step5.notes = tilesDiag?.detail ?: "حزمة الملاحة الأوفلاين غير مثبتة"
+                step5.notes = (tilesDiag?.detail ?: "حزمة الملاحة الأوفلاين غير مثبتة") + " [cfgValid=$cfgValid]"
             }
 
             // 6: محرك التوجيه

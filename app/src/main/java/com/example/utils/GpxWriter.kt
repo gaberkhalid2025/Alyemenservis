@@ -4,10 +4,7 @@ import android.content.Context
 import android.net.Uri
 import androidx.core.content.FileProvider
 import java.io.File
-import java.text.SimpleDateFormat
-import java.util.Date
 import java.util.Locale
-import java.util.TimeZone
 
 data class TrackPoint(
     val lat: Double,
@@ -68,11 +65,7 @@ object GpxWriter {
 
     private fun formatCoord(v: Double): String = String.format(Locale.US, "%.6f", v)
 
-    private fun isoUtc(ms: Long): String {
-        val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)
-        sdf.timeZone = TimeZone.getTimeZone("UTC")
-        return sdf.format(Date(ms))
-    }
+    private fun isoUtc(ms: Long): String = DateFormatter.formatIsoUtc(ms)
 
     private fun escapeXml(s: String): String = s
         .replace("&", "&amp;")

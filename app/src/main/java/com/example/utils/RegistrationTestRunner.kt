@@ -4,13 +4,11 @@ import android.content.Context
 import com.example.data.models.JoinRequestEntity
 import com.example.data.PendingProviderEntity
 import com.example.data.repositories.StatusRepositoryImpl
+import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.delay
 import java.io.File
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 data class TestStepReport(
     val section: String,
@@ -81,63 +79,42 @@ class RegistrationTestRunner(private val context: Context) {
     suspend fun cleanAllTestData(onProgress: (String) -> Unit = {}) {
         onProgress("🧹 جاري تصفية وتطهير بيانات الاختبار القديمة من قاعدة البيانات...")
         try {
-            val batch = db.batch()
+            val refsToDelete = mutableListOf<DocumentReference>()
 
             for (phone in testPhones) {
-                // Delete from join_requests where phone == phone
-                val jrSnapshot = db.collection("join_requests").whereEqualTo("phone", phone).get().await()
-                for (doc in jrSnapshot.documents) {
-                    batch.delete(doc.reference)
-                }
+                val reqId = "test_req_id_$phone"
+                refsToDelete.add(db.collection("join_requests").document(reqId))
+                refsToDelete.add(db.collection("pending_providers").document(reqId))
+                refsToDelete.add(db.collection("registered_users").document(phone))
+                refsToDelete.add(db.collection("registered_users").document(reqId))
+                refsToDelete.add(db.collection("users").document(phone))
+                refsToDelete.add(db.collection("users").document(reqId))
 
-                // Delete from pending_providers where phone == phone
-                val ppSnapshot = db.collection("pending_providers").whereEqualTo("phone", phone).get().await()
-                for (doc in ppSnapshot.documents) {
-                    batch.delete(doc.reference)
-                }
-
-                // Delete from registered_users
-                val ruSnapshot1 = db.collection("registered_users").whereEqualTo("phone", phone).get().await()
-                for (doc in ruSnapshot1.documents) {
-                    batch.delete(doc.reference)
-                }
-                val ruSnapshot2 = db.collection("registered_users").document(phone).get().await()
-                if (ruSnapshot2.exists()) {
-                    batch.delete(ruSnapshot2.reference)
-                }
-
-                // Delete from users
-                val uSnapshot = db.collection("users").document(phone).get().await()
-                if (uSnapshot.exists()) {
-                    batch.delete(uSnapshot.reference)
-                }
-
-                // Delete from providers
-                val pSnapshot = db.collection("providers").whereEqualTo("phone", phone).get().await()
-                for (doc in pSnapshot.documents) {
-                    batch.delete(doc.reference)
-                }
-
-                // Delete from stores
-                val sSnapshot = db.collection("stores").whereEqualTo("phone", phone).get().await()
-                for (doc in sSnapshot.documents) {
-                    batch.delete(doc.reference)
-                }
-
-                // Delete from properties
-                val propSnapshot = db.collection("properties").whereEqualTo("phone", phone).get().await()
-                for (doc in propSnapshot.documents) {
-                    batch.delete(doc.reference)
-                }
-
-                // Delete from jobs
-                val jSnapshot = db.collection("jobs").whereEqualTo("phone", phone).get().await()
-                for (doc in jSnapshot.documents) {
-                    batch.delete(doc.reference)
-                }
+                db.collection("join_requests").whereEqualTo("phone", phone).get().await()
+                    .documents.forEach { refsToDelete.add(it.reference) }
+                db.collection("pending_providers").whereEqualTo("phone", phone).get().await()
+                    .documents.forEach { refsToDelete.add(it.reference) }
+                db.collection("registered_users").whereEqualTo("phone", phone).get().await()
+                    .documents.forEach { refsToDelete.add(it.reference) }
+                db.collection("users").whereEqualTo("phone", phone).get().await()
+                    .documents.forEach { refsToDelete.add(it.reference) }
+                db.collection("providers").whereEqualTo("phone", phone).get().await()
+                    .documents.forEach { refsToDelete.add(it.reference) }
+                db.collection("stores").whereEqualTo("phone", phone).get().await()
+                    .documents.forEach { refsToDelete.add(it.reference) }
+                db.collection("properties").whereEqualTo("phone", phone).get().await()
+                    .documents.forEach { refsToDelete.add(it.reference) }
+                db.collection("jobs").whereEqualTo("phone", phone).get().await()
+                    .documents.forEach { refsToDelete.add(it.reference) }
+                db.collection("notifications").whereEqualTo("targetValue", phone).get().await()
+                    .documents.forEach { refsToDelete.add(it.reference) }
             }
 
-            batch.commit().await()
+            refsToDelete.distinctBy { it.path }.chunked(400).forEach { chunk ->
+                val batch = db.batch()
+                chunk.forEach { batch.delete(it) }
+                batch.commit().await()
+            }
             onProgress("✅ تم تنظيف جميع كولكشن الحسابات التجريبية بنجاح!")
         } catch (e: Exception) {
             e.printStackTrace()
@@ -301,8 +278,10 @@ class RegistrationTestRunner(private val context: Context) {
                     var isMoved = false
                     when (type) {
                         "CLIENT" -> {
-                            val userDoc = db.collection("registered_users").document(phone).get().await()
-                            if (userDoc.exists()) isMoved = true
+                            val regUserDoc = db.collection("registered_users").document(phone).get().await()
+                            val userDoc = db.collection("users").document(id).get().await()
+                            val plainLeak = userDoc.getString("password").orEmpty()
+                            if (regUserDoc.exists() && userDoc.exists() && plainLeak.isBlank()) isMoved = true
                         }
                         "PROVIDER" -> {
                             val provDoc = db.collection("providers").document(id).get().await()
@@ -345,8 +324,7 @@ class RegistrationTestRunner(private val context: Context) {
         val passedCount = steps.filter { (it.status == "APPROVED" && it.groupVerified) || (it.status == "REJECTED" && it.groupVerified) }.size
         val failedCount = 8 - passedCount
 
-        val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale("ar"))
-        val currentDateString = sdf.format(Date())
+        val currentDateString = DateFormatter.formatCustom(System.currentTimeMillis(), "yyyy-MM-dd HH:mm:ss")
 
         val report = FullTestReport(
             timestamp = currentDateString,

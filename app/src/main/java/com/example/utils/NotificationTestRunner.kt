@@ -1,13 +1,12 @@
 package com.example.utils
 
 import android.content.Context
+import com.google.firebase.firestore.DocumentReference
+import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.delay
 import java.io.File
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 data class NotificationStepReport(
     val stepName: String,
@@ -217,24 +216,24 @@ class NotificationTestRunner(private val context: Context) {
 
     suspend fun cleanAllTestData() {
         try {
-            val batch = db.batch()
+            val refsToDelete = mutableListOf<DocumentReference>()
 
-            // Delete notifications matching our testClientPhone
-            val snapshot = db.collection("notifications").whereEqualTo("targetValue", testUserPhone).get().await()
-            for (doc in snapshot.documents) {
-                batch.delete(doc.reference)
+            db.collection("notifications").whereEqualTo("targetValue", testUserPhone).get().await()
+                .documents.forEach { refsToDelete.add(it.reference) }
+
+            listOf("notif_test_", "notif_flood_").forEach { prefix ->
+                db.collection("notifications")
+                    .whereGreaterThanOrEqualTo(FieldPath.documentId(), prefix)
+                    .whereLessThanOrEqualTo(FieldPath.documentId(), "$prefix\uf8ff")
+                    .get().await()
+                    .documents.forEach { refsToDelete.add(it.reference) }
             }
 
-            // Delete all test ones explicitly
-            val snapshot2 = db.collection("notifications").get().await()
-            for (doc in snapshot2.documents) {
-                val id = doc.id
-                if (id.startsWith("notif_test_") || id.startsWith("notif_flood_")) {
-                    batch.delete(doc.reference)
-                }
+            refsToDelete.distinctBy { it.path }.chunked(400).forEach { chunk ->
+                val batch = db.batch()
+                chunk.forEach { batch.delete(it) }
+                batch.commit().await()
             }
-
-            batch.commit().await()
         } catch (_: Exception) {}
     }
 

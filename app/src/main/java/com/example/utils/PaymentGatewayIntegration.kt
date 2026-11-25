@@ -88,6 +88,43 @@ class PaymentGatewayIntegration(private val context: Context? = null) {
     private val firestore: FirebaseFirestore by lazy { FirebaseFirestore.getInstance() }
     private val moshi: Moshi = Moshi.Builder().addLast(KotlinJsonAdapterFactory()).build()
 
+    init {
+        loadCachedTransactions()
+    }
+
+    private fun loadCachedTransactions() {
+        val safeCtx = context ?: return
+        try {
+            val sharedPrefs = safeCtx.getSharedPreferences("yemen_gateway_secure_vault", Context.MODE_PRIVATE)
+            val raw = sharedPrefs.getString("active_txs_v1", null) ?: return
+            val json = if (raw.startsWith("gcm:") || raw.startsWith("gcmx:")) {
+                SecurityCryptoUtils.decrypt(raw)
+            } else raw
+            if (json.isBlank()) return
+            val type = Types.newParameterizedType(List::class.java, Payment::class.java)
+            val adapter = moshi.adapter<List<Payment>>(type)
+            val list = adapter.fromJson(json) ?: return
+            list.forEach { p -> activeTransactions[p.id] = p }
+        } catch (_: Exception) {}
+    }
+
+    private fun saveCachedTransactions() {
+        val safeCtx = context ?: return
+        try {
+            val list = activeTransactions.values
+                .sortedByDescending { it.timestamp }
+                .take(200)
+            val type = Types.newParameterizedType(List::class.java, Payment::class.java)
+            val adapter = moshi.adapter<List<Payment>>(type)
+            val json = adapter.toJson(list)
+            val encrypted = SecurityCryptoUtils.encrypt(json)
+            safeCtx.getSharedPreferences("yemen_gateway_secure_vault", Context.MODE_PRIVATE)
+                .edit()
+                .putString("active_txs_v1", encrypted)
+                .apply()
+        } catch (_: Exception) {}
+    }
+
     /**
      * 🔐 Retrieve gateway configurations safely from SharedPreferences
      */
@@ -233,6 +270,7 @@ class PaymentGatewayIntegration(private val context: Context? = null) {
                 val txId = "TXN-PENDING-${UUID.randomUUID().toString().take(12).uppercase()}"
                 val recordedPayment = payment.copy(id = txId)
                 activeTransactions[txId] = recordedPayment
+                saveCachedTransactions()
                 try {
                     firestore.collection("payment_transactions").document(txId).set(
                         mapOf(
@@ -260,6 +298,7 @@ class PaymentGatewayIntegration(private val context: Context? = null) {
                 // Local sandbox mode when no gateway API is configured
                 val demoTxId = "TXN-LOCAL-${UUID.randomUUID().toString().take(10).uppercase()}"
                 activeTransactions[demoTxId] = payment.copy(id = demoTxId)
+                saveCachedTransactions()
 
                 val result = PaymentResult(
                     success = true,
@@ -353,6 +392,7 @@ class PaymentGatewayIntegration(private val context: Context? = null) {
         }
         return try {
             activeTransactions.remove(cleanTxId)
+            saveCachedTransactions()
             try {
                 firestore.collection("payment_transactions").document(cleanTxId)
                     .set(
@@ -387,6 +427,7 @@ class PaymentGatewayIntegration(private val context: Context? = null) {
             if (isFullRefund) {
                 activeTransactions.remove(cleanTxId)
             }
+            saveCachedTransactions()
             try {
                 firestore.collection("payment_transactions").document(cleanTxId)
                     .set(

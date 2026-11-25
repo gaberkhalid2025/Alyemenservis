@@ -1,7 +1,5 @@
 package com.example.utils
 
-import java.text.SimpleDateFormat
-import java.util.Date
 import java.util.Locale
 
 object DeepSystemDiagnosticOrchestrator {
@@ -22,7 +20,7 @@ object DeepSystemDiagnosticOrchestrator {
         sett: SettingsFullReport?,
         totalDurationMs: Long = 0L
     ): ComprehensiveDiagnosticReport {
-        val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
+        val timestamp = DateFormatter.formatCustom(System.currentTimeMillis(), "yyyy-MM-dd HH:mm:ss")
         val systemMap = linkedMapOf<String, List<TestDetail>>()
         val allErrors = mutableListOf<TestError>()
         val allWarnings = mutableListOf<TestWarning>()

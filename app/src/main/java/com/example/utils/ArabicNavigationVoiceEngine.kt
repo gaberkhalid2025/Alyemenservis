@@ -136,7 +136,12 @@ class ArabicNavigationVoiceEngine(
                         runCatching { engine.shutdown() }
                         if (cont.isActive) cont.resume(ok to label)
                     }
-                    tts = if (enginePkg != null) TextToSpeech(context, listener, enginePkg) else TextToSpeech(context, listener)
+                    tts = runCatching {
+                        if (enginePkg != null) TextToSpeech(context, listener, enginePkg) else TextToSpeech(context, listener)
+                    }.onFailure {
+                        runCatching { tts?.shutdown() }
+                        if (cont.isActive) cont.resume(false to null)
+                    }.getOrNull()
                     cont.invokeOnCancellation { runCatching { tts?.shutdown() } }
                 }
             } ?: (false to null)

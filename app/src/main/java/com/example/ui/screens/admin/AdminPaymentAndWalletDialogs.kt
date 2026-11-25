@@ -193,15 +193,26 @@ internal fun AdminPaymentAndWalletDialogs(
                 }
             },
             confirmButton = {
+                val context = androidx.compose.ui.platform.LocalContext.current
                 Button(
                     onClick = {
+                        if (state.walletNumberInput.isBlank() ||
+                            (state.walletAccountNameArInput.isBlank() && state.walletAccountNameInput.isBlank())
+                        ) {
+                            android.widget.Toast.makeText(
+                                context,
+                                "يرجى إدخال رقم المحفظة واسم صاحب الحساب",
+                                android.widget.Toast.LENGTH_SHORT
+                            ).show()
+                            return@Button
+                        }
                         val wallet = PaymentWalletEntity(
                             id = state.editingWalletObj?.id ?: "",
                             provider = state.walletProviderInput,
-                            walletNumber = state.walletNumberInput,
-                            accountName = state.walletAccountNameInput.ifBlank { state.walletAccountNameArInput },
-                            accountNameAr = state.walletAccountNameArInput,
-                            description = state.walletDescriptionInput,
+                            walletNumber = state.walletNumberInput.trim(),
+                            accountName = state.walletAccountNameInput.ifBlank { state.walletAccountNameArInput }.trim(),
+                            accountNameAr = state.walletAccountNameArInput.trim(),
+                            description = state.walletDescriptionInput.trim(),
                             walletType = state.walletTypeInput,
                             currency = state.walletCurrencyInput,
                             isVisibleToUsers = state.walletIsVisibleInput,
@@ -230,13 +241,14 @@ internal fun AdminPaymentAndWalletDialogs(
     }
 
     // 1b. Internal Wallet Transaction Dialog
-    if (state.showWalletTxDialog && state.selectedWalletForTx != null) {
-        val wallet = state.selectedWalletForTx!!
-        AlertDialog(
-            onDismissRequest = { state.showWalletTxDialog = false },
-            title = {
-                Text("💸 معاملة محفظة داخلية (${wallet.ownerName})", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
-            },
+    if (state.showWalletTxDialog) {
+        state.selectedWalletForTx?.let { wallet ->
+            val context = androidx.compose.ui.platform.LocalContext.current
+            AlertDialog(
+                onDismissRequest = { state.showWalletTxDialog = false },
+                title = {
+                    Text("💸 معاملة محفظة داخلية (${wallet.ownerName})", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("نوع الحساب: ${wallet.ownerType} | الرقم: ${wallet.ownerPhone}", fontSize = 11.sp, color = Color.LightGray)
@@ -283,11 +295,18 @@ internal fun AdminPaymentAndWalletDialogs(
                     )
                 }
             },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        val amt = state.txAmountInput.toDoubleOrNull() ?: 0.0
-                        if (amt > 0) {
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            val amt = state.txAmountInput.trim().toDoubleOrNull()
+                            if (amt == null || !amt.isFinite() || amt <= 0.0) {
+                                android.widget.Toast.makeText(
+                                    context,
+                                    "يرجى إدخال مبلغ صحيح أكبر من الصفر",
+                                    android.widget.Toast.LENGTH_SHORT
+                                ).show()
+                                return@Button
+                            }
                             viewModel.performWalletTransaction(
                                 walletId = wallet.id,
                                 ownerName = wallet.ownerName,
@@ -298,19 +317,19 @@ internal fun AdminPaymentAndWalletDialogs(
                                 note = state.txNoteInput
                             )
                             state.showWalletTxDialog = false
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent)
-                ) {
-                    Text("تنفيذ العملية ⚡", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent)
+                    ) {
+                        Text("تنفيذ العملية ⚡", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { state.showWalletTxDialog = false }) {
+                        Text("إلغاء", color = Color.Gray)
+                    }
                 }
-            },
-            dismissButton = {
-                TextButton(onClick = { state.showWalletTxDialog = false }) {
-                    Text("إلغاء", color = Color.Gray)
-                }
-            }
-        )
+            )
+        }
     }
 
     // 2. Verify Payment Dialog

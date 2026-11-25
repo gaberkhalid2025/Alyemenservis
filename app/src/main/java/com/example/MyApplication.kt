@@ -213,9 +213,11 @@ class MyApplication : Application() {
     private fun tryAlternativeCrashlyticsInit() {
         try {
             val crashlytics = FirebaseCrashlytics.getInstance()
-            crashlytics.setCrashlyticsCollectionEnabled(true)
+            val prefs = getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE)
+            val isConsentGranted = prefs.getBoolean("user_diagnostics_consent", true)
+            crashlytics.setCrashlyticsCollectionEnabled(isConsentGranted)
             isCrashlyticsReady = true
-            Log.d("MyApplication", "✅ Firebase Crashlytics initialized (alternative method)")
+            Log.d("MyApplication", "✅ Firebase Crashlytics initialized (alternative method, Consent=$isConsentGranted)")
         } catch (e: Throwable) {
             Log.e("MyApplication", "❌ Firebase Crashlytics alternative initialization failed: ${e.message}")
             // التطبيق يستمر في العمل بدون Crashlytics

@@ -2,12 +2,11 @@ package com.example.utils
 
 import android.content.Context
 import com.example.data.BookingEntity
+import com.google.firebase.firestore.DocumentReference
+import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.delay
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 import java.io.File
 
 data class BookingStepReport(
@@ -201,13 +200,24 @@ class BookingTestRunner(private val context: Context) {
             ).await()
             delay(1500)
             val docCancelled = db.collection("bookings").document(bookingId2).get().await()
-            if (docCancelled.getString("status") == "CANCELLED" && docCancelled.getString("cancellationReason") != null) {
+            val soonDate = DateFormatter.formatDateDashUs(System.currentTimeMillis() + 2 * 3600_000L)
+            val soonTime = DateFormatter.formatCustom(System.currentTimeMillis() + 2 * 3600_000L, "HH:mm")
+            val cutoffEnforced = !BookingUtils.canModifyOrCancelBooking(0L, soonDate, soonTime)
+            val acceptedLabel = com.example.ui.theme.BookingStatusColors.getBookingStatusLabel("ACCEPTED")
+            val approvedLabel = com.example.ui.theme.BookingStatusColors.getBookingStatusLabel("APPROVED")
+            val acceptedColor = com.example.ui.theme.BookingStatusColors.getBookingStatusColor("ACCEPTED")
+            val approvedColor = com.example.ui.theme.BookingStatusColors.getBookingStatusColor("APPROVED")
+            val statusUnified = acceptedLabel == approvedLabel && acceptedColor == approvedColor
+            if (docCancelled.getString("status") == "CANCELLED" &&
+                docCancelled.getString("cancellationReason") != null &&
+                cutoffEnforced && statusUnified
+            ) {
                 step6.status = "SUCCESS"
                 step6.firestoreVerified = true
-                step6.notes = "نجح الإلغاء وتم تدوين سبب الإلغاء بشكل صحيح"
+                step6.notes = "نجح الإلغاء وتطبيق مهلة الـ 8 ساعات وتوحيد حالات ACCEPTED/APPROVED"
             } else {
                 step6.status = "FAILED"
-                step6.notes = "فشل الإلغاء أو لم يتم حفظ سبب الإلغاء"
+                step6.notes = "فشل الإلغاء أو مهلة الـ 8 ساعات (cutoff=$cutoffEnforced, statusUnified=$statusUnified)"
             }
 
             // Step 7: Test Pin lock-out
@@ -274,29 +284,33 @@ class BookingTestRunner(private val context: Context) {
 
     suspend fun cleanAllTestData() {
         try {
-            val batch = db.batch()
+            val refsToDelete = mutableListOf<DocumentReference>()
 
             // Delete bookings matching testClientPhone
-            val bkSnapshot = db.collection("bookings").whereIn("customerPhone", listOf(testClientPhone, "777100100")).get().await()
-            for (doc in bkSnapshot.documents) {
-                batch.delete(doc.reference)
-            }
+            db.collection("bookings").whereIn("customerPhone", listOf(testClientPhone, "777100100")).get().await()
+                .documents.forEach { refsToDelete.add(it.reference) }
 
-            // Delete cancel and lock test docs explicitly
-            val bkSnapshot2 = db.collection("bookings").get().await()
-            for (doc in bkSnapshot2.documents) {
-                if (doc.id.startsWith("test_booking_")) {
-                    batch.delete(doc.reference)
-                }
-            }
+            // Delete prefixed test_booking_ docs without full collection scan
+            db.collection("bookings")
+                .whereGreaterThanOrEqualTo(FieldPath.documentId(), "test_booking_")
+                .whereLessThanOrEqualTo(FieldPath.documentId(), "test_booking_\uf8ff")
+                .get().await()
+                .documents.forEach { refsToDelete.add(it.reference) }
 
             // Delete notifications created during test
-            val notifSnapshot = db.collection("notifications").whereEqualTo("targetValue", testClientPhone).get().await()
-            for (doc in notifSnapshot.documents) {
-                batch.delete(doc.reference)
-            }
+            db.collection("notifications").whereEqualTo("targetValue", testClientPhone).get().await()
+                .documents.forEach { refsToDelete.add(it.reference) }
+            db.collection("notifications")
+                .whereGreaterThanOrEqualTo(FieldPath.documentId(), "notif_bk_")
+                .whereLessThanOrEqualTo(FieldPath.documentId(), "notif_bk_\uf8ff")
+                .get().await()
+                .documents.forEach { refsToDelete.add(it.reference) }
 
-            batch.commit().await()
+            refsToDelete.distinctBy { it.path }.chunked(400).forEach { chunk ->
+                val batch = db.batch()
+                chunk.forEach { batch.delete(it) }
+                batch.commit().await()
+            }
         } catch (_: Exception) {}
     }
 

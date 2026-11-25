@@ -416,7 +416,35 @@ internal fun LazyListScope.adminModerationAndControlSection(
 
         "ADMIN_PAYMENT_PANEL" -> {
             item {
-                AdminPaymentPanel(viewModel = viewModel, themeColors = themeColors)
+                AdminPaymentPanel(
+                    viewModel = viewModel,
+                    themeColors = themeColors,
+                    onToggleSystem = { enabled ->
+                        viewModel.saveCustomSettingsState(settingsState.copy(isPaymentEnabled = enabled))
+                    },
+                    onUnlinkAll = {
+                        viewModel.saveCustomSettingsState(
+                            settingsState.copy(
+                                isBookingPaymentRequired = false,
+                                requireAdvancePayment = false
+                            )
+                        )
+                    },
+                    onAdminOverride = { targetId, amount ->
+                        val cleanTarget = targetId.trim()
+                        if (cleanTarget.isNotBlank() && amount.isFinite() && amount != 0.0) {
+                            viewModel.performWalletTransaction(
+                                walletId = cleanTarget,
+                                ownerName = cleanTarget,
+                                ownerPhone = cleanTarget,
+                                ownerType = "OVERRIDE",
+                                type = if (amount >= 0.0) "DEPOSIT" else "WITHDRAWAL",
+                                amount = kotlin.math.abs(amount),
+                                note = "تعديل إداري عبر لوحة المدفوعات"
+                            )
+                        }
+                    }
+                )
             }
         }
 

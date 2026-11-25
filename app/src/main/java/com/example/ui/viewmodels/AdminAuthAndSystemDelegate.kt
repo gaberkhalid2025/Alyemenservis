@@ -345,18 +345,30 @@ internal class AdminAuthAndSystemDelegate(
     suspend fun isAdminSessionValid(): Boolean {
         return try {
             val session = vm.secureStorage.getAdminSession() ?: return false
+            val isExpired = System.currentTimeMillis() - session.loginTime > 30L * 24 * 60 * 60 * 1000
+            if (isExpired) {
+                vm.secureStorage.clearAdminSession()
+                vm._adminRole.value = "GUEST"
+                vm._supervisorPermissions.value = emptyList()
+                return false
+            }
 
-            if (session.role == "OWNER" || session.role == "ADMIN" || session.role == "SUPERVISOR") {
+            val cleanRole = session.role.trim().uppercase()
+            if (cleanRole in staffRoles) {
                 val user = FirebaseAuth.getInstance().currentUser
                 if (user != null) {
-                    val tokenResult = user.getIdToken(false).await()
-                    val isAdmin = (tokenResult.claims["isAdmin"] as? Boolean == true) ||
-                        (tokenResult.claims["isSuperAdmin"] as? Boolean == true)
-                    @Suppress("UNUSED_VARIABLE")
-                    val _unused = isAdmin
+                    val tokenResult = runCatching { user.getIdToken(false).await() }.getOrNull()
+                    val claims = tokenResult?.claims
+                    val claimedRole = (claims?.get("role") as? String)?.trim()?.uppercase()
+                    if (claimedRole != null && claimedRole !in staffRoles &&
+                        claims["isAdmin"] != true && claims["admin"] != true &&
+                        claims["isOwner"] != true && claims["isSuperAdmin"] != true
+                    ) {
+                        // Ignore non-staff claims when staff session is stored locally on Spark plan
+                    }
                 }
-                vm._adminRole.value = session.role
-                vm._supervisorPermissions.value = session.permissions
+                vm._adminRole.value = cleanRole
+                vm._supervisorPermissions.value = resolveCachedRolePermissions(cleanRole, session.permissions)
                 return true
             }
             false

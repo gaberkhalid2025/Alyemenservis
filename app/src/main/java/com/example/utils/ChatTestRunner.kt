@@ -2,13 +2,13 @@ package com.example.utils
 
 import android.content.Context
 import com.example.data.models.*
+import com.example.ui.helpers.AppPreferenceHelper
+import com.google.firebase.firestore.DocumentReference
+import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.delay
 import java.io.File
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 data class ChatStepReport(
     val stepName: String,
@@ -164,19 +164,32 @@ class ChatTestRunner(private val context: Context) {
                 step4.notes = "فشل في تحديث حالة الاتصال للطرف الآخر"
             }
 
-            // Step 5: In-chat notifications deduplication
-            onProgress("🔔 خطوة 5: فحص إشعارات المحادثات ومنع التكرار تحت الإرسال السريع...")
+            // Step 5: In-chat notifications deduplication + crypto/phone normalization check
+            onProgress("🔔 خطوة 5: فحص إشعارات المحادثات وتشفير الرسائل وتطبيع الأرقام...")
             val notifRef = db.collection("notifications").document("test_notif_${System.currentTimeMillis()}")
-            notifRef.set(mapOf("title" to "رسالة جديدة", "body" to "لديك رسالة من الفني", "read" to false, "targetPhone" to clientPhone)).await()
+            notifRef.set(
+                mapOf(
+                    "id" to notifRef.id,
+                    "title" to "رسالة جديدة",
+                    "message" to "لديك رسالة من الفني",
+                    "targetType" to "USER",
+                    "targetValue" to clientPhone,
+                    "isRead" to false,
+                    "createdAt" to System.currentTimeMillis()
+                )
+            ).await()
             delay(500)
             val nDoc = notifRef.get().await()
-            if (nDoc.exists() && nDoc.getBoolean("read") == false) {
+            val phoneNormOk = AppPreferenceHelper.normalizePhoneNumber("+967$clientPhone") == clientPhone
+            val cipher = SecurityCryptoUtils.encrypt("رسالة اختبار مشفرة")
+            val cryptoOk = SecurityCryptoUtils.decrypt(cipher) == "رسالة اختبار مشفرة"
+            if (nDoc.exists() && nDoc.getBoolean("isRead") == false && phoneNormOk && cryptoOk) {
                 step5.status = "SUCCESS"
                 step5.firestoreVerified = true
-                step5.notes = "تم إنشاء الإشعار وعدم تكراره بكفاءة عالية"
+                step5.notes = "تم التحقق من الإشعار (isRead=false) وتشفير الرسائل وتطبيع رقم الهاتف بنجاح"
             } else {
                 step5.status = "FAILED"
-                step5.notes = "فشل نظام الإشعارات أو حدث تكرار"
+                step5.notes = "فشل فحص الإشعارات أو التشفير (phoneNormOk=$phoneNormOk, cryptoOk=$cryptoOk)"
             }
 
             // Step 6: Reply, Edit & Delete for everyone
@@ -246,32 +259,38 @@ class ChatTestRunner(private val context: Context) {
 
     suspend fun cleanAllTestData() {
         try {
-            val batch = db.batch()
+            val refsToDelete = mutableListOf<DocumentReference>()
 
-            // Delete chat_channels matching our test client/provider phone
             val chSnapshot = db.collection("chat_channels").whereEqualTo("customerPhone", clientPhone).get().await()
             for (doc in chSnapshot.documents) {
-                // Delete submessages first
-                val msgsSnapshot = doc.reference.collection("messages").get().await()
-                for (mDoc in msgsSnapshot.documents) {
-                    batch.delete(mDoc.reference)
-                }
-                batch.delete(doc.reference)
+                doc.reference.collection("messages").get().await().documents.forEach { refsToDelete.add(it.reference) }
+                refsToDelete.add(doc.reference)
             }
 
-            // Explicit prefixed channel deletes
-            val chSnapshot2 = db.collection("chat_channels").get().await()
-            for (doc in chSnapshot2.documents) {
-                if (doc.id.startsWith("test_channel_") || doc.id.startsWith("support_channel_")) {
-                    val msgsSnapshot = doc.reference.collection("messages").get().await()
-                    for (mDoc in msgsSnapshot.documents) {
-                        batch.delete(mDoc.reference)
-                    }
-                    batch.delete(doc.reference)
+            listOf("test_channel_", "support_channel_").forEach { prefix ->
+                val chPrefixed = db.collection("chat_channels")
+                    .whereGreaterThanOrEqualTo(FieldPath.documentId(), prefix)
+                    .whereLessThanOrEqualTo(FieldPath.documentId(), "$prefix\uf8ff")
+                    .get().await()
+                for (doc in chPrefixed.documents) {
+                    doc.reference.collection("messages").get().await().documents.forEach { refsToDelete.add(it.reference) }
+                    refsToDelete.add(doc.reference)
                 }
             }
 
-            batch.commit().await()
+            // Clean presence & test notifications created in Step 4 and Step 5
+            refsToDelete.add(db.collection("user_presence").document("user_tech_99"))
+            db.collection("notifications")
+                .whereGreaterThanOrEqualTo(FieldPath.documentId(), "test_notif_")
+                .whereLessThanOrEqualTo(FieldPath.documentId(), "test_notif_\uf8ff")
+                .get().await()
+                .documents.forEach { refsToDelete.add(it.reference) }
+
+            refsToDelete.distinctBy { it.path }.chunked(400).forEach { chunk ->
+                val batch = db.batch()
+                chunk.forEach { batch.delete(it) }
+                batch.commit().await()
+            }
         } catch (_: Exception) {}
     }
 

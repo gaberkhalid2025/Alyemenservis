@@ -115,7 +115,17 @@ internal fun LazyListScope.adminPasswordResetAndRolesSection(
                             val reqName = (req["name"] as? String) ?: "مستخدم"
                             val reqType = (req["accountType"] as? String) ?: "حساب"
                             val reqStatus = (req["status"] as? String) ?: "PENDING"
-                            var newPassInput by remember { mutableStateOf((req["newPassword"] as? String) ?: "") }
+                            val initialPassDisplay = remember(req["id"], req["newPassword"]) {
+                                val raw = (req["newPassword"] as? String).orEmpty()
+                                when {
+                                    raw.isBlank() -> ""
+                                    com.example.utils.SecureHasher.isValidHash(raw) -> ""
+                                    raw.startsWith("gcm:") || raw.startsWith("gcmx:") || raw.startsWith("enc::") ->
+                                        com.example.utils.SecurityCryptoUtils.decryptCrossDevice(raw)
+                                    else -> raw
+                                }
+                            }
+                            var newPassInput by remember(req["id"], initialPassDisplay) { mutableStateOf(initialPassDisplay) }
 
                             Card(
                                 colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
@@ -154,7 +164,7 @@ internal fun LazyListScope.adminPasswordResetAndRolesSection(
                                             colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
                                         )
                                         Button(
-                                            onClick = { newPassInput = (100000..999999).random().toString() },
+                                            onClick = { newPassInput = com.example.utils.SecurityCryptoUtils.generateStrongTempPassword(10) },
                                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF8B5CF6)),
                                             contentPadding = PaddingValues(horizontal = 8.dp),
                                             modifier = Modifier.height(48.dp)
@@ -185,10 +195,15 @@ internal fun LazyListScope.adminPasswordResetAndRolesSection(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                                     ) {
+                                        val cleanReqPhone = com.example.ui.helpers.AppPreferenceHelper.normalizePhoneNumber(reqPhone)
                                         Button(
                                             onClick = {
+                                                if (newPassInput.isBlank()) {
+                                                    Toast.makeText(context, "يرجى إدخال أو توليد كلمة المرور أولاً", Toast.LENGTH_SHORT).show()
+                                                    return@Button
+                                                }
                                                 val text = "مرحباً $reqName، تم تعيين كلمة المرور الجديدة لحسابك في دليل اليمن: $newPassInput"
-                                                val url = "https://wa.me/967${reqPhone.trim().removePrefix("0").removePrefix("+967")}?text=${Uri.encode(text)}"
+                                                val url = "https://wa.me/967$cleanReqPhone?text=${Uri.encode(text)}"
                                                 try {
                                                     context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
                                                 } catch (e: Exception) {
@@ -205,6 +220,10 @@ internal fun LazyListScope.adminPasswordResetAndRolesSection(
 
                                         Button(
                                             onClick = {
+                                                if (newPassInput.isBlank()) {
+                                                    Toast.makeText(context, "يرجى إدخال أو توليد كلمة المرور أولاً", Toast.LENGTH_SHORT).show()
+                                                    return@Button
+                                                }
                                                 val text = "مرحباً $reqName، تم تعيين كلمة المرور الجديدة لحسابك في دليل اليمن: $newPassInput"
                                                 val url = "https://t.me/share/url?url=https://yemen-services.app&text=${Uri.encode(text)}"
                                                 try {
@@ -223,6 +242,10 @@ internal fun LazyListScope.adminPasswordResetAndRolesSection(
 
                                         Button(
                                             onClick = {
+                                                if (newPassInput.isBlank()) {
+                                                    Toast.makeText(context, "يرجى إدخال أو توليد كلمة المرور أولاً", Toast.LENGTH_SHORT).show()
+                                                    return@Button
+                                                }
                                                 val text = "كلمة المرور الجديدة لحسابك في دليل اليمن هي: $newPassInput"
                                                 try {
                                                     val intent = Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:$reqPhone")).apply {
@@ -243,8 +266,14 @@ internal fun LazyListScope.adminPasswordResetAndRolesSection(
 
                                         Button(
                                             onClick = {
-                                                viewModel.triggerNotification("🔔 تم إرسال إشعار فوري لـ $reqName بكلمة المرور")
-                                                Toast.makeText(context, "🔔 تم إرسال إشعار فوري داخل التطبيق!", Toast.LENGTH_SHORT).show()
+                                                val targetPhone = cleanReqPhone.ifBlank { reqPhone.trim() }
+                                                viewModel.addNotification(
+                                                    title = "🔑 تحديث طلب استعادة الحساب",
+                                                    message = "تمت معالجة طلب استعادة كلمة المرور لحسابك. يرجى التواصل مع الإدارة عبر الدعم أو الدخول بكلمة المرور المعتمدة.",
+                                                    targetType = "USER",
+                                                    targetValue = targetPhone
+                                                )
+                                                Toast.makeText(context, "🔔 تم إرسال إشعار التحديث إلى $reqName بنجاح!", Toast.LENGTH_SHORT).show()
                                             },
                                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF59E0B)),
                                             shape = RoundedCornerShape(8.dp),
@@ -317,7 +346,7 @@ internal fun LazyListScope.adminPasswordResetAndRolesSection(
                                 category = "عقار",
                                 password = "",
                                 onResetPassword = { newPass ->
-                                    viewModel.resetAccountPassword("STORE", prop.phone, newPass)
+                                    viewModel.resetAccountPassword("PROPERTY", prop.phone, newPass)
                                     Toast.makeText(context, "🔐 تم تحديث كلمة المرور لـ ${prop.title}", Toast.LENGTH_SHORT).show()
                                 },
                                 context = context

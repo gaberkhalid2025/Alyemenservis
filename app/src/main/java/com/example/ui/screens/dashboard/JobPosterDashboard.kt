@@ -280,7 +280,11 @@ fun JobPosterDashboard(
                                                 if (app.applicantPhone.isNotBlank()) {
                                                     OutlinedButton(
                                                         onClick = {
-                                                            context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:${app.applicantPhone}")))
+                                                            runCatching {
+                                                                context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:${app.applicantPhone.trim()}")))
+                                                            }.onFailure {
+                                                                Toast.makeText(context, "تعذر فتح تطبيق الاتصال على هذا الجهاز", Toast.LENGTH_SHORT).show()
+                                                            }
                                                         },
                                                         shape = RoundedCornerShape(8.dp),
                                                         modifier = Modifier.weight(1f).height(36.dp),

@@ -8,9 +8,6 @@ import com.example.data.models.UserRole
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.tasks.await
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 data class PermissionFullReport(
     val timestamp: String,
@@ -20,7 +17,7 @@ data class PermissionFullReport(
     val details: List<TestDetail>
 )
 
-class PermissionsDiagnosticRunner(context: Context) {
+class PermissionsDiagnosticRunner(private val context: Context) {
 
     private val db = FirebaseFirestore.getInstance()
     private val testSupervisorDocId = "test_diag_supervisor_777"
@@ -37,7 +34,7 @@ class PermissionsDiagnosticRunner(context: Context) {
         onComplete: (PermissionFullReport) -> Unit
     ) {
         // [تعديل مهندس النظام] فحص صارم للصلاحيات والأدوار وحراسة الأمن تحت الضغط
-        val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
+        val timestamp = DateFormatter.formatCustom(System.currentTimeMillis(), "yyyy-MM-dd HH:mm:ss")
         val details = mutableListOf<TestDetail>()
         var errorIndex = 1
 
@@ -320,6 +317,42 @@ class PermissionsDiagnosticRunner(context: Context) {
         } finally {
             cleanAllTestData()
         }
+
+        // 8. Google Play Policy storage compliance check (Photo Picker instead of broad media permissions)
+        onProgress("🛡️ [8/8] فحص توافق الأذونات مع سياسة Google Play (حظر أذونات التخزين الواسعة)...")
+        val t8Start = System.currentTimeMillis()
+        val forbiddenPerms = setOf(
+            "android.permission.READ_MEDIA_IMAGES",
+            "android.permission.READ_MEDIA_VIDEO",
+            "android.permission.READ_EXTERNAL_STORAGE"
+        )
+        val hasStorageConstant = PermissionManager::class.java.declaredFields.any { field ->
+            field.name.contains("STORAGE", ignoreCase = true) || field.name.contains("READ_MEDIA", ignoreCase = true)
+        }
+        val manifestPerms = runCatching {
+            context.packageManager.getPackageInfo(
+                context.packageName,
+                android.content.pm.PackageManager.GET_PERMISSIONS
+            ).requestedPermissions?.toSet() ?: emptySet()
+        }.getOrDefault(emptySet())
+        val leakedInManifest = manifestPerms.intersect(forbiddenPerms)
+        val t8Dur = System.currentTimeMillis() - t8Start
+        val t8Passed = !hasStorageConstant && leakedInManifest.isEmpty()
+        recordCheck(
+            id = "perm_play_policy_storage",
+            subCat = "توافق سياسة Google Play",
+            testName = "التحقق من استخدام Photo Picker وخلو التطبيق من أذونات READ_MEDIA_IMAGES / READ_EXTERNAL_STORAGE",
+            fileName = "PermissionManager.kt",
+            line = 15,
+            fnName = "PermissionManager",
+            durationMs = t8Dur,
+            passed = t8Passed,
+            expected = "عدم وجود أي إذن تخزين واسع في PermissionManager أو AndroidManifest",
+            actual = "hasStorageConstant=$hasStorageConstant | leakedInManifest=${leakedInManifest.joinToString()}",
+            notes = if (t8Passed) "✅ متوافق بالكامل مع سياسة Google Play لاختيار الصور بدون أذونات تخزين" else "❌ يوجد إذن تخزين مخالف لسياسة Google Play!",
+            probableCauseIfFailed = "بقاء ثابت READ_MEDIA_IMAGES أو إعلان الإذن في AndroidManifest.xml.",
+            fixIfFailed = "استخدم PickVisualMedia واحذف READ_MEDIA_IMAGES / READ_EXTERNAL_STORAGE من PermissionManager و AndroidManifest.xml."
+        )
 
         val passedCount = details.count { it.status == "SUCCESS" }
         val failedCount = details.size - passedCount

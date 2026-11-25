@@ -3,13 +3,13 @@ package com.example.utils
 import android.content.Context
 import com.example.data.models.InstantRequestEntity
 import com.example.data.models.RequestOfferEntity
+import com.google.firebase.firestore.DocumentReference
+import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.delay
 import java.io.File
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import java.security.SecureRandom
 
 data class InstantRequestStepReport(
     val stepName: String,
@@ -37,7 +37,8 @@ class InstantRequestTestRunner(private val context: Context) {
         onComplete: (InstantRequestFullReport) -> Unit
     ) {
         val stepsList = mutableListOf<InstantRequestStepReport>()
-        val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date())
+        val timestamp = DateFormatter.formatCustom(System.currentTimeMillis(), "yyyy-MM-dd HH:mm")
+        val secureRng = SecureRandom()
 
         fun addStep(name: String, desc: String): InstantRequestStepReport {
             // [تعديل مهندس النظام] فحص صارم لطلبات الطوارئ والطلبات الفورية تحت ضغط عالي واتصال متقطع
@@ -62,7 +63,7 @@ class InstantRequestTestRunner(private val context: Context) {
             // Step 1: Create instant request
             onProgress("⚡ خطوة 1: جاري تقديم طلب عاجل (تسرب مياه)...")
             val reqId1 = "test_instant_req_" + System.currentTimeMillis()
-            val reqCode1 = "R-" + (100000..999999).random()
+            val reqCode1 = "R-" + (secureRng.nextInt(900000) + 100000)
             val rawPin = "5555"
             val hashedPin = SecureHasher.hashPin(rawPin)
 
@@ -129,19 +130,23 @@ class InstantRequestTestRunner(private val context: Context) {
             db.collection("request_offers").document(offerId1).set(offer1).await()
             db.collection("request_offers").document(offerId2).set(offer2).await()
             db.collection("request_offers").document(offerId3).set(offer3).await()
+            db.collection("instant_requests").document(reqId1).collection("offers").document(offerId1).set(offer1).await()
+            db.collection("instant_requests").document(reqId1).collection("offers").document(offerId2).set(offer2).await()
+            db.collection("instant_requests").document(reqId1).collection("offers").document(offerId3).set(offer3).await()
 
             // Update request offersCount
             db.collection("instant_requests").document(reqId1).update("offersCount", 3).await()
 
             delay(1500)
             val offersSnapshot = db.collection("request_offers").whereEqualTo("requestId", reqId1).get().await()
-            if (offersSnapshot.size() == 3) {
+            val subOffersSnapshot = db.collection("instant_requests").document(reqId1).collection("offers").get().await()
+            if (offersSnapshot.size() == 3 && subOffersSnapshot.size() == 3) {
                 step3.status = "SUCCESS"
                 step3.firestoreVerified = true
-                step3.notes = "تم حقن 3 عروض أسعار بنجاح في كولكشن request_offers"
+                step3.notes = "تم حقن 3 عروض أسعار ومزامنة subcollection offers بنجاح"
             } else {
                 step3.status = "FAILED"
-                step3.notes = "خطأ: لم يتم تسجيل العروض الثلاثة بشكل صحيح"
+                step3.notes = "خطأ: لم يتم تسجيل العروض الثلاثة أو المزامنة الفرعية بشكل صحيح"
             }
 
             // Step 4: Accept Cheapest (Offer 2)
@@ -149,6 +154,7 @@ class InstantRequestTestRunner(private val context: Context) {
             db.collection("request_offers").document(offerId2).update("status", "ACCEPTED").await()
             db.collection("request_offers").document(offerId1).update("status", "REJECTED").await()
             db.collection("request_offers").document(offerId3).update("status", "REJECTED").await()
+            db.collection("instant_requests").document(reqId1).collection("offers").document(offerId2).update("status", "ACCEPTED").await()
 
             db.collection("instant_requests").document(reqId1).update(
                 "status", "IN_PROGRESS",
@@ -161,13 +167,14 @@ class InstantRequestTestRunner(private val context: Context) {
 
             delay(1500)
             val docAccepted = db.collection("instant_requests").document(reqId1).get().await()
-            if (docAccepted.getString("status") == "IN_PROGRESS" && docAccepted.getDouble("acceptedPrice") == 4500.0) {
+            val pinNotPlain = docAccepted.getString("pinHash")?.let { it != rawPin && SecureHasher.isValidHash(it) } == true
+            if (docAccepted.getString("status") == "IN_PROGRESS" && docAccepted.getDouble("acceptedPrice") == 4500.0 && pinNotPlain) {
                 step4.status = "SUCCESS"
                 step4.firestoreVerified = true
-                step4.notes = "تم قبول الفني الأرخص وتحديث حالة الطلب إلى IN_PROGRESS"
+                step4.notes = "تم قبول الفني الأرخص وتحديث الحالة إلى IN_PROGRESS مع التحقق من تشفير PIN"
             } else {
                 step4.status = "FAILED"
-                step4.notes = "فشل في تسجيل قبول العرض الأرخص"
+                step4.notes = "فشل في تسجيل قبول العرض الأرخص أو التحقق من تشفير PIN"
             }
 
             // Step 5: Complete Request
@@ -189,7 +196,7 @@ class InstantRequestTestRunner(private val context: Context) {
             val reqId2 = "test_instant_req_cancel_" + System.currentTimeMillis()
             val testReq2 = InstantRequestEntity(
                 id = reqId2,
-                requestCode = "R-" + (100000..999999).random(),
+                requestCode = "R-" + (secureRng.nextInt(900000) + 100000),
                 userId = testUserId,
                 status = "WAITING_FOR_OFFERS",
                 createdAt = System.currentTimeMillis()
@@ -266,31 +273,40 @@ class InstantRequestTestRunner(private val context: Context) {
 
     suspend fun cleanAllTestData() {
         try {
-            val batch = db.batch()
+            val refsToDelete = mutableListOf<DocumentReference>()
 
-            // Delete requests matching testUserId
             val snapshot = db.collection("instant_requests").whereEqualTo("userId", testUserId).get().await()
             for (doc in snapshot.documents) {
-                batch.delete(doc.reference)
+                doc.reference.collection("offers").get().await().documents.forEach { refsToDelete.add(it.reference) }
+                refsToDelete.add(doc.reference)
             }
 
-            // Delete generated request_offers
-            val snapshot2 = db.collection("request_offers").get().await()
-            for (doc in snapshot2.documents) {
-                if (doc.getString("technicianPhone")?.startsWith("77700") == true || doc.id.startsWith("offer_")) {
-                    batch.delete(doc.reference)
+            val snapshotPrefix = db.collection("instant_requests")
+                .whereGreaterThanOrEqualTo(FieldPath.documentId(), "test_instant_req_")
+                .whereLessThanOrEqualTo(FieldPath.documentId(), "test_instant_req_\uf8ff")
+                .get().await()
+            for (doc in snapshotPrefix.documents) {
+                doc.reference.collection("offers").get().await().documents.forEach { refsToDelete.add(it.reference) }
+                refsToDelete.add(doc.reference)
+            }
+
+            db.collection("request_offers")
+                .whereGreaterThanOrEqualTo(FieldPath.documentId(), "offer_")
+                .whereLessThanOrEqualTo(FieldPath.documentId(), "offer_\uf8ff")
+                .get().await()
+                .documents.forEach { doc ->
+                    if (doc.getString("technicianPhone")?.startsWith("77700") == true ||
+                        doc.getString("requestId")?.startsWith("test_instant_req_") == true
+                    ) {
+                        refsToDelete.add(doc.reference)
+                    }
                 }
-            }
 
-            // Explicit clean prefix
-            val snapshot3 = db.collection("instant_requests").get().await()
-            for (doc in snapshot3.documents) {
-                if (doc.id.startsWith("test_instant_req_")) {
-                    batch.delete(doc.reference)
-                }
+            refsToDelete.distinctBy { it.path }.chunked(400).forEach { chunk ->
+                val batch = db.batch()
+                chunk.forEach { batch.delete(it) }
+                batch.commit().await()
             }
-
-            batch.commit().await()
         } catch (_: Exception) {}
     }
 

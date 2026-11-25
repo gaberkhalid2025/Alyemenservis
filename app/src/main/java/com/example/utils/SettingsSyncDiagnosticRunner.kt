@@ -10,9 +10,6 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeoutOrNull
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 data class SettingsFullReport(
     val timestamp: String,
@@ -40,9 +37,10 @@ class SettingsSyncDiagnosticRunner(context: Context) {
         onComplete: (SettingsFullReport) -> Unit
     ) {
         // [تعديل مهندس النظام] فحص ومزامنة إعدادات النظام تحت الضغط والاتصال المتقطع
-        val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
+        val timestamp = DateFormatter.formatCustom(System.currentTimeMillis(), "yyyy-MM-dd HH:mm:ss")
         val details = mutableListOf<TestDetail>()
         var errorIndex = 1
+        var liveMainSettingsSnap: com.google.firebase.firestore.DocumentSnapshot? = null
 
         cleanAllTestData()
 
@@ -51,6 +49,7 @@ class SettingsSyncDiagnosticRunner(context: Context) {
         val t1Start = System.currentTimeMillis()
         try {
             val mainSnap = db.collection("settings").document("main_settings").get().await()
+            liveMainSettingsSnap = mainSnap
             val entity = if (mainSnap.exists()) {
                 mainSnap.toObject(AdminSettingsEntity::class.java) ?: AdminSettingsEntity()
             } else {
@@ -257,8 +256,8 @@ class SettingsSyncDiagnosticRunner(context: Context) {
         }
         delay(200)
 
-        // 4. Security check: Verify adminPassword is removed and ownerPassword is @Exclude
-        onProgress("🔐 [4/6] فحص أمان حقول كلمات المرور (حذف adminPassword وعزل ownerPassword بـ @Exclude)...")
+        // 4. Security check: Verify adminPassword is removed, ownerPassword is @Exclude, and live settings doc has no leaked secrets
+        onProgress("🔐 [4/6] فحص أمان حقول كلمات المرور (حذف adminPassword وعزل ownerPassword بـ @Exclude ومنع تسريبها في main_settings)...")
         val t4Start = System.currentTimeMillis()
         val adminPassRemoved = try {
             AdminSettingsEntity::class.java.getDeclaredMethod("getAdminPassword")
@@ -272,22 +271,26 @@ class SettingsSyncDiagnosticRunner(context: Context) {
         } catch (_: Exception) {
             true
         }
-        val t4Passed = adminPassRemoved && ownerPassExcluded
+        val liveData = liveMainSettingsSnap?.data ?: emptyMap<String, Any>()
+        val noLiveSecretLeak = !liveData.containsKey("adminPassword") &&
+            !liveData.containsKey("adminPasswordHash") &&
+            liveData["ownerPassword"].toString().let { it.isBlank() || it == "null" }
+        val t4Passed = adminPassRemoved && ownerPassExcluded && noLiveSecretLeak
         val t4Dur = System.currentTimeMillis() - t4Start
         details.add(
             TestDetail(
                 id = "settings_security_exclude",
                 systemName = "13. نظام الإعدادات والمزامنة (AdminSettings)",
                 subCategory = "الأمان وحماية كلمات المرور",
-                testName = "التحقق من حذف adminPassword المهجور وعزل ownerPassword عبر @Exclude",
+                testName = "التحقق من حذف adminPassword المهجور وعزل ownerPassword عبر @Exclude وخلو main_settings من التسريب",
                 fileName = "AdminSettingsEntity.kt",
                 lineNumber = 40,
                 functionName = "getOwnerPassword()",
                 status = if (t4Passed) "SUCCESS" else "FAILED",
-                message = if (t4Passed) "✅ تم حذف adminPassword نهائياً وعزل ownerPassword بـ @Exclude لمنع التخزين النصي" else "❌ تحذير أمني في حقول كلمات المرور!",
+                message = if (t4Passed) "✅ تم حذف adminPassword نهائياً وعزل ownerPassword بـ @Exclude وخلو settings/main_settings من أي أسرار" else "❌ تحذير أمني في حقول كلمات المرور (noLiveSecretLeak=$noLiveSecretLeak)!",
                 durationMs = t4Dur,
-                expectedOutcome = "حذف adminPassword ووجود @get:Exclude على ownerPassword",
-                actualOutcome = "adminPassRemoved=$adminPassRemoved, ownerPassExcluded=$ownerPassExcluded"
+                expectedOutcome = "حذف adminPassword ووجود @get:Exclude على ownerPassword وخلو main_settings من كلمات المرور",
+                actualOutcome = "adminPassRemoved=$adminPassRemoved, ownerPassExcluded=$ownerPassExcluded, noLiveSecretLeak=$noLiveSecretLeak"
             )
         )
         delay(150)

@@ -16,6 +16,7 @@
 
 package com.example.ui.screens.bookings
 import com.example.ui.*
+import com.example.ui.helpers.AppPreferenceHelper
 
 import android.content.Context
 import android.content.Intent
@@ -62,24 +63,25 @@ fun OrdersScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalette
     }
 
     val cleanActivePhone = remember(activePhone) {
-        activePhone.trim().replace(" ", "").replace("+967", "").replace("00967", "")
+        AppPreferenceHelper.normalizePhoneNumber(activePhone)
     }
 
     var selectedTab by remember { mutableIntStateOf(0) } // 0: Instant Requests (اطلب خدمتك الآن), 1: Store Orders (المشتريات)
 
     val myInstantRequests = remember(instantRequests, cleanActivePhone, currentUserId) {
         instantRequests.filter { req ->
-            val reqPhoneClean = req.userPhone.trim().replace(" ", "").replace("+967", "").replace("00967", "")
+            val reqPhoneClean = AppPreferenceHelper.normalizePhoneNumber(req.userPhone)
             cleanActivePhone.isBlank() || reqPhoneClean == cleanActivePhone || (currentUserId.isNotBlank() && req.userId == currentUserId)
         }.sortedByDescending { it.createdAt }
     }
 
-    val myOrders = remember(orders, activePhone) {
+    val myOrders = remember(orders, cleanActivePhone, activePhone) {
         if (activePhone.isBlank()) {
             orders.sortedByDescending { it.timestamp }
         } else {
-            orders.filter { 
-                it.customerPhone.trim() == activePhone.trim()
+            orders.filter {
+                val orderPhoneClean = AppPreferenceHelper.normalizePhoneNumber(it.customerPhone)
+                (cleanActivePhone.isNotBlank() && orderPhoneClean == cleanActivePhone) || it.customerPhone.trim() == activePhone.trim()
             }.sortedByDescending { it.timestamp }
         }
     }
@@ -261,7 +263,7 @@ fun OrdersScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalette
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    items(myInstantRequests) { req ->
+                    items(myInstantRequests, key = { it.id }) { req ->
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp),
@@ -471,7 +473,7 @@ fun OrdersScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalette
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    items(paginatedOrders) { order ->
+                    items(paginatedOrders, key = { it.id }) { order ->
                     val deleteCode = remember(order.id) { 
                         (order.id.hashCode().let { kotlin.math.abs(it) } % 9000 + 1000).toString()
                     }
@@ -647,7 +649,7 @@ fun OrdersScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalette
                         color = themeColors.accent
                     )
                     Text(
-                        text = "لحذف هذا الطلب، يرجى كتابة كود الحذف الآمن وهو ($correctCode):",
+                        text = "لحذف هذا الطلب، يرجى كتابة كود الحذف المكون من 4 أرقام الظاهر على بطاقة الطلب:",
                         fontSize = 12.sp,
                         color = Color.LightGray,
                         textAlign = TextAlign.Center,

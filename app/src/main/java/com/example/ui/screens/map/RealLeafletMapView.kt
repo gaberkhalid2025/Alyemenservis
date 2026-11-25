@@ -484,6 +484,11 @@ fun RealLeafletMapView(
                             ViewGroup.LayoutParams.MATCH_PARENT,
                             ViewGroup.LayoutParams.MATCH_PARENT
                         )
+                        val cachePrefs = ctx.getSharedPreferences("map_webview_cache_prefs", Context.MODE_PRIVATE)
+                        if (!cachePrefs.getBoolean("v2026_cleared_carto_cache", false)) {
+                            runCatching { clearCache(true) }
+                            cachePrefs.edit().putBoolean("v2026_cleared_carto_cache", true).apply()
+                        }
                         setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
                         setBackgroundColor(android.graphics.Color.parseColor("#0F172A"))
                         settings.apply {

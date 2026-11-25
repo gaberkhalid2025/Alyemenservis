@@ -77,7 +77,7 @@ object BookingUtils {
         val now = System.currentTimeMillis()
         val diffMs = scheduledMs - now
         // Allow modification/cancellation anytime prior to 8 hours before scheduled time
-        return diffMs > CANCELLATION_WINDOW_MS || scheduledAtTimestamp <= 0
+        return diffMs > CANCELLATION_WINDOW_MS
     }
 
     /**

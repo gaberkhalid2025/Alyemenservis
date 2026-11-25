@@ -174,62 +174,75 @@ open class BookingViewModel @Inject constructor(
         val parentId = java.util.UUID.randomUUID().toString()
         val secureRandom = java.security.SecureRandom()
         val dates = com.example.utils.ScheduleManager.calculateRecurringDates(baseBooking.effectiveDate, baseBooking.recurrenceRule)
-        
-        val batch = db.batch()
-        val newBookings = mutableListOf<BookingEntity>()
-        
-        dates.forEachIndexed { index, dateStr ->
-            val bId = "${parentId}_${index}"
-            val bNum = "YEM-${10000 + secureRandom.nextInt(90000)}"
-            val bPass = "${1000 + secureRandom.nextInt(9000)}"
-            val b = baseBooking.copy(
-                id = bId,
-                parentId = parentId,
-                date = dateStr,
-                dateString = dateStr,
-                bookingNumber = bNum,
-                pinCode = com.example.utils.SecureHasher.hashPin(bPass),
-                isRecurring = true,
-                createdAt = System.currentTimeMillis(),
-                updatedAt = System.currentTimeMillis()
-            )
-            newBookings.add(b)
-            val docRef = db.collection("bookings").document(bId)
-            batch.set(docRef, b)
+        if (dates.isEmpty()) {
+            onResult(false)
+            return
         }
-        
+
+        val newBookings = mutableListOf<BookingEntity>()
+        val batches = dates.chunked(450).mapIndexed { chunkIdx, chunkDates ->
+            val batch = db.batch()
+            chunkDates.forEachIndexed { localIdx, dateStr ->
+                val index = chunkIdx * 450 + localIdx
+                val bId = "${parentId}_${index}"
+                val bNum = "YEM-${10000 + secureRandom.nextInt(90000)}"
+                val bPass = "${1000 + secureRandom.nextInt(9000)}"
+                val b = baseBooking.copy(
+                    id = bId,
+                    parentId = parentId,
+                    date = dateStr,
+                    dateString = dateStr,
+                    bookingNumber = bNum,
+                    pinCode = com.example.utils.SecureHasher.hashPin(bPass),
+                    isRecurring = true,
+                    createdAt = System.currentTimeMillis(),
+                    updatedAt = System.currentTimeMillis()
+                )
+                newBookings.add(b)
+                batch.set(db.collection("bookings").document(bId), b)
+            }
+            batch
+        }
+
         safeFirestoreCallWithCallback(
             operation = { onSuccess, onFailure ->
-                batch.commit().addOnSuccessListener {
-                    _bookings.value = _bookings.value + newBookings
-                    
-                    val custPhone = baseBooking.effectiveCustomerPhone
-                    val custName = baseBooking.effectiveCustomerName
-                    val provPhone = baseBooking.providerPhone.ifEmpty {
-                        getProviders?.invoke()?.find { it.id == baseBooking.providerId || it.name.trim() == baseBooking.providerName.trim() }?.phone?.trim() ?: baseBooking.providerId
+                com.google.android.gms.tasks.Tasks.whenAllComplete(batches.map { it.commit() })
+                    .addOnSuccessListener { tasks ->
+                        val firstError = tasks.firstOrNull { !it.isSuccessful }?.exception
+                        if (firstError != null) {
+                            onFailure(firstError)
+                            onResult(false)
+                            return@addOnSuccessListener
+                        }
+                        _bookings.value = _bookings.value + newBookings
+
+                        val custPhone = baseBooking.effectiveCustomerPhone
+                        val custName = baseBooking.effectiveCustomerName
+                        val provPhone = baseBooking.providerPhone.ifEmpty {
+                            getProviders?.invoke()?.find { it.id == baseBooking.providerId || it.name.trim() == baseBooking.providerName.trim() }?.phone?.trim() ?: baseBooking.providerId
+                        }
+
+                        val msg = "لديك سلسلة حجوزات جديدة متكررة (${newBookings.size} مواعيد) من $custName برقم $custPhone"
+                        if (provPhone.isNotBlank()) {
+                            onAddNotification?.invoke("سلسلة حجوزات جديدة", msg, "PROVIDER", provPhone)
+                        }
+
+                        val auditId = java.util.UUID.randomUUID().toString()
+                        val auditLog = mapOf(
+                            "id" to auditId,
+                            "action" to "CREATE_RECURRING_BOOKING",
+                            "details" to "تم إنشاء ${newBookings.size} حجوزات للمزود ${baseBooking.providerName}",
+                            "timestamp" to System.currentTimeMillis()
+                        )
+                        db.collection("security_audit_logs").document(auditId).set(auditLog)
+
+                        onSuccess()
+                        onResult(true)
                     }
-                    
-                    // Notify provider about the batch
-                    val msg = "لديك سلسلة حجوزات جديدة متكررة (${newBookings.size} مواعيد) من $custName برقم $custPhone"
-                    if (provPhone.isNotBlank()) {
-                        onAddNotification?.invoke("سلسلة حجوزات جديدة", msg, "PROVIDER", provPhone)
+                    .addOnFailureListener { e ->
+                        onFailure(e)
+                        onResult(false)
                     }
-                    
-                    // Log to admin
-                    val auditLog = mapOf(
-                        "id" to java.util.UUID.randomUUID().toString(),
-                        "action" to "CREATE_RECURRING_BOOKING",
-                        "details" to "تم إنشاء ${newBookings.size} حجوزات للمزود ${baseBooking.providerName}",
-                        "timestamp" to System.currentTimeMillis()
-                    )
-                    db.collection("security_audit_logs").document(auditLog["id"].toString()).set(auditLog)
-                    
-                    onSuccess()
-                    onResult(true)
-                }.addOnFailureListener { e ->
-                    onFailure(e)
-                    onResult(false)
-                }
             },
             onSuccess = { triggerToast("✅ تم إنشاء السلسلة المتكررة بنجاح") },
             onError = { triggerToast("⚠️ خطأ في المزامنة، يرجى التحقق من اتصالك") },
@@ -583,13 +596,19 @@ open class BookingViewModel @Inject constructor(
             .whereEqualTo("customerPhone", customerPhone)
             .get()
             .addOnSuccessListener { querySnapshot ->
-                val batch = db.batch()
-                for (doc in querySnapshot.documents) {
-                    batch.delete(doc.reference)
+                if (querySnapshot.isEmpty) {
+                    triggerNotificationCallback?.invoke("🗑️ لا توجد حجوزات لحذفها.")
+                    return@addOnSuccessListener
                 }
-                batch.commit().addOnSuccessListener {
-                    triggerNotificationCallback?.invoke("🗑️ تم تصفية وحذف سجل جميع الحجوزات بنجاح.")
+                val commitTasks = querySnapshot.documents.chunked(450).map { chunk ->
+                    val batch = db.batch()
+                    chunk.forEach { doc -> batch.delete(doc.reference) }
+                    batch.commit()
                 }
+                com.google.android.gms.tasks.Tasks.whenAllComplete(commitTasks)
+                    .addOnSuccessListener {
+                        triggerNotificationCallback?.invoke("🗑️ تم تصفية وحذف سجل جميع الحجوزات بنجاح.")
+                    }
             }
     }
 
@@ -675,34 +694,34 @@ open class BookingViewModel @Inject constructor(
     }
 
     fun getBookingStatusColor(status: String): String {
-        return when (status) {
-            "PENDING" -> "#FF9800" // Orange
-            "APPROVED" -> "#2196F3" // Blue
+        return when (status.uppercase()) {
+            "PENDING", "UNDER_REVIEW" -> "#FF9800" // Orange
+            "APPROVED", "ACCEPTED" -> "#2196F3" // Blue
             "IN_PROGRESS" -> "#9C27B0" // Purple
             "COMPLETED" -> "#4CAF50" // Green
-            "CANCELLED" -> "#F44336" // Red
+            "CANCELLED", "REJECTED" -> "#F44336" // Red
             else -> "#757575" // Grey
         }
     }
 
     fun getBookingStatusLabel(status: String): String {
-        return when (status) {
-            "PENDING" -> "قيد الانتظار"
-            "APPROVED" -> "مقبول"
+        return when (status.uppercase()) {
+            "PENDING", "UNDER_REVIEW" -> "قيد الانتظار"
+            "APPROVED", "ACCEPTED" -> "مقبول"
             "IN_PROGRESS" -> "جاري التنفيذ"
             "COMPLETED" -> "مكتمل"
             "CANCELLED" -> "ملغي"
+            "REJECTED" -> "مرفوض"
             else -> "غير معروف"
         }
     }
 
     fun getBookingProgress(status: String): Float {
-        return when (status) {
-            "PENDING" -> 0.25f
-            "APPROVED" -> 0.50f
+        return when (status.uppercase()) {
+            "PENDING", "UNDER_REVIEW" -> 0.25f
+            "APPROVED", "ACCEPTED" -> 0.50f
             "IN_PROGRESS" -> 0.75f
-            "COMPLETED" -> 1.0f
-            "CANCELLED" -> 1.0f
+            "COMPLETED", "CANCELLED", "REJECTED" -> 1.0f
             else -> 0.0f
         }
     }

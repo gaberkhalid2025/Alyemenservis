@@ -362,7 +362,7 @@ fun BookingCalendarScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        items(availableSlots) { slot ->
+                        items(availableSlots, key = { it.timeString }) { slot ->
                             val isSelected = selectedTimeSlot?.timeString == slot.timeString
                             Card(
                                 shape = RoundedCornerShape(10.dp),
@@ -479,10 +479,11 @@ fun BookingCalendarScreen(
                         }
 
                         calendarViewModel.setSubmitting(true)
-                        val rawGeneratedPass = "${(1000..9999).random()}"
+                        val secureRandom = java.security.SecureRandom()
+                        val rawGeneratedPass = "${1000 + secureRandom.nextInt(9000)}"
                         val newBooking = BookingEntity(
                             id = com.example.utils.EntityIdGenerator.generateBookingId(),
-                            bookingNumber = "YEM-${(10000..99999).random()}",
+                            bookingNumber = "YEM-${10000 + secureRandom.nextInt(90000)}",
                             pinCode = com.example.utils.SecureHasher.hashPin(rawGeneratedPass),
                             clientId = currentUserPhone.ifEmpty { com.example.utils.EntityIdGenerator.generateUserId() },
                             clientName = currentUserName.ifEmpty { "عميل معتمد" },
@@ -513,7 +514,7 @@ fun BookingCalendarScreen(
                             if (success) {
                                 // Schedule local 24h & 1h notification reminders
                                 BookingReminderService.scheduleBookingReminders(context, newBooking)
-                                Toast.makeText(context, "✅ تم إرسال طلب الحجز بنجاح وجدولة التنبيهات!", Toast.LENGTH_LONG).show()
+                                Toast.makeText(context, "✅ تم الحجز #${newBooking.bookingNumber} | احتفظ برمز PIN: $rawGeneratedPass", Toast.LENGTH_LONG).show()
                                 onBookingSuccess(newBooking)
                             } else {
                                 Toast.makeText(context, "فشل إنشاء الحجز، يرجى المحاولة مرة أخرى", Toast.LENGTH_SHORT).show()

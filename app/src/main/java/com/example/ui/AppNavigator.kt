@@ -597,7 +597,24 @@ fun AppNavigator(
                 AppScreens.OFFERS_LIST -> UrgentOffersList(
                     offers = requestOffers,
                     isOwner = viewModel.isProviderUser,
-                    onAcceptOffer = { _ -> },
+                    onAcceptOffer = { offer ->
+                        val matchingReq = viewModel.instantRequests.value.find { it.id == offer.requestId }
+                        if (matchingReq != null) {
+                            viewModel.instantRequestViewModel.acceptRequestOffer(matchingReq, offer)
+                        } else {
+                            viewModel.instantRequestViewModel.acceptOffer(
+                                requestId = offer.requestId,
+                                offerId = offer.id,
+                                providerPhone = offer.technicianPhone
+                            ) { success, msg ->
+                                if (!msg.isNullOrBlank()) {
+                                    viewModel.triggerNotification(msg)
+                                } else if (success) {
+                                    viewModel.triggerNotification("✅ تم قبول العرض بنجاح")
+                                }
+                            }
+                        }
+                    },
                     onContactProvider = { offer ->
                         viewModel.openOrCreateChatChannel(
                             targetId = offer.technicianId.ifBlank { offer.technicianPhone },

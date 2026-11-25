@@ -9,9 +9,6 @@ import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.tasks.await
 import java.io.File
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 import java.util.UUID
 
 data class AssistantStepReport(
@@ -45,7 +42,7 @@ class AssistantTestRunner(private val context: Context) {
         onComplete: (AssistantFullReport) -> Unit
     ) {
         val stepsList = mutableListOf<AssistantStepReport>()
-        val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
+        val timestamp = DateFormatter.formatCustom(System.currentTimeMillis(), "yyyy-MM-dd HH:mm:ss")
         // [تعديل مهندس النظام] فحص صارم ومحاكاة لضغط مستخدمين حقيقيين واستعلامات متكررة واتصال متقطع للمساعد الذكي
         val testSessionId = "assistant_diag_${UUID.randomUUID().toString().take(8)}"
         val testPlumberId = "test_plumber_diag_${UUID.randomUUID().toString().take(6)}"

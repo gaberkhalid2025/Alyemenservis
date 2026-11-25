@@ -68,9 +68,10 @@ service firebase.storage {
       return request.resource.contentType.matches('application/pdf');
     }
 
-    // التحقق من عدم احتواء الملف على امتدادات برمجية أو تنفيذية خبيثة
+    // التحقق من عدم احتواء الملف على امتدادات برمجية أو تنفيذية خبيثة أو مسارات عبور
     function isSafeFileName(fileName) {
-      return !fileName.matches('.*\\.(exe|bat|sh|apk|dll|so|vbs|cmd|msi|bin|jar)');
+      return !fileName.matches('.*\\.\\..*') &&
+             !fileName.matches('.*\\.(exe|bat|sh|apk|dll|so|vbs|cmd|msi|bin|jar)');
     }
 
     // ========================================================================
@@ -80,82 +81,91 @@ service firebase.storage {
     // 1. وسائط المستخدمين والصور الشخصية (/users/{userId}/ أو /profiles/{userId}/)
     match /users/{userId}/{fileName} {
       allow read: if true;
-      allow write: if (isOwner(userId) || isAdmin()) &&
-                      isValidImageSize() &&
-                      isSafeFileName(fileName) &&
-                      isAllowedImageType();
+      allow create, update: if (isOwner(userId) || isAdmin()) &&
+                               isValidImageSize() &&
+                               isSafeFileName(fileName) &&
+                               isAllowedImageType();
+      allow delete: if isOwner(userId) || isAdmin();
     }
 
     match /profiles/{userId}/{fileName} {
       allow read: if true;
-      allow write: if (isOwner(userId) || isAdmin()) &&
-                      isValidImageSize() &&
-                      isSafeFileName(fileName) &&
-                      isAllowedImageType();
+      allow create, update: if (isOwner(userId) || isAdmin()) &&
+                               isValidImageSize() &&
+                               isSafeFileName(fileName) &&
+                               isAllowedImageType();
+      allow delete: if isOwner(userId) || isAdmin();
     }
 
     // 2. وسائط المحادثات والشات (/chat/{channelId}/{allPaths=**} و /chats/{channelId}/{allPaths=**})
     match /chat/{channelId}/{allPaths=**} {
       allow read: if true;
-      allow write: if isAuthenticated() &&
-                      isValidChatMediaSize() &&
-                      (request.resource.contentType.matches('image/.*') ||
-                       request.resource.contentType.matches('audio/.*') ||
-                       isAllowedVideoType() ||
-                       request.resource.contentType.matches('application/.*'));
+      allow create, update: if isAuthenticated() &&
+                               isValidChatMediaSize() &&
+                               (request.resource.contentType.matches('image/.*') ||
+                                request.resource.contentType.matches('audio/.*') ||
+                                isAllowedVideoType() ||
+                                request.resource.contentType.matches('application/.*'));
+      allow delete: if isAdmin() || isAuthenticated();
     }
 
     match /chats/{channelId}/{allPaths=**} {
       allow read: if true;
-      allow write: if isAuthenticated() &&
-                      isValidChatMediaSize() &&
-                      (request.resource.contentType.matches('image/.*') ||
-                       request.resource.contentType.matches('audio/.*') ||
-                       isAllowedVideoType() ||
-                       request.resource.contentType.matches('application/.*'));
+      allow create, update: if isAuthenticated() &&
+                               isValidChatMediaSize() &&
+                               (request.resource.contentType.matches('image/.*') ||
+                                request.resource.contentType.matches('audio/.*') ||
+                                isAllowedVideoType() ||
+                                request.resource.contentType.matches('application/.*'));
+      allow delete: if isAdmin() || isAuthenticated();
     }
 
     // 3. وسائط مزودي الخدمات والفنيين (/providers/{providerId}/{fileName})
     match /providers/{providerId}/{fileName} {
       allow read: if true;
-      allow write: if isAuthenticated() &&
-                      isValidMediaSize() &&
-                      isSafeFileName(fileName) &&
-                      (isAllowedImageType() || isAllowedDocType());
+      allow create, update: if isAuthenticated() &&
+                               isValidMediaSize() &&
+                               isSafeFileName(fileName) &&
+                               (isAllowedImageType() || isAllowedDocType());
+      allow delete: if isAdmin() || isOwner(providerId);
     }
 
     // 4. صور المتاجر ومنتجاتها (/stores/{storeId}/{fileName})
     match /stores/{storeId}/{fileName} {
       allow read: if true;
-      allow write: if isAuthenticated() &&
-                      isValidImageSize() &&
-                      isSafeFileName(fileName) &&
-                      isAllowedImageType();
+      allow create, update: if isAuthenticated() &&
+                               isValidImageSize() &&
+                               isSafeFileName(fileName) &&
+                               isAllowedImageType();
+      allow delete: if isAdmin() || isOwner(storeId);
     }
 
     // 5. صور العقارات المعروضة (/properties/{propertyId}/{fileName})
     match /properties/{propertyId}/{fileName} {
       allow read: if true;
-      allow write: if isAuthenticated() &&
-                      isValidImageSize() &&
-                      isSafeFileName(fileName) &&
-                      isAllowedImageType();
+      allow create, update: if isAuthenticated() &&
+                               isValidImageSize() &&
+                               isSafeFileName(fileName) &&
+                               isAllowedImageType();
+      allow delete: if isAdmin() || isOwner(propertyId);
     }
 
     // 6. مرفقات وبلاغات النظام العامة والطلبات العاجلة (/reports/{reportId}/{fileName} و /urgent_requests/{allPaths=**})
     match /urgent_requests/{allPaths=**} {
       allow read: if true;
-      allow write: if isAuthenticated() &&
-                      isValidImageSize() &&
-                      isAllowedImageType();
+      allow create, update: if isAuthenticated() &&
+                               isValidImageSize() &&
+                               isAllowedImageType();
+      allow delete: if isAdmin() || isAuthenticated();
     }
 
     match /reports/{reportId}/{fileName} {
       allow read: if isAuthenticated();
-      allow write: if isAuthenticated() &&
-                      isValidMediaSize() &&
-                      isSafeFileName(fileName) &&
-                      (isAllowedImageType() || isAllowedDocType());
+      allow create, update: if isAuthenticated() &&
+                               isValidMediaSize() &&
+                               isSafeFileName(fileName) &&
+                               (isAllowedImageType() || isAllowedDocType());
+      allow delete: if isAdmin();
     }
 
     // 7. البانرات الإعلانية الترويجية وأقسام التطبيق العامة

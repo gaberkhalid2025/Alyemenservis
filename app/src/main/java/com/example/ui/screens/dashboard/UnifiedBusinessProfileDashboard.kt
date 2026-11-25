@@ -259,9 +259,14 @@ private fun LoadingOrEmptyDashboard(
         val outcome = withTimeoutOrNull(8000L) {
             try {
                 val db = FirebaseFirestore.getInstance()
+                val phoneVariants = if (cleanId.isNotBlank()) {
+                    listOf(cleanId, "0$cleanId", "+967$cleanId", "00967$cleanId").distinct()
+                } else {
+                    emptyList()
+                }
                 when (accountType) {
                     "RESTAURANT", "MEDICAL", "MALL", "STORE" -> {
-                        val candidateIds = listOf(providerId, "store_$cleanId")
+                        val candidateIds = listOf(providerId, "store_$cleanId", cleanId)
                             .map { it.trim() }
                             .filter { it.isNotBlank() }
                             .distinct()
@@ -274,15 +279,15 @@ private fun LoadingOrEmptyDashboard(
                                 break
                             }
                         }
-                        if (found == null && cleanId.isNotBlank()) {
+                        if (found == null && phoneVariants.isNotEmpty()) {
                             val q = db.collection(AppConstants.COL_STORES)
-                                .whereEqualTo("phone", cleanId)
-                                .limit(1)
+                                .whereIn("phone", phoneVariants)
+                                .limit(10)
                                 .get()
                                 .await()
-                            val doc = q.documents.firstOrNull()
-                            val parsed = doc?.toObject(StoreEntity::class.java)?.copy(id = doc.id)
-                            if (parsed != null && !parsed.isDeleted) found = parsed
+                            found = q.documents
+                                .mapNotNull { doc -> doc.toObject(StoreEntity::class.java)?.copy(id = doc.id) }
+                                .firstOrNull { !it.isDeleted }
                         }
                         if (found != null) {
                             onStoreResolved(found)
@@ -292,7 +297,7 @@ private fun LoadingOrEmptyDashboard(
                         }
                     }
                     "REAL_ESTATE" -> {
-                        val candidateIds = listOf(providerId, "prop_$cleanId")
+                        val candidateIds = listOf(providerId, "prop_$cleanId", cleanId)
                             .map { it.trim() }
                             .filter { it.isNotBlank() }
                             .distinct()
@@ -305,15 +310,15 @@ private fun LoadingOrEmptyDashboard(
                                 break
                             }
                         }
-                        if (found == null && cleanId.isNotBlank()) {
+                        if (found == null && phoneVariants.isNotEmpty()) {
                             val q = db.collection(AppConstants.COL_PROPERTIES)
-                                .whereEqualTo("phone", cleanId)
-                                .limit(1)
+                                .whereIn("phone", phoneVariants)
+                                .limit(10)
                                 .get()
                                 .await()
-                            val doc = q.documents.firstOrNull()
-                            val parsed = doc?.toObject(PropertyEntity::class.java)?.copy(id = doc.id)
-                            if (parsed != null && !parsed.isDeleted) found = parsed
+                            found = q.documents
+                                .mapNotNull { doc -> doc.toObject(PropertyEntity::class.java)?.copy(id = doc.id) }
+                                .firstOrNull { !it.isDeleted }
                         }
                         if (found != null) {
                             onPropertyResolved(found)
@@ -323,7 +328,7 @@ private fun LoadingOrEmptyDashboard(
                         }
                     }
                     else -> {
-                        val candidateIds = listOf(providerId, "prov_$cleanId")
+                        val candidateIds = listOf(providerId, "prov_$cleanId", cleanId)
                             .map { it.trim() }
                             .filter { it.isNotBlank() }
                             .distinct()
@@ -336,15 +341,15 @@ private fun LoadingOrEmptyDashboard(
                                 break
                             }
                         }
-                        if (found == null && cleanId.isNotBlank()) {
+                        if (found == null && phoneVariants.isNotEmpty()) {
                             val q = db.collection(AppConstants.COL_PROVIDERS)
-                                .whereEqualTo("phone", cleanId)
-                                .limit(1)
+                                .whereIn("phone", phoneVariants)
+                                .limit(10)
                                 .get()
                                 .await()
-                            val doc = q.documents.firstOrNull()
-                            val parsed = doc?.toObject(ProviderEntity::class.java)?.copy(id = doc.id)
-                            if (parsed != null && !parsed.isDeleted) found = parsed
+                            found = q.documents
+                                .mapNotNull { doc -> doc.toObject(ProviderEntity::class.java)?.copy(id = doc.id) }
+                                .firstOrNull { !it.isDeleted }
                         }
                         if (found != null) {
                             onProviderResolved(found)

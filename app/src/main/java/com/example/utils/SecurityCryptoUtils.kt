@@ -327,4 +327,30 @@ object SecurityCryptoUtils {
         }
         return Pair(true, null)
     }
+
+    /**
+     * Generates a cryptographically strong temporary password using SecureRandom
+     * containing uppercase, lowercase, and numeric characters matching validatePasswordPolicy.
+     */
+    fun generateStrongTempPassword(length: Int = 10): String {
+        val safeLen = length.coerceAtLeast(8)
+        val upper = "ABCDEFGHJKLMNPQRSTUVWXYZ"
+        val lower = "abcdefghijkmnopqrstuvwxyz"
+        val digits = "23456789"
+        val all = upper + lower + digits
+        val chars = CharArray(safeLen)
+        chars[0] = upper[secureRandom.nextInt(upper.length)]
+        chars[1] = lower[secureRandom.nextInt(lower.length)]
+        chars[2] = digits[secureRandom.nextInt(digits.length)]
+        for (i in 3 until safeLen) {
+            chars[i] = all[secureRandom.nextInt(all.length)]
+        }
+        for (i in chars.indices.reversed()) {
+            val j = secureRandom.nextInt(i + 1)
+            val tmp = chars[i]
+            chars[i] = chars[j]
+            chars[j] = tmp
+        }
+        return String(chars)
+    }
 }

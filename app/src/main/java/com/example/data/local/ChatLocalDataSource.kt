@@ -16,6 +16,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.util.concurrent.ConcurrentHashMap
 
@@ -50,6 +52,8 @@ class ChatLocalDataSource(
     private val channelsMemoryCache = MutableStateFlow<List<ChatChannel>>(emptyList())
     private val messagesMemoryCache = ConcurrentHashMap<String, MutableStateFlow<List<ChatMessage>>>()
     private val presenceMemoryCache = ConcurrentHashMap<String, MutableStateFlow<UserPresence?>>()
+    private val channelsMutex = Mutex()
+    private val messagesMutex = Mutex()
 
     init {
         migrateLegacyChatData()
@@ -116,6 +120,12 @@ class ChatLocalDataSource(
     }
 
     suspend fun saveChannels(channels: List<ChatChannel>) = withContext(ioDispatcher) {
+        channelsMutex.withLock {
+            saveChannelsInternal(channels)
+        }
+    }
+
+    private suspend fun saveChannelsInternal(channels: List<ChatChannel>) {
         try {
             val strListAdapter = moshi.adapter<List<String>>(Types.newParameterizedType(List::class.java, String::class.java))
             val mapAdapter = moshi.adapter<Map<String, Int>>(Types.newParameterizedType(Map::class.java, String::class.java, Int::class.javaObjectType))
@@ -142,41 +152,51 @@ class ChatLocalDataSource(
     }
 
     suspend fun saveOrUpdateChannel(channel: ChatChannel) = withContext(ioDispatcher) {
-        val current = getCachedChannelsInternal().toMutableList()
-        val index = current.indexOfFirst { it.id == channel.id }
-        if (index >= 0) {
-            current[index] = channel
-        } else {
-            current.add(0, channel)
+        channelsMutex.withLock {
+            val current = getCachedChannelsInternal().toMutableList()
+            val index = current.indexOfFirst { it.id == channel.id }
+            if (index >= 0) {
+                current[index] = channel
+            } else {
+                current.add(0, channel)
+            }
+            val sorted = current.sortedByDescending { it.lastMessageTime }
+            saveChannelsInternal(sorted)
         }
-        val sorted = current.sortedByDescending { it.lastMessageTime }
-        saveChannels(sorted)
     }
 
     suspend fun deleteChannel(channelId: String) = withContext(ioDispatcher) {
-        try {
-            chatDao.deleteChannel(channelId)
-            chatDao.deleteMessagesByChannel(channelId)
-        } catch (e: Exception) {
-            android.util.Log.e("ChatLocalDataSource", "Error in deleteChannel: ${e.message}", e)
+        channelsMutex.withLock {
+            messagesMutex.withLock {
+                try {
+                    chatDao.deleteChannel(channelId)
+                    chatDao.deleteMessagesByChannel(channelId)
+                } catch (e: Exception) {
+                    android.util.Log.e("ChatLocalDataSource", "Error in deleteChannel: ${e.message}", e)
+                }
+                val current = getCachedChannelsInternal().filter { it.id != channelId }
+                channelsMemoryCache.value = current
+                prefs.edit().remove(KEY_PREFIX_SYNC_TIME + channelId).apply()
+                messagesMemoryCache.remove(channelId)
+            }
         }
-        val current = getCachedChannelsInternal().filter { it.id != channelId }
-        channelsMemoryCache.value = current
-        prefs.edit().remove(KEY_PREFIX_SYNC_TIME + channelId).apply()
-        messagesMemoryCache.remove(channelId)
     }
 
     suspend fun clearAllChannels() = withContext(ioDispatcher) {
-        try {
-            chatDao.deleteAllChannels()
-            chatDao.deleteAllMessages()
-        } catch (e: Exception) {
-            android.util.Log.e("ChatLocalDataSource", "Error in clearAllChannels: ${e.message}", e)
+        channelsMutex.withLock {
+            messagesMutex.withLock {
+                try {
+                    chatDao.deleteAllChannels()
+                    chatDao.deleteAllMessages()
+                } catch (e: Exception) {
+                    android.util.Log.e("ChatLocalDataSource", "Error in clearAllChannels: ${e.message}", e)
+                }
+                prefs.edit().clear().apply()
+                channelsMemoryCache.value = emptyList()
+                messagesMemoryCache.clear()
+                presenceMemoryCache.clear()
+            }
         }
-        prefs.edit().clear().apply()
-        channelsMemoryCache.value = emptyList()
-        messagesMemoryCache.clear()
-        presenceMemoryCache.clear()
     }
 
     private suspend fun getCachedChannelsInternal(): List<ChatChannel> {
@@ -233,36 +253,44 @@ class ChatLocalDataSource(
     }
 
     suspend fun saveMessages(channelId: String, messages: List<ChatMessage>) = withContext(ioDispatcher) {
-        val sorted = messages.sortedBy { it.timestamp }
-        try {
-            val roomMessages = sorted.map { msg ->
-                val encText = if (msg.message.isNotBlank()) SecurityCryptoUtils.encrypt(msg.message) else ""
-                ChatMessageRoomEntity(
-                    id = msg.id,
-                    channelId = msg.channelId.ifBlank { channelId },
-                    senderId = msg.senderId,
-                    senderName = msg.senderName,
-                    senderPhoto = msg.senderPhoto,
-                    message = if (encText.isNotEmpty()) encText else msg.message,
-                    mediaType = msg.mediaType.name,
-                    mediaUrl = msg.mediaUrl,
-                    status = msg.status.name,
-                    isEncrypted = true,
-                    timestamp = msg.timestamp,
-                    syncStatus = msg.syncStatus.name
-                )
+        messagesMutex.withLock {
+            val sorted = messages.sortedBy { it.timestamp }
+            try {
+                val roomMessages = sorted.map { msg ->
+                    val encText = if (msg.message.isNotBlank()) SecurityCryptoUtils.encrypt(msg.message) else ""
+                    ChatMessageRoomEntity(
+                        id = msg.id,
+                        channelId = msg.channelId.ifBlank { channelId },
+                        senderId = msg.senderId,
+                        senderName = msg.senderName,
+                        senderPhoto = msg.senderPhoto,
+                        message = if (encText.isNotEmpty()) encText else msg.message,
+                        mediaType = msg.mediaType.name,
+                        mediaUrl = msg.mediaUrl,
+                        status = msg.status.name,
+                        isEncrypted = true,
+                        timestamp = msg.timestamp,
+                        syncStatus = msg.syncStatus.name
+                    )
+                }
+                chatDao.replaceMessagesForChannel(channelId, roomMessages)
+            } catch (e: Exception) {
+                android.util.Log.e("ChatLocalDataSource", "Error in saveMessages: ${e.message}", e)
             }
-            chatDao.replaceMessagesForChannel(channelId, roomMessages)
-        } catch (e: Exception) {
-            android.util.Log.e("ChatLocalDataSource", "Error in saveMessages: ${e.message}", e)
-        }
 
-        // Update in-memory stream
-        val flow = messagesMemoryCache.getOrPut(channelId) { MutableStateFlow(emptyList()) }
-        flow.value = sorted
+            // Update in-memory stream
+            val flow = messagesMemoryCache.getOrPut(channelId) { MutableStateFlow(emptyList()) }
+            flow.value = sorted
+        }
     }
 
     suspend fun insertOrUpdateMessage(message: ChatMessage) = withContext(ioDispatcher) {
+        messagesMutex.withLock {
+            insertOrUpdateMessageInternal(message)
+        }
+    }
+
+    private suspend fun insertOrUpdateMessageInternal(message: ChatMessage) {
         try {
             val encText = if (message.message.isNotBlank()) SecurityCryptoUtils.encrypt(message.message) else ""
             val roomEntity = ChatMessageRoomEntity(
@@ -296,64 +324,72 @@ class ChatLocalDataSource(
     }
 
     suspend fun updateMessageStatus(channelId: String, messageId: String, status: MessageStatus) = withContext(ioDispatcher) {
-        try {
-            chatDao.updateMessageStatus(messageId, status.name)
-        } catch (e: Exception) {
-            android.util.Log.e("ChatLocalDataSource", "Error in updateMessageStatus: ${e.message}", e)
-        }
-        val current = (messagesMemoryCache[channelId]?.value ?: getCachedMessagesInternal(channelId)).toMutableList()
-        val index = current.indexOfFirst { it.id == messageId }
-        if (index >= 0) {
-            current[index] = current[index].copy(status = status)
-            val flow = messagesMemoryCache.getOrPut(channelId) { MutableStateFlow(emptyList()) }
-            flow.value = current
+        messagesMutex.withLock {
+            try {
+                chatDao.updateMessageStatus(messageId, status.name)
+            } catch (e: Exception) {
+                android.util.Log.e("ChatLocalDataSource", "Error in updateMessageStatus: ${e.message}", e)
+            }
+            val current = (messagesMemoryCache[channelId]?.value ?: getCachedMessagesInternal(channelId)).toMutableList()
+            val index = current.indexOfFirst { it.id == messageId }
+            if (index >= 0) {
+                current[index] = current[index].copy(status = status)
+                val flow = messagesMemoryCache.getOrPut(channelId) { MutableStateFlow(emptyList()) }
+                flow.value = current
+            }
         }
     }
 
     // [إصلاح نهائي] تحديث رابط الوسائط والحالة محلياً في الكاش و Room
     suspend fun updateMessageMediaUrl(channelId: String, messageId: String, downloadUrl: String, status: MessageStatus) = withContext(ioDispatcher) {
-        val current = (messagesMemoryCache[channelId]?.value ?: getCachedMessagesInternal(channelId)).toMutableList()
-        val index = current.indexOfFirst { it.id == messageId }
-        if (index >= 0) {
-            val updatedMsg = current[index].copy(mediaUrl = downloadUrl, status = status, syncStatus = SyncStatus.SYNCED)
-            current[index] = updatedMsg
-            val flow = messagesMemoryCache.getOrPut(channelId) { MutableStateFlow(emptyList()) }
-            flow.value = current
-            try {
-                insertOrUpdateMessage(updatedMsg)
-            } catch (e: Exception) {
-                android.util.Log.e("ChatLocalDataSource", "Error updating mediaUrl in Room: ${e.message}")
+        messagesMutex.withLock {
+            val current = (messagesMemoryCache[channelId]?.value ?: getCachedMessagesInternal(channelId)).toMutableList()
+            val index = current.indexOfFirst { it.id == messageId }
+            if (index >= 0) {
+                val updatedMsg = current[index].copy(mediaUrl = downloadUrl, status = status, syncStatus = SyncStatus.SYNCED)
+                current[index] = updatedMsg
+                val flow = messagesMemoryCache.getOrPut(channelId) { MutableStateFlow(emptyList()) }
+                flow.value = current
+                try {
+                    insertOrUpdateMessageInternal(updatedMsg)
+                } catch (e: Exception) {
+                    android.util.Log.e("ChatLocalDataSource", "Error updating mediaUrl in Room: ${e.message}")
+                }
             }
         }
     }
 
     suspend fun deleteMessage(channelId: String, messageId: String) = withContext(ioDispatcher) {
-        try {
-            chatDao.deleteMessage(messageId)
-        } catch (e: Exception) {
-            android.util.Log.e("ChatLocalDataSource", "Error in deleteMessage: ${e.message}", e)
+        messagesMutex.withLock {
+            try {
+                chatDao.deleteMessage(messageId)
+            } catch (e: Exception) {
+                android.util.Log.e("ChatLocalDataSource", "Error in deleteMessage: ${e.message}", e)
+            }
+            val current = (messagesMemoryCache[channelId]?.value ?: getCachedMessagesInternal(channelId)).filter { it.id != messageId }
+            val flow = messagesMemoryCache.getOrPut(channelId) { MutableStateFlow(emptyList()) }
+            flow.value = current
         }
-        val current = (messagesMemoryCache[channelId]?.value ?: getCachedMessagesInternal(channelId)).filter { it.id != messageId }
-        val flow = messagesMemoryCache.getOrPut(channelId) { MutableStateFlow(emptyList()) }
-        flow.value = current
     }
 
     suspend fun markMessagesAsRead(channelId: String, currentUserId: String) = withContext(ioDispatcher) {
-        val current = getCachedMessagesInternal(channelId).toMutableList()
-        var modified = false
-        for (i in current.indices) {
-            val msg = current[i]
-            if (msg.senderId != currentUserId && msg.status != MessageStatus.READ) {
-                current[i] = msg.copy(status = MessageStatus.READ)
-                try {
-                    chatDao.updateMessageStatus(msg.id, MessageStatus.READ.name)
-                } catch (_: Exception) {}
-                modified = true
+        messagesMutex.withLock {
+            val current = getCachedMessagesInternal(channelId).toMutableList()
+            var modified = false
+            for (i in current.indices) {
+                val msg = current[i]
+                if (msg.senderId != currentUserId && msg.status != MessageStatus.READ) {
+                    current[i] = msg.copy(status = MessageStatus.READ)
+                    try {
+                        chatDao.updateMessageStatus(msg.id, MessageStatus.READ.name)
+                    } catch (_: Exception) {}
+                    modified = true
+                }
             }
-        }
-        if (modified) {
-            val flow = messagesMemoryCache.getOrPut(channelId) { MutableStateFlow(emptyList()) }
-            flow.value = current
+            if (modified) {
+                val flow = messagesMemoryCache.getOrPut(channelId) { MutableStateFlow(emptyList()) }
+                flow.value = current
+            }
         }
     }
 
@@ -404,23 +440,25 @@ class ChatLocalDataSource(
     }
 
     suspend fun removePendingMessage(messageId: String) = withContext(ioDispatcher) {
-        try {
-            chatDao.updateMessageSyncStatus(messageId, SyncStatus.SYNCED.name)
-            chatDao.updateMessageStatus(messageId, MessageStatus.SENT.name)
-            messagesMemoryCache.forEach { (_, flow) ->
-                val list = flow.value
-                val idx = list.indexOfFirst { it.id == messageId }
-                if (idx >= 0) {
-                    val updated = list.toMutableList()
-                    updated[idx] = updated[idx].copy(
-                        status = MessageStatus.SENT,
-                        syncStatus = SyncStatus.SYNCED
-                    )
-                    flow.value = updated
+        messagesMutex.withLock {
+            try {
+                chatDao.updateMessageSyncStatus(messageId, SyncStatus.SYNCED.name)
+                chatDao.updateMessageStatus(messageId, MessageStatus.SENT.name)
+                messagesMemoryCache.forEach { (_, flow) ->
+                    val list = flow.value
+                    val idx = list.indexOfFirst { it.id == messageId }
+                    if (idx >= 0) {
+                        val updated = list.toMutableList()
+                        updated[idx] = updated[idx].copy(
+                            status = MessageStatus.SENT,
+                            syncStatus = SyncStatus.SYNCED
+                        )
+                        flow.value = updated
+                    }
                 }
+            } catch (e: Exception) {
+                android.util.Log.e("ChatLocalDataSource", "Error in removePendingMessage: ${e.message}", e)
             }
-        } catch (e: Exception) {
-            android.util.Log.e("ChatLocalDataSource", "Error in removePendingMessage: ${e.message}", e)
         }
     }
 

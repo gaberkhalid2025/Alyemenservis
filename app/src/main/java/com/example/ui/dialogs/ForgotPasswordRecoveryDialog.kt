@@ -199,21 +199,30 @@ fun ForgotPasswordRecoveryDialog(
 
                                 when (selectedChannel) {
                                     "WHATSAPP" -> {
-                                        val rawSupport = viewModel.settings.value.supportWhatsapp.trim().ifBlank { "967777000000" }
-                                        val adminPhone = when {
-                                            rawSupport.startsWith("967") || rawSupport.startsWith("+967") -> rawSupport.removePrefix("+")
-                                            rawSupport.length == 9 -> "967$rawSupport"
-                                            else -> "967777000000"
+                                        val rawSupport = viewModel.settings.value.supportWhatsapp.trim()
+                                        val cleanSupport = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(rawSupport).filter { it.isDigit() }
+                                        if (cleanSupport.length < 7) {
+                                            Toast.makeText(context, "⚠️ رقم دعم واتساب غير مهيأ حالياً، يرجى استخدام المحادثة الفورية", Toast.LENGTH_LONG).show()
+                                            return@Button
                                         }
+                                        val adminPhone = if (cleanSupport.startsWith("967")) cleanSupport else "967$cleanSupport"
                                         val msg = "مرحباً إدارة دليل خدمات اليمن، أود استعادة كلمة المرور لرقمي المسجل: $cleanPhone"
-                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/$adminPhone?text=${Uri.encode(msg)}"))
-                                        context.startActivity(intent)
-                                        isSubmitted = true
+                                        try {
+                                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/$adminPhone?text=${Uri.encode(msg)}"))
+                                            context.startActivity(intent)
+                                            isSubmitted = true
+                                        } catch (e: Exception) {
+                                            Toast.makeText(context, "⚠️ تعذر فتح تطبيق واتساب على هذا الجهاز", Toast.LENGTH_SHORT).show()
+                                        }
                                     }
                                     "TELEGRAM" -> {
-                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/yemenservices_support"))
-                                        context.startActivity(intent)
-                                        isSubmitted = true
+                                        try {
+                                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/yemenservices_support"))
+                                            context.startActivity(intent)
+                                            isSubmitted = true
+                                        } catch (e: Exception) {
+                                            Toast.makeText(context, "⚠️ تعذر فتح تطبيق تيليجرام على هذا الجهاز", Toast.LENGTH_SHORT).show()
+                                        }
                                     }
                                     else -> {
                                         // Open unified in-app support chat channel first, then dispatch message
@@ -352,7 +361,7 @@ fun ForgotPasswordRecoveryDialog(
                                                 Toast.makeText(context, "📋 تم نسخ كلمة المرور الجديدة", Toast.LENGTH_SHORT).show()
                                             }
                                         ) {
-                                            Icon(Icons.Default.Share, contentDescription = "نسخ", tint = Color.LightGray)
+                                            Icon(Icons.Default.ContentCopy, contentDescription = "نسخ", tint = Color.LightGray)
                                         }
                                     }
                                 }

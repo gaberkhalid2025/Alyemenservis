@@ -29,41 +29,35 @@ class FirestoreLocalBackupWorker(
             Log.d(TAG, "Starting daily local encrypted backup of Firestore cache...")
             val db = FirebaseFirestore.getInstance()
 
-            val backupSb = StringBuilder()
-            backupSb.append("{\n\"timestamp\": \"${System.currentTimeMillis()}\",\n\"collections\": {\n")
-
             val collectionsToBackup = listOf(
                 "providers", "stores", "properties", "bookings",
                 "registered_users", "settings", "chats"
             )
 
-            var isFirstCol = true
-            // TODO: تطبيق التصفح بالصفحات (Pagination) بدلاً من جلب المجموعة كاملة دفعة واحدة لتفادي استهلاك الذاكرة مع نمو البيانات
+            val rootJson = org.json.JSONObject()
+            rootJson.put("timestamp", System.currentTimeMillis().toString())
+            val collectionsJson = org.json.JSONObject()
+
             for (colName in collectionsToBackup) {
                 try {
                     val snapshot = db.collection(colName).limit(300).get().await()
-                    if (!isFirstCol) backupSb.append(",\n")
-                    isFirstCol = false
-
-                    backupSb.append("  \"$colName\": [")
-                    var isFirstDoc = true
+                    val arr = org.json.JSONArray()
                     for (doc in snapshot.documents) {
-                        if (!isFirstDoc) backupSb.append(",")
-                        isFirstDoc = false
-                        val dataJson = doc.data?.entries?.joinToString(prefix = "{", postfix = "}") {
-                            "\"${it.key}\": \"${it.value.toString().replace("\"", "\\\"")}\""
-                        } ?: "{}"
-                        backupSb.append(dataJson)
+                        val docObj = org.json.JSONObject()
+                        docObj.put("_id", doc.id)
+                        doc.data?.forEach { (k, v) ->
+                            docObj.put(k, v ?: org.json.JSONObject.NULL)
+                        }
+                        arr.put(docObj)
                     }
-                    backupSb.append("]")
+                    collectionsJson.put(colName, arr)
                 } catch (e: Exception) {
                     Log.e(TAG, "Failed backing up collection $colName", e)
                 }
             }
+            rootJson.put("collections", collectionsJson)
 
-            backupSb.append("\n}\n}")
-
-            val rawBackupString = backupSb.toString()
+            val rawBackupString = rootJson.toString()
             val encryptedData = SecurityCryptoUtils.encrypt(rawBackupString)
 
             val backupDir = File(context.filesDir, "encrypted_backups")

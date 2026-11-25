@@ -54,10 +54,12 @@ class MedicalRepository @Inject constructor(
             .whereEqualTo("ownerId", cleanOwnerId)
             .addSnapshotListener { snapshot, error ->
                 if (error != null || snapshot == null) {
-                    trySend(getCachedDoctors(ownerId))
+                    trySend(getCachedDoctors(cleanOwnerId))
                     return@addSnapshotListener
                 }
                 val list = snapshot.documents.mapNotNull { doc ->
+                    val isDel = doc.getBoolean("isDeleted") == true || doc.getBoolean("deleted") == true
+                    if (isDel) return@mapNotNull null
                     DoctorItem(
                         id = doc.id,
                         name = doc.getString("name") ?: "",
@@ -65,7 +67,7 @@ class MedicalRepository @Inject constructor(
                         workingHours = doc.getString("workingHours") ?: ""
                     )
                 }
-                saveCachedDoctors(ownerId, list)
+                saveCachedDoctors(cleanOwnerId, list)
                 trySend(list)
             }
         awaitClose { listener.remove() }

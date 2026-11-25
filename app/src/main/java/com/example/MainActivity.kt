@@ -260,15 +260,17 @@ class MainActivity : ComponentActivity() {
         }
 
         try {
-            val firestore = com.google.firebase.firestore.FirebaseFirestore.getInstance()
-            val docRef = firestore.collection("settings").document("main_settings")
-            docRef.get().addOnSuccessListener { snapshot ->
-                if (snapshot != null && !snapshot.exists() && com.google.firebase.auth.FirebaseAuth.getInstance().currentUser != null) {
-                    val initSettings = com.example.data.AdminSettingsEntity(
-                        isStoresEnabled = true,
-                        isPropertiesEnabled = true
-                    )
-                    docRef.set(initSettings, com.google.firebase.firestore.SetOptions.merge())
+            if (viewModel.adminRole.value != "GUEST" && com.google.firebase.auth.FirebaseAuth.getInstance().currentUser != null) {
+                val firestore = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                val docRef = firestore.collection("settings").document("main_settings")
+                docRef.get().addOnSuccessListener { snapshot ->
+                    if (snapshot != null && !snapshot.exists() && viewModel.adminRole.value != "GUEST") {
+                        val initSettings = com.example.data.AdminSettingsEntity(
+                            isStoresEnabled = true,
+                            isPropertiesEnabled = true
+                        )
+                        docRef.set(initSettings, com.google.firebase.firestore.SetOptions.merge())
+                    }
                 }
             }
         } catch (e: Exception) {

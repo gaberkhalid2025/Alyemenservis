@@ -39,19 +39,27 @@ class JobRepository @Inject constructor(
     }
 
     fun getJobs(ownerId: String): Flow<List<JobPostItem>> = callbackFlow {
-        val cached = getCachedJobs(ownerId)
+        val cleanOwnerId = ownerId.trim()
+        if (cleanOwnerId.isBlank()) {
+            trySend(emptyList())
+            close()
+            return@callbackFlow
+        }
+        val cached = getCachedJobs(cleanOwnerId)
         if (cached.isNotEmpty()) {
             trySend(cached)
         }
 
         val listener = firestore.collection(com.example.utils.AppConstants.COL_JOBS)
-            .whereEqualTo("ownerId", ownerId)
+            .whereEqualTo("ownerId", cleanOwnerId)
             .addSnapshotListener { snapshot, error ->
                 if (error != null || snapshot == null) {
-                    trySend(getCachedJobs(ownerId))
+                    trySend(getCachedJobs(cleanOwnerId))
                     return@addSnapshotListener
                 }
                 val list = snapshot.documents.mapNotNull { doc ->
+                    val isDel = doc.getBoolean("isDeleted") == true || doc.getBoolean("deleted") == true
+                    if (isDel) return@mapNotNull null
                     JobPostItem(
                         id = doc.id,
                         title = doc.getString("title") ?: doc.getString("jobTitle") ?: "",
@@ -61,7 +69,7 @@ class JobRepository @Inject constructor(
                         applicantsCount = doc.getLong("applicantsCount")?.toInt() ?: 0
                     )
                 }
-                saveCachedJobs(ownerId, list)
+                saveCachedJobs(cleanOwnerId, list)
                 trySend(list)
             }
         awaitClose { listener.remove() }

@@ -243,13 +243,15 @@ class BookingRepository(
             firestore.collection(AppConstants.COL_BOOKINGS).document(docId).set(finalBooking)
                 .addOnSuccessListener {
                     // Write Notification payloads to "notifications" collection
+                    val cleanCustPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(finalBooking.effectiveCustomerPhone)
+                        .ifBlank { finalBooking.customerPhone }
                     val userNotifId = UUID.randomUUID().toString()
                     val userNotif = mapOf(
                         "id" to userNotifId,
                         "title" to "تم استلام طلب حجزك بنجاح",
                         "message" to "مرحباً! تم استلام طلب حجزك برقم #${finalBooking.bookingNumber} بنجاح وهو قيد المراجعة. رمز PIN سيُرسل عبر قناة منفصلة.",
                         "targetType" to "USER",
-                        "targetValue" to finalBooking.customerPhone,
+                        "targetValue" to cleanCustPhone,
                         "timestamp" to System.currentTimeMillis()
                     )
                     firestore.collection(AppConstants.COL_NOTIFICATIONS).document(userNotifId).set(userNotif)

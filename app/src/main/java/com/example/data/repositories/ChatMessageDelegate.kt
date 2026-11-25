@@ -16,6 +16,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 
@@ -28,6 +30,8 @@ internal class ChatMessageDelegate(
     private val channelsCollection: CollectionReference,
     private val localProvider: () -> ChatLocalDataSource?
 ) {
+
+    private val mergeMutex = Mutex()
 
     fun getChannelMessages(channelId: String, currentUserId: String, limit: Int): Flow<List<ChatMessage>> = callbackFlow {
         if (channelId.isBlank()) {
@@ -65,29 +69,31 @@ internal class ChatMessageDelegate(
             } ?: emptyList()
 
             launch(Dispatchers.IO) {
-                val currentLocal = local?.getMessages(channelId) ?: emptyList()
-                val pendingLocal = currentLocal.filter { it.status == MessageStatus.PENDING || it.status == MessageStatus.SENDING }
+                mergeMutex.withLock {
+                    val currentLocal = local?.getMessages(channelId) ?: emptyList()
+                    val pendingLocal = currentLocal.filter { it.status == MessageStatus.PENDING || it.status == MessageStatus.SENDING }
 
-                val mergedMap = LinkedHashMap<String, ChatMessage>()
-                for (localMsg in currentLocal) {
-                    mergedMap[localMsg.id] = localMsg
-                }
-                for (remote in remoteMessages) {
-                    mergedMap[remote.id] = remote
-                }
-                for (pending in pendingLocal) {
-                    if (!mergedMap.containsKey(pending.id)) {
-                        mergedMap[pending.id] = pending
+                    val mergedMap = LinkedHashMap<String, ChatMessage>()
+                    for (localMsg in currentLocal) {
+                        mergedMap[localMsg.id] = localMsg
                     }
+                    for (remote in remoteMessages) {
+                        mergedMap[remote.id] = remote
+                    }
+                    for (pending in pendingLocal) {
+                        if (!mergedMap.containsKey(pending.id)) {
+                            mergedMap[pending.id] = pending
+                        }
+                    }
+
+                    // Bound memory & storage to at most 150 messages
+                    val mergedList = mergedMap.values.sortedBy { it.timestamp }.takeLast(150)
+                    local?.saveMessages(channelId, mergedList)
+                    local?.setLastSyncTimestamp(channelId, System.currentTimeMillis())
+
+                    val visible = mergedList.filter { !it.isHiddenFor(currentUserId) }
+                    trySend(visible)
                 }
-
-                // Bound memory & storage to at most 150 messages
-                val mergedList = mergedMap.values.sortedBy { it.timestamp }.takeLast(150)
-                local?.saveMessages(channelId, mergedList)
-                local?.setLastSyncTimestamp(channelId, System.currentTimeMillis())
-
-                val visible = mergedList.filter { !it.isHiddenFor(currentUserId) }
-                trySend(visible)
             }
         }
 
@@ -551,13 +557,15 @@ internal class ChatMessageDelegate(
             }
 
             if (newMessages.isNotEmpty()) {
-                val current = local?.getMessages(channelId) ?: emptyList()
-                val mergedMap = LinkedHashMap<String, ChatMessage>()
-                current.forEach { mergedMap[it.id] = it }
-                newMessages.forEach { mergedMap[it.id] = it }
-                val merged = mergedMap.values.sortedBy { it.timestamp }
-                local?.saveMessages(channelId, merged)
-                local?.setLastSyncTimestamp(channelId, System.currentTimeMillis())
+                mergeMutex.withLock {
+                    val current = local?.getMessages(channelId) ?: emptyList()
+                    val mergedMap = LinkedHashMap<String, ChatMessage>()
+                    current.forEach { mergedMap[it.id] = it }
+                    newMessages.forEach { mergedMap[it.id] = it }
+                    val merged = mergedMap.values.sortedBy { it.timestamp }
+                    local?.saveMessages(channelId, merged)
+                    local?.setLastSyncTimestamp(channelId, System.currentTimeMillis())
+                }
             }
 
             AppResult.Success(newMessages.size)

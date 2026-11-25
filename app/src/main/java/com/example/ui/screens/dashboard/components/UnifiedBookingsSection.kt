@@ -35,16 +35,16 @@ fun UnifiedBookingsSection(
     var showRejectDialog by remember { mutableStateOf(false) }
     var rejectReasonInput by remember { mutableStateOf("") }
 
-    val statusColor = when (status) {
-        "APPROVED" -> Color(0xFF10B981)
+    val statusColor = when (status.uppercase()) {
+        "APPROVED", "ACCEPTED" -> Color(0xFF10B981)
         "REJECTED", "CANCELLED" -> Color(0xFFEF4444)
         "IN_PROGRESS", "IN_PREPARATION" -> Color(0xFF3B82F6)
         "COMPLETED", "READY", "DELIVERED" -> Color(0xFF10B981)
         else -> Color(0xFFF59E0B)
     }
 
-    val statusLabel = when (status) {
-        "APPROVED" -> "مقبول ✅"
+    val statusLabel = when (status.uppercase()) {
+        "APPROVED", "ACCEPTED" -> "مقبول ✅"
         "REJECTED" -> "مرفوض ❌"
         "CANCELLED" -> "ملغى 🚫"
         "IN_PROGRESS" -> "قيد التنفيذ ⚙️"

@@ -1,13 +1,12 @@
 package com.example.utils
 
 import android.content.Context
+import com.google.firebase.firestore.DocumentReference
+import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.delay
 import java.io.File
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 data class ReviewStepReport(
     val stepName: String,
@@ -36,7 +35,7 @@ class ReviewTestRunner(private val context: Context) {
         onComplete: (ReviewFullReport) -> Unit
     ) {
         val stepsList = mutableListOf<ReviewStepReport>()
-        val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date())
+        val timestamp = DateFormatter.formatCustom(System.currentTimeMillis(), "yyyy-MM-dd HH:mm")
 
         fun addStep(name: String, desc: String): ReviewStepReport {
             // [تعديل مهندس النظام] فحص واختبار التقييمات والأبعاد المتعددة تحت الضغط
@@ -238,26 +237,26 @@ class ReviewTestRunner(private val context: Context) {
 
     suspend fun cleanAllTestData() {
         try {
-            val batch = db.batch()
+            val refsToDelete = mutableListOf<DocumentReference>()
 
-            // Delete ratings matching targetId = testProviderId
-            val snap = db.collection("ratings").whereEqualTo("targetId", testProviderId).get().await()
-            for (doc in snap.documents) {
-                batch.delete(doc.reference)
+            db.collection("ratings").whereEqualTo("targetId", testProviderId).get().await()
+                .documents.forEach { refsToDelete.add(it.reference) }
+
+            listOf("rating_test_", "rating_multidim_").forEach { prefix ->
+                db.collection("ratings")
+                    .whereGreaterThanOrEqualTo(FieldPath.documentId(), prefix)
+                    .whereLessThanOrEqualTo(FieldPath.documentId(), "$prefix\uf8ff")
+                    .get().await()
+                    .documents.forEach { refsToDelete.add(it.reference) }
             }
 
-            // Delete generated reviews / multi reviews
-            val snap2 = db.collection("ratings").get().await()
-            for (doc in snap2.documents) {
-                if (doc.id.startsWith("rating_test_") || doc.id.startsWith("rating_multidim_")) {
-                    batch.delete(doc.reference)
-                }
+            refsToDelete.add(db.collection("providers").document(testProviderId))
+
+            refsToDelete.distinctBy { it.path }.chunked(400).forEach { chunk ->
+                val batch = db.batch()
+                chunk.forEach { batch.delete(it) }
+                batch.commit().await()
             }
-
-            // Delete provider doc
-            batch.delete(db.collection("providers").document(testProviderId))
-
-            batch.commit().await()
         } catch (_: Exception) {}
     }
 

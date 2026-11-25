@@ -156,7 +156,6 @@ open class HomeViewModel @Inject constructor(
                 it.phone.contains(query)
             }
         }
-        _filteredProviders.value = filtered.take(100)
 
         // Store and Property filtering
         val allStores = appState._stores.value
@@ -228,6 +227,9 @@ open class HomeViewModel @Inject constructor(
         }
 
         val finalResult = filtered.take(100)
+        if (cachedFilteredResults.size >= 40) {
+            cachedFilteredResults.clear()
+        }
         cachedFilteredResults[cacheKey] = finalResult
         _filteredProviders.value = finalResult
     }

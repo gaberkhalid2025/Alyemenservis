@@ -1,13 +1,11 @@
 package com.example.utils
 
 import android.content.Context
+import com.example.ui.helpers.AppPreferenceHelper
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.tasks.await
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 data class ProfileStepReport(
     val profileType: String,
@@ -81,7 +79,7 @@ class ProfileDiagnosticRunner(context: Context) {
         onProgress: (String) -> Unit,
         onComplete: (ProfileFullReport) -> Unit
     ) {
-        val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
+        val timestamp = DateFormatter.formatCustom(System.currentTimeMillis(), "yyyy-MM-dd HH:mm:ss")
         val steps = mutableListOf<ProfileStepReport>()
         val details = mutableListOf<TestDetail>()
         var errorCounter = 1
@@ -326,11 +324,14 @@ class ProfileDiagnosticRunner(context: Context) {
 
                 stepReport.durationMs = System.currentTimeMillis() - stepStart
 
-                if (stepReport.readVerified && actualVal == expectedVal) {
+                val phoneNormMatch = AppPreferenceHelper.normalizePhoneNumber("+967777101101") == "777101101" &&
+                    AppPreferenceHelper.normalizePhoneNumber("00967777101101") == "777101101"
+
+                if (stepReport.readVerified && actualVal == expectedVal && phoneNormMatch) {
                     stepReport.updateVerified = true
                     stepReport.status = "SUCCESS"
                     stepReport.actualOutcome = "تم الإنشاء والقراءة والتحديث بنجاح (${spec.verifyKey} = $actualVal)"
-                    stepReport.notes = "✅ إنشاء + قراءة + تعديل وحفظ (${stepReport.durationMs}ms)"
+                    stepReport.notes = "✅ إنشاء + قراءة + تعديل وحفظ وتطابق تطبيع الهاتف (${stepReport.durationMs}ms)"
                 } else {
                     stepReport.status = "FAILED"
                     stepReport.actualOutcome = "القيمة الفعلية للحقل ${spec.verifyKey} هي '$actualVal' بدلاً من '$expectedVal'"

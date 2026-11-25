@@ -138,40 +138,70 @@ internal class AdminCommerceAndEngagementDelegate(
         amount: Double,
         note: String
     ) {
-        val currentW = vm._internalWallets.value.find { it.id == walletId }
-            ?: InternalWalletEntity(
-                id = walletId,
-                ownerName = ownerName,
-                ownerPhone = ownerPhone,
-                ownerType = ownerType
-            )
-
-        val newBalance = when (type) {
-            "DEPOSIT" -> currentW.balance + amount
-            "WITHDRAWAL" -> (currentW.balance - amount).coerceAtLeast(0.0)
-            else -> currentW.balance + amount
+        val cleanWalletId = walletId.trim()
+        if (cleanWalletId.isBlank() || !amount.isFinite() || amount <= 0.0) {
+            vm.mainViewModel.triggerNotification("❌ بيانات المعاملة أو المبلغ غير صالحة")
+            return
         }
 
-        val updatedWallet = currentW.copy(
-            balance = newBalance,
-            updatedAt = System.currentTimeMillis()
-        )
-
-        vm.db.collection("internal_wallets").document(walletId).set(updatedWallet)
-
+        val normalizedType = type.trim().uppercase()
+        val walletRef = vm.db.collection("internal_wallets").document(cleanWalletId)
         val txId = vm.db.collection("wallet_transactions").document().id
-        val tx = WalletTransactionEntity(
-            id = txId,
-            walletId = walletId,
-            type = type,
-            amount = amount,
-            balanceAfter = newBalance,
-            note = note,
-            performByAdmin = true,
-            timestamp = System.currentTimeMillis()
-        )
-        vm.db.collection("wallet_transactions").document(txId).set(tx)
-        vm.mainViewModel.triggerNotification("💸 تم تنفيذ عملية ($type) بمبلغ $amount ريال للمحفظة ${currentW.ownerName}. الرصيد الجديد: $newBalance ريال")
+        val txRef = vm.db.collection("wallet_transactions").document(txId)
+        val now = System.currentTimeMillis()
+
+        vm.db.runTransaction { transaction ->
+            val snap = transaction.get(walletRef)
+            val currentW = if (snap.exists()) {
+                snap.toObject(InternalWalletEntity::class.java)?.copy(id = cleanWalletId)
+                    ?: InternalWalletEntity(
+                        id = cleanWalletId,
+                        ownerName = ownerName,
+                        ownerPhone = ownerPhone,
+                        ownerType = ownerType
+                    )
+            } else {
+                InternalWalletEntity(
+                    id = cleanWalletId,
+                    ownerName = ownerName,
+                    ownerPhone = ownerPhone,
+                    ownerType = ownerType
+                )
+            }
+
+            val newBalance = when (normalizedType) {
+                "DEPOSIT" -> currentW.balance + amount
+                "WITHDRAWAL", "TRANSFER" -> {
+                    if (currentW.balance < amount) {
+                        throw IllegalStateException("الرصيد غير كافٍ. المتاح: ${currentW.balance} ريال")
+                    }
+                    currentW.balance - amount
+                }
+                else -> throw IllegalArgumentException("نوع معاملة غير مدعوم: $type")
+            }
+
+            val updatedWallet = currentW.copy(balance = newBalance, updatedAt = now)
+            transaction.set(walletRef, updatedWallet)
+
+            val tx = WalletTransactionEntity(
+                id = txId,
+                walletId = cleanWalletId,
+                type = normalizedType,
+                amount = amount,
+                balanceAfter = newBalance,
+                note = note,
+                performByAdmin = true,
+                timestamp = now
+            )
+            transaction.set(txRef, tx)
+            updatedWallet
+        }.addOnSuccessListener { updatedWallet ->
+            vm.mainViewModel.triggerNotification(
+                "💸 تم تنفيذ عملية ($normalizedType) بمبلغ $amount ريال للمحفظة ${updatedWallet.ownerName}. الرصيد الجديد: ${updatedWallet.balance} ريال"
+            )
+        }.addOnFailureListener { e ->
+            vm.mainViewModel.triggerNotification("❌ فشل تنفيذ المعاملة: ${e.localizedMessage ?: "خطأ غير معروف"}")
+        }
     }
 
     fun addPaymentWallet(wallet: PaymentWalletEntity) {
@@ -643,12 +673,22 @@ internal class AdminCommerceAndEngagementDelegate(
             .whereEqualTo("customerPhone", customerPhone)
             .get()
             .addOnSuccessListener { querySnapshot ->
-                val batch = vm.db.batch()
-                for (doc in querySnapshot.documents) {
-                    batch.delete(doc.reference)
+                val docs = querySnapshot.documents
+                if (docs.isEmpty()) {
+                    vm.mainViewModel.triggerNotification("🗑️ لا توجد طلبات لحذفها.")
+                    return@addOnSuccessListener
                 }
-                batch.commit().addOnSuccessListener {
-                    vm.mainViewModel.triggerNotification("🗑️ تم حذف جميع الطلبات بنجاح.")
+                val chunks = docs.chunked(450)
+                chunks.forEachIndexed { idx, chunk ->
+                    val batch = vm.db.batch()
+                    for (doc in chunk) {
+                        batch.delete(doc.reference)
+                    }
+                    batch.commit().addOnSuccessListener {
+                        if (idx == chunks.lastIndex) {
+                            vm.mainViewModel.triggerNotification("🗑️ تم حذف جميع الطلبات بنجاح.")
+                        }
+                    }
                 }
             }
     }

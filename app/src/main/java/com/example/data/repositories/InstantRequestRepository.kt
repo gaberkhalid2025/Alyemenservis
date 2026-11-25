@@ -309,18 +309,37 @@ class InstantRequestRepository(private val context: Context? = null) {
         // تنفيذ عملية القبول عبر Transaction واحدة موحدة لتقليل استهلاك Firebase Spark
         firestore.runTransaction { tx ->
             val snapshot = tx.get(requestRef)
-            if (snapshot.exists()) {
-                val currentStatus = snapshot.getString("status")?.uppercase() ?: "WAITING_FOR_OFFERS"
-                val currentAcceptedOffer = snapshot.getString("acceptedOfferId") ?: ""
-                if (currentStatus in setOf("CANCELLED", "COMPLETED", "EXPIRED") ||
-                    (currentStatus == "ACCEPTED" && currentAcceptedOffer.isNotBlank() && currentAcceptedOffer != offerId)
-                ) {
-                    throw IllegalStateException("لا يمكن قبول العرض لأن حالة الطلب الحالية هي: $currentStatus")
-                }
+            val offerSnap = tx.get(offerRef)
+            val topLevelSnap = tx.get(topLevelOfferRef)
+            if (!snapshot.exists()) {
+                throw IllegalStateException("الطلب الفوري غير موجود")
+            }
+            val currentStatus = snapshot.getString("status")?.uppercase() ?: "WAITING_FOR_OFFERS"
+            val currentAcceptedOffer = snapshot.getString("acceptedOfferId") ?: ""
+            if (currentStatus in setOf("CANCELLED", "COMPLETED", "EXPIRED") ||
+                (currentStatus == "ACCEPTED" && currentAcceptedOffer.isNotBlank() && currentAcceptedOffer != offerId)
+            ) {
+                throw IllegalStateException("لا يمكن قبول العرض لأن حالة الطلب الحالية هي: $currentStatus")
             }
             tx.update(requestRef, updates)
-            tx.update(offerRef, "status", "ACCEPTED")
-            tx.update(topLevelOfferRef, "status", "ACCEPTED")
+            if (offerSnap.exists()) {
+                tx.update(offerRef, "status", "ACCEPTED")
+            } else {
+                tx.set(
+                    offerRef,
+                    mapOf("id" to offerId, "requestId" to requestId, "status" to "ACCEPTED"),
+                    com.google.firebase.firestore.SetOptions.merge()
+                )
+            }
+            if (topLevelSnap.exists()) {
+                tx.update(topLevelOfferRef, "status", "ACCEPTED")
+            } else {
+                tx.set(
+                    topLevelOfferRef,
+                    mapOf("id" to offerId, "requestId" to requestId, "status" to "ACCEPTED"),
+                    com.google.firebase.firestore.SetOptions.merge()
+                )
+            }
         }.addOnSuccessListener {
             // رفض العروض المنافسة المعلقة في Batch واحد محدود لتوفير استهلاك الكوتا
             requestRef.collection("offers")
@@ -334,7 +353,11 @@ class InstantRequestRepository(private val context: Context? = null) {
                         snap.documents.forEach { doc ->
                             if (doc.id != offerId) {
                                 rejectBatch.update(doc.reference, "status", "REJECTED")
-                                rejectBatch.update(firestore.collection("request_offers").document(doc.id), "status", "REJECTED")
+                                rejectBatch.set(
+                                    firestore.collection("request_offers").document(doc.id),
+                                    mapOf("status" to "REJECTED"),
+                                    com.google.firebase.firestore.SetOptions.merge()
+                                )
                                 hasRejects = true
                             }
                         }

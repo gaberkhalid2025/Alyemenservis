@@ -1,13 +1,12 @@
 package com.example.utils
 
 import android.content.Context
+import com.google.firebase.firestore.DocumentReference
+import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.delay
 import java.io.File
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 data class ReportStepReport(
     val stepName: String,
@@ -36,7 +35,7 @@ class ReportTestRunner(private val context: Context) {
         onComplete: (ReportFullReport) -> Unit
     ) {
         val stepsList = mutableListOf<ReportStepReport>()
-        val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date())
+        val timestamp = DateFormatter.formatCustom(System.currentTimeMillis(), "yyyy-MM-dd HH:mm")
 
         fun addStep(name: String, desc: String): ReportStepReport {
             // [تعديل مهندس النظام] فحص واختبار التقارير والبلاغات والشكاوى تحت الضغط العالي
@@ -186,23 +185,22 @@ class ReportTestRunner(private val context: Context) {
 
     suspend fun cleanAllTestData() {
         try {
-            val batch = db.batch()
+            val refsToDelete = mutableListOf<DocumentReference>()
 
-            // Delete reports matching testReporterName
-            val snap = db.collection("reports").whereEqualTo("reporterName", testReporterName).get().await()
-            for (doc in snap.documents) {
-                batch.delete(doc.reference)
+            db.collection("reports").whereEqualTo("reporterName", testReporterName).get().await()
+                .documents.forEach { refsToDelete.add(it.reference) }
+
+            db.collection("reports")
+                .whereGreaterThanOrEqualTo(FieldPath.documentId(), "report_test_")
+                .whereLessThanOrEqualTo(FieldPath.documentId(), "report_test_\uf8ff")
+                .get().await()
+                .documents.forEach { refsToDelete.add(it.reference) }
+
+            refsToDelete.distinctBy { it.path }.chunked(400).forEach { chunk ->
+                val batch = db.batch()
+                chunk.forEach { batch.delete(it) }
+                batch.commit().await()
             }
-
-            // Delete all test ones explicitly
-            val snap2 = db.collection("reports").get().await()
-            for (doc in snap2.documents) {
-                if (doc.id.startsWith("report_test_")) {
-                    batch.delete(doc.reference)
-                }
-            }
-
-            batch.commit().await()
         } catch (_: Exception) {}
     }
 

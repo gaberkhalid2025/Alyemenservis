@@ -2,37 +2,48 @@ package com.example.ui.viewmodels
 
 import android.util.Log
 import androidx.lifecycle.viewModelScope
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
+import androidx.work.workDataOf
+import com.example.MyApplication
 import com.example.data.ActivityLogEntity
 import com.example.data.NotificationEntity
 import com.example.domain.usecases.ValidatePhoneUseCase
 import com.example.utils.AppConstants
-import com.example.utils.PasswordHasher
+import com.example.utils.AutoCleanupWorker
 import com.example.utils.SecureHasher
 import com.example.utils.SecurityCryptoUtils
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.SetOptions
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.UUID
+import java.util.concurrent.TimeUnit
 
 internal class SettingsPasswordRecoveryAndCleanupDelegate(private val vm: SettingsViewModel) {
 
     fun resetAccountPassword(entityType: String, phoneOrId: String, newPass: String) {
+        val cleanNewPass = newPass.trim()
+        if (cleanNewPass.isBlank()) {
+            vm.mainViewModel.triggerNotification("❌ كلمة المرور الجديدة غير صالحة")
+            return
+        }
         val cleanPhone = phoneOrId.trim().replace(" ", "").replace("+967", "").replace("967", "").replace("+", "")
-        val hashedPass = PasswordHasher.hash(newPass.trim())
-        val passUpdate = mapOf("password" to hashedPass, "passwordHash" to hashedPass)
+        val hashedPass = SecureHasher.hashPassword(cleanNewPass)
+        val passUpdate = mapOf("password" to "", "passwordHash" to hashedPass)
 
         val normalized = ValidatePhoneUseCase.normalizePhone(phoneOrId).filter { it.isDigit() }
         val targetPhone = normalized.ifBlank { cleanPhone }
         val phoneVariants = listOf(targetPhone, "0$targetPhone", "+967$targetPhone", "967$targetPhone", "00967$targetPhone")
             .filter { it.isNotBlank() }
             .distinct()
+            .take(10)
 
         fun updateByPhone(collectionName: String) {
-            for (ph in phoneVariants) {
+            if (phoneVariants.isNotEmpty()) {
                 vm.db.collection(collectionName)
-                    .whereEqualTo("phone", ph)
-                    .limit(5)
+                    .whereIn("phone", phoneVariants)
+                    .limit(10)
                     .get()
                     .addOnSuccessListener { qs ->
                         qs.documents.forEach { doc ->
@@ -53,13 +64,25 @@ internal class SettingsPasswordRecoveryAndCleanupDelegate(private val vm: Settin
             "PROVIDER", "TECHNICIAN", "TECH" -> {
                 updateByPhone("providers")
                 vm.mainViewModel.homeViewModel._providers.value = vm.mainViewModel.homeViewModel._providers.value.map {
-                    if (it.phone.contains(targetPhone)) it.copy(passwordHash = hashedPass) else it
+                    if (ValidatePhoneUseCase.normalizePhone(it.phone).filter { c -> c.isDigit() } == targetPhone) {
+                        it.copy(passwordHash = hashedPass)
+                    } else it
                 }
             }
             "STORE", "RESTAURANT", "MEDICAL", "CENTER", "MALL" -> {
                 updateByPhone("stores")
                 vm.mainViewModel.adminViewModel._stores.value = vm.mainViewModel.adminViewModel._stores.value.map {
-                    if (it.phone.contains(targetPhone)) it.copy(passwordHash = hashedPass) else it
+                    if (ValidatePhoneUseCase.normalizePhone(it.phone).filter { c -> c.isDigit() } == targetPhone) {
+                        it.copy(passwordHash = hashedPass)
+                    } else it
+                }
+            }
+            "PROPERTY", "PROPERTIES" -> {
+                updateByPhone("properties")
+                vm.mainViewModel._properties.value = vm.mainViewModel._properties.value.map {
+                    if (ValidatePhoneUseCase.normalizePhone(it.phone).filter { c -> c.isDigit() } == targetPhone) {
+                        it.copy(passwordHash = hashedPass)
+                    } else it
                 }
             }
             "JOB" -> updateByPhone("jobs")
@@ -115,8 +138,7 @@ internal class SettingsPasswordRecoveryAndCleanupDelegate(private val vm: Settin
             return
         }
 
-        val chars = "1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-        val tempPassword = (1..8).map { chars.random() }.joinToString("")
+        val tempPassword = SecurityCryptoUtils.generateStrongTempPassword(10)
         val hashedPassword = SecureHasher.hashPassword(tempPassword)
         val encryptedTempPass = SecurityCryptoUtils.encryptCrossDevice(tempPassword)
         val now = System.currentTimeMillis()
@@ -133,15 +155,15 @@ internal class SettingsPasswordRecoveryAndCleanupDelegate(private val vm: Settin
         vm.db.collection("password_resets").document(cleanPhone)
             .set(statusPayload, SetOptions.merge())
 
-        val phoneVariants = listOf(cleanPhone, "0$cleanPhone", "+967$cleanPhone", "967$cleanPhone", "00967$cleanPhone").distinct()
+        val phoneVariants = listOf(cleanPhone, "0$cleanPhone", "+967$cleanPhone", "967$cleanPhone", "00967$cleanPhone")
+            .distinct()
+            .take(10)
         val passUpdate = mapOf("password" to "", "passwordHash" to hashedPassword)
         val collections = listOf("providers", "pending_providers", "stores", "properties", "registered_users", "users", "join_requests")
         for (col in collections) {
-            for (ph in phoneVariants) {
-                vm.db.collection(col).whereEqualTo("phone", ph).get().addOnSuccessListener { qs ->
-                    for (doc in qs.documents) {
-                        doc.reference.update(passUpdate)
-                    }
+            vm.db.collection(col).whereIn("phone", phoneVariants).get().addOnSuccessListener { qs ->
+                for (doc in qs.documents) {
+                    doc.reference.update(passUpdate)
                 }
             }
             vm.db.collection(col).document(cleanPhone).get().addOnSuccessListener { doc ->
@@ -157,7 +179,7 @@ internal class SettingsPasswordRecoveryAndCleanupDelegate(private val vm: Settin
         val notif = NotificationEntity(
             id = notifId,
             title = "🔑 تم إعادة تعيين كلمة المرور",
-            message = "تمت الموافقة على طلبك لإعادة تعيين كلمة المرور. كلمة المرور المؤقتة الجديدة هي: $tempPassword  يرجى تغييرها بعد تسجيل الدخول حفاظاً على خصوصيتك.",
+            message = "تمت الموافقة على طلبك لإعادة تعيين كلمة المرور بنجاح. يرجى التواصل مع الدعم أو استلام كلمة المرور المؤقتة وتغييرها بعد تسجيل الدخول حفاظاً على خصوصيتك.",
             targetType = "USER",
             targetValue = cleanPhone,
             notificationType = "PASSWORD_RESET_APPROVED",
@@ -177,7 +199,7 @@ internal class SettingsPasswordRecoveryAndCleanupDelegate(private val vm: Settin
         batch.commit()
             .addOnSuccessListener {
                 vm.mainViewModel.triggerNotification("🔑 تم الموافقة على طلب إعادة تعيين كلمة المرور للهاتف ($cleanPhone)")
-                onResult(true, "تم إعادة التعيين بنجاح. كلمة المرور المؤقتة هي: $tempPassword")
+                onResult(true, "تمت الموافقة وإعادة تعيين كلمة المرور المؤقتة بنجاح: $tempPassword")
             }
             .addOnFailureListener {
                 onResult(false, "فشل حفظ التحديثات: ${it.localizedMessage}")
@@ -194,15 +216,15 @@ internal class SettingsPasswordRecoveryAndCleanupDelegate(private val vm: Settin
         val hashedPassword = SecureHasher.hashPassword(cleanNewPass)
         val encryptedNewPass = SecurityCryptoUtils.encryptCrossDevice(cleanNewPass)
         val passUpdate = mapOf("password" to "", "passwordHash" to hashedPassword)
-        val phoneVariants = listOf(cleanPhone, "0$cleanPhone", "+967$cleanPhone", "967$cleanPhone", "00967$cleanPhone").distinct()
+        val phoneVariants = listOf(cleanPhone, "0$cleanPhone", "+967$cleanPhone", "967$cleanPhone", "00967$cleanPhone")
+            .distinct()
+            .take(10)
 
         val collections = listOf("providers", "pending_providers", "stores", "properties", "registered_users", "users", "join_requests")
         for (col in collections) {
-            for (ph in phoneVariants) {
-                vm.db.collection(col).whereEqualTo("phone", ph).get().addOnSuccessListener { snap ->
-                    for (doc in snap.documents) {
-                        doc.reference.update(passUpdate)
-                    }
+            vm.db.collection(col).whereIn("phone", phoneVariants).get().addOnSuccessListener { snap ->
+                for (doc in snap.documents) {
+                    doc.reference.update(passUpdate)
                 }
             }
             vm.db.collection(col).document(cleanPhone).get().addOnSuccessListener { doc ->
@@ -379,10 +401,15 @@ internal class SettingsPasswordRecoveryAndCleanupDelegate(private val vm: Settin
     fun autoCleanupData(daysToKeep: Int = 30) {
         vm.viewModelScope.launch {
             try {
-                val cutoffTime = System.currentTimeMillis() - (daysToKeep * 24L * 60 * 60 * 1000)
+                val safeDays = daysToKeep.coerceAtLeast(1)
+                val cutoffTime = System.currentTimeMillis() - (safeDays * 24L * 60L * 60L * 1000L)
                 vm.db.collection("notifications").whereLessThan("timestamp", cutoffTime).limit(300).get()
                     .addOnSuccessListener { snapshot ->
-                        snapshot?.documents?.forEach { doc -> doc.reference.delete() }
+                        snapshot?.documents?.chunked(450)?.forEach { chunk ->
+                            val batch = vm.db.batch()
+                            chunk.forEach { doc -> batch.delete(doc.reference) }
+                            batch.commit()
+                        }
                     }
             } catch (e: Exception) {
                 Log.e("SettingsViewModel", "Error in autoCleanupData", e)
@@ -391,15 +418,23 @@ internal class SettingsPasswordRecoveryAndCleanupDelegate(private val vm: Settin
     }
 
     fun scheduleAutoCleanup(days: Int = 30) {
-        vm.viewModelScope.launch {
-            while (true) {
-                delay(24 * 60 * 60 * 1000L)
-                try {
-                    autoCleanupData(days)
-                } catch (e: Exception) {
-                    Log.e("SettingsViewModel", "Error in scheduleAutoCleanup", e)
-                }
+        val ctx = vm.appContext ?: MyApplication.instance
+        if (ctx != null) {
+            try {
+                val request = PeriodicWorkRequestBuilder<AutoCleanupWorker>(24, TimeUnit.HOURS)
+                    .setInputData(workDataOf(AutoCleanupWorker.KEY_DAYS_TO_KEEP to days.coerceAtLeast(1)))
+                    .build()
+                WorkManager.getInstance(ctx).enqueueUniquePeriodicWork(
+                    AutoCleanupWorker.UNIQUE_WORK_NAME,
+                    ExistingPeriodicWorkPolicy.KEEP,
+                    request
+                )
+            } catch (e: Exception) {
+                Log.e("SettingsViewModel", "Failed to schedule AutoCleanupWorker", e)
+                autoCleanupData(days)
             }
+        } else {
+            autoCleanupData(days)
         }
     }
 }

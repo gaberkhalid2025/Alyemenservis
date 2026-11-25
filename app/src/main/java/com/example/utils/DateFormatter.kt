@@ -117,6 +117,30 @@ object DateFormatter {
             .format(FULL_FORMAT)
     }
     
+    private val US_DATE_DASH_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd", Locale.US)
+    private val US_DATE_KEY_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd", Locale.US)
+    private val UTC_ISO_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)
+        .withZone(ZoneId.of("UTC"))
+
+    /** 2026-01-15 (ASCII Locale.US) */
+    fun formatDateDashUs(timestamp: Long): String {
+        return Instant.ofEpochMilli(timestamp)
+            .atZone(ZoneId.systemDefault())
+            .format(US_DATE_DASH_FORMAT)
+    }
+
+    /** 20260115 (ASCII Locale.US for prefs/counters) */
+    fun formatDateKeyUs(timestamp: Long): String {
+        return Instant.ofEpochMilli(timestamp)
+            .atZone(ZoneId.systemDefault())
+            .format(US_DATE_KEY_FORMAT)
+    }
+
+    /** 2026-01-15T15:30:45Z (UTC ISO-8601) */
+    fun formatIsoUtc(timestamp: Long): String {
+        return UTC_ISO_FORMAT.format(Instant.ofEpochMilli(timestamp))
+    }
+
     /** تنسيق مخصص */
     fun formatCustom(timestamp: Long, pattern: String): String {
         return try {

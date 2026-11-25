@@ -4,13 +4,12 @@ import android.content.Context
 import com.example.data.models.Transaction
 import com.example.data.models.TransactionType
 import com.example.data.models.TransactionStatus
+import com.google.firebase.firestore.DocumentReference
+import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.delay
 import java.io.File
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 data class PaymentStepReport(
     val stepName: String,
@@ -39,7 +38,7 @@ class PaymentTestRunner(private val context: Context) {
         onComplete: (PaymentFullReport) -> Unit
     ) {
         val stepsList = mutableListOf<PaymentStepReport>()
-        val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date())
+        val timestamp = DateFormatter.formatCustom(System.currentTimeMillis(), "yyyy-MM-dd HH:mm")
 
         fun addStep(name: String, desc: String): PaymentStepReport {
             // [تعديل مهندس النظام] فحص صارم لمعاملات الدفع، المحافظ والمحاكاة المالية تحت الضغط
@@ -158,13 +157,19 @@ class PaymentTestRunner(private val context: Context) {
 
             val clientWallet = db.collection("wallets").document(testUserId).get().await()
             val techWallet = db.collection("wallets").document(testProviderId).get().await()
-            if (clientWallet.getDouble("balance") == 5000.0 && techWallet.getDouble("balance") == 2000.0) {
+            val walletMgr = WalletManager(context)
+            val selfTransferBlocked = walletMgr.transfer(testUserId, testUserId, 100.0).isFailure
+            val negativeTransferBlocked = walletMgr.transfer(testUserId, testProviderId, -50.0).isFailure
+            if (clientWallet.getDouble("balance") == 5000.0 &&
+                techWallet.getDouble("balance") == 2000.0 &&
+                selfTransferBlocked && negativeTransferBlocked
+            ) {
                 step4.status = "SUCCESS"
                 step4.firestoreVerified = true
-                step4.notes = "تم التحويل بنجاح (رصيد العميل: 5000، رصيد الفني: 2000)"
+                step4.notes = "تم التحويل بنجاح (العميل: 5000، الفني: 2000) مع حظر التحويل الذاتي والمبالغ السالبة"
             } else {
                 step4.status = "FAILED"
-                step4.notes = "خطأ في أرصدة التحويل المالي"
+                step4.notes = "خطأ في أرصدة التحويل المالي أو فحوصات الحماية (selfBlocked=$selfTransferBlocked, negBlocked=$negativeTransferBlocked)"
             }
 
             // Step 5: Mobile wallet payment (PROCESSING)
@@ -251,27 +256,29 @@ class PaymentTestRunner(private val context: Context) {
 
     suspend fun cleanAllTestData() {
         try {
-            val batch = db.batch()
+            val refsToDelete = mutableListOf<DocumentReference>()
 
-            // Delete wallets for our test IDs
-            batch.delete(db.collection("wallets").document(testUserId))
-            batch.delete(db.collection("wallets").document(testProviderId))
+            refsToDelete.add(db.collection("wallets").document(testUserId))
+            refsToDelete.add(db.collection("wallets").document(testProviderId))
+            refsToDelete.add(db.collection("internal_wallets").document(testUserId))
+            refsToDelete.add(db.collection("internal_wallets").document(testProviderId))
 
-            // Delete transactions related to our test users
-            val txsSnapshot1 = db.collection("transactions").whereEqualTo("userId", testUserId).get().await()
-            for (doc in txsSnapshot1.documents) {
-                batch.delete(doc.reference)
+            db.collection("transactions").whereIn("userId", listOf(testUserId, testProviderId)).get().await()
+                .documents.forEach { refsToDelete.add(it.reference) }
+
+            listOf("tx_deposit_", "tx_withdraw_", "tx_transfer_", "tx_pay_").forEach { prefix ->
+                db.collection("transactions")
+                    .whereGreaterThanOrEqualTo(FieldPath.documentId(), prefix)
+                    .whereLessThanOrEqualTo(FieldPath.documentId(), "$prefix\uf8ff")
+                    .get().await()
+                    .documents.forEach { refsToDelete.add(it.reference) }
             }
 
-            // Delete transaction docs matching prefix
-            val txsSnapshot2 = db.collection("transactions").get().await()
-            for (doc in txsSnapshot2.documents) {
-                if (doc.id.startsWith("tx_deposit_") || doc.id.startsWith("tx_withdraw_") || doc.id.startsWith("tx_transfer_") || doc.id.startsWith("tx_pay_")) {
-                    batch.delete(doc.reference)
-                }
+            refsToDelete.distinctBy { it.path }.chunked(400).forEach { chunk ->
+                val batch = db.batch()
+                chunk.forEach { batch.delete(it) }
+                batch.commit().await()
             }
-
-            batch.commit().await()
         } catch (_: Exception) {}
     }
 

@@ -84,8 +84,6 @@ fun MainViewModel.changeAdminCredentials(newPass: String, newOwnerPass: String =
         if (current.adminUsername.isNotBlank()) hashUpdates["adminUsername"] = current.adminUsername
     }
     if (hashUpdates.isNotEmpty()) {
-        db.collection("settings").document("main_settings")
-            .set(hashUpdates, com.google.firebase.firestore.SetOptions.merge())
         db.collection("admin_secrets").document("credentials")
             .set(hashUpdates, com.google.firebase.firestore.SetOptions.merge())
     }
@@ -217,20 +215,78 @@ fun MainViewModel.setLanguage(context: Context, lang: String) {
 }
 
 fun MainViewModel.loadUserPoints() {
-    _currentUserPoints.value = (100..500).random()
+    val uid = currentUserId.value
+    val cleanPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(currentUserPhone.value).filter { it.isDigit() }
+    if (uid.isBlank() || uid == "guest" || uid.startsWith("USR_GUEST_")) {
+        _currentUserPoints.value = 0
+        return
+    }
+    val candidates = listOfNotNull(
+        uid.takeIf { it.isNotBlank() },
+        cleanPhone.takeIf { it.length >= 7 },
+        cleanPhone.takeIf { it.length >= 7 }?.let { "usr_$it" }
+    ).distinct()
+    viewModelScope.launch {
+        var resolvedPoints = _currentUserPoints.value
+        for (col in listOf("registered_users", "users")) {
+            var found = false
+            for (docId in candidates) {
+                val doc = runCatching {
+                    com.google.android.gms.tasks.Tasks.await(db.collection(col).document(docId).get())
+                }.getOrNull()
+                if (doc != null && doc.exists()) {
+                    val pts = (doc.get("loyaltyPoints") as? Number)?.toInt()
+                        ?: (doc.get("points") as? Number)?.toInt()
+                        ?: 0
+                    resolvedPoints = pts.coerceAtLeast(0)
+                    found = true
+                    break
+                }
+            }
+            if (found) break
+        }
+        _currentUserPoints.value = resolvedPoints
+    }
 }
 
 fun MainViewModel.redeemLoyaltyPoints() {
-    triggerNotification("🎉 تم استبدال نقاطك بنجاح! تم الخصم بنجاح.")
+    val currentPts = _currentUserPoints.value
+    if (currentPts <= 0) {
+        triggerNotification("⚠️ لا يوجد لديك نقاط ولاء كافية للاستبدال حالياً")
+        return
+    }
+    val updated = (currentPts - 100).coerceAtLeast(0)
+    _currentUserPoints.value = updated
+    val uid = currentUserId.value
+    if (uid.isNotBlank() && uid != "guest" && !uid.startsWith("USR_GUEST_")) {
+        db.collection("registered_users").document(uid)
+            .set(mapOf("loyaltyPoints" to updated), com.google.firebase.firestore.SetOptions.merge())
+    }
+    triggerNotification("🎉 تم استبدال نقاطك بنجاح! الرصيد المتبقي: $updated نقطة.")
 }
 
 fun MainViewModel.rewardSharePoints() {
-    _currentUserPoints.value = _currentUserPoints.value + 20
-    triggerNotification("🎁 حصلت على 20 نقطة مشاركة!")
+    val updated = _currentUserPoints.value + 20
+    _currentUserPoints.value = updated
+    val uid = currentUserId.value
+    if (uid.isNotBlank() && uid != "guest" && !uid.startsWith("USR_GUEST_")) {
+        db.collection("registered_users").document(uid)
+            .set(mapOf("loyaltyPoints" to updated), com.google.firebase.firestore.SetOptions.merge())
+    }
+    triggerNotification("🎁 حصلت على 20 نقطة مشاركة! (الإجمالي: $updated)")
 }
 
 fun MainViewModel.clearSmartAssistantChatHistory() {
-    _currentUserPoints.value = 0
+    val uid = currentUserId.value
+    if (uid.isNotBlank() && uid != "guest") {
+        db.collection("ai_assistant_sessions")
+            .whereEqualTo("userId", uid)
+            .limit(20)
+            .get()
+            .addOnSuccessListener { snap ->
+                snap.documents.forEach { it.reference.delete() }
+            }
+    }
     triggerNotification("🧹 تم تصفية وحذف سجل المحادثة الذكية بنجاح!")
 }
 
@@ -395,20 +451,77 @@ fun MainViewModel.restoreUserAccountByPhoneAndPassword(
     password: String,
     onResult: (Boolean, String) -> Unit
 ) {
-    val email = getAuthEmailForPhone(phone)
-    auth.signInWithEmailAndPassword(email, password)
-        .addOnSuccessListener { authResult ->
-            val userId = authResult.user?.uid ?: ""
-            viewModelScope.launch {
-                adminViewModel.crud.updateFields("users", userId, mapOf("isDeleted" to false))
-                adminViewModel.crud.updateFields("providers", phone, mapOf("isDeleted" to false))
-                adminViewModel.crud.updateFields("stores", phone, mapOf("isDeleted" to false))
-                adminViewModel.crud.updateFields("properties", phone, mapOf("isDeleted" to false))
-                onResult(true, "تم استعادة الحساب بنجاح!")
+    val cleanPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(phone).filter { it.isDigit() }
+    val cleanPassword = password.trim()
+    if (cleanPhone.length < 7 || cleanPassword.isBlank()) {
+        onResult(false, "يرجى إدخال رقم الهاتف وكلمة المرور بشكل صحيح")
+        return
+    }
+    val phoneVariants = listOf(cleanPhone, "0$cleanPhone", "+967$cleanPhone", "967$cleanPhone", "00967$cleanPhone")
+        .filter { it.isNotBlank() }
+        .distinct()
+        .take(10)
+
+    fun finalizeRestore(authUid: String = "") {
+        viewModelScope.launch {
+            var restoredName = ""
+            var restoredCity = "اليمن"
+            for (col in listOf("users", "registered_users", "providers", "stores", "properties")) {
+                val snap = runCatching {
+                    com.google.android.gms.tasks.Tasks.await(
+                        db.collection(col).whereIn("phone", phoneVariants).limit(5).get()
+                    )
+                }.getOrNull()
+                snap?.documents?.forEach { doc ->
+                    if (restoredName.isBlank()) {
+                        restoredName = doc.getString("name")?.takeIf { it.isNotBlank() }
+                            ?: doc.getString("fullName")?.takeIf { it.isNotBlank() }
+                            ?: doc.getString("title")?.takeIf { it.isNotBlank() }
+                            ?: ""
+                    }
+                    if (restoredCity == "اليمن") {
+                        restoredCity = doc.getString("city")?.takeIf { it.isNotBlank() }
+                            ?: doc.getString("area")?.takeIf { it.isNotBlank() }
+                            ?: doc.getString("cityId")?.takeIf { it.isNotBlank() }
+                            ?: "اليمن"
+                    }
+                    runCatching {
+                        com.google.android.gms.tasks.Tasks.await(
+                            doc.reference.update(mapOf("isDeleted" to false, "deleted" to false))
+                        )
+                    }
+                }
             }
+            if (authUid.isNotBlank()) {
+                runCatching {
+                    adminViewModel.crud.updateFields("users", authUid, mapOf("isDeleted" to false))
+                }
+            }
+            setUserSessionDetails(context, restoredName.ifBlank { "عميل" }, cleanPhone, restoredCity)
+            onResult(true, "تم استعادة الحساب بنجاح!")
         }
-        .addOnFailureListener { e ->
-            onResult(false, e.message ?: "فشل في تسجيل الدخول")
+    }
+
+    val primaryEmail = getAuthEmailForPhone(cleanPhone)
+    val altEmail = "$cleanPhone@yemen-services.app"
+    auth.signInWithEmailAndPassword(primaryEmail, cleanPassword)
+        .addOnSuccessListener { authResult ->
+            finalizeRestore(authResult.user?.uid ?: "")
+        }
+        .addOnFailureListener {
+            auth.signInWithEmailAndPassword(altEmail, cleanPassword)
+                .addOnSuccessListener { authResult ->
+                    finalizeRestore(authResult.user?.uid ?: "")
+                }
+                .addOnFailureListener { authErr ->
+                    accountRecoveryHelper.verifyRestorePassword(cleanPhone, "CLIENT", cleanPassword) { verified ->
+                        if (verified) {
+                            finalizeRestore()
+                        } else {
+                            onResult(false, authErr.localizedMessage ?: "فشل التحقق من كلمة المرور أو رقم الهاتف")
+                        }
+                    }
+                }
         }
 }
 
@@ -434,7 +547,7 @@ val MainViewModel.currentSupervisorPermissions get() = authViewModel.currentSupe
 
 fun MainViewModel.verifyAdminOrOwnerPassword(password: String, adminPass: String = "", ownerPass: String = ""): Boolean {
     val effectiveAdmin = adminPass
-    val effectiveOwner = ownerPass.ifEmpty { settings.value.ownerPassword }
+    val effectiveOwner = ownerPass
     if (authViewModel.verifyAdminOrOwnerPassword(password, effectiveAdmin, effectiveOwner)) {
         return true
     }

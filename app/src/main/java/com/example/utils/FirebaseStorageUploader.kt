@@ -97,6 +97,10 @@ object FirebaseStorageUploader {
                     finalBitmap.compress(Bitmap.CompressFormat.JPEG, 55, bos)
                     outputBytes = bos.toByteArray()
                 }
+                if (finalBitmap !== decodedBitmap) {
+                    decodedBitmap.recycle()
+                }
+                finalBitmap.recycle()
 
                 outputBytes
             } catch (e: Exception) {
@@ -140,6 +144,9 @@ object FirebaseStorageUploader {
             quality -= 15
         } while (outputBytes.size > maxSizeBytes && quality >= 30)
 
+        if (scaledBitmap !== bitmap) {
+            scaledBitmap.recycle()
+        }
         outputBytes
     }
 

@@ -19,12 +19,36 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
         if (userId.isEmpty() || userId == "guest" || token.isBlank()) return
         viewModelScope.launch {
             try {
+                val now = System.currentTimeMillis()
+                val cleanPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(currentUserPhone).filter { it.isDigit() }
+                val authUid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
+                val targetTokenDocId = authUid?.takeIf { it.isNotBlank() } ?: userId
+                val tokenPayload = buildMap<String, Any> {
+                    put("token", token)
+                    put("userId", targetTokenDocId)
+                    put("appUserId", userId)
+                    put("isActive", true)
+                    put("role", _adminRole.value.ifBlank { "CLIENT" })
+                    put("updatedAt", now)
+                    if (cleanPhone.isNotBlank()) put("phone", cleanPhone)
+                }
+                db.collection("fcm_tokens").document(targetTokenDocId)
+                    .set(tokenPayload, com.google.firebase.firestore.SetOptions.merge())
+                runCatching {
+                    val tokenHash = java.security.MessageDigest.getInstance("SHA-256")
+                        .digest(token.toByteArray(Charsets.UTF_8))
+                        .joinToString("") { "%02x".format(it) }
+                        .take(32)
+                    db.collection("fcm_tokens").document(targetTokenDocId)
+                        .collection("devices").document(tokenHash)
+                        .set(tokenPayload, com.google.firebase.firestore.SetOptions.merge())
+                }
+
                 db.collection("registered_users").document(userId).get().addOnSuccessListener { doc ->
                     if (doc != null && doc.exists()) {
                         doc.reference.update("fcmToken", token)
                     }
                 }
-                val cleanPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(currentUserPhone).filter { it.isDigit() }
                 if (cleanPhone.length >= 7) {
                     val phoneVariants = listOf(cleanPhone, "0$cleanPhone", "+967$cleanPhone", "967$cleanPhone", "00967$cleanPhone")
                         .distinct()
@@ -111,7 +135,7 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
             current = if (savedGuest.isNotBlank() && savedGuest != "guest") {
                 savedGuest
             } else {
-                "USR_GUEST_" + (100000..999999).random().toString()
+                "USR_GUEST_" + (java.security.SecureRandom().nextInt(900_000) + 100_000).toString()
             }
             _currentUserId.value = current
             if (sp != null) {
@@ -181,14 +205,14 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
         if (savedId == "guest" || savedId.isEmpty()) {
             if (savedPhone.isNotEmpty()) {
                 val cleanP = savedPhone.filter { it.isDigit() }
-                savedId = "USR-" + (if (cleanP.length >= 6) cleanP.takeLast(6) else (100000..999999).random().toString())
+                savedId = "USR-" + (if (cleanP.length >= 6) cleanP.takeLast(6) else (java.security.SecureRandom().nextInt(900_000) + 100_000).toString())
             } else {
                 val persistentGuest = sp.getString("persistent_guest_id", "") ?: ""
                 if (persistentGuest.isNotEmpty()) {
                     savedId = com.example.utils.SecurityCryptoUtils.decrypt(persistentGuest)
                 }
                 if (savedId.isEmpty() || savedId == "guest") {
-                    savedId = "USR_GUEST_" + (100000..999999).random().toString()
+                    savedId = "USR_GUEST_" + (java.security.SecureRandom().nextInt(900_000) + 100_000).toString()
                     val enc = com.example.utils.SecurityCryptoUtils.encrypt(savedId)
                     sp.edit().putString("persistent_guest_id", enc).apply()
                 }
@@ -434,7 +458,7 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
         _currentUserPhone.value = finalPhone
         _currentUserResidence.value = residence.ifBlank { "اليمن" }
         if (_currentUserId.value.isEmpty() || _currentUserId.value == "guest") {
-            _currentUserId.value = "user_" + (if (finalPhone.length >= 6) finalPhone.takeLast(6) else (100000..999999).random().toString())
+            _currentUserId.value = "user_" + (if (finalPhone.length >= 6) finalPhone.takeLast(6) else (java.security.SecureRandom().nextInt(900_000) + 100_000).toString())
         }
         _joinRequestPhone.value = finalPhone
         val sp = context.getSharedPreferences("yemen_service_prefs", Context.MODE_PRIVATE)

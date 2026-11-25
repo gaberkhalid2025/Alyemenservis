@@ -7,8 +7,6 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
-import java.text.SimpleDateFormat
-import java.util.Date
 import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -167,7 +165,7 @@ object RoadReportRepository {
         }
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val now = System.currentTimeMillis()
-        val todayKey = "count_" + SimpleDateFormat("yyyyMMdd", Locale.US).format(Date(now))
+        val todayKey = "count_" + DateFormatter.formatDateKeyUs(now)
         val todayCount = prefs.getInt(todayKey, 0)
         val lastWriteAt = prefs.getLong("last_write_at", 0L)
 

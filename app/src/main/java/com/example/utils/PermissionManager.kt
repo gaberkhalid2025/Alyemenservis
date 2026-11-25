@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
-import android.os.Build
 import android.provider.Settings
 import androidx.core.content.ContextCompat
 
@@ -21,13 +20,6 @@ object PermissionManager {
     const val PERMISSION_FINE_LOCATION = Manifest.permission.ACCESS_FINE_LOCATION
     const val PERMISSION_COARSE_LOCATION = Manifest.permission.ACCESS_COARSE_LOCATION
     const val PERMISSION_NOTIFICATIONS = "android.permission.POST_NOTIFICATIONS"
-
-    val PERMISSION_STORAGE_IMAGES: String
-        get() = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            Manifest.permission.READ_MEDIA_IMAGES
-        } else {
-            Manifest.permission.READ_EXTERNAL_STORAGE
-        }
 
     /**
      * التحقق مما إذا كان الإذن الممكن ممنوحاً
@@ -50,7 +42,6 @@ object PermissionManager {
         return when (permission) {
             PERMISSION_CAMERA -> "يحتاج التطبيق إلى الوصول لكاميرا الجهاز لالتقاط صور المعرض، الهوية أو الترخيص مباشرة."
             PERMISSION_RECORD_AUDIO -> "يحتاج التطبيق لإذن الميكروفون لتسجيل وإرسال الرسائل الصوتية والفويس نوت في المحادثات المباشرة."
-            PERMISSION_STORAGE_IMAGES, Manifest.permission.READ_EXTERNAL_STORAGE -> "يحتاج التطبيق لإذن الوصول للصور والمعرض لاختيار الصور وإرفاق السير الذاتية."
             PERMISSION_FINE_LOCATION, PERMISSION_COARSE_LOCATION -> "نستخدم موقعك لعرض الفنيين والمتاجر القريبة وحساب المسارات والملاحة. لا يغادر موقعك جهازك إلا عند طلبك مساراً عبر الإنترنت أو إرسالك نداء فزعة بموافقتك."
             PERMISSION_NOTIFICATIONS -> "يحتاج التطبيق لإذن الإشعارات لتنبيهك بجديد العروض والرسائل وتحديثات طلبات الانضمام."
             else -> "يحتاج التطبيق إلى هذا الإذن لضمان تقديم كافة الخدمات بكفاءة عالية."

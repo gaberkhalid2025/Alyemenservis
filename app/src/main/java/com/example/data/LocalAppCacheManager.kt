@@ -22,22 +22,42 @@ class LocalAppCacheManager @Inject constructor(
 
     private val prefs: SharedPreferences = context.getSharedPreferences("YS_Local_App_Cache_v2026", Context.MODE_PRIVATE)
 
-    // 1. Save & Load Cached Providers (DISABLED for Direct Firestore)
+    companion object {
+        private const val CACHE_TTL_MS = 12L * 60L * 60L * 1000L // 12 hours TTL
+    }
+
+    private fun saveWithTimestamp(dataKey: String, timeKey: String, rawJsonString: String) {
+        if (rawJsonString.isBlank()) return
+        prefs.edit()
+            .putString(dataKey, rawJsonString)
+            .putLong(timeKey, System.currentTimeMillis())
+            .apply()
+    }
+
+    private fun readIfFresh(dataKey: String, timeKey: String): String {
+        val savedAt = prefs.getLong(timeKey, 0L)
+        if (savedAt <= 0L || System.currentTimeMillis() - savedAt > CACHE_TTL_MS) {
+            return "[]"
+        }
+        return prefs.getString(dataKey, "[]") ?: "[]"
+    }
+
+    // 1. Save & Load Cached Providers (12h TTL)
     fun saveProvidersCache(rawJsonString: String) {
-        // [DISABLED] prefs.edit().putString("KEY_PROVIDERS_CACHE", rawJsonString).putLong("KEY_PROVIDERS_TIME", System.currentTimeMillis()).apply()
+        saveWithTimestamp("KEY_PROVIDERS_CACHE", "KEY_PROVIDERS_TIME", rawJsonString)
     }
 
     fun getProvidersCacheRaw(): String {
-        return "[]" // Always return empty for pure Firestore sync
+        return readIfFresh("KEY_PROVIDERS_CACHE", "KEY_PROVIDERS_TIME")
     }
 
-    // 2. Save & Load Cached Stores (DISABLED for Direct Firestore)
+    // 2. Save & Load Cached Stores (12h TTL)
     fun saveStoresCache(rawJsonString: String) {
-        // [DISABLED] prefs.edit().putString("KEY_STORES_CACHE", rawJsonString).putLong("KEY_STORES_TIME", System.currentTimeMillis()).apply()
+        saveWithTimestamp("KEY_STORES_CACHE", "KEY_STORES_TIME", rawJsonString)
     }
 
     fun getStoresCacheRaw(): String {
-        return "[]" // Always return empty for pure Firestore sync
+        return readIfFresh("KEY_STORES_CACHE", "KEY_STORES_TIME")
     }
 
     // 3. Bookings Cache -> Delegated exclusively to Room Database (AppDatabase.bookingDao())
@@ -48,42 +68,50 @@ class LocalAppCacheManager @Inject constructor(
     }
 
     fun saveOffersCache(rawJsonString: String) {
-        // [DISABLED] prefs.edit().putString("KEY_OFFERS_CACHE", rawJsonString).putLong("KEY_OFFERS_TIME", System.currentTimeMillis()).apply()
+        saveWithTimestamp("KEY_OFFERS_CACHE", "KEY_OFFERS_TIME", rawJsonString)
     }
 
     fun getOffersCacheRaw(): String {
-        return "[]"
+        return readIfFresh("KEY_OFFERS_CACHE", "KEY_OFFERS_TIME")
     }
 
     fun getOffersCacheTime(): Long {
-        return 0L
+        return prefs.getLong("KEY_OFFERS_TIME", 0L)
     }
 
-    // 4. Save & Load Cached Categories (DISABLED for Direct Firestore)
+    // 4. Save & Load Cached Categories (12h TTL)
     fun saveCategoriesCache(rawJsonString: String) {
-        // [DISABLED]
+        saveWithTimestamp("KEY_CATEGORIES_CACHE", "KEY_CATEGORIES_TIME", rawJsonString)
     }
 
     fun getCategoriesCacheRaw(): String {
-        return "[]"
+        return readIfFresh("KEY_CATEGORIES_CACHE", "KEY_CATEGORIES_TIME")
     }
 
-    // 4.1 Save & Load Cached Jobs (DISABLED for Direct Firestore)
+    // 4.1 Save & Load Cached Jobs (12h TTL)
     fun saveJobsCache(ownerId: String, rawJsonString: String) {
-        // [DISABLED]
+        val key = ownerId.trim()
+        if (key.isBlank()) return
+        saveWithTimestamp("KEY_JOBS_CACHE_$key", "KEY_JOBS_TIME_$key", rawJsonString)
     }
 
     fun getJobsCacheRaw(ownerId: String): String {
-        return "[]"
+        val key = ownerId.trim()
+        if (key.isBlank()) return "[]"
+        return readIfFresh("KEY_JOBS_CACHE_$key", "KEY_JOBS_TIME_$key")
     }
 
-    // 4.2 Save & Load Cached Doctors (DISABLED for Direct Firestore)
+    // 4.2 Save & Load Cached Doctors (12h TTL)
     fun saveDoctorsCache(ownerId: String, rawJsonString: String) {
-        // [DISABLED]
+        val key = ownerId.trim()
+        if (key.isBlank()) return
+        saveWithTimestamp("KEY_DOCTORS_CACHE_$key", "KEY_DOCTORS_TIME_$key", rawJsonString)
     }
 
     fun getDoctorsCacheRaw(ownerId: String): String {
-        return "[]"
+        val key = ownerId.trim()
+        if (key.isBlank()) return "[]"
+        return readIfFresh("KEY_DOCTORS_CACHE_$key", "KEY_DOCTORS_TIME_$key")
     }
 
     // 5. Offline Queue Operations (When user creates booking or sends message offline)

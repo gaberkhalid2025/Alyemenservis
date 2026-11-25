@@ -55,145 +55,130 @@ class AccountRecoveryHelper(
             "00967$normalizedPhone"
         ).filter { it.isNotBlank() }.distinct()
 
+        val safeVariants = phoneVariants.take(10)
+
         recoveryScope.launch {
             try {
                 val matches = supervisorScope {
                     val providerDef = async(Dispatchers.IO) {
                         runCatching {
-                            for (ph in phoneVariants) {
-                                val snap = com.google.android.gms.tasks.Tasks.await(
-                                    db.collection("providers").whereEqualTo("phone", ph).limit(5).get()
-                                )
-                                val candidates = snap.documents.mapNotNull { doc ->
-                                    doc.toObject(ProviderEntity::class.java)?.let { entity ->
-                                        if (entity.id.isBlank()) entity.copy(id = doc.id) else entity
-                                    }
-                                }
-                                val chosen = candidates.firstOrNull { !it.isDeleted } ?: candidates.firstOrNull()
-                                if (chosen != null) {
-                                    return@runCatching RestoreAccountMatch(
-                                        type = "PROVIDER",
-                                        name = maskDisplayName(chosen.name.ifBlank { "مزود خدمة" }),
-                                        provider = chosen
-                                    )
+                            val snap = com.google.android.gms.tasks.Tasks.await(
+                                db.collection("providers").whereIn("phone", safeVariants).limit(5).get()
+                            )
+                            val candidates = snap.documents.mapNotNull { doc ->
+                                doc.toObject(ProviderEntity::class.java)?.let { entity ->
+                                    if (entity.id.isBlank()) entity.copy(id = doc.id) else entity
                                 }
                             }
-                            null
+                            val chosen = candidates.firstOrNull { !it.isDeleted } ?: candidates.firstOrNull()
+                            if (chosen != null) {
+                                RestoreAccountMatch(
+                                    type = "PROVIDER",
+                                    name = maskDisplayName(chosen.name.ifBlank { "مزود خدمة" }),
+                                    provider = chosen
+                                )
+                            } else null
                         }.getOrNull()
                     }
                     val storeDef = async(Dispatchers.IO) {
                         runCatching {
-                            for (ph in phoneVariants) {
-                                val snap = com.google.android.gms.tasks.Tasks.await(
-                                    db.collection("stores").whereEqualTo("phone", ph).limit(5).get()
-                                )
-                                val candidates = snap.documents.mapNotNull { doc ->
-                                    doc.toObject(StoreEntity::class.java)?.let { entity ->
-                                        if (entity.id.isBlank()) entity.copy(id = doc.id) else entity
-                                    }
-                                }
-                                val chosen = candidates.firstOrNull { !it.isDeleted } ?: candidates.firstOrNull()
-                                if (chosen != null) {
-                                    val resolvedType = when (chosen.sectionId.lowercase().trim()) {
-                                        "restaurants", "restaurant" -> "RESTAURANT"
-                                        "medical" -> "MEDICAL"
-                                        else -> "STORE"
-                                    }
-                                    return@runCatching RestoreAccountMatch(
-                                        type = resolvedType,
-                                        name = maskDisplayName(chosen.name.ifBlank { "متجر معتمد" }),
-                                        store = chosen
-                                    )
+                            val snap = com.google.android.gms.tasks.Tasks.await(
+                                db.collection("stores").whereIn("phone", safeVariants).limit(5).get()
+                            )
+                            val candidates = snap.documents.mapNotNull { doc ->
+                                doc.toObject(StoreEntity::class.java)?.let { entity ->
+                                    if (entity.id.isBlank()) entity.copy(id = doc.id) else entity
                                 }
                             }
-                            null
+                            val chosen = candidates.firstOrNull { !it.isDeleted } ?: candidates.firstOrNull()
+                            if (chosen != null) {
+                                val resolvedType = when (chosen.sectionId.lowercase().trim()) {
+                                    "restaurants", "restaurant" -> "RESTAURANT"
+                                    "medical" -> "MEDICAL"
+                                    else -> "STORE"
+                                }
+                                RestoreAccountMatch(
+                                    type = resolvedType,
+                                    name = maskDisplayName(chosen.name.ifBlank { "متجر معتمد" }),
+                                    store = chosen
+                                )
+                            } else null
                         }.getOrNull()
                     }
                     val propDef = async(Dispatchers.IO) {
                         runCatching {
-                            for (ph in phoneVariants) {
-                                val snap = com.google.android.gms.tasks.Tasks.await(
-                                    db.collection("properties").whereEqualTo("phone", ph).limit(5).get()
-                                )
-                                val candidates = snap.documents.mapNotNull { doc ->
-                                    doc.toObject(PropertyEntity::class.java)?.let { entity ->
-                                        if (entity.id.isBlank()) entity.copy(id = doc.id) else entity
-                                    }
-                                }
-                                val chosen = candidates.firstOrNull { !it.isDeleted } ?: candidates.firstOrNull()
-                                if (chosen != null) {
-                                    return@runCatching RestoreAccountMatch(
-                                        type = "PROPERTY",
-                                        name = maskDisplayName(chosen.title.ifBlank { "مكتب عقارات" }),
-                                        property = chosen
-                                    )
+                            val snap = com.google.android.gms.tasks.Tasks.await(
+                                db.collection("properties").whereIn("phone", safeVariants).limit(5).get()
+                            )
+                            val candidates = snap.documents.mapNotNull { doc ->
+                                doc.toObject(PropertyEntity::class.java)?.let { entity ->
+                                    if (entity.id.isBlank()) entity.copy(id = doc.id) else entity
                                 }
                             }
-                            null
+                            val chosen = candidates.firstOrNull { !it.isDeleted } ?: candidates.firstOrNull()
+                            if (chosen != null) {
+                                RestoreAccountMatch(
+                                    type = "PROPERTY",
+                                    name = maskDisplayName(chosen.title.ifBlank { "مكتب عقارات" }),
+                                    property = chosen
+                                )
+                            } else null
                         }.getOrNull()
                     }
                     val jobDef = async(Dispatchers.IO) {
                         runCatching {
-                            for (ph in phoneVariants) {
-                                val snap = com.google.android.gms.tasks.Tasks.await(
-                                    db.collection("jobs").whereEqualTo("phone", ph).limit(1).get()
-                                )
-                                val doc = snap.documents.firstOrNull()
-                                if (doc != null) {
-                                    val jName = doc.getString("title")?.takeIf { it.isNotBlank() }
-                                        ?: doc.getString("jobTitle")?.takeIf { it.isNotBlank() }
-                                        ?: doc.getString("companyName")?.takeIf { it.isNotBlank() }
-                                        ?: "معلن وظائف"
-                                    return@runCatching RestoreAccountMatch("JOB", maskDisplayName(jName))
-                                }
-                            }
-                            null
+                            val snap = com.google.android.gms.tasks.Tasks.await(
+                                db.collection("jobs").whereIn("phone", safeVariants).limit(1).get()
+                            )
+                            val doc = snap.documents.firstOrNull()
+                            if (doc != null) {
+                                val jName = doc.getString("title")?.takeIf { it.isNotBlank() }
+                                    ?: doc.getString("jobTitle")?.takeIf { it.isNotBlank() }
+                                    ?: doc.getString("companyName")?.takeIf { it.isNotBlank() }
+                                    ?: "معلن وظائف"
+                                RestoreAccountMatch("JOB", maskDisplayName(jName))
+                            } else null
                         }.getOrNull()
                     }
                     val userDef = async(Dispatchers.IO) {
                         runCatching {
-                            for (ph in phoneVariants) {
-                                val snap = com.google.android.gms.tasks.Tasks.await(
-                                    db.collection("users").whereEqualTo("phone", ph).limit(1).get()
-                                )
-                                val doc = snap.documents.firstOrNull() ?: runCatching {
+                            val userDoc = com.google.android.gms.tasks.Tasks.await(
+                                db.collection("users").whereIn("phone", safeVariants).limit(1).get()
+                            ).documents.firstOrNull()
+                                ?: runCatching {
                                     com.google.android.gms.tasks.Tasks.await(
-                                        db.collection("registered_users").whereEqualTo("phone", ph).limit(1).get()
+                                        db.collection("registered_users").whereIn("phone", safeVariants).limit(1).get()
                                     ).documents.firstOrNull()
-                                }.getOrNull() ?: runCatching {
+                                }.getOrNull()
+                                ?: runCatching {
                                     com.google.android.gms.tasks.Tasks.await(
-                                        db.collection("registered_users").document(ph).get()
+                                        db.collection("registered_users").document(normalizedPhone).get()
                                     ).takeIf { it.exists() }
                                 }.getOrNull()
-                                if (doc != null) {
-                                    val uName = doc.getString("name")?.takeIf { it.isNotBlank() }
-                                        ?: doc.getString("fullName")?.takeIf { it.isNotBlank() }
-                                        ?: "مستخدم مسجل"
-                                    return@runCatching RestoreAccountMatch("CLIENT", maskDisplayName(uName))
-                                }
-                            }
-                            null
+                            if (userDoc != null) {
+                                val uName = userDoc.getString("name")?.takeIf { it.isNotBlank() }
+                                    ?: userDoc.getString("fullName")?.takeIf { it.isNotBlank() }
+                                    ?: "مستخدم مسجل"
+                                RestoreAccountMatch("CLIENT", maskDisplayName(uName))
+                            } else null
                         }.getOrNull()
                     }
                     val joinReqDef = async(Dispatchers.IO) {
                         runCatching {
-                            for (ph in phoneVariants) {
-                                val snap = com.google.android.gms.tasks.Tasks.await(
-                                    db.collection("join_requests").whereEqualTo("phone", ph).limit(1).get()
-                                )
-                                val rDoc = snap.documents.firstOrNull()
-                                if (rDoc != null) {
-                                    val rName = rDoc.getString("fullName")?.takeIf { it.isNotBlank() }
-                                        ?: rDoc.getString("businessName")?.takeIf { it.isNotBlank() }
-                                        ?: rDoc.getString("propertyTitle")?.takeIf { it.isNotBlank() }
-                                        ?: rDoc.getString("jobTitle")?.takeIf { it.isNotBlank() }
-                                        ?: rDoc.getString("name")?.takeIf { it.isNotBlank() }
-                                        ?: "حساب مسجل"
-                                    val rType = rDoc.getString("type")?.takeIf { it.isNotBlank() } ?: "CLIENT"
-                                    return@runCatching RestoreAccountMatch(rType, maskDisplayName(rName))
-                                }
-                            }
-                            null
+                            val snap = com.google.android.gms.tasks.Tasks.await(
+                                db.collection("join_requests").whereIn("phone", safeVariants).limit(1).get()
+                            )
+                            val rDoc = snap.documents.firstOrNull()
+                            if (rDoc != null) {
+                                val rName = rDoc.getString("fullName")?.takeIf { it.isNotBlank() }
+                                    ?: rDoc.getString("businessName")?.takeIf { it.isNotBlank() }
+                                    ?: rDoc.getString("propertyTitle")?.takeIf { it.isNotBlank() }
+                                    ?: rDoc.getString("jobTitle")?.takeIf { it.isNotBlank() }
+                                    ?: rDoc.getString("name")?.takeIf { it.isNotBlank() }
+                                    ?: "حساب مسجل"
+                                val rType = rDoc.getString("type")?.takeIf { it.isNotBlank() } ?: "CLIENT"
+                                RestoreAccountMatch(rType, maskDisplayName(rName))
+                            } else null
                         }.getOrNull()
                     }
 
@@ -252,48 +237,49 @@ class AccountRecoveryHelper(
 
                     var foundAnyStoredCredentialInPrimary = false
 
+                    val safeVariants = phoneVariants.take(10)
                     for (col in candidateCols) {
                         // إذا وُجدت كلمة مرور في المجموعة الأساسية للكيان ولم تتطابق، نرفض الرجوع إلى مجموعات ثانوية قديمة
                         if (col !in primaryCols && foundAnyStoredCredentialInPrimary) {
                             continue
                         }
-                        for (ph in phoneVariants) {
-                            val snap = runCatching {
-                                com.google.android.gms.tasks.Tasks.await(
-                                    db.collection(col).whereEqualTo("phone", ph).get()
-                                )
-                            }.getOrNull()
-                            val docs = snap?.documents.orEmpty().toMutableList()
-                            if (col in listOf("users", "registered_users")) {
+                        val snap = runCatching {
+                            com.google.android.gms.tasks.Tasks.await(
+                                db.collection(col).whereIn("phone", safeVariants).get()
+                            )
+                        }.getOrNull()
+                        val docs = snap?.documents.orEmpty().toMutableList()
+                        if (col in listOf("users", "registered_users")) {
+                            for (docId in listOf(normalizedPhone, "usr_$normalizedPhone", "user_$normalizedPhone")) {
                                 runCatching {
                                     val directDoc = com.google.android.gms.tasks.Tasks.await(
-                                        db.collection(col).document(ph).get()
+                                        db.collection(col).document(docId).get()
                                     )
                                     if (directDoc.exists() && docs.none { it.id == directDoc.id }) {
                                         docs.add(directDoc)
                                     }
                                 }
                             }
-                            for (doc in docs) {
-                                val hashFieldVal = doc.getString("passwordHash")?.trim().orEmpty()
-                                val passFieldVal = doc.getString("password")?.trim().orEmpty()
-                                val storedHash = hashFieldVal.ifBlank { passFieldVal }
-                                val fieldUsed = if (hashFieldVal.isNotBlank()) "passwordHash" else "password"
+                        }
+                        for (doc in docs) {
+                            val hashFieldVal = doc.getString("passwordHash")?.trim().orEmpty()
+                            val passFieldVal = doc.getString("password")?.trim().orEmpty()
+                            val storedHash = hashFieldVal.ifBlank { passFieldVal }
+                            val fieldUsed = if (hashFieldVal.isNotBlank()) "passwordHash" else "password"
 
-                                if (storedHash.isNotBlank()) {
-                                    if (col in primaryCols) {
-                                        foundAnyStoredCredentialInPrimary = true
-                                    }
-                                    val matched = com.example.utils.PasswordHasher.verifyPassword(trimmedInput, storedHash) ||
-                                        com.example.utils.SecurityCryptoUtils.verifyAdminPassword(trimmedInput, storedHash) ||
-                                        com.example.utils.SecureAdminStorage.verifyAndMigrate(
-                                            docRef = doc.reference,
-                                            inputPassword = trimmedInput,
-                                            storedPassOrHash = storedHash,
-                                            fieldName = fieldUsed
-                                        )
-                                    if (matched) return@withContext true
+                            if (storedHash.isNotBlank()) {
+                                if (col in primaryCols) {
+                                    foundAnyStoredCredentialInPrimary = true
                                 }
+                                val matched = com.example.utils.PasswordHasher.verifyPassword(trimmedInput, storedHash) ||
+                                    com.example.utils.SecurityCryptoUtils.verifyAdminPassword(trimmedInput, storedHash) ||
+                                    com.example.utils.SecureAdminStorage.verifyAndMigrate(
+                                        docRef = doc.reference,
+                                        inputPassword = trimmedInput,
+                                        storedPassOrHash = storedHash,
+                                        fieldName = fieldUsed
+                                    )
+                                if (matched) return@withContext true
                             }
                         }
                     }
@@ -330,17 +316,15 @@ class AccountRecoveryHelper(
                                 // مزامنة التجزئة الجديدة مع المجموعات الأساسية ومسح كلمة المرور المؤقتة المعروضة بعد التأكد من نجاح التحديث
                                 var updatedAny = false
                                 for (col in primaryCols) {
-                                    for (ph in phoneVariants) {
-                                        runCatching {
-                                            val s = com.google.android.gms.tasks.Tasks.await(
-                                                db.collection(col).whereEqualTo("phone", ph).get()
+                                    runCatching {
+                                        val s = com.google.android.gms.tasks.Tasks.await(
+                                            db.collection(col).whereIn("phone", safeVariants).get()
+                                        )
+                                        for (d in s.documents) {
+                                            com.google.android.gms.tasks.Tasks.await(
+                                                d.reference.update(mapOf("password" to "", "passwordHash" to finalHash))
                                             )
-                                            for (d in s.documents) {
-                                                com.google.android.gms.tasks.Tasks.await(
-                                                    d.reference.update(mapOf("password" to "", "passwordHash" to finalHash))
-                                                )
-                                                updatedAny = true
-                                            }
+                                            updatedAny = true
                                         }
                                     }
                                 }
@@ -507,13 +491,14 @@ class AccountRecoveryHelper(
                     ).distinct()
                     val collections = listOf("providers", "stores", "properties", "jobs", "users", "registered_users", "join_requests", "pending_providers")
 
+                    val safeQueries = phoneQueries.take(10)
                     for (col in collections) {
-                        for (ph in phoneQueries) {
-                            val snaps = runCatching {
-                                com.google.android.gms.tasks.Tasks.await(
-                                    db.collection(col).whereEqualTo("phone", ph).get()
-                                )
-                            }.getOrNull() ?: continue
+                        val snaps = runCatching {
+                            com.google.android.gms.tasks.Tasks.await(
+                                db.collection(col).whereIn("phone", safeQueries).get()
+                            )
+                        }.getOrNull()
+                        if (snaps != null) {
                             for (doc in snaps.documents) {
                                 runCatching {
                                     com.google.android.gms.tasks.Tasks.await(doc.reference.update(passUpdate))

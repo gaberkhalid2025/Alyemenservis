@@ -236,15 +236,33 @@ service cloud.firestore {
 
     // 6. استعادة الحسابات وكلمات المرور
     match /password_resets/{d} {
-      allow read, update, delete: if isStaff();
+      allow read: if isStaff() || (isSignedIn() && (
+        resource == null ||
+        resource.data.uid == request.auth.uid ||
+        matchesOwner(resource.data) ||
+        (('email' in request.auth.token) && request.auth.token.email is string && request.auth.token.email == (d + '@yemen-services.app'))
+      ));
+      allow update, delete: if isStaff();
       allow create: if isSignedIn();
     }
     match /password_recovery_requests/{d} {
-      allow read, update, delete: if isStaff();
+      allow read: if isStaff() || (isSignedIn() && (
+        resource == null ||
+        resource.data.uid == request.auth.uid ||
+        matchesOwner(resource.data) ||
+        (('email' in request.auth.token) && request.auth.token.email is string && request.auth.token.email == (d + '@yemen-services.app'))
+      ));
+      allow update, delete: if isStaff();
       allow create: if isSignedIn();
     }
     match /account_recovery_requests/{d} {
-      allow read, update, delete: if isStaff();
+      allow read: if isStaff() || (isSignedIn() && (
+        resource == null ||
+        resource.data.uid == request.auth.uid ||
+        matchesOwner(resource.data) ||
+        (('email' in request.auth.token) && request.auth.token.email is string && request.auth.token.email == (d + '@yemen-services.app'))
+      ));
+      allow update, delete: if isStaff();
       allow create: if isSignedIn();
     }
 
@@ -369,7 +387,13 @@ service cloud.firestore {
       );
     }
     match /payments/{d} {
-      allow read, create: if isSignedIn();
+      allow read: if isSignedIn() && (
+        isStaff() ||
+        matchesOwner(resource.data) ||
+        (('customerId' in resource.data) && resource.data.customerId == request.auth.uid) ||
+        (('customerPhone' in resource.data) && ('email' in request.auth.token) && request.auth.token.email is string && request.auth.token.email == (resource.data.customerPhone + '@yemen-services.app'))
+      );
+      allow create: if isSignedIn();
       allow update, delete: if isStaff() || matchesOwner(resource.data);
     }
     match /payment_transactions/{d} {
@@ -391,7 +415,12 @@ service cloud.firestore {
     }
     match /internal_wallets/{d} {
       allow read: if isSignedIn() && (isStaff() || d == request.auth.uid || matchesOwner(resource.data));
-      allow create: if isSignedIn();
+      allow create: if isSignedIn() && (
+        isStaff() || (
+          (d == request.auth.uid || matchesOwner(request.resource.data)) &&
+          (!('balance' in request.resource.data) || request.resource.data.balance == 0)
+        )
+      );
       allow update, delete: if isStaff();
     }
     match /wallet_transactions/{txId} {

@@ -62,6 +62,15 @@ class WalletManagerTest {
     }
 
     @Test
+    fun `transfer rejects self-transfer and blank wallet ids`() = runTest {
+        val selfTransfer = walletManager.transfer("wallet_same", "wallet_same", 500.0, "YER")
+        assertTrue(selfTransfer.isFailure)
+
+        val blankTransfer = walletManager.transfer("", "wallet_b", 500.0, "YER")
+        assertTrue(blankTransfer.isFailure)
+    }
+
+    @Test
     fun `freezeWallet and unfreezeWallet update wallet status`() {
         walletManager.createWallet("771112223", "USER")
         val freezeRes = walletManager.freezeWallet("wallet_771112223", "مراجعة أمنية")

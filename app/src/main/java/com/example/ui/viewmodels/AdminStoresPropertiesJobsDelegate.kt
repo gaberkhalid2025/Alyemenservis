@@ -26,6 +26,27 @@ import java.util.UUID
 internal class AdminStoresPropertiesJobsDelegate(
     private val vm: AdminViewModel
 ) {
+    private fun createSecondaryAuthUser(authEmail: String, rawPassword: String) {
+        try {
+            val primaryApp = com.google.firebase.FirebaseApp.getInstance()
+            val secondaryApp = runCatching {
+                com.google.firebase.FirebaseApp.getInstance("SecondaryUserCreation")
+            }.getOrElse {
+                com.google.firebase.FirebaseApp.initializeApp(
+                    vm.application,
+                    primaryApp.options,
+                    "SecondaryUserCreation"
+                )
+            }
+            val secondaryAuth = com.google.firebase.auth.FirebaseAuth.getInstance(secondaryApp)
+            secondaryAuth.createUserWithEmailAndPassword(authEmail, rawPassword)
+                .addOnCompleteListener {
+                    runCatching { secondaryAuth.signOut() }
+                }
+        } catch (_: Exception) {
+        }
+    }
+
     // ==========================================
     // 🏪 المتاجر والمطاعم والمراكز الطبية (Stores)
     // ==========================================
@@ -58,12 +79,7 @@ internal class AdminStoresPropertiesJobsDelegate(
         vm._stores.value = updatedStores
 
         if (rawPassword.isNotEmpty() && !SecureHasher.isValidHash(rawPassword)) {
-            try {
-                val authEmail = vm.resolveAuthEmailForPhone(cleanPhone)
-                vm.firebaseAuth.createUserWithEmailAndPassword(authEmail, rawPassword)
-                    .addOnFailureListener { /* account exists */ }
-            } catch (_: Exception) {
-            }
+            createSecondaryAuthUser(vm.resolveAuthEmailForPhone(cleanPhone), rawPassword)
         }
 
         vm.viewModelScope.launch {
@@ -440,12 +456,7 @@ internal class AdminStoresPropertiesJobsDelegate(
         vm._properties.value = updatedProps
 
         if (rawPassword.isNotEmpty() && !SecureHasher.isValidHash(rawPassword)) {
-            try {
-                val authEmail = vm.resolveAuthEmailForPhone(cleanPhone)
-                vm.firebaseAuth.createUserWithEmailAndPassword(authEmail, rawPassword)
-                    .addOnFailureListener { /* account exists */ }
-            } catch (_: Exception) {
-            }
+            createSecondaryAuthUser(vm.resolveAuthEmailForPhone(cleanPhone), rawPassword)
         }
 
         vm.viewModelScope.launch {
