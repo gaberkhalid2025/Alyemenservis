@@ -104,9 +104,14 @@ object ValhallaTileDownloader {
         }
     }
 
+    // [نظام خرائط وملاحة عالمي - ملكنا]
     fun isTilesDownloaded(context: Context): Boolean {
         return try {
             val dir = valhallaDir(context)
+            if (!dir.exists() || !dir.isDirectory) return false
+            val files = dir.listFiles()
+            if (files == null || files.isEmpty()) return false
+
             val marker = File(dir, MARKER_FILE_NAME)
             val tile = resolveTilesFile(dir)
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)

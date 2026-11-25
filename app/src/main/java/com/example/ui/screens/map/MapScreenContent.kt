@@ -13,14 +13,12 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Emergency
-import androidx.compose.material.icons.filled.EmojiEvents
-import androidx.compose.material.icons.filled.LocalShipping
-import androidx.compose.material.icons.filled.Nightlife
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -41,6 +39,7 @@ import com.example.data.StoreEntity
 import com.example.ui.MainViewModel
 import com.example.ui.screens.map.components.RoadReportDialog
 import com.example.ui.screens.map.utils.OfflineMapManager
+import com.example.ui.theme.*
 import com.example.utils.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -583,39 +582,109 @@ fun MapScreenContent(
                 hasRealLocation = hasRealLocation
             )
 
-            MapControlsDockHost(
-                context = context,
-                coroutineScope = coroutineScope,
-                snackbarHostState = snackbarHostState,
-                viewModel = viewModel,
-                state = state,
-                themeColors = themeColors,
-                hasRealLocation = hasRealLocation,
-                heading = heading,
-                isDrivingMode = isDrivingMode,
-                onToggleDrivingMode = { isDrivingMode = !isDrivingMode },
-                isEcoMode = isEcoMode,
-                isPinPickMode = isPinPickMode,
-                onSetPinPickMode = { isPinPickMode = it },
-                onClearPinnedAndSearched = {
-                    pinnedPoint = null
-                    state.selectedEntity = null
-                    searchedPlace = null
+            var showToolsMenu by remember { mutableStateOf(false) }
+
+            MapFabCluster(
+                isNavigating = state.isNavigating,
+                locateActive = hasRealLocation,
+                onNavigate = {
+                    val searchedWp = searchedPlace?.let {
+                        NavWaypoint(name = it.shortName, latitude = it.latitude, longitude = it.longitude)
+                    }
+                    when {
+                        !hasRealLocation -> {
+                            viewModel.startLocationUpdates()
+                            coroutineScope.launch { snackbarHostState.showSnackbar("فعّل GPS وانتظر تحديد موقعك ثم أعد المحاولة") }
+                        }
+                        state.startNavigation(state.selectedEntity ?: searchedWp) -> {
+                            searchedPlace = null
+                        }
+                        else -> {
+                            showDestinationPicker = true
+                        }
+                    }
                 },
-                searchedPlace = searchedPlace,
-                onClearSearchedOnly = { searchedPlace = null },
-                showZones = showZones,
-                onSetShowZones = { showZones = it },
-                locationPermissionLauncher = locationPermissionLauncher,
-                onShowDestinationPicker = { showDestinationPicker = true },
-                onShowGnss = { showGnss = true },
-                onShowCoordinateDialog = { showCoordinateDialog = true },
-                onOpenMoreLayersSheet = { showMoreLayersSheet = true },
-                onCloseMoreLayersSheet = { showMoreLayersSheet = false },
-                onShowGroupTracking = { showGroupTracking = true },
-                onOpenSos = { showSosDialog = true },
-                onOpenServicesSheet = { showServicesSheet = true },
-                onOpenRoadReports = { showRoadReportDialog = true }
+                onLayers = { state.showLayerDialog = true },
+                onZoomIn = { state.zoomInTick++ },
+                onZoomOut = { state.zoomOutTick++ },
+                onLocate = {
+                    state.recenterTick++
+                    viewModel.startLocationUpdates()
+                    coroutineScope.launch { snackbarHostState.showSnackbar("تمت إعادة التمركز إلى موقعك 📍") }
+                },
+                onMore = { showToolsMenu = true },
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .navigationBarsPadding()
+                    .padding(end = 12.dp, bottom = 90.dp)
+            )
+
+            if (showToolsMenu) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 72.dp, bottom = 140.dp)
+                ) {
+                    // [نظام خرائط وملاحة عالمي - ملكنا]
+                    DropdownMenu(
+                        expanded = showToolsMenu,
+                        onDismissRequest = { showToolsMenu = false },
+                        containerColor = MapUi.SurfaceSolid,
+                        modifier = Modifier.border(1.dp, MapUi.Border, RoundedCornerShape(MapUi.RadiusS))
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("فزعة طوارئ", color = MapUi.Danger, fontWeight = FontWeight.Bold) },
+                            leadingIcon = { Icon(Icons.Default.Emergency, null, tint = MapUi.Danger) },
+                            onClick = { showToolsMenu = false; showSosDialog = true }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("خدمات الطريق", color = MapUi.Ok) },
+                            leadingIcon = { Icon(Icons.Default.LocalShipping, null, tint = MapUi.Ok) },
+                            onClick = { showToolsMenu = false; showServicesSheet = true }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("بلاغات الطرق", color = MapUi.Warn) },
+                            leadingIcon = { Icon(Icons.Default.Warning, null, tint = MapUi.Warn) },
+                            onClick = { showToolsMenu = false; showRoadReportDialog = true }
+                        )
+                        HorizontalDivider(color = MapUi.Border)
+                        DropdownMenuItem(
+                            text = { Text(if (state.nightMode) "وضع النهار" else "الوضع الليلي", color = MapUi.TextPrimary) },
+                            leadingIcon = { Icon(if (state.nightMode) Icons.Default.LightMode else Icons.Default.Bedtime, null, tint = MapUi.RoyalTop) },
+                            onClick = { showToolsMenu = false; state.nightMode = !state.nightMode }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("إدخال إحداثيات", color = MapUi.TextPrimary) },
+                            leadingIcon = { Icon(Icons.Default.EditLocationAlt, null, tint = MapUi.RoyalTop) },
+                            onClick = { showToolsMenu = false; showCoordinateDialog = true }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("تشخيص GPS", color = MapUi.TextPrimary) },
+                            leadingIcon = { Icon(Icons.Default.SatelliteAlt, null, tint = MapUi.Accent) },
+                            onClick = { showToolsMenu = false; showGnss = true }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("تتبع المجموعة", color = MapUi.TextPrimary) },
+                            leadingIcon = { Icon(Icons.Default.Group, null, tint = MapUi.Ok) },
+                            onClick = { showToolsMenu = false; showGroupTracking = true }
+                        )
+                    }
+                }
+            }
+
+            MapContextBanner(
+                text = when {
+                    areTilesFailing -> "الخريطة تحتاج إنترنت أو حزمة عرض"
+                    !hasRealLocation -> "إشارة GPS ضعيفة — تأكد من الموقع"
+                    else -> null
+                },
+                color = if (areTilesFailing) MapUi.Warn else MapUi.Danger,
+                icon = if (areTilesFailing) Icons.Default.CloudOff else Icons.Default.GpsOff,
+                onClick = { if (areTilesFailing) showDownloadDialog = true },
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .statusBarsPadding()
+                    .padding(top = 78.dp, start = 72.dp, end = 72.dp)
             )
 
             MapWaypointsAndBottomCards(

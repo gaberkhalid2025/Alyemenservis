@@ -494,56 +494,46 @@ internal fun BoxScope.MapScreenViewport(
             modifier = Modifier.fillMaxSize()
         )
 
-        // 🌐 زر أنيق وصغير لنمط الخريطة (قياسي / قمر صناعي / تضاريس / أوفلاين) مع قائمة منسدلة
+        // [نظام خرائط وملاحة عالمي - ملكنا]
+        // 🌐 زر كرية زجاجية أنيقة لنمط الخريطة (قياسي / قمر صناعي / تضاريس / أوفلاين) مع قائمة منسدلة
         var showMapTypeDropdown by remember { mutableStateOf(false) }
         Box(
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .statusBarsPadding()
-                .padding(top = 74.dp, end = 16.dp)
+                .padding(top = 74.dp, end = 14.dp)
         ) {
-            Surface(
+            com.example.ui.theme.GlassIconButton(
+                icon = when (state.currentMapMode) {
+                    MapMode.SATELLITE, MapMode.SATELLITE_CLARITY -> Icons.Default.SatelliteAlt
+                    MapMode.TOPO -> Icons.Default.Terrain
+                    else -> Icons.Default.Public
+                },
+                description = "نمط الخريطة",
                 onClick = { showMapTypeDropdown = true },
-                shape = CircleShape,
-                color = Color(0xFF0F172A).copy(alpha = 0.92f),
-                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.16f)),
-                shadowElevation = 8.dp,
-                modifier = Modifier
-                    .size(40.dp)
-                    .testTag("map_type_dropdown_btn")
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = when (state.currentMapMode) {
-                            MapMode.SATELLITE, MapMode.SATELLITE_CLARITY -> Icons.Default.SatelliteAlt
-                            MapMode.TOPO -> Icons.Default.Terrain
-                            else -> Icons.Default.Public
-                        },
-                        contentDescription = "نمط الخريطة",
-                        tint = when (state.currentMapMode) {
-                            MapMode.SATELLITE, MapMode.SATELLITE_CLARITY -> Color(0xFF38BDF8)
-                            MapMode.TOPO -> Color(0xFFF59E0B)
-                            else -> Color(0xFF10B981)
-                        },
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
+                active = true,
+                tint = when (state.currentMapMode) {
+                    MapMode.SATELLITE, MapMode.SATELLITE_CLARITY -> com.example.ui.theme.MapUi.RoyalTop
+                    MapMode.TOPO -> Color(0xFFF59E0B)
+                    else -> Color(0xFF10B981)
+                },
+                size = 48.dp,
+                modifier = Modifier.testTag("map_type_dropdown_btn")
+            )
 
             DropdownMenu(
                 expanded = showMapTypeDropdown,
                 onDismissRequest = { showMapTypeDropdown = false },
-                containerColor = Color(0xFF0F172A),
+                containerColor = com.example.ui.theme.MapUi.SurfaceSolid,
                 modifier = Modifier
-                    .border(1.dp, Color.White.copy(alpha = 0.14f), RoundedCornerShape(14.dp))
-                    .widthIn(min = 200.dp)
+                    .border(1.dp, com.example.ui.theme.MapUi.BorderGlow, RoundedCornerShape(16.dp))
+                    .widthIn(min = 210.dp)
             ) {
-                // 1. خريطة قياسية (شوارع)
                 val isStandard = (state.currentMapMode == MapMode.OSM || state.currentMapMode == MapMode.VELA) && state.mapLayer != MapLayer.VALHALLA_OFFLINE
                 DropdownMenuItem(
                     text = {
                         Text(
-                            "🌐 خريطة قياسية (شوارع)",
+                            "خريطة قياسية (شوارع)",
                             fontWeight = if (isStandard) FontWeight.Bold else FontWeight.Normal,
                             color = if (isStandard) Color(0xFF10B981) else Color.White
                         )
@@ -561,21 +551,20 @@ internal fun BoxScope.MapScreenViewport(
                     }
                 )
 
-                // 2. قمر صناعي
                 val isSat = state.currentMapMode == MapMode.SATELLITE || state.currentMapMode == MapMode.SATELLITE_CLARITY
                 DropdownMenuItem(
                     text = {
                         Text(
-                            "🛰️ قمر صناعي (أقمار حقيقية)",
+                            "قمر صناعي (أقمار حقيقية)",
                             fontWeight = if (isSat) FontWeight.Bold else FontWeight.Normal,
-                            color = if (isSat) Color(0xFF38BDF8) else Color.White
+                            color = if (isSat) com.example.ui.theme.MapUi.RoyalTop else Color.White
                         )
                     },
                     leadingIcon = {
-                        Icon(Icons.Default.SatelliteAlt, contentDescription = null, tint = if (isSat) Color(0xFF38BDF8) else Color(0xFF94A3B8))
+                        Icon(Icons.Default.SatelliteAlt, contentDescription = null, tint = if (isSat) com.example.ui.theme.MapUi.RoyalTop else Color(0xFF94A3B8))
                     },
                     trailingIcon = if (isSat) {
-                        { Icon(Icons.Default.Check, contentDescription = null, tint = Color(0xFF38BDF8), modifier = Modifier.size(16.dp)) }
+                        { Icon(Icons.Default.Check, contentDescription = null, tint = com.example.ui.theme.MapUi.RoyalTop, modifier = Modifier.size(16.dp)) }
                     } else null,
                     onClick = {
                         state.currentMapMode = MapMode.SATELLITE
@@ -583,12 +572,11 @@ internal fun BoxScope.MapScreenViewport(
                     }
                 )
 
-                // 3. تضاريس ومرتفعات
                 val isTopo = state.currentMapMode == MapMode.TOPO
                 DropdownMenuItem(
                     text = {
                         Text(
-                            "⛰️ خريطة تضاريس (Topo)",
+                            "خريطة تضاريس (Topo)",
                             fontWeight = if (isTopo) FontWeight.Bold else FontWeight.Normal,
                             color = if (isTopo) Color(0xFFF59E0B) else Color.White
                         )
@@ -605,12 +593,11 @@ internal fun BoxScope.MapScreenViewport(
                     }
                 )
 
-                // 4. وضع أوفلاين
                 val isOffline = state.mapLayer == MapLayer.VALHALLA_OFFLINE
                 DropdownMenuItem(
                     text = {
                         Text(
-                            "📦 وضع أوفلاين بدون إنترنت",
+                            "وضع أوفلاين بدون إنترنت",
                             fontWeight = if (isOffline) FontWeight.Bold else FontWeight.Normal,
                             color = if (isOffline) Color(0xFF10B981) else Color.White
                         )
@@ -629,11 +616,10 @@ internal fun BoxScope.MapScreenViewport(
 
                 HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
 
-                // 5. إظهار/إخفاء الأسماء
                 DropdownMenuItem(
                     text = {
                         Text(
-                            if (state.showLabelsOnMap) "🙈 إخفاء أسماء الشوارع" else "👁️ إظهار أسماء الشوارع",
+                            if (state.showLabelsOnMap) "إخفاء أسماء الشوارع" else "إظهار أسماء الشوارع",
                             color = Color.White
                         )
                     },
@@ -641,7 +627,7 @@ internal fun BoxScope.MapScreenViewport(
                         Icon(
                             if (state.showLabelsOnMap) Icons.Default.VisibilityOff else Icons.Default.Visibility,
                             contentDescription = null,
-                            tint = Color(0xFF00E5FF)
+                            tint = com.example.ui.theme.MapUi.Accent
                         )
                     },
                     onClick = {
@@ -650,16 +636,15 @@ internal fun BoxScope.MapScreenViewport(
                     }
                 )
 
-                // 6. تصفية المعالم
                 DropdownMenuItem(
                     text = {
                         Text(
-                            "🎯 تصفية معالم الخريطة",
+                            "تصفية معالم الخريطة",
                             color = Color.White
                         )
                     },
                     leadingIcon = {
-                        Icon(Icons.Default.Place, contentDescription = null, tint = Color(0xFF00E5FF))
+                        Icon(Icons.Default.Place, contentDescription = null, tint = com.example.ui.theme.MapUi.Accent)
                     },
                     onClick = {
                         state.showLandmarkFilterSheet = true
@@ -814,26 +799,22 @@ internal fun BoxScope.MapScreenViewport(
             }
         }
 
-        // 🏠 زر «عنواني بالمعلم» (في الجانب المقابل لشريط الأدوات لتجنب التداخل)
-        Surface(
+        // 🏠 زر كرية زجاجية «عنواني بالمعلم» (في الجانب المقابل لشريط الأدوات لتجنب التداخل)
+        com.example.ui.theme.GlassIconButton(
+            icon = Icons.Default.HomeWork,
+            description = "عنواني بالمعلم",
             onClick = {
                 if (savedAddresses.isEmpty()) onOpenLandmarkAddress()
                 else onOpenSavedAddresses()
             },
-            shape = RoundedCornerShape(16.dp),
-            color = Color(0xFF0F172A).copy(alpha = 0.92f),
-            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.14f)),
-            shadowElevation = 8.dp,
+            tint = com.example.ui.theme.MapUi.RoyalTop,
+            size = 48.dp,
             modifier = Modifier
                 .align(Alignment.BottomStart)
                 .navigationBarsPadding()
                 .padding(start = 16.dp, bottom = 84.dp)
-                .size(48.dp)
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Text("🏠", fontSize = 17.sp)
-            }
-        }
+                .testTag("map_landmark_address_orb_btn")
+        )
     }
 }
 
@@ -1271,9 +1252,12 @@ internal fun BoxScope.MapWaypointsAndBottomCards(
                                 onDismissSearchedPlace()
                             }
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
-                        modifier = Modifier.weight(1f)
+                        colors = ButtonDefaults.buttonColors(containerColor = com.example.ui.theme.MapUi.RoyalMid),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.weight(1f).heightIn(min = 48.dp)
                     ) {
+                        Icon(Icons.Default.Navigation, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
                         Text("ابدأ الملاحة", fontWeight = FontWeight.Bold)
                     }
                     OutlinedButton(
@@ -1281,11 +1265,12 @@ internal fun BoxScope.MapWaypointsAndBottomCards(
                             state.addWaypoint(NavWaypoint(name = place.shortName, latitude = place.latitude, longitude = place.longitude))
                             coroutineScope.launch { snackbarHostState.showSnackbar("تمت إضافة المحطة للمسار") }
                         },
-                        modifier = Modifier.weight(1f)
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.weight(1f).heightIn(min = 48.dp)
                     ) {
                         Text("إضافة كمحطة")
                     }
-                    TextButton(onClick = onDismissSearchedPlace) {
+                    TextButton(onClick = onDismissSearchedPlace, modifier = Modifier.heightIn(min = 48.dp)) {
                         Text("إغلاق", color = Color(0xFF94A3B8))
                     }
                 }

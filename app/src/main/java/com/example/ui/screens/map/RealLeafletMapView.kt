@@ -596,8 +596,6 @@ fun RealLeafletMapView(
                                 "www.hotosm.org",
                                 "opentopomap.org",
                                 "www.esri.com",
-                                "carto.com",
-                                "basemaps.cartocdn.com",
                                 "earthdata.nasa.gov",
                                 "s2maps.eu",
                                 "realearth.ssec.wisc.edu",
@@ -668,7 +666,21 @@ fun RealLeafletMapView(
                             }
                         }
 
-                        loadUrl("file:///android_asset/map.html")
+                        // [نظام خرائط وملاحة عالمي - ملكنا] تمرير الإحداثيات والوضع مباشرة لتجنب تأخير التحميل الأول
+                        val initLat = if (userCoords.first != 0.0 && !userCoords.first.isNaN()) userCoords.first else 15.3694
+                        val initLng = if (userCoords.second != 0.0 && !userCoords.second.isNaN()) userCoords.second else 44.1910
+                        val initMode = when (currentMapMode) {
+                            MapMode.VELA_3D -> "VELA_3D"
+                            MapMode.VELA -> "VELA"
+                            MapMode.OSM -> "OSM"
+                            MapMode.HOT -> "HOT"
+                            MapMode.TOPO -> "TOPO"
+                            MapMode.SATELLITE -> "SATELLITE"
+                            MapMode.SATELLITE_CLARITY -> "SATELLITE_CLARITY"
+                            else -> "SATELLITE"
+                        }
+                        val initZoom = navZoom ?: if (followUser) 17 else 15
+                        loadUrl("file:///android_asset/map.html#lat=$initLat&lng=$initLng&mode=$initMode&zoom=$initZoom")
                         webViewRef = this
                     }
                 },
@@ -697,18 +709,18 @@ fun RealLeafletMapView(
                         Box(
                             modifier = Modifier
                                 .size(64.dp)
-                                .background(Color(0xFF10B981).copy(alpha = 0.15f), CircleShape),
+                                .background(Color(0xFF3A6BFF).copy(alpha = 0.16f), CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
                             CircularProgressIndicator(
                                 modifier = Modifier.size(54.dp),
-                                color = Color(0xFF10B981),
+                                color = Color(0xFF5B86FF),
                                 strokeWidth = 3.dp
                             )
                             Icon(
                                 imageVector = Icons.Default.Explore,
                                 contentDescription = null,
-                                tint = Color(0xFF10B981),
+                                tint = Color(0xFF5B86FF),
                                 modifier = Modifier.size(28.dp)
                             )
                         }

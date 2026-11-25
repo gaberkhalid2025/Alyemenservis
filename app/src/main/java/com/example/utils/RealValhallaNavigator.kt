@@ -472,6 +472,7 @@ object RealValhallaNavigator {
             else -> 44.1910
         }
 
+        // [نظام خرائط وملاحة عالمي - ملكنا]
         // 1) محلي أولاً: العناوين المحفوظة + الفنيون والمتاجر والعقارات + القاموس الجغرافي اليمني + الكاش الدائم
         val local = mutableListOf<SearchAddressResult>()
         val expansions = DialectSynonyms.expand(clean).ifEmpty { listOf(nq) }
@@ -479,8 +480,9 @@ object RealValhallaNavigator {
         fun hit(text: String): Boolean {
             val t = normalizeArabic(text)
             if (t.isBlank()) return false
-            return expansions.any { t.contains(it) } ||
-                (tokens.isNotEmpty() && tokens.all { t.contains(it) })
+            if (expansions.any { t.contains(it) }) return true
+            if (tokens.isNotEmpty() && tokens.all { t.contains(it) }) return true
+            return tolerantArabicMatch(nq, t)
         }
 
         if (context != null) {
@@ -561,9 +563,15 @@ object RealValhallaNavigator {
                             }
                         } ?: emptyList()
                     }
-                    val nomList = nomDef.await().orEmpty()
+                    var nomList = nomDef.await().orEmpty()
+                    var photonList = photonDef.await()
+                    val overpassList = overpassDef.await()
+                    if (nomList.isEmpty() && photonList.isEmpty() && nq != clean) {
+                        nomList = withTimeoutOrNull(3_000L) { fetchNominatim(nq, refLat, refLng, hasRef) }.orEmpty()
+                        photonList = withTimeoutOrNull(3_000L) { fetchPhoton(nq, refLat, refLng, hasRef) }.orEmpty()
+                    }
                     lastNominatimAt = System.currentTimeMillis()
-                    (overpassDef.await() + photonDef.await() + nomList)
+                    (overpassList + photonList + nomList)
                 }
                 if (fetched.isNotEmpty()) {
                     searchCache[cacheKey] = fetched
@@ -585,16 +593,18 @@ object RealValhallaNavigator {
             val sn = normalizeArabic(r.shortName)
             val dn = normalizeArabic(r.displayName)
             var s = when {
-                sn == nq -> 120
-                sn.startsWith(nq) -> 105
-                sn.contains(nq) -> 95
-                expansions.any { sn.contains(it) } -> 85
-                dn.contains(nq) -> 75
-                tokens.isNotEmpty() && tokens.all { sn.contains(it) || dn.contains(it) } -> 70
-                expansions.any { dn.contains(it) } -> 60
+                sn == nq -> 130
+                sn.startsWith(nq) -> 112
+                sn.contains(nq) -> 100
+                expansions.any { sn.contains(it) } -> 90
+                dn.contains(nq) -> 80
+                tokens.isNotEmpty() && tokens.all { sn.contains(it) || dn.contains(it) } -> 74
+                expansions.any { dn.contains(it) } -> 65
+                tolerantArabicMatch(nq, sn) -> 58
                 else -> 40
             }
-            if (r.type in setOf("saved_landmark", "provider", "store", "property")) s += 10
+            // نتائج التطبيق المحلية تتقدم على النتائج العامة
+            if (r.type in setOf("saved_landmark", "provider", "store", "property")) s += 35
             if (hasRef && !explicitOtherCity) {
                 val distKm = HaversinePrecisionNavigator.calculateDistance(refLat, refLng, r.latitude, r.longitude) / 1000.0
                 s += when {
@@ -763,6 +773,37 @@ object RealValhallaNavigator {
         .replace('ؤ', 'و')
         .replace('ة', 'ه')
         .replace(Regex("\\s+"), " ")
+
+    /** مطابقة عربية متسامحة للأخطاء الإملائية (حرف ناقص أو زائد أو مبدّل). */
+    private fun tolerantArabicMatch(queryNorm: String, targetNorm: String): Boolean {
+        if (queryNorm.length < 3 || targetNorm.length < 3) return false
+        val qWords = queryNorm.split(" ").filter { it.length >= 3 }
+        val tWords = targetNorm.split(" ").filter { it.length >= 3 }
+        if (qWords.isEmpty() || tWords.isEmpty()) return false
+        return qWords.all { qw ->
+            tWords.any { tw ->
+                tw.contains(qw) || qw.contains(tw) || editDistanceAtMost(qw, tw, if (qw.length >= 6) 2 else 1)
+            }
+        }
+    }
+
+    private fun editDistanceAtMost(a: String, b: String, maxDist: Int): Boolean {
+        if (kotlin.math.abs(a.length - b.length) > maxDist) return false
+        var prev = IntArray(b.length + 1) { it }
+        var curr = IntArray(b.length + 1)
+        for (i in 1..a.length) {
+            curr[0] = i
+            var minRow = curr[0]
+            for (j in 1..b.length) {
+                val cost = if (a[i - 1] == b[j - 1]) 0 else 1
+                curr[j] = minOf(prev[j] + 1, curr[j - 1] + 1, prev[j - 1] + cost)
+                if (curr[j] < minRow) minRow = curr[j]
+            }
+            if (minRow > maxDist) return false
+            val tmp = prev; prev = curr; curr = tmp
+        }
+        return prev[b.length] <= maxDist
+    }
 
     data class SearchAddressResult(
         val displayName: String,

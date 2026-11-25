@@ -11,6 +11,7 @@ import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
 
+// [نظام خرائط وملاحة عالمي - ملكنا]
 object OfflineTileInterceptor {
 
     private const val TAG = "TileInterceptor"
@@ -21,10 +22,12 @@ object OfflineTileInterceptor {
     private const val MAX_DISK_CACHE_BYTES = 120L * 1024L * 1024L
 
     private data class CachedTile(val bytes: ByteArray, val mime: String)
-    private val memoryCache = object : android.util.LruCache<String, CachedTile>(10 * 1024 * 1024) {
+    private val memoryCache = object : android.util.LruCache<String, CachedTile>(12 * 1024 * 1024) {
         override fun sizeOf(key: String, value: CachedTile): Int = value.bytes.size
     }
     @Volatile private var lastPruneAt = 0L
+    private val pruneRunning = java.util.concurrent.atomic.AtomicBoolean(false)
+    private val legacyCartoPurged = java.util.concurrent.atomic.AtomicBoolean(false)
 
     private val CORS_HEADERS = mapOf(
         "Access-Control-Allow-Origin" to "*",
@@ -38,18 +41,18 @@ object OfflineTileInterceptor {
     private val HOT = Regex("^https://[a-c]\\.tile\\.openstreetmap\\.fr/hot/(\\d+)/(\\d+)/(\\d+)\\.png$")
     private val TOPO = Regex("^https://[a-c]\\.tile\\.opentopomap\\.org/(\\d+)/(\\d+)/(\\d+)\\.png$")
     private val ESRI_TOPO = Regex("^https://server\\.arcgisonline\\.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/(\\d+)/(\\d+)/(\\d+)$")
-    private val CARTO_VOYAGER = Regex("^https://[a-d]\\.basemaps\\.cartocdn\\.com/rastertiles/voyager/(\\d+)/(\\d+)/(\\d+)(?:@2x)?\\.png$")
     private val SAT = Regex("^https://server\\.arcgisonline\\.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/(\\d+)/(\\d+)/(\\d+)$")
     private val SAT_CLARITY = Regex("^https://clarity\\.maptiles\\.arcgis\\.com/arcgis/rest/services/World_Imagery/MapServer/tile/(\\d+)/(\\d+)/(\\d+)$")
     private val VELA = Regex("^https://server\\.arcgisonline\\.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/(\\d+)/(\\d+)/(\\d+)$")
     private val ESRI_LABELS = Regex("^https://server\\.arcgisonline\\.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/(\\d+)/(\\d+)/(\\d+)$")
     private val ESRI_TRANS = Regex("^https://server\\.arcgisonline\\.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/(\\d+)/(\\d+)/(\\d+)$")
-    private val CARTO_LABELS = Regex("^https://[a-d]\\.basemaps\\.cartocdn\\.com/rastertiles/voyager_only_labels/(\\d+)/(\\d+)/(\\d+)(?:@2x)?\\.png$")
     private val EOX = Regex("^https://tiles\\.maps\\.eox\\.at/wmts/1\\.0\\.0/s2cloudless_3857/default/GoogleMapsCompatible/(\\d+)/(\\d+)/(\\d+)\\.jpg$")
     private val DEM_TERRARIUM = Regex("^https://s3\\.amazonaws\\.com/elevation-tiles-prod/terrarium/(\\d+)/(\\d+)/(\\d+)\\.png$")
 
     private data class Tile(val source: String, val z: Int, val x: Int, val y: Int, val ext: String, val mime: String) {
         val key: String get() = "$source/$z/$x/$y"
+        val isSatelliteFamily: Boolean get() = source == "sat" || source == "sat_clarity"
+        val isOverlay: Boolean get() = source in setOf("dem", "eox16", "esri_labels", "esri_trans")
     }
 
     private fun parse(url: String): Tile? {
@@ -57,8 +60,6 @@ object OfflineTileInterceptor {
         OSM_DE.matchEntire(url)?.let { return Tile("osm_de", it.groupValues[1].toInt(), it.groupValues[2].toInt(), it.groupValues[3].toInt(), "png", "image/png") }
         HOT.matchEntire(url)?.let { return Tile("hot", it.groupValues[1].toInt(), it.groupValues[2].toInt(), it.groupValues[3].toInt(), "png", "image/png") }
         TOPO.matchEntire(url)?.let { return Tile("topo", it.groupValues[1].toInt(), it.groupValues[2].toInt(), it.groupValues[3].toInt(), "png", "image/png") }
-        CARTO_VOYAGER.matchEntire(url)?.let { return Tile("carto_voyager", it.groupValues[1].toInt(), it.groupValues[2].toInt(), it.groupValues[3].toInt(), "png", "image/png") }
-        CARTO_LABELS.matchEntire(url)?.let { return Tile("carto_labels", it.groupValues[1].toInt(), it.groupValues[2].toInt(), it.groupValues[3].toInt(), "png", "image/png") }
         DEM_TERRARIUM.matchEntire(url)?.let { return Tile("dem", it.groupValues[1].toInt(), it.groupValues[2].toInt(), it.groupValues[3].toInt(), "png", "image/png") }
         // Esri & EOX: {z}/{y}/{x}
         ESRI_TOPO.matchEntire(url)?.let { return Tile("esri_topo", it.groupValues[1].toInt(), it.groupValues[3].toInt(), it.groupValues[2].toInt(), "jpg", "image/jpeg") }
@@ -73,52 +74,129 @@ object OfflineTileInterceptor {
 
     private fun mirrorUrls(t: Tile): List<Pair<String, String>> = when (t.source) {
         "topo" -> listOf(
-            "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/${t.z}/${t.y}/${t.x}" to "image/jpeg",
-            "https://a.basemaps.cartocdn.com/rastertiles/voyager/${t.z}/${t.x}/${t.y}.png" to "image/png"
+            "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/${t.z}/${t.y}/${t.x}" to "image/jpeg"
         )
         "osm", "osm_de", "hot" -> listOf(
-            "https://a.basemaps.cartocdn.com/rastertiles/voyager/${t.z}/${t.x}/${t.y}.png" to "image/png",
             "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/${t.z}/${t.y}/${t.x}" to "image/jpeg"
+        )
+        "sat" -> listOf(
+            "https://clarity.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/${t.z}/${t.y}/${t.x}" to "image/jpeg"
         )
         "sat_clarity" -> listOf(
             "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${t.z}/${t.y}/${t.x}" to "image/jpeg"
         )
-        "vela_esri", "carto_voyager" -> listOf(
-            "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/${t.z}/${t.y}/${t.x}" to "image/jpeg",
+        "vela_esri" -> listOf(
             "https://tile.openstreetmap.org/${t.z}/${t.x}/${t.y}.png" to "image/png"
         )
         else -> emptyList()
     }
 
-    private fun findFallbackCachedTile(context: Context, requested: Tile): Pair<ByteArray, String>? {
-        if (requested.source in setOf("dem", "eox16", "esri_labels", "esri_trans", "carto_labels")) return null
-        val fallbackOrder = listOf(
-            "sat" to ("jpg" to "image/jpeg"),
-            "sat_clarity" to ("jpg" to "image/jpeg"),
-            "vela_esri" to ("jpg" to "image/jpeg"),
-            "carto_voyager" to ("png" to "image/png"),
-            "esri_topo" to ("jpg" to "image/jpeg"),
-            "osm" to ("png" to "image/png"),
-            "hot" to ("png" to "image/png"),
-            "topo" to ("png" to "image/png")
-        )
+    private fun isValidImageBytes(bytes: ByteArray): Boolean {
+        if (bytes.size < 64) return false
+        val isPng = bytes[0] == 0x89.toByte() && bytes[1] == 0x50.toByte() && bytes[2] == 0x4E.toByte() && bytes[3] == 0x47.toByte()
+        val isJpg = bytes[0] == 0xFF.toByte() && bytes[1] == 0xD8.toByte()
+        val isWebp = bytes.size >= 12 && bytes[0] == 'R'.code.toByte() && bytes[1] == 'I'.code.toByte() && bytes[2] == 'F'.code.toByte() && bytes[3] == 'F'.code.toByte()
+        return isPng || isJpg || isWebp
+    }
+
+    private fun findSameFamilyCachedTile(context: Context, requested: Tile): Pair<ByteArray, String>? {
+        if (requested.isOverlay) return null
+        val fallbackOrder = if (requested.isSatelliteFamily) {
+            listOf(
+                "sat" to ("jpg" to "image/jpeg"),
+                "sat_clarity" to ("jpg" to "image/jpeg")
+            )
+        } else {
+            listOf(
+                "osm" to ("png" to "image/png"),
+                "vela_esri" to ("jpg" to "image/jpeg"),
+                "esri_topo" to ("jpg" to "image/jpeg"),
+                "hot" to ("png" to "image/png"),
+                "topo" to ("png" to "image/png")
+            )
+        }
+
+        // 1) نفس المستوى من نفس العائلة البصرية فقط (منع خلط صور الأقمار مع الشوارع)
         for ((src, extMime) in fallbackOrder) {
             if (src == requested.source) continue
             if (src == "osm") {
                 readMbtile(context, requested.copy(source = "osm", ext = "png", mime = "image/png"))?.let {
-                    return it to "image/png"
+                    if (isValidImageBytes(it)) return it to "image/png"
                 }
             }
             val f = File(OfflineMapManager.getTileCacheDir(context), "$src/${requested.z}/${requested.x}/${requested.y}.${extMime.first}")
             if (f.exists() && f.length() > 0) {
-                return f.readBytes() to extMime.second
+                val b = f.readBytes()
+                if (isValidImageBytes(b)) return b to extMime.second
+            }
+        }
+
+        // 2) قص البلاطة الأم (z-1 أو z-2) من نفس العائلة لمنع المربعات السوداء نهائياً
+        val sourcesToCheck = listOf(requested.source to (requested.ext to requested.mime)) + fallbackOrder
+        for (dz in 1..2) {
+            if (requested.z - dz < 2) break
+            val pz = requested.z - dz
+            val scale = 1 shl dz
+            val px = requested.x ushr dz
+            val py = requested.y ushr dz
+            val subX = requested.x and (scale - 1)
+            val subY = requested.y and (scale - 1)
+            for ((src, extMime) in sourcesToCheck) {
+                val parentBytes = if (src == "osm") {
+                    readMbtile(context, Tile("osm", pz, px, py, "png", "image/png"))
+                        ?: File(OfflineMapManager.getTileCacheDir(context), "osm/$pz/$px/$py.png").takeIf { it.exists() && it.length() > 0 }?.readBytes()
+                } else {
+                    File(OfflineMapManager.getTileCacheDir(context), "$src/$pz/$px/$py.${extMime.first}").takeIf { it.exists() && it.length() > 0 }?.readBytes()
+                }
+                if (parentBytes != null && isValidImageBytes(parentBytes)) {
+                    cropTileQuadrant(parentBytes, scale, subX, subY)?.let { cropped ->
+                        return cropped to "image/jpeg"
+                    }
+                }
             }
         }
         return null
     }
 
+    private fun cropTileQuadrant(parentBytes: ByteArray, scale: Int, subX: Int, subY: Int): ByteArray? {
+        return try {
+            val bmp = android.graphics.BitmapFactory.decodeByteArray(parentBytes, 0, parentBytes.size) ?: return null
+            val qW = (bmp.width / scale).coerceAtLeast(1)
+            val qH = (bmp.height / scale).coerceAtLeast(1)
+            val left = (subX * qW).coerceIn(0, bmp.width - qW)
+            val top = (subY * qH).coerceIn(0, bmp.height - qH)
+            val sub = android.graphics.Bitmap.createBitmap(bmp, left, top, qW, qH)
+            val scaled = if (qW != 256 || qH != 256) android.graphics.Bitmap.createScaledBitmap(sub, 256, 256, true) else sub
+            val out = java.io.ByteArrayOutputStream()
+            scaled.compress(android.graphics.Bitmap.CompressFormat.JPEG, 88, out)
+            if (scaled !== sub) scaled.recycle()
+            if (sub !== bmp) sub.recycle()
+            bmp.recycle()
+            out.toByteArray()
+        } catch (_: Throwable) {
+            null
+        }
+    }
+
+    private fun purgeLegacyCartoCacheOnce(context: Context) {
+        if (!legacyCartoPurged.compareAndSet(false, true)) return
+        Thread {
+            try {
+                val dir = OfflineMapManager.getTileCacheDir(context)
+                listOf("carto_voyager", "carto_labels").forEach { sub ->
+                    val f = File(dir, sub)
+                    if (f.exists()) f.deleteRecursively()
+                }
+            } catch (_: Throwable) {}
+        }.apply { isDaemon = true; start() }
+    }
+
     /** يعيد استجابة البلاطة من الذاكرة أو الكاش المحلي أو الشبكة (مع وضع أوفلاين صارم لـ MapLayer.VALHALLA_OFFLINE). */
     fun intercept(context: Context, url: String, offlineOnly: Boolean = false): WebResourceResponse? {
+        purgeLegacyCartoCacheOnce(context)
+        if (url.contains("cartocdn.com", ignoreCase = true) || url.contains("carto.com/basemaps", ignoreCase = true)) {
+            return WebResourceResponse("text/plain", "utf-8", 404, "Blocked", CORS_HEADERS, ByteArrayInputStream(ByteArray(0)))
+        }
         val tile = parse(url) ?: return null
 
         memoryCache.get(tile.key)?.let { cached ->
@@ -127,8 +205,10 @@ object OfflineTileInterceptor {
 
         if (tile.source == "osm") {
             readMbtile(context, tile)?.let { bytes ->
-                memoryCache.put(tile.key, CachedTile(bytes, "image/png"))
-                return tileResponse(bytes, "image/png")
+                if (isValidImageBytes(bytes)) {
+                    memoryCache.put(tile.key, CachedTile(bytes, "image/png"))
+                    return tileResponse(bytes, "image/png")
+                }
             }
         }
 
@@ -138,13 +218,17 @@ object OfflineTileInterceptor {
             val age = System.currentTimeMillis() - cache.lastModified()
             if (offlineOnly || eco || age <= CACHE_TTL_MS) {
                 val bytes = cache.readBytes()
-                memoryCache.put(tile.key, CachedTile(bytes, tile.mime))
-                return tileResponse(bytes, tile.mime)
+                if (isValidImageBytes(bytes)) {
+                    memoryCache.put(tile.key, CachedTile(bytes, tile.mime))
+                    return tileResponse(bytes, tile.mime)
+                } else {
+                    cache.delete()
+                }
             }
         }
 
         if (offlineOnly) {
-            findFallbackCachedTile(context, tile)?.let { (bytes, mime) ->
+            findSameFamilyCachedTile(context, tile)?.let { (bytes, mime) ->
                 memoryCache.put(tile.key, CachedTile(bytes, mime))
                 return tileResponse(bytes, mime)
             }
@@ -164,13 +248,14 @@ object OfflineTileInterceptor {
         }
 
         if (downloaded == null) {
-            // إذا فشل الاتصال نعيد النسخة المخزنة حتى لو قديمة أو بديل متوفر محلياً
             if (cache.exists() && cache.length() > 0) {
                 val old = cache.readBytes()
-                memoryCache.put(tile.key, CachedTile(old, tile.mime))
-                return tileResponse(old, tile.mime)
+                if (isValidImageBytes(old)) {
+                    memoryCache.put(tile.key, CachedTile(old, tile.mime))
+                    return tileResponse(old, tile.mime)
+                }
             }
-            findFallbackCachedTile(context, tile)?.let { (fallbackBytes, mime) ->
+            findSameFamilyCachedTile(context, tile)?.let { (fallbackBytes, mime) ->
                 memoryCache.put(tile.key, CachedTile(fallbackBytes, mime))
                 return tileResponse(fallbackBytes, mime)
             }
@@ -182,7 +267,7 @@ object OfflineTileInterceptor {
         if (mime == tile.mime) {
             try {
                 writeAtomically(cache, bytes)
-                maybePruneDiskCache(context)
+                maybePruneDiskCacheAsync(context)
             } catch (t: Throwable) {
                 Log.w(TAG, "cache write failed: ${t.message}")
             }
@@ -196,21 +281,29 @@ object OfflineTileInterceptor {
     private fun cacheFile(context: Context, t: Tile) =
         File(OfflineMapManager.getTileCacheDir(context), "${t.source}/${t.z}/${t.x}/${t.y}.${t.ext}")
 
-    private fun maybePruneDiskCache(context: Context) {
+    private fun maybePruneDiskCacheAsync(context: Context) {
         val now = System.currentTimeMillis()
-        if (now - lastPruneAt < 10 * 60_000L) return
+        if (now - lastPruneAt < 15 * 60_000L) return
+        if (!pruneRunning.compareAndSet(false, true)) return
         lastPruneAt = now
-        try {
-            val dir = OfflineMapManager.getTileCacheDir(context)
-            val files = dir.walkTopDown().filter { it.isFile && !it.name.endsWith(".tmp") }.toList()
-            var total = files.sumOf { it.length() }
-            if (total <= MAX_DISK_CACHE_BYTES) return
-            for (f in files.sortedBy { it.lastModified() }) {
-                if (total <= MAX_DISK_CACHE_BYTES * 8 / 10) break
-                val len = f.length()
-                if (f.delete()) total -= len
+        val appCtx = context.applicationContext
+        Thread {
+            try {
+                val dir = OfflineMapManager.getTileCacheDir(appCtx)
+                val files = dir.walkTopDown().filter { it.isFile && !it.name.endsWith(".tmp") }.toList()
+                var total = files.sumOf { it.length() }
+                if (total > MAX_DISK_CACHE_BYTES) {
+                    for (f in files.sortedBy { it.lastModified() }) {
+                        if (total <= MAX_DISK_CACHE_BYTES * 8 / 10) break
+                        val len = f.length()
+                        if (f.delete()) total -= len
+                    }
+                }
+            } catch (_: Throwable) {
+            } finally {
+                pruneRunning.set(false)
             }
-        } catch (_: Throwable) {}
+        }.apply { isDaemon = true; start() }
     }
 
     private fun writeAtomically(target: File, bytes: ByteArray) {
@@ -224,15 +317,16 @@ object OfflineTileInterceptor {
         var c: HttpURLConnection? = null
         return try {
             c = (URL(url).openConnection() as HttpURLConnection).apply {
-                connectTimeout = 3_000; readTimeout = 4_500
+                connectTimeout = 2_500; readTimeout = 4_000
+                instanceFollowRedirects = true
                 useCaches = true
                 setRequestProperty("User-Agent", USER_AGENT)
             }
             if (c.responseCode != 200) return null
             val data = c.inputStream.use { it.readBytes() }
-            if (data.isEmpty() || data.size > MAX_TILE_BYTES) null else data
-        } catch (t: Throwable) {
-            null            // لا اتصال: لا بلاطة (الخريطة تعرض ما هو مخزّن فقط)
+            if (data.isEmpty() || data.size > MAX_TILE_BYTES || !isValidImageBytes(data)) null else data
+        } catch (_: Throwable) {
+            null
         } finally {
             c?.disconnect()
         }

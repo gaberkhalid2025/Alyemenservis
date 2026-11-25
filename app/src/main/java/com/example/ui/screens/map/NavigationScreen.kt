@@ -6,10 +6,12 @@ import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -28,6 +30,7 @@ import com.example.ui.screens.map.components.PrimaryLayersBottomSheet
 import com.example.ui.screens.map.components.RouteStreetsBottomSheet
 import com.example.ui.screens.map.components.RouteStreetsHelper
 import com.example.ui.screens.map.utils.MapDistanceCalculator
+import com.example.ui.theme.*
 import com.example.utils.*
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
@@ -176,6 +179,7 @@ fun NavigationScreen(
     var focusRouteTick by remember { mutableIntStateOf(0) }
     var navRecenterTick by remember { mutableIntStateOf(0) }
     var showLabelsOnMap by remember { mutableStateOf(true) }
+    var showNavMenu by remember { mutableStateOf(false) }
 
     val speedEstimator = remember { SpeedEstimator() }
     val offRoute = remember { OffRouteDetector(NavConfig.OFF_ROUTE_THRESHOLD_METERS) }
@@ -493,118 +497,133 @@ fun NavigationScreen(
             modifier = Modifier.fillMaxSize()
         )
 
-        NavigationTopOverlay(
-            engineLabel = engineLabel,
-            isApproximate = isApproximate,
-            isTilesDownloaded = isTilesDownloaded,
-            nativeError = nativeError,
-            waypoints = waypoints.toList(),
-            currentWaypointIndex = currentWaypointIndex,
-            isTopCardCollapsed = isTopCardCollapsed,
-            onToggleTopCardCollapsed = { isTopCardCollapsed = it },
-            upcoming = upcoming,
-            isLoadingRoute = isLoadingRoute,
-            hasResult = result != null,
-            voiceEnabled = voiceEnabled,
-            onToggleVoice = { voiceEnabled = !voiceEnabled },
-            dialectVoice = dialectVoice,
-            voiceUsingFallback = voiceState.usingAudioCueFallback,
-            currentSpeedKmh = currentSpeedKmh,
-            distToManeuver = distToManeuver,
-            instructionText = instructionText,
-            activeHazardBanner = activeHazardBanner,
-            onToggleMapMode = { mapMode = if (mapMode == MapMode.OSM) MapMode.SATELLITE else MapMode.OSM },
-            onOpenAddStop = { showAddStopDialog = true },
-            onOpenDownloadDialog = { showDownloadDialog = true },
-            onRemoveWaypoint = { index ->
-                waypoints.removeAt(index)
-                if (index < currentWaypointIndex) currentWaypointIndex -= 1
-                if (currentWaypointIndex >= waypoints.size) navigationFinished = true else routeVersion += 1
-            },
-            onOpenVoiceSetup = { showVoiceSetupDialog = true },
-            vehicleProfile = vehicleProfile,
-            onCycleVehicleProfile = {
-                val next = vehicleProfile.next()
-                vehicleProfile = next
-                scope.launch {
-                    snackbarHostState.showSnackbar("${next.emoji} وضع المركبة: ${next.labelAr}")
-                }
-            },
-            streetCount = routeStreets.size,
-            onOpenStreets = { showStreetsSheet = true },
-            onOpenLayersSheet = { showNavLayersSheet = true },
-            modifier = Modifier.align(Alignment.TopCenter)
-        )
+        Column(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .statusBarsPadding()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // [نظام خرائط وملاحة عالمي - ملكنا]
+            NavTopCard(
+                maneuver = if (isApproximate) ManeuverType.STRAIGHT else (upcoming?.maneuverType ?: ManeuverType.STRAIGHT),
+                distanceMeters = distToManeuver,
+                instruction = instructionText,
+                thenText = steps.getOrNull(currentStepIndex + 2)?.instruction,
+                statusText = when {
+                    !hasRealLocation && !drActive -> "إشارة GPS ضعيفة — نتابع التوجيه"
+                    isApproximate -> "مسار تقريبي (خط مستقيم)"
+                    nativeError != null -> "تعذر تحميل خرائط الأوفلاين"
+                    else -> null
+                },
+                speedKmh = currentSpeedKmh,
+                onExpand = { showStreetsSheet = true }
+            )
+        }
 
         if (!followUser) {
-            Surface(
-                onClick = {
-                    followUser = true
-                    navRecenterTick++
-                },
-                shape = RoundedCornerShape(20.dp),
-                color = Color(0xFF0F172A).copy(alpha = 0.95f),
-                border = BorderStroke(1.dp, Color(0xFF00E5FF)),
-                shadowElevation = 8.dp,
+            Box(
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
                     .padding(end = 12.dp)
-                    .testTag("nav_recenter_pill")
             ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Icon(Icons.Default.MyLocation, contentDescription = "موقعي", tint = Color(0xFF00E5FF), modifier = Modifier.size(18.dp))
-                    Text("موقعي", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                }
+                StatusPill(
+                    text = "إعادة التمركز",
+                    color = MapUi.RoyalTop,
+                    icon = Icons.Default.MyLocation,
+                    modifier = Modifier.clickable {
+                        followUser = true
+                        navRecenterTick++
+                    }.testTag("nav_recenter_pill")
+                )
             }
         }
 
         SnackbarHost(
             snackbarHostState,
-            modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 240.dp)
+            modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 200.dp)
         )
 
-        NavigationBottomOverlay(
-            context = context,
-            scope = scope,
-            snackbarHostState = snackbarHostState,
-            bookingId = bookingId,
-            chatBridge = chatBridge,
-            etaClock = etaClock,
-            result = result,
-            isApproximate = isApproximate,
-            remainingSeconds = remainingSeconds,
-            remainingMeters = remainingMeters,
-            totalMeters = totalMeters,
+        NavBottomPanel(
+            arrivalClock = etaClock,
+            durationText = MapDistanceCalculator.formatDuration(remainingSeconds),
+            distanceText = MapDistanceCalculator.formatDistance(remainingMeters),
+            destinationName = target?.name ?: "الوجهة",
             progress = progress,
-            isBottomCardCollapsed = isBottomCardCollapsed,
-            onToggleBottomCardCollapsed = { isBottomCardCollapsed = it },
-            onRequestExit = { showExitConfirm = true },
-            onOpenHud = { showHud = true },
-            isRecordingTrip = isRecordingTrip,
-            recordedPointCount = recordedPointCount,
-            onToggleRecordTrip = {
-                isRecordingTrip = !isRecordingTrip
-                if (isRecordingTrip && hasRealLocation) {
-                    tripRecorder.record(userLat, userLng)
-                    recordedPointCount = tripRecorder.size
-                }
-                scope.launch {
-                    snackbarHostState.showSnackbar(
-                        if (isRecordingTrip) "⏺️ بدأ تسجيل مسار الرحلة"
-                        else "⏸️ توقف التسجيل ($recordedPointCount نقطة محفوظة)"
+            isApproximate = isApproximate,
+            onEnd = { showExitConfirm = true },
+            onMore = { showNavMenu = true },
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
+                .padding(horizontal = 12.dp, vertical = 8.dp)
+        )
+
+        if (showNavMenu) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 120.dp)
+            ) {
+                DropdownMenu(
+                    expanded = showNavMenu,
+                    onDismissRequest = { showNavMenu = false },
+                    containerColor = MapUi.SurfaceSolid,
+                    modifier = Modifier.border(1.dp, MapUi.Border, RoundedCornerShape(MapUi.RadiusS))
+                ) {
+                    DropdownMenuItem(
+                        text = { Text(if (voiceEnabled) "كتم الصوت" else "تشغيل الصوت", color = MapUi.TextPrimary) },
+                        leadingIcon = { Icon(if (voiceEnabled) Icons.Default.VolumeUp else Icons.Default.VolumeOff, null, tint = MapUi.RoyalTop) },
+                        onClick = { showNavMenu = false; voiceEnabled = !voiceEnabled }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("وضع HUD للزجاج", color = MapUi.TextPrimary) },
+                        leadingIcon = { Icon(Icons.Default.Speed, null, tint = MapUi.Ok) },
+                        onClick = { showNavMenu = false; showHud = true }
+                    )
+                    DropdownMenuItem(
+                        text = { Text(if (isRecordingTrip) "إيقاف تسجيل الرحلة" else "تسجيل الرحلة (GPX)", color = MapUi.TextPrimary) },
+                        leadingIcon = { Icon(Icons.Default.FiberManualRecord, null, tint = MapUi.Danger) },
+                        onClick = {
+                            showNavMenu = false
+                            isRecordingTrip = !isRecordingTrip
+                            if (isRecordingTrip && hasRealLocation) {
+                                tripRecorder.record(userLat, userLng)
+                                recordedPointCount = tripRecorder.size
+                            }
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("تصدير تقرير PDF", color = MapUi.TextPrimary) },
+                        leadingIcon = { Icon(Icons.Default.PictureAsPdf, null, tint = MapUi.Warn) },
+                        onClick = {
+                            showNavMenu = false
+                            shareNavigationPdf(
+                                context = context,
+                                scope = scope,
+                                snackbarHostState = snackbarHostState,
+                                targetName = target?.name ?: "الوجهة",
+                                coords = result?.coordinates.orEmpty(),
+                                waypoints = waypoints.toList(),
+                                steps = steps,
+                                totalDistanceMeters = totalMeters,
+                                totalDurationSeconds = result?.totalDurationSeconds ?: 0.0
+                            )
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("إضافة محطة وسيطة", color = MapUi.TextPrimary) },
+                        leadingIcon = { Icon(Icons.Default.AddLocationAlt, null, tint = MapUi.Accent) },
+                        onClick = { showNavMenu = false; showAddStopDialog = true }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("طبقات الخريطة", color = MapUi.TextPrimary) },
+                        leadingIcon = { Icon(Icons.Default.Layers, null, tint = MapUi.Ok) },
+                        onClick = { showNavMenu = false; showNavLayersSheet = true }
                     )
                 }
-            },
-            tripRecorder = tripRecorder,
-            target = target,
-            waypoints = waypoints.toList(),
-            steps = steps,
-            modifier = Modifier.align(Alignment.BottomCenter)
-        )
+            }
+        }
 
         if (showHud) {
             BackHandler(enabled = true) { showHud = false }

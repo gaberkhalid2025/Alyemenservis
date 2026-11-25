@@ -85,28 +85,28 @@ fun MapFilterBar(
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
-        // Single Top Glassmorphism Capsule
+        // [نظام خرائط وملاحة عالمي - ملكنا] كبسولة البحث الزجاجية بنظام الأزرق الملكي
         Surface(
-            shape = RoundedCornerShape(26.dp),
-            color = Color(0xFF0F172A).copy(alpha = 0.92f),
-            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.14f)),
-            shadowElevation = 12.dp,
+            shape = RoundedCornerShape(28.dp),
+            color = com.example.ui.theme.MapUi.Surface,
+            border = BorderStroke(1.1.dp, com.example.ui.theme.MapUi.BorderGlow),
+            shadowElevation = 14.dp,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(54.dp)
+                .height(56.dp)
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(horizontal = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 // Back Button
                 IconButton(
                     onClick = onBackClick,
                     modifier = Modifier
-                        .size(36.dp)
+                        .size(40.dp)
                         .testTag("map_back_btn")
                 ) {
                     Icon(
@@ -121,7 +121,7 @@ fun MapFilterBar(
                 Icon(
                     imageVector = Icons.Default.Search,
                     contentDescription = "بحث",
-                    tint = Color(0xFF10B981),
+                    tint = com.example.ui.theme.MapUi.RoyalTop,
                     modifier = Modifier.size(20.dp)
                 )
 
@@ -131,7 +131,7 @@ fun MapFilterBar(
                     onValueChange = onSearchQueryChange,
                     placeholder = {
                         Text(
-                            text = "ابحث عن شارع، متجر، جولة، أو تقاطع...",
+                            text = "ابحث عن شارع، متجر، جولة، أو معلم...",
                             fontSize = 12.sp,
                             color = Color(0xFF94A3B8),
                             maxLines = 1
@@ -147,7 +147,7 @@ fun MapFilterBar(
                         unfocusedContainerColor = Color.Transparent,
                         focusedIndicatorColor = Color.Transparent,
                         unfocusedIndicatorColor = Color.Transparent,
-                        cursorColor = Color(0xFF10B981)
+                        cursorColor = com.example.ui.theme.MapUi.RoyalTop
                     ),
                     singleLine = true,
                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(

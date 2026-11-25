@@ -30,13 +30,16 @@
         #map {
             width: 100%;
             height: 100%;
-            background-color: #0F172A;
-            background-image: 
-                linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
-            background-size: 32px 32px;
+            background-color: #0B1220;
             transition: transform 0.3s ease;
         }
+        .leaflet-container { background: #0B1220 !important; }
+        .leaflet-tile { outline: 1px solid transparent; }
+
+        .custom-pin-label, .osm-poi-text { display: none !important; }
+        #map.lbl-on .custom-pin-label,
+        #map.lbl-on .osm-poi-text,
+        .custom-pin-container:hover .custom-pin-label { display: block !important; }
 
         /* Marker Badge Design */
         .custom-leaflet-marker {
@@ -55,6 +58,7 @@
             -webkit-user-select: none;
             width: 145px;
         }
+        /* [نظام خرائط وملاحة عالمي - ملكنا] */
         .custom-pin-head {
             width: 38px;
             height: 38px;
@@ -62,30 +66,65 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 19px;
+            font-size: 18px;
             color: #ffffff;
-            border: 2.5px solid #ffffff;
-            box-shadow: 0 4px 14px rgba(0,0,0,0.6);
+            background-image: radial-gradient(circle at 32% 26%, rgba(255,255,255,0.52) 0%, rgba(255,255,255,0.10) 38%, rgba(0,0,0,0.22) 100%);
+            border: 2px solid rgba(255,255,255,0.88);
+            box-shadow: inset 0 2px 4px rgba(255,255,255,0.5), inset 0 -3px 6px rgba(0,0,0,0.35), 0 6px 16px rgba(0,0,0,0.65);
             transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
         .custom-pin-head:hover,
         .custom-pin-head:active {
             transform: scale(1.18);
         }
+        .crystal-pin-wrap {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            filter: drop-shadow(0 8px 14px rgba(30, 58, 138, 0.65));
+        }
+        .crystal-pin-head {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: linear-gradient(145deg, #5B86FF 0%, #3A6BFF 50%, #2851D8 100%);
+            border: 2.5px solid rgba(255,255,255,0.92);
+            box-shadow: inset 3px 3px 8px rgba(255,255,255,0.55), inset -3px -4px 10px rgba(15, 23, 42, 0.45);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        .crystal-pin-dome {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 35% 35%, #ffffff 0%, #dbeafe 70%, #93c5fd 100%);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+        }
+        .crystal-pin-tail {
+            width: 0;
+            height: 0;
+            border-left: 8px solid transparent;
+            border-right: 8px solid transparent;
+            border-top: 13px solid #2851D8;
+            margin-top: -3px;
+        }
         .custom-pin-label {
-            background: rgba(15, 23, 42, 0.95);
+            background: rgba(15, 23, 42, 0.94);
             color: #ffffff;
             font-size: 11px;
             font-weight: 700;
-            padding: 2.5px 8px;
+            padding: 3px 9px;
             border-radius: 12px;
-            margin-top: 3px;
+            margin-top: 4px;
             white-space: nowrap;
-            max-width: 140px;
+            max-width: 145px;
             overflow: hidden;
             text-overflow: ellipsis;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.7);
-            border: 1px solid rgba(0, 229, 255, 0.55);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.75);
+            border: 1px solid rgba(91, 134, 255, 0.55);
             text-align: center;
             pointer-events: none;
         }
@@ -99,19 +138,19 @@
         .user-dot {
             width: 16px;
             height: 16px;
-            background: #00E5FF;
+            background: linear-gradient(145deg, #5B86FF, #00E5FF);
             border: 3px solid #ffffff;
             border-radius: 50%;
             position: absolute;
             top: 4px;
             left: 4px;
-            box-shadow: 0 0 14px #00E5FF;
+            box-shadow: 0 0 16px #3A6BFF;
             z-index: 2;
         }
         .user-pulse {
             width: 40px;
             height: 40px;
-            background: rgba(0, 229, 255, 0.35);
+            background: rgba(58, 107, 255, 0.35);
             border-radius: 50%;
             position: absolute;
             top: -8px;
@@ -132,7 +171,7 @@
             display: none !important;
         }
 
-        /* Compact OSM POI overlay markers */
+        /* Compact 3D Glass Dome OSM POI overlay markers */
         .osm-poi-marker {
             background: transparent !important;
             border: none !important;
@@ -148,16 +187,17 @@
             width: 130px;
         }
         .osm-poi-dot {
-            width: 24px;
-            height: 24px;
+            width: 26px;
+            height: 26px;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             font-size: 12px;
             color: #ffffff;
-            border: 2px solid #ffffff;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.85);
+            background-image: radial-gradient(circle at 30% 25%, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.08) 42%, rgba(0,0,0,0.24) 100%);
+            border: 1.8px solid rgba(255,255,255,0.9);
+            box-shadow: inset 0 1.5px 3px rgba(255,255,255,0.5), 0 3px 10px rgba(0,0,0,0.8);
         }
         .osm-poi-text {
             margin-top: 2px;
@@ -254,16 +294,19 @@
                 var el = currentBaseLayer.getContainer();
                 if (!el) return;
                 if (!nightEnabled) {
-                    el.style.filter = '';
-                    el.style.webkitFilter = '';
+                    var dayFilter = (currentProviderKey === 'satellite' || currentProviderKey === 'satellite_clarity')
+                        ? 'contrast(1.04) saturate(1.06)'
+                        : 'contrast(1.08) saturate(1.12)';
+                    el.style.filter = dayFilter;
+                    el.style.webkitFilter = dayFilter;
                     return;
                 }
                 if (currentProviderKey === 'satellite' || currentProviderKey === 'satellite_clarity') {
-                    var satFilter = 'brightness(0.80) contrast(1.05)';
+                    var satFilter = 'brightness(0.80) contrast(1.06)';
                     el.style.filter = satFilter;
                     el.style.webkitFilter = satFilter;
                 } else {
-                    var vectorFilter = 'invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.95) saturate(0.85)';
+                    var vectorFilter = 'invert(1) hue-rotate(180deg) brightness(0.92) contrast(1.02) saturate(0.90)';
                     el.style.filter = vectorFilter;
                     el.style.webkitFilter = vectorFilter;
                 }
@@ -288,9 +331,10 @@
         }
 
         var ATTR_OSM = '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
+        // [نظام خرائط وملاحة عالمي - ملكنا] إزالة CARTO واستخدام مصادر حرة 100% بدون مفاتيح API
         var providers = {
-            'osm': L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png', {
-                maxZoom: 24, maxNativeZoom: 20, subdomains: ['a', 'b', 'c', 'd'], updateWhenIdle: false, updateWhenZooming: false, keepBuffer: 2, attribution: ATTR_OSM + ' · CARTO'
+            'osm': L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 24, maxNativeZoom: 19, updateWhenIdle: false, updateWhenZooming: false, keepBuffer: 2, attribution: ATTR_OSM
             }),
             'osm_raw': L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 maxZoom: 24, maxNativeZoom: 19, updateWhenIdle: false, updateWhenZooming: false, keepBuffer: 2, attribution: ATTR_OSM
@@ -300,19 +344,19 @@
                 attribution: ATTR_OSM + ' — HOT'
             }),
             'topo': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
-                maxZoom: 24, maxNativeZoom: 19, updateWhenIdle: false, updateWhenZooming: false, keepBuffer: 2,
+                maxZoom: 24, maxNativeZoom: 18, updateWhenIdle: false, updateWhenZooming: false, keepBuffer: 2,
                 attribution: 'تضاريس © Esri — ' + ATTR_OSM
             }),
             'vela': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
-                maxZoom: 24, maxNativeZoom: 19, updateWhenIdle: false, updateWhenZooming: false, keepBuffer: 2,
+                maxZoom: 24, maxNativeZoom: 18, updateWhenIdle: false, updateWhenZooming: false, keepBuffer: 2,
                 attribution: 'خرائط VELA — © Esri Street'
             }),
             'satellite': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-                maxZoom: 24, maxNativeZoom: 19, updateWhenIdle: false, updateWhenZooming: false, keepBuffer: 2,
+                maxZoom: 24, maxNativeZoom: 18, updateWhenIdle: false, updateWhenZooming: false, keepBuffer: 2,
                 attribution: 'صور © Esri'
             }),
             'satellite_clarity': L.tileLayer('https://clarity.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-                maxZoom: 24, maxNativeZoom: 19, updateWhenIdle: false, updateWhenZooming: false, keepBuffer: 2,
+                maxZoom: 24, maxNativeZoom: 18, updateWhenIdle: false, updateWhenZooming: false, keepBuffer: 2,
                 attribution: 'صور Clarity © Esri'
             })
         };
@@ -345,21 +389,62 @@
         }
         window.setLabelsVisible = setLabelsVisible;
 
-        var tileOk = 0, tileErr = 0, tilesFailingNotified = false;
+        var tileOk = 0, tileErr = 0, tilesFailingNotified = false, tileTimeoutTimer = null;
+        var fallbackGridLayer = null;
+        function ensureFallbackCanvasGrid() {
+            if (!map) return;
+            if (!fallbackGridLayer) {
+                var CanvasGrid = L.GridLayer.extend({
+                    createTile: function (coords) {
+                        var tile = document.createElement('canvas');
+                        var size = this.getTileSize();
+                        tile.width = size.x;
+                        tile.height = size.y;
+                        var ctx = tile.getContext('2d');
+                        ctx.fillStyle = '#0D1526';
+                        ctx.fillRect(0, 0, size.x, size.y);
+                        ctx.strokeStyle = 'rgba(58, 107, 255, 0.16)';
+                        ctx.lineWidth = 1;
+                        for (var g = 0; g <= size.x; g += 64) {
+                            ctx.beginPath(); ctx.moveTo(g, 0); ctx.lineTo(g, size.y); ctx.stroke();
+                            ctx.beginPath(); ctx.moveTo(0, g); ctx.lineTo(size.x, g); ctx.stroke();
+                        }
+                        ctx.strokeStyle = 'rgba(147, 197, 253, 0.08)';
+                        ctx.strokeRect(0, 0, size.x, size.y);
+                        return tile;
+                    }
+                });
+                fallbackGridLayer = new CanvasGrid({ zIndex: 1, tileSize: 256 });
+            }
+            if (!map.hasLayer(fallbackGridLayer)) {
+                fallbackGridLayer.addTo(map);
+                fallbackGridLayer.bringToBack();
+            }
+        }
         function notifyTiles(failing) {
+            if (failing) ensureFallbackCanvasGrid();
             if (window.AndroidBridge && window.AndroidBridge.onTilesFailing) window.AndroidBridge.onTilesFailing(failing);
         }
         function watchLayer(layer) {
             tileOk = 0; tileErr = 0; tilesFailingNotified = false;
+            if (tileTimeoutTimer) { clearTimeout(tileTimeoutTimer); tileTimeoutTimer = null; }
+            ensureFallbackCanvasGrid();
             if (!layer) return;
+            tileTimeoutTimer = setTimeout(function () {
+                if (tileOk === 0 && !tilesFailingNotified) {
+                    tilesFailingNotified = true;
+                    notifyTiles(true);
+                }
+            }, 7000);
             layer.off('tileload'); layer.off('tileerror');
             layer.on('tileload', function () {
                 tileOk++;
+                if (tileTimeoutTimer) { clearTimeout(tileTimeoutTimer); tileTimeoutTimer = null; }
                 if (tilesFailingNotified && tileOk >= 3) { tilesFailingNotified = false; notifyTiles(false); }
             });
             layer.on('tileerror', function () {
                 tileErr++;
-                if (!tilesFailingNotified && tileErr >= 6 && tileOk < tileErr / 3) {
+                if (!tilesFailingNotified && tileErr >= 5 && tileOk < tileErr / 3) {
                     tilesFailingNotified = true;
                     notifyTiles(true);
                 }
@@ -375,29 +460,22 @@
 
         var hybridLabelsActive = true;
         var labelsLayerGroup = null;
-        function setHybridLabels(on) {
-            hybridLabelsActive = (on !== undefined) ? !!on : true;
+        function applyHybridLabelsOverlay(shouldShow) {
             if (!map) return;
-            if (hybridLabelsActive) {
+            if (shouldShow) {
                 if (!labelsLayerGroup) {
                     ensurePane('labelsPane', 250);
                     labelsLayerGroup = L.layerGroup([
                         L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}', {
-                            maxZoom: 24, maxNativeZoom: 19,
+                            maxZoom: 24, maxNativeZoom: 18, minZoom: 14,
                             pane: 'labelsPane',
-                            opacity: 0.95
+                            opacity: 0.86
                         }),
                         L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
-                            maxZoom: 24, maxNativeZoom: 19,
+                            maxZoom: 24, maxNativeZoom: 18, minZoom: 12,
                             pane: 'labelsPane',
-                            opacity: 0.98
-                        }),
-                        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}.png', {
-                            maxZoom: 24, maxNativeZoom: 20,
-                            subdomains: ['a', 'b', 'c', 'd'],
-                            pane: 'labelsPane',
-                            opacity: 0.98,
-                            attribution: 'أسماء © <a href="https://carto.com">CARTO</a> / OSM'
+                            opacity: 0.90,
+                            attribution: 'أسماء © Esri'
                         })
                     ]);
                 }
@@ -405,6 +483,11 @@
             } else if (labelsLayerGroup && map.hasLayer(labelsLayerGroup)) {
                 map.removeLayer(labelsLayerGroup);
             }
+        }
+        function setHybridLabels(on) {
+            hybridLabelsActive = (on !== undefined) ? !!on : true;
+            var isSatMode = (currentProviderKey === 'satellite' || currentProviderKey === 'satellite_clarity');
+            applyHybridLabelsOverlay(hybridLabelsActive && isSatMode);
         }
         window.setHybridLabels = setHybridLabels;
 
@@ -757,28 +840,41 @@
         }
         window.setEumet = setEumet;
 
-        function initMap(lat, lng, mode) {
+        function initMap(lat, lng, mode, initialZoom) {
             userLat = lat || 15.3694;
             userLng = lng || 44.1910;
             activeMode = mode || 'SATELLITE';
+            var startZoom = (typeof initialZoom === 'number' && isFinite(initialZoom)) ? Math.max(3, Math.min(20, Math.round(initialZoom))) : 15;
 
             try {
                 map = L.map('map', {
                     zoomControl: false,
                     attributionControl: true,
-                    fadeAnimation: true,
+                    fadeAnimation: false,
                     zoomAnimation: true,
-                    preferCanvas: true
+                    preferCanvas: true,
+                    zoomSnap: 1,
+                    zoomDelta: 1
                 });
                 runProgrammaticMove(function () {
-                    map.setView([userLat, userLng], 15);
+                    map.setView([userLat, userLng], startZoom);
                 });
                 if (map.attributionControl) {
                     map.attributionControl.setPrefix(false);
                 }
 
                 setLayer(activeMode);
-                setHybridLabels(true);
+
+                function updateLabelLevel() {
+                    try {
+                        if (map) {
+                            var z = map.getZoom();
+                            map.getContainer().classList.toggle('lbl-on', z >= 16);
+                        }
+                    } catch (e) {}
+                }
+                map.on('zoomend', updateLabelLevel);
+                updateLabelLevel();
 
                 markerClusterGroup = L.markerClusterGroup({
                     maxClusterRadius: 24,
@@ -922,9 +1018,8 @@
                 watchLayer(currentBaseLayer);
                 currentProviderKey = providerKey;
                 applyNight();
-                if (hybridLabelsActive && (providerKey === 'satellite' || providerKey === 'satellite_clarity')) {
-                    setHybridLabels(true);
-                }
+                var isSatMode = (providerKey === 'satellite' || providerKey === 'satellite_clarity');
+                applyHybridLabelsOverlay(hybridLabelsActive && isSatMode);
             }
 
             currentBaseIcon = icon;
@@ -1169,9 +1264,11 @@
                 var p = JSON.parse(jsonStr); // {name,lat,lng}
                 if (!map) return;
                 if (searchPin) { map.removeLayer(searchPin); searchPin = null; }
-                var html = '<div class="custom-pin-container"><div class="custom-pin-head" style="background-color:#F59E0B;">📍</div>' +
+                var html = '<div class="custom-pin-container crystal-pin-wrap">' +
+                    '<div class="crystal-pin-head"><div class="crystal-pin-dome"></div></div>' +
+                    '<div class="crystal-pin-tail"></div>' +
                     '<div class="custom-pin-label">' + esc(p.name) + '</div></div>';
-                var icon = L.divIcon({ className: 'custom-leaflet-marker', html: html, iconSize: [145, 65], iconAnchor: [72, 38] });
+                var icon = L.divIcon({ className: 'custom-leaflet-marker', html: html, iconSize: [145, 82], iconAnchor: [72, 54] });
                 searchPin = L.marker([p.lat, p.lng], { icon: icon }).addTo(map);
                 runProgrammaticMove(function () {
                     map.flyTo([p.lat, p.lng], 17, { duration: 1.0, easeLinearity: 0.25 });
@@ -1233,10 +1330,27 @@
         }
         window.setMapInsets = setMapInsets;
 
-        // Auto initialize on load if not called by Android view
+        // Auto initialize on load using URL hash coordinates/mode for instant first-frame rendering
         window.onload = function() {
             if (!map) {
-                initMap(15.3694, 44.1910, 'SATELLITE');
+                var lat = 15.3694, lng = 44.1910, mode = 'SATELLITE', zoom = 15;
+                try {
+                    var h = (window.location.hash || '').replace(/^#/, '');
+                    if (h) {
+                        var params = {};
+                        h.split('&').forEach(function (part) {
+                            var kv = part.split('=');
+                            if (kv.length === 2) params[decodeURIComponent(kv[0])] = decodeURIComponent(kv[1]);
+                        });
+                        var pLat = parseFloat(params.lat);
+                        var pLng = parseFloat(params.lng);
+                        var pZoom = parseInt(params.zoom, 10);
+                        if (isFinite(pLat) && isFinite(pLng) && (pLat !== 0 || pLng !== 0)) { lat = pLat; lng = pLng; }
+                        if (isFinite(pZoom)) zoom = pZoom;
+                        if (params.mode) mode = params.mode;
+                    }
+                } catch (e) {}
+                initMap(lat, lng, mode, zoom);
             }
         };
     </script>

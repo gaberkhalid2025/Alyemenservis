@@ -99,7 +99,7 @@
           tiles: baseTileUrls(mode),
           tileSize: 256,
           maxzoom: 19,
-          attribution: '© OpenStreetMap / Esri / CARTO'
+          attribution: '© OpenStreetMap / Esri'
         }
       },
       layers: [
@@ -340,7 +340,6 @@
     if (!map || !styleReady) { pending.hybrid = !!on; return; }
     toggleRasterOverlay('labels-3d-trans', 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}', 0.92, on);
     toggleRasterOverlay('labels-3d', 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', 0.95, on);
-    toggleRasterOverlay('labels-3d-carto', 'https://a.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}.png', 0.98, on);
   };
 
   window.setEox3D = function (on) {

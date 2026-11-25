@@ -31,7 +31,7 @@ object NavConfig {
     // Smart Navigation Zoom
     const val SMART_ZOOM_NEAR_METERS = 200.0
     const val SMART_ZOOM_NEAR_LEVEL = 18
-    const val SMART_ZOOM_CRUISE_LEVEL = 15
+    const val SMART_ZOOM_CRUISE_LEVEL = 17
     
     // Default Yemen Location (Sana'a)
     const val DEFAULT_YEMEN_LAT = 15.3694
