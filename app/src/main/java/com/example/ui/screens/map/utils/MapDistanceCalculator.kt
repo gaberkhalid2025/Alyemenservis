@@ -22,8 +22,8 @@ object MapDistanceCalculator {
 
     fun formatDistance(meters: Double): String {
         if (meters.isNaN() || meters < 0) return "—"
-        return if (meters < 1000) "${meters.roundToInt()} م"
-        else String.format(java.util.Locale.US, "%.1f كم", meters / 1000.0)
+        return if (meters < 1000) "${meters.roundToInt()}\u00A0م"
+        else String.format(java.util.Locale.US, "%.1f\u00A0كم", meters / 1000.0)
     }
 
     /** للنطق: يقرّب إلى 10 م (<100) أو 50 م، وللكيلومترات رقم عشري واحد. */

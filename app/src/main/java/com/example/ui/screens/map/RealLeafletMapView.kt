@@ -489,6 +489,7 @@ fun RealLeafletMapView(
                             runCatching { clearCache(true) }
                             cachePrefs.edit().putBoolean("v2026_cleared_carto_cache", true).apply()
                         }
+                        OfflineTileInterceptor.migrateCacheIfNeeded(ctx)
                         setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
                         setBackgroundColor(android.graphics.Color.parseColor("#0F172A"))
                         settings.apply {

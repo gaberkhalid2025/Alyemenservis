@@ -197,12 +197,16 @@ internal fun NavigationTopOverlay(
                     modifier = Modifier.size(56.dp).align(Alignment.CenterHorizontally)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            maneuverIcon(if (isApproximate) null else upcoming?.maneuverType),
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(30.dp)
-                        )
+                        androidx.compose.runtime.CompositionLocalProvider(
+                            androidx.compose.ui.platform.LocalLayoutDirection provides androidx.compose.ui.unit.LayoutDirection.Ltr
+                        ) {
+                            Icon(
+                                maneuverIcon(if (isApproximate) null else upcoming?.maneuverType),
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(30.dp)
+                            )
+                        }
                     }
                 }
             } else {
@@ -222,7 +226,13 @@ internal fun NavigationTopOverlay(
                             Surface(shape = CircleShape, color = Color(0xFF0284C7), modifier = Modifier.size(44.dp)) {
                                 Box(contentAlignment = Alignment.Center) {
                                     if (isLoadingRoute && !hasResult) CircularProgressIndicator(Modifier.size(22.dp), color = Color.White, strokeWidth = 2.dp)
-                                    else Icon(maneuverIcon(if (isApproximate) null else upcoming?.maneuverType), contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp))
+                                    else {
+                                        androidx.compose.runtime.CompositionLocalProvider(
+                                            androidx.compose.ui.platform.LocalLayoutDirection provides androidx.compose.ui.unit.LayoutDirection.Ltr
+                                        ) {
+                                            Icon(maneuverIcon(if (isApproximate) null else upcoming?.maneuverType), contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp))
+                                        }
+                                    }
                                 }
                             }
                             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {

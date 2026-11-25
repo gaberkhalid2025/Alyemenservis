@@ -672,15 +672,40 @@ fun MapScreenContent(
                 }
             }
 
+            val isGpsHardwareEnabled = remember(context, hasRealLocation) {
+                val lm = context.getSystemService(android.content.Context.LOCATION_SERVICE) as? android.location.LocationManager
+                lm != null && (
+                    lm.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER) ||
+                    lm.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER)
+                )
+            }
+
             MapContextBanner(
                 text = when {
                     areTilesFailing -> "الخريطة تحتاج إنترنت أو حزمة عرض"
-                    !hasRealLocation -> "إشارة GPS ضعيفة — تأكد من الموقع"
+                    !isGpsHardwareEnabled -> "الموقع متوقف — يرجى تفعيل GPS"
+                    !hasRealLocation -> "جارٍ البحث عن الأقمار الصناعية (GPS)…"
+                    accuracyForBanner in 61f..1500f -> "دقة الموقع تقريبية (±${accuracyForBanner.toInt()} م)"
                     else -> null
                 },
-                color = if (areTilesFailing) MapUi.Warn else MapUi.Danger,
-                icon = if (areTilesFailing) Icons.Default.CloudOff else Icons.Default.GpsOff,
-                onClick = { if (areTilesFailing) showDownloadDialog = true },
+                color = when {
+                    areTilesFailing -> MapUi.Warn
+                    !isGpsHardwareEnabled -> MapUi.Danger
+                    !hasRealLocation -> MapUi.Warn
+                    else -> MapUi.RoyalTop
+                },
+                icon = when {
+                    areTilesFailing -> Icons.Default.CloudOff
+                    !isGpsHardwareEnabled -> Icons.Default.LocationDisabled
+                    !hasRealLocation -> Icons.Default.GpsNotFixed
+                    else -> Icons.Default.LocationSearching
+                },
+                onClick = {
+                    if (areTilesFailing) showDownloadDialog = true
+                    else if (!isGpsHardwareEnabled) {
+                        try { context.startActivity(android.content.Intent(android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS)) } catch (_: Exception) {}
+                    }
+                },
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .statusBarsPadding()

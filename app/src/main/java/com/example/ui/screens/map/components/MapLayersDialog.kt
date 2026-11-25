@@ -81,7 +81,7 @@ fun MapLayersDialog(
                 // ✨ خرائط VELA المجانية
                 BaseLayerCard(
                     title = "✨ خرائط VELA المجانية",
-                    desc = "تصميم عصري نظيف وسريع للشوارع والمعالم والحدود (Carto Voyager / OSM — مجانية بلا قيود)",
+                    desc = "تصميم عصري نظيف وسريع للشوارع والمعالم والحدود (Esri Street / OSM — مجانية بلا قيود)",
                     badge = "جديد • مجاني",
                     badgeColor = Color(0xFF00E5FF),
                     isSelected = currentMapMode == MapMode.VELA && !is3DActive,

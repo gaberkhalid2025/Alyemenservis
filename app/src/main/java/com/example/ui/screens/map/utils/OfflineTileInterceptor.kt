@@ -20,6 +20,31 @@ object OfflineTileInterceptor {
     private const val MAX_TILE_BYTES = 2 * 1024 * 1024
     private const val CACHE_TTL_MS = 30L * 24L * 3600L * 1000L // 30 يوماً لتوفير الباقة
     private const val MAX_DISK_CACHE_BYTES = 120L * 1024L * 1024L
+    private const val CACHE_VERSION = 4
+
+    private val CACHEABLE_HOSTS = setOf(
+        "tile.openstreetmap.org",
+        "tile.openstreetmap.fr",
+        "tile.opentopomap.org",
+        "server.arcgisonline.com",
+        "clarity.maptiles.arcgis.com",
+        "tiles.maps.eox.at",
+        "s3.amazonaws.com"
+    )
+
+    fun migrateCacheIfNeeded(context: Context) {
+        val prefs = context.getSharedPreferences("tile_cache_meta", Context.MODE_PRIVATE)
+        if (prefs.getInt("v", 0) < CACHE_VERSION) {
+            try {
+                OfflineMapManager.getTileCacheDir(context).deleteRecursively()
+            } catch (_: Exception) {}
+            prefs.edit().putInt("v", CACHE_VERSION).apply()
+        }
+    }
+
+    private fun isCacheable(host: String, contentType: String?, bytes: ByteArray): Boolean =
+        (host in CACHEABLE_HOSTS || host.contains("openstreetmap") || host.contains("arcgisonline.com")) &&
+            bytes.size in 300..600_000 && (contentType == null || contentType.startsWith("image/"))
 
     private data class CachedTile(val bytes: ByteArray, val mime: String)
     private val memoryCache = object : android.util.LruCache<String, CachedTile>(12 * 1024 * 1024) {
@@ -193,6 +218,7 @@ object OfflineTileInterceptor {
 
     /** يعيد استجابة البلاطة من الذاكرة أو الكاش المحلي أو الشبكة (مع وضع أوفلاين صارم لـ MapLayer.VALHALLA_OFFLINE). */
     fun intercept(context: Context, url: String, offlineOnly: Boolean = false): WebResourceResponse? {
+        migrateCacheIfNeeded(context)
         purgeLegacyCartoCacheOnce(context)
         if (url.contains("cartocdn.com", ignoreCase = true) || url.contains("carto.com/basemaps", ignoreCase = true)) {
             return WebResourceResponse("text/plain", "utf-8", 404, "Blocked", CORS_HEADERS, ByteArrayInputStream(ByteArray(0)))
@@ -264,7 +290,8 @@ object OfflineTileInterceptor {
 
         val (bytes, mime) = downloaded
         memoryCache.put(tile.key, CachedTile(bytes, mime))
-        if (mime == tile.mime) {
+        val host = try { Uri.parse(url).host.orEmpty() } catch (_: Throwable) { "" }
+        if (mime == tile.mime && isCacheable(host, mime, bytes)) {
             try {
                 writeAtomically(cache, bytes)
                 maybePruneDiskCacheAsync(context)

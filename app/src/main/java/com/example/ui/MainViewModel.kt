@@ -451,10 +451,9 @@ class MainViewModel @Inject constructor(
             fusedClient.lastLocation.addOnSuccessListener { loc ->
                 if (loc == null || _isManualLocationSet.value) return@addOnSuccessListener
                 val isMock = if (android.os.Build.VERSION.SDK_INT >= 31) loc.isMock else @Suppress("DEPRECATION") loc.isFromMockProvider
-                val real = !isMock && isFresh(loc) && (!loc.hasAccuracy() || loc.accuracy <= 150f)
-                if (real) {                                   // الموقع القديم يُتجاهل تماماً ولا يغيّر الحالة
+                if (!isMock && LandmarkAddress.isValid(loc.latitude, loc.longitude)) {
                     updateUserLocation(loc.latitude, loc.longitude)
-                    _userLocationAccuracyM.value = loc.accuracy
+                    _userLocationAccuracyM.value = if (loc.hasAccuracy()) loc.accuracy else 25f
                     markFix()
                 }
             }
@@ -477,10 +476,9 @@ class MainViewModel @Inject constructor(
                     if (navTrackingJob?.isActive == true || _isManualLocationSet.value) return
                     val loc = result.lastLocation ?: return
                     val isMock = if (android.os.Build.VERSION.SDK_INT >= 31) loc.isMock else @Suppress("DEPRECATION") loc.isFromMockProvider
-                    val real = !isMock && isFresh(loc, 30_000L) && (!loc.hasAccuracy() || loc.accuracy <= 150f)
-                    if (real) {
+                    if (!isMock && LandmarkAddress.isValid(loc.latitude, loc.longitude)) {
                         updateUserLocation(loc.latitude, loc.longitude)
-                        _userLocationAccuracyM.value = loc.accuracy
+                        _userLocationAccuracyM.value = if (loc.hasAccuracy()) loc.accuracy else 20f
                         markFix()
                     }
                 }

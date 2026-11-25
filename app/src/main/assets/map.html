@@ -17,7 +17,7 @@
         html, body {
             width: 100%;
             height: 100%;
-            background-color: #0B1120;
+            background-color: #14202e;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Cairo", Tahoma, sans-serif;
             overflow: hidden;
         }
@@ -25,15 +25,16 @@
             width: 100%;
             height: 100%;
             position: relative;
+            background-color: #14202e;
             overflow: hidden;
         }
         #map {
             width: 100%;
             height: 100%;
-            background-color: #0B1220;
+            background-color: #14202e;
             transition: transform 0.3s ease;
         }
-        .leaflet-container { background: #0B1220 !important; }
+        .leaflet-container { background: #14202e !important; }
         .leaflet-tile { outline: 1px solid transparent; }
 
         .custom-pin-label, .osm-poi-text { display: none !important; }
@@ -331,34 +332,25 @@
         }
 
         var ATTR_OSM = '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
-        // [نظام خرائط وملاحة عالمي - ملكنا] إزالة CARTO واستخدام مصادر حرة 100% بدون مفاتيح API
+        // [نظام خرائط وملاحة عالمي - ملكنا] خيارات تسريع البلاطات وتوفير 75% من البيانات ومنع الشاشات السوداء
+        var TILE_OPTS = {
+            maxZoom: 24,
+            maxNativeZoom: 18,
+            updateWhenIdle: true,
+            updateWhenZooming: false,
+            keepBuffer: 4,
+            detectRetina: false,
+            crossOrigin: false,
+            errorTileUrl: 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=='
+        };
         var providers = {
-            'osm': L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                maxZoom: 24, maxNativeZoom: 19, updateWhenIdle: false, updateWhenZooming: false, keepBuffer: 2, attribution: ATTR_OSM
-            }),
-            'osm_raw': L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                maxZoom: 24, maxNativeZoom: 19, updateWhenIdle: false, updateWhenZooming: false, keepBuffer: 2, attribution: ATTR_OSM
-            }),
-            'hot': L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
-                maxZoom: 24, maxNativeZoom: 19, subdomains: ['a', 'b', 'c'], updateWhenIdle: false, updateWhenZooming: false, keepBuffer: 2,
-                attribution: ATTR_OSM + ' — HOT'
-            }),
-            'topo': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
-                maxZoom: 24, maxNativeZoom: 18, updateWhenIdle: false, updateWhenZooming: false, keepBuffer: 2,
-                attribution: 'تضاريس © Esri — ' + ATTR_OSM
-            }),
-            'vela': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
-                maxZoom: 24, maxNativeZoom: 18, updateWhenIdle: false, updateWhenZooming: false, keepBuffer: 2,
-                attribution: 'خرائط VELA — © Esri Street'
-            }),
-            'satellite': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-                maxZoom: 24, maxNativeZoom: 18, updateWhenIdle: false, updateWhenZooming: false, keepBuffer: 2,
-                attribution: 'صور © Esri'
-            }),
-            'satellite_clarity': L.tileLayer('https://clarity.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-                maxZoom: 24, maxNativeZoom: 18, updateWhenIdle: false, updateWhenZooming: false, keepBuffer: 2,
-                attribution: 'صور Clarity © Esri'
-            })
+            'osm': L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', Object.assign({}, TILE_OPTS, { maxNativeZoom: 19, attribution: ATTR_OSM })),
+            'osm_raw': L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', Object.assign({}, TILE_OPTS, { maxNativeZoom: 19, attribution: ATTR_OSM })),
+            'hot': L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', Object.assign({}, TILE_OPTS, { maxNativeZoom: 19, subdomains: ['a', 'b', 'c'], attribution: ATTR_OSM + ' — HOT' })),
+            'topo': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', Object.assign({}, TILE_OPTS, { attribution: 'تضاريس © Esri — ' + ATTR_OSM })),
+            'vela': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', Object.assign({}, TILE_OPTS, { attribution: 'خرائط VELA — © Esri Street' })),
+            'satellite': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', Object.assign({}, TILE_OPTS, { attribution: 'صور © Esri' })),
+            'satellite_clarity': L.tileLayer('https://clarity.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', Object.assign({}, TILE_OPTS, { attribution: 'صور Clarity © Esri' }))
         };
 
         function setEcoMode(on) {
@@ -390,45 +382,12 @@
         window.setLabelsVisible = setLabelsVisible;
 
         var tileOk = 0, tileErr = 0, tilesFailingNotified = false, tileTimeoutTimer = null;
-        var fallbackGridLayer = null;
-        function ensureFallbackCanvasGrid() {
-            if (!map) return;
-            if (!fallbackGridLayer) {
-                var CanvasGrid = L.GridLayer.extend({
-                    createTile: function (coords) {
-                        var tile = document.createElement('canvas');
-                        var size = this.getTileSize();
-                        tile.width = size.x;
-                        tile.height = size.y;
-                        var ctx = tile.getContext('2d');
-                        ctx.fillStyle = '#0D1526';
-                        ctx.fillRect(0, 0, size.x, size.y);
-                        ctx.strokeStyle = 'rgba(58, 107, 255, 0.16)';
-                        ctx.lineWidth = 1;
-                        for (var g = 0; g <= size.x; g += 64) {
-                            ctx.beginPath(); ctx.moveTo(g, 0); ctx.lineTo(g, size.y); ctx.stroke();
-                            ctx.beginPath(); ctx.moveTo(0, g); ctx.lineTo(size.x, g); ctx.stroke();
-                        }
-                        ctx.strokeStyle = 'rgba(147, 197, 253, 0.08)';
-                        ctx.strokeRect(0, 0, size.x, size.y);
-                        return tile;
-                    }
-                });
-                fallbackGridLayer = new CanvasGrid({ zIndex: 1, tileSize: 256 });
-            }
-            if (!map.hasLayer(fallbackGridLayer)) {
-                fallbackGridLayer.addTo(map);
-                fallbackGridLayer.bringToBack();
-            }
-        }
         function notifyTiles(failing) {
-            if (failing) ensureFallbackCanvasGrid();
             if (window.AndroidBridge && window.AndroidBridge.onTilesFailing) window.AndroidBridge.onTilesFailing(failing);
         }
         function watchLayer(layer) {
             tileOk = 0; tileErr = 0; tilesFailingNotified = false;
             if (tileTimeoutTimer) { clearTimeout(tileTimeoutTimer); tileTimeoutTimer = null; }
-            ensureFallbackCanvasGrid();
             if (!layer) return;
             tileTimeoutTimer = setTimeout(function () {
                 if (tileOk === 0 && !tilesFailingNotified) {
@@ -466,17 +425,12 @@
                 if (!labelsLayerGroup) {
                     ensurePane('labelsPane', 250);
                     labelsLayerGroup = L.layerGroup([
-                        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}', {
-                            maxZoom: 24, maxNativeZoom: 18, minZoom: 14,
-                            pane: 'labelsPane',
-                            opacity: 0.86
-                        }),
-                        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
-                            maxZoom: 24, maxNativeZoom: 18, minZoom: 12,
+                        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', Object.assign({}, TILE_OPTS, {
+                            minZoom: 12,
                             pane: 'labelsPane',
                             opacity: 0.90,
                             attribution: 'أسماء © Esri'
-                        })
+                        }))
                     ]);
                 }
                 if (!map.hasLayer(labelsLayerGroup)) labelsLayerGroup.addTo(map);
@@ -851,6 +805,7 @@
                     zoomControl: false,
                     attributionControl: true,
                     fadeAnimation: false,
+                    markerZoomAnimation: false,
                     zoomAnimation: true,
                     preferCanvas: true,
                     zoomSnap: 1,
@@ -909,21 +864,35 @@
                         window.AndroidBridge.onMapCenterChanged(c.lat, c.lng);
                     }
                 });
+                var clickTimer = null;
+                map.on('click', function (e) {
+                    if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; }
+                    var lat = e.latlng.lat;
+                    var lng = e.latlng.lng;
+                    clickTimer = setTimeout(function () {
+                        clickTimer = null;
+                        if (pickModeEnabled) {
+                            if (window.AndroidBridge && window.AndroidBridge.onMapPicked) {
+                                window.AndroidBridge.onMapPicked(lat, lng);
+                            }
+                            return;
+                        }
+                        if (window.AndroidBridge && window.AndroidBridge.onMapClicked) window.AndroidBridge.onMapClicked();
+                    }, 280);
+                });
+                map.on('dblclick zoomstart dragstart', function () {
+                    if (clickTimer) {
+                        clearTimeout(clickTimer);
+                        clickTimer = null;
+                    }
+                });
                 map.on('contextmenu', function (e) {
+                    if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; }
                     if (window.AndroidBridge && window.AndroidBridge.onMapLongPressed) {
                         window.AndroidBridge.onMapLongPressed(e.latlng.lat, e.latlng.lng);
                     } else if (pickModeEnabled && window.AndroidBridge && window.AndroidBridge.onMapPicked) {
                         window.AndroidBridge.onMapPicked(e.latlng.lat, e.latlng.lng);
                     }
-                });
-                map.on('click', function (e) {
-                    if (pickModeEnabled) {
-                        if (window.AndroidBridge && window.AndroidBridge.onMapPicked) {
-                            window.AndroidBridge.onMapPicked(e.latlng.lat, e.latlng.lng);
-                        }
-                        return;
-                    }
-                    if (window.AndroidBridge && window.AndroidBridge.onMapClicked) window.AndroidBridge.onMapClicked();
                 });
 
                 try {

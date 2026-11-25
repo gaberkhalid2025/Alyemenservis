@@ -345,7 +345,7 @@ internal fun BoxScope.MapScreenViewport(
         )
     } else {
         RealLeafletMapView(
-            userCoords = if (hasRealLocation) Pair(safeUserLat, safeUserLng) else Pair(0.0, 0.0),
+            userCoords = Pair(safeUserLat, safeUserLng),
             nearbyProviders = filteredProviders,
             nearbyStores = filteredStores,
             nearbyProperties = filteredProperties,
