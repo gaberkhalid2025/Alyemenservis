@@ -53,6 +53,8 @@ object GpxWriter {
     fun saveAndUri(context: Context, fileName: String, content: String): Uri? {
         return try {
             val dir = File(context.cacheDir, "exports").apply { mkdirs() }
+            val cutoff = System.currentTimeMillis() - 24 * 60 * 60 * 1000L
+            dir.listFiles()?.filter { it.isFile && it.lastModified() < cutoff }?.forEach { it.delete() }
             val safeName = fileName.replace(Regex("[^A-Za-z0-9._-]"), "_")
                 .let { if (it.endsWith(".gpx", ignoreCase = true)) it else "$it.gpx" }
             val file = File(dir, safeName)

@@ -30,6 +30,30 @@ internal class AdminAuthAndSystemDelegate(
     private val fullAccessRoles = setOf("OWNER", "SUPER_ADMIN", "MAIN_ADMIN")
     private val staffRoles = setOf("OWNER", "SUPER_ADMIN", "MAIN_ADMIN", "ADMIN", "SUPERVISOR", "AUDITOR", "SUPPORT", "OPERATIONS")
 
+    @Volatile private var failedLoginCount = 0
+    @Volatile private var lockoutUntilMs = 0L
+
+    private fun checkLockoutRemainingSec(): Long {
+        val now = System.currentTimeMillis()
+        return if (now < lockoutUntilMs) ((lockoutUntilMs - now) / 1000L).coerceAtLeast(1L) else 0L
+    }
+
+    private fun recordLoginFailure(): Long {
+        failedLoginCount++
+        if (failedLoginCount >= 5) {
+            val factor = (failedLoginCount - 4).coerceIn(1, 5)
+            val delaySec = 30L * factor
+            lockoutUntilMs = System.currentTimeMillis() + delaySec * 1000L
+            return delaySec
+        }
+        return 0L
+    }
+
+    private fun resetLoginLockout() {
+        failedLoginCount = 0
+        lockoutUntilMs = 0L
+    }
+
     fun initSessionAndRecoveryListener() {
         try {
             val session = vm.secureStorage.getAdminSession()
@@ -143,6 +167,11 @@ internal class AdminAuthAndSystemDelegate(
         onResult: (success: Boolean, errorMessage: String?) -> Unit
     ) {
         vm.viewModelScope.launch {
+            val remaining = checkLockoutRemainingSec()
+            if (remaining > 0L) {
+                onResult(false, "تم تقييد المحاولات مؤقتاً لأمان الحساب. انتظر $remaining ثانية")
+                return@launch
+            }
             try {
                 vm._isLoadingState.value = true
                 val trimmedEmail = email.trim()
@@ -160,6 +189,7 @@ internal class AdminAuthAndSystemDelegate(
                 )
 
                 if (verifiedRole != null && (verifiedRole == "ADMIN" || verifiedRole in fullAccessRoles)) {
+                    resetLoginLockout()
                     val assignedRole: String = verifiedRole
                     val perms = resolveCachedRolePermissions(assignedRole, emptyList())
 
@@ -194,8 +224,10 @@ internal class AdminAuthAndSystemDelegate(
                     return@launch
                 }
 
+                val lockSec = recordLoginFailure()
                 vm._isLoadingState.value = false
-                onResult(false, "بيانات الدخول غير صحيحة")
+                val msg = if (lockSec > 0L) "محاولات خاطئة متكررة — تم القفل مؤقتاً لـ $lockSec ثانية" else "بيانات الدخول غير صحيحة"
+                onResult(false, msg)
             } catch (e: Exception) {
                 vm._isLoadingState.value = false
                 onResult(false, e.message ?: "فشل تسجيل الدخول")
@@ -210,6 +242,11 @@ internal class AdminAuthAndSystemDelegate(
         onResult: (success: Boolean, errorMessage: String?) -> Unit
     ) {
         vm.viewModelScope.launch {
+            val remaining = checkLockoutRemainingSec()
+            if (remaining > 0L) {
+                onResult(false, "تم تقييد المحاولات مؤقتاً لأمان الحساب. انتظر $remaining ثانية")
+                return@launch
+            }
             try {
                 vm._isLoadingState.value = true
                 val trimmedEmail = email.trim()
@@ -227,6 +264,7 @@ internal class AdminAuthAndSystemDelegate(
                 )
 
                 if (verifiedRole == "OWNER") {
+                    resetLoginLockout()
                     SecureAdminStorage.storeCredentials(
                         context = vm.application,
                         ownerEmail = trimmedEmail,
@@ -253,8 +291,10 @@ internal class AdminAuthAndSystemDelegate(
                     return@launch
                 }
 
+                val lockSec = recordLoginFailure()
                 vm._isLoadingState.value = false
-                onResult(false, "بيانات دخول المالك غير صحيحة")
+                val msg = if (lockSec > 0L) "محاولات خاطئة متكررة — تم القفل مؤقتاً لـ $lockSec ثانية" else "بيانات دخول المالك غير صحيحة"
+                onResult(false, msg)
             } catch (e: Exception) {
                 vm._isLoadingState.value = false
                 onResult(false, e.message ?: "فشل تسجيل الدخول")
@@ -269,6 +309,11 @@ internal class AdminAuthAndSystemDelegate(
         onResult: (success: Boolean, errorMessage: String?) -> Unit
     ) {
         vm.viewModelScope.launch {
+            val remaining = checkLockoutRemainingSec()
+            if (remaining > 0L) {
+                onResult(false, "تم تقييد المحاولات مؤقتاً لأمان الحساب. انتظر $remaining ثانية")
+                return@launch
+            }
             try {
                 vm._isLoadingState.value = true
                 val trimmedUser = usernameOrEmail.trim()
@@ -286,6 +331,7 @@ internal class AdminAuthAndSystemDelegate(
                 )
 
                 if (verifiedRole != null && verifiedRole != "GUEST") {
+                    resetLoginLockout()
                     val matchingSup = supervisorsList.find {
                         it.id.equals(trimmedUser, ignoreCase = true) ||
                             it.name.trim().equals(trimmedUser, ignoreCase = true)
@@ -319,8 +365,10 @@ internal class AdminAuthAndSystemDelegate(
                     return@launch
                 }
 
+                val lockSec = recordLoginFailure()
                 vm._isLoadingState.value = false
-                onResult(false, "بيانات دخول المشرف غير صحيحة")
+                val msg = if (lockSec > 0L) "محاولات خاطئة متكررة — تم القفل مؤقتاً لـ $lockSec ثانية" else "بيانات دخول المشرف غير صحيحة"
+                onResult(false, msg)
             } catch (e: Exception) {
                 vm._isLoadingState.value = false
                 onResult(false, e.message ?: "فشل تسجيل الدخول")

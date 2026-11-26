@@ -234,12 +234,15 @@ internal fun rememberOwnerBackdoorState(settingsState: AdminSettingsEntity): Own
             try {
                 val mimeType = context.contentResolver.getType(it)
                 if (mimeType != null && mimeType.startsWith("video/")) {
-                    val inputStream = context.contentResolver.openInputStream(it)
-                    val bytes = inputStream?.readBytes()
+                    val bytes = context.contentResolver.openInputStream(it)?.use { stream -> stream.readBytes() }
                     if (bytes != null) {
-                        state.bannerBase64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
-                        state.bannerType = "VIDEO"
-                        Toast.makeText(context, "📹 تم تحميل الفيديو القصير للبنر بنجاح!", Toast.LENGTH_SHORT).show()
+                        if (bytes.size > 2_000_000) {
+                            Toast.makeText(context, "⚠️ حجم الفيديو كبير جداً (الحد الأقصى 2 ميجابايت)", Toast.LENGTH_LONG).show()
+                        } else {
+                            state.bannerBase64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
+                            state.bannerType = "VIDEO"
+                            Toast.makeText(context, "📹 تم تحميل الفيديو القصير للبنر بنجاح!", Toast.LENGTH_SHORT).show()
+                        }
                     }
                 } else {
                     val base64Str = compressAndResizeImageUri(context, it, 800, 70)

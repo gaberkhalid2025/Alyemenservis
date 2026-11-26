@@ -4,6 +4,9 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>خريطة Vela العالمية المفتوحة</title>
+    <link rel="preconnect" href="https://tile.openstreetmap.org" crossorigin>
+    <link rel="preconnect" href="https://server.arcgisonline.com" crossorigin>
+    <link rel="dns-prefetch" href="https://tile.openstreetmap.fr">
     <link rel="stylesheet" href="leaflet.css" />
     <link rel="stylesheet" href="MarkerCluster.css" />
     <link rel="stylesheet" href="MarkerCluster.Default.css" />
@@ -36,6 +39,8 @@
         }
         .leaflet-container { background: #14202e !important; }
         .leaflet-tile { outline: 1px solid transparent; }
+        #nightDim { position: absolute; inset: 0; background: rgba(4, 8, 18, 0.42); pointer-events: none; z-index: 450; display: none; }
+        #map.night-dim #nightDim { display: block; }
 
         .custom-pin-label, .osm-poi-text { display: none !important; }
         #map.lbl-on .custom-pin-label,
@@ -202,31 +207,31 @@
         }
         .osm-poi-text {
             margin-top: 2px;
-            font-size: 10.5px;
-            font-weight: 700;
+            font-size: 11px;
+            font-weight: 800;
             color: #FFFFFF;
-            background: rgba(15, 23, 42, 0.88);
-            padding: 1px 6px;
-            border-radius: 6px;
-            border: 0.5px solid rgba(255, 255, 255, 0.35);
-            text-shadow: 0 1px 2px rgba(0,0,0,0.9);
-            box-shadow: 0 2px 6px rgba(0,0,0,0.75);
+            background: rgba(15, 23, 42, 0.95);
+            padding: 2px 8px;
+            border-radius: 8px;
+            border: 1px solid rgba(56, 189, 248, 0.6);
+            text-shadow: 0 1px 2px rgba(0,0,0,0.95);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.85);
             white-space: nowrap;
-            max-width: 124px;
+            max-width: 135px;
             overflow: hidden;
             text-overflow: ellipsis;
             text-align: center;
             pointer-events: none;
         }
         .route-street-badge {
-            background: rgba(15, 23, 42, 0.94);
-            color: #38BDF8;
-            font-size: 10.5px;
-            font-weight: 800;
-            padding: 3px 9px;
-            border-radius: 10px;
-            border: 1.2px solid rgba(56, 189, 248, 0.65);
-            box-shadow: 0 3px 10px rgba(0,0,0,0.65);
+            background: rgba(15, 23, 42, 0.96);
+            color: #00E5FF;
+            font-size: 11.5px;
+            font-weight: 900;
+            padding: 4px 11px;
+            border-radius: 12px;
+            border: 1.5px solid rgba(0, 229, 255, 0.8);
+            box-shadow: 0 4px 14px rgba(0,229,255,0.3);
             white-space: nowrap;
             pointer-events: none;
         }
@@ -289,23 +294,22 @@
             return pane;
         }
 
+        var nightInvertEnabled = false;
         function applyNight() {
-            if (!currentBaseLayer) return;
+            if (!map) return;
             try {
+                map.getContainer().classList.toggle('night-dim', !!nightEnabled);
+                if (!currentBaseLayer) return;
                 var el = currentBaseLayer.getContainer();
                 if (!el) return;
-                if (!nightEnabled) {
-                    var dayFilter = (currentProviderKey === 'satellite' || currentProviderKey === 'satellite_clarity')
-                        ? 'contrast(1.04) saturate(1.06)'
-                        : 'contrast(1.08) saturate(1.12)';
-                    el.style.filter = dayFilter;
-                    el.style.webkitFilter = dayFilter;
+                if (!nightEnabled || !nightInvertEnabled) {
+                    el.style.filter = '';
+                    el.style.webkitFilter = '';
                     return;
                 }
                 if (currentProviderKey === 'satellite' || currentProviderKey === 'satellite_clarity') {
-                    var satFilter = 'brightness(0.80) contrast(1.06)';
-                    el.style.filter = satFilter;
-                    el.style.webkitFilter = satFilter;
+                    el.style.filter = 'brightness(0.80) contrast(1.06)';
+                    el.style.webkitFilter = 'brightness(0.80) contrast(1.06)';
                 } else {
                     var vectorFilter = 'invert(1) hue-rotate(180deg) brightness(0.92) contrast(1.02) saturate(0.90)';
                     el.style.filter = vectorFilter;
@@ -321,6 +325,12 @@
             applyNight();
         }
         window.setNightMode = setNightMode;
+
+        function setNightInvert(on) {
+            nightInvertEnabled = !!on;
+            applyNight();
+        }
+        window.setNightInvert = setNightInvert;
 
         var ecoModeEnabled = false;
         var isProgrammaticMove = 0;
@@ -426,7 +436,7 @@
                     ensurePane('labelsPane', 250);
                     labelsLayerGroup = L.layerGroup([
                         L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', Object.assign({}, TILE_OPTS, {
-                            minZoom: 12,
+                            minZoom: 14,
                             pane: 'labelsPane',
                             opacity: 0.90,
                             attribution: 'أسماء © Esri'
@@ -817,6 +827,14 @@
                 if (map.attributionControl) {
                     map.attributionControl.setPrefix(false);
                 }
+
+                (function () {
+                    if (!document.getElementById('nightDim')) {
+                        var d = document.createElement('div');
+                        d.id = 'nightDim';
+                        map.getContainer().appendChild(d);
+                    }
+                })();
 
                 setLayer(activeMode);
 

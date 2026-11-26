@@ -375,8 +375,12 @@ fun StoreListItemCard(
                     if (store.phone.isNotBlank()) {
                         Button(
                             onClick = {
-                                val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${store.phone}"))
-                                context.startActivity(intent)
+                                try {
+                                    val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${store.phone}"))
+                                    context.startActivity(intent)
+                                } catch (_: Exception) {
+                                    android.widget.Toast.makeText(context, "تعذر فتح تطبيق الاتصال", android.widget.Toast.LENGTH_SHORT).show()
+                                }
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
                             shape = RoundedCornerShape(10.dp),

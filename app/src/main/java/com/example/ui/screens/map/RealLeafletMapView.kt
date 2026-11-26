@@ -196,13 +196,17 @@ fun RealLeafletMapView(
         }
     }
 
-    // إرسال العلامات للخريطة عند اكتمال الجاهزية أو تغير البيانات بأمان تام عبر Base64
+    // إرسال العلامات للخريطة عند اكتمال الجاهزية أو تغير البيانات بأمان تام عبر Base64 (مع دمج التغييرات)
+    var lastSentHash by remember { mutableIntStateOf(0) }
     LaunchedEffect(isMapReady, markersJson) {
-        if (isMapReady && webViewRef != null && markersJson.isNotBlank()) {
-            val b64 = Base64.encodeToString(markersJson.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
-            val script = "if (window.setMarkersBase64) { window.setMarkersBase64('$b64'); }"
-            webViewRef?.evaluateJavascript(script, null)
-        }
+        if (!isMapReady || webViewRef == null || markersJson.isBlank()) return@LaunchedEffect
+        val h = markersJson.hashCode()
+        if (h == lastSentHash) return@LaunchedEffect
+        kotlinx.coroutines.delay(250)
+        lastSentHash = h
+        val b64 = Base64.encodeToString(markersJson.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
+        val script = "if (window.setMarkersBase64) { window.setMarkersBase64('$b64'); }"
+        webViewRef?.evaluateJavascript(script, null)
     }
 
     // تبديل أوضاع الخريطة
@@ -505,6 +509,10 @@ fun RealLeafletMapView(
                             useWideViewPort = false
                             allowFileAccess = false
                             allowContentAccess = false
+                            @Suppress("DEPRECATION")
+                            allowFileAccessFromFileURLs = false
+                            @Suppress("DEPRECATION")
+                            allowUniversalAccessFromFileURLs = false
                             javaScriptCanOpenWindowsAutomatically = false
                         }
 

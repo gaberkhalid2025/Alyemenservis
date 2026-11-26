@@ -103,7 +103,7 @@ fun GlassPanel(
 ) {
     Box(
         modifier = modifier
-            .shadow(10.dp, shape, clip = false, ambientColor = MapUi.RoyalShadow.copy(alpha = 0.45f), spotColor = Color.Black.copy(alpha = 0.65f))
+            .shadow(4.dp, shape, clip = false, ambientColor = MapUi.RoyalShadow.copy(alpha = 0.35f), spotColor = Color.Black.copy(alpha = 0.45f))
             .clip(shape)
             .background(MapUi.GlassPanelBrush)
             .border(BorderStroke(1.dp, MapUi.GlassRimBrush), shape),
@@ -149,7 +149,7 @@ fun GlassIconButton(
     Box(
         modifier = modifier
             .size(size)
-            .shadow(8.dp, CircleShape, clip = false, ambientColor = MapUi.RoyalShadow, spotColor = Color.Black)
+            .shadow(3.dp, CircleShape, clip = false, ambientColor = MapUi.RoyalShadow, spotColor = Color.Black)
             .clip(CircleShape)
             .background(orbBrush)
             .drawBehind {
@@ -184,7 +184,7 @@ fun RoyalBlueGemButton(
     Box(
         modifier = modifier
             .size(size)
-            .shadow(14.dp, shape, clip = false, ambientColor = MapUi.RoyalMid, spotColor = MapUi.RoyalShadow)
+            .shadow(4.dp, shape, clip = false, ambientColor = MapUi.RoyalMid, spotColor = MapUi.RoyalShadow)
             .clip(shape)
             .background(MapUi.RoyalGemBrush)
             .drawBehind {
@@ -221,7 +221,7 @@ fun RedGemButton(
     Row(
         modifier = modifier
             .heightIn(min = 48.dp)
-            .shadow(10.dp, shape, clip = false, ambientColor = MapUi.RedDeep, spotColor = MapUi.RedDeep)
+            .shadow(4.dp, shape, clip = false, ambientColor = MapUi.RedDeep, spotColor = MapUi.RedDeep)
             .clip(shape)
             .background(MapUi.RedGemBrush)
             .drawBehind {
@@ -253,7 +253,6 @@ fun StatusPill(
 ) {
     Row(
         modifier
-            .shadow(6.dp, RoundedCornerShape(50), clip = false)
             .clip(RoundedCornerShape(50))
             .background(
                 Brush.verticalGradient(

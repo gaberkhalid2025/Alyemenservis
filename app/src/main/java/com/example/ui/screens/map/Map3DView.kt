@@ -145,6 +145,11 @@ fun Map3DView(
                         useWideViewPort = true
                         allowFileAccess = false
                         allowContentAccess = false
+                        @Suppress("DEPRECATION")
+                        allowFileAccessFromFileURLs = false
+                        @Suppress("DEPRECATION")
+                        allowUniversalAccessFromFileURLs = false
+                        javaScriptCanOpenWindowsAutomatically = false
                         userAgentString = "AlYemenServicesApp/1.0 (Android; OpenStreetMap)"
                     }
                     addJavascriptInterface(object {

@@ -3,6 +3,7 @@ package com.example.ui.screens.map
 import android.content.Context
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -191,10 +192,18 @@ internal fun NavigationTopOverlay(
                 Surface(
                     onClick = { onToggleTopCardCollapsed(false) },
                     shape = CircleShape,
-                    color = Color(0xFF0F172A).copy(alpha = 0.95f),
-                    border = BorderStroke(1.5.dp, Color(0xFF00E5FF)),
-                    shadowElevation = 8.dp,
-                    modifier = Modifier.size(56.dp).align(Alignment.CenterHorizontally)
+                    color = Color.Transparent,
+                    shadowElevation = 12.dp,
+                    modifier = Modifier
+                        .size(60.dp)
+                        .align(Alignment.CenterHorizontally)
+                        .background(
+                            brush = androidx.compose.ui.graphics.Brush.radialGradient(
+                                colors = listOf(Color(0xFF38BDF8), Color(0xFF0284C7), Color(0xFF0369A1))
+                            ),
+                            shape = CircleShape
+                        )
+                        .border(2.5.dp, Color.White.copy(alpha = 0.95f), CircleShape)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         androidx.compose.runtime.CompositionLocalProvider(
@@ -204,7 +213,7 @@ internal fun NavigationTopOverlay(
                                 maneuverIcon(if (isApproximate) null else upcoming?.maneuverType),
                                 contentDescription = null,
                                 tint = Color.White,
-                                modifier = Modifier.size(30.dp)
+                                modifier = Modifier.size(32.dp)
                             )
                         }
                     }
@@ -214,7 +223,7 @@ internal fun NavigationTopOverlay(
                     shape = RoundedCornerShape(20.dp),
                     color = Color(0xFF0F172A).copy(alpha = 0.95f),
                     border = BorderStroke(1.5.dp, Color(0xFF00E5FF)),
-                    shadowElevation = 12.dp,
+                    shadowElevation = 14.dp,
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -223,14 +232,26 @@ internal fun NavigationTopOverlay(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            Surface(shape = CircleShape, color = Color(0xFF0284C7), modifier = Modifier.size(44.dp)) {
+                            Surface(
+                                shape = CircleShape,
+                                color = Color.Transparent,
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .background(
+                                        brush = androidx.compose.ui.graphics.Brush.radialGradient(
+                                            colors = listOf(Color(0xFF38BDF8), Color(0xFF0284C7), Color(0xFF0369A1))
+                                        ),
+                                        shape = CircleShape
+                                    )
+                                    .border(2.dp, Color.White.copy(alpha = 0.9f), CircleShape)
+                            ) {
                                 Box(contentAlignment = Alignment.Center) {
                                     if (isLoadingRoute && !hasResult) CircularProgressIndicator(Modifier.size(22.dp), color = Color.White, strokeWidth = 2.dp)
                                     else {
                                         androidx.compose.runtime.CompositionLocalProvider(
                                             androidx.compose.ui.platform.LocalLayoutDirection provides androidx.compose.ui.unit.LayoutDirection.Ltr
                                         ) {
-                                            Icon(maneuverIcon(if (isApproximate) null else upcoming?.maneuverType), contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp))
+                                            Icon(maneuverIcon(if (isApproximate) null else upcoming?.maneuverType), contentDescription = null, tint = Color.White, modifier = Modifier.size(26.dp))
                                         }
                                     }
                                 }

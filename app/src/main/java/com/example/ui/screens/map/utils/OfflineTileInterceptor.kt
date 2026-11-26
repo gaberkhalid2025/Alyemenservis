@@ -5,11 +5,11 @@ import android.database.sqlite.SQLiteDatabase
 import android.net.Uri
 import android.util.Log
 import android.webkit.WebResourceResponse
+import com.example.utils.TileHttp
+import okhttp3.Request
 import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.IOException
-import java.net.HttpURLConnection
-import java.net.URL
 
 // [نظام خرائط وملاحة عالمي - ملكنا]
 object OfflineTileInterceptor {
@@ -341,21 +341,20 @@ object OfflineTileInterceptor {
     }
 
     private fun download(url: String): ByteArray? {
-        var c: HttpURLConnection? = null
         return try {
-            c = (URL(url).openConnection() as HttpURLConnection).apply {
-                connectTimeout = 6_000; readTimeout = 9_000
-                instanceFollowRedirects = true
-                useCaches = true
-                setRequestProperty("User-Agent", USER_AGENT)
+            val req = Request.Builder()
+                .url(url)
+                .header("User-Agent", USER_AGENT)
+                .build()
+            TileHttp.client.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) return null
+                val ct = resp.header("Content-Type")
+                if (ct != null && !ct.startsWith("image/", ignoreCase = true)) return null
+                val data = resp.body?.bytes() ?: return null
+                if (data.isEmpty() || data.size > MAX_TILE_BYTES || !isValidImageBytes(data)) null else data
             }
-            if (c.responseCode != 200) return null
-            val data = c.inputStream.use { it.readBytes() }
-            if (data.isEmpty() || data.size > MAX_TILE_BYTES || !isValidImageBytes(data)) null else data
         } catch (_: Throwable) {
             null
-        } finally {
-            c?.disconnect()
         }
     }
 

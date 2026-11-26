@@ -28,6 +28,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -114,9 +115,9 @@ fun StoreCreateEditDialog(
     var selectedCatId by remember { mutableStateOf(store?.categoryId ?: availableCategories.firstOrNull()?.id ?: "") }
     var workingHours by remember { mutableStateOf(store?.workingHours ?: "9:00 AM - 10:00 PM") }
     
-    // Passwords
-    var password by remember { mutableStateOf(store?.password ?: "") }
-    var confirmPassword by remember { mutableStateOf(store?.password ?: "") }
+    // Passwords (never pre-fill stored passwordHash)
+    var password by remember { mutableStateOf("") }
+    var confirmPassword by remember { mutableStateOf("") }
 
     // Admin limit
     var customMaxPhotosInput by remember { mutableStateOf(if (store != null) store.maxImages.toString() else "5") }
@@ -162,15 +163,18 @@ fun StoreCreateEditDialog(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
         if (uri != null) {
-            pdfUriText = uri.toString()
             try {
-                val bytes = context.contentResolver.openInputStream(uri)?.readBytes()
+                val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
                 if (bytes != null) {
-                    val base64 = android.util.Base64.encodeToString(bytes, android.util.Base64.DEFAULT)
-                    pdfBase64Text = base64
+                    if (bytes.size > 700_000) {
+                        android.widget.Toast.makeText(context, "⚠️ حجم ملف PDF كبير جداً (الحد الأقصى 700 كيلوبايت)", android.widget.Toast.LENGTH_LONG).show()
+                    } else {
+                        pdfUriText = uri.toString()
+                        pdfBase64Text = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
+                    }
                 }
             } catch (e: Exception) {
-                e.printStackTrace()
+                android.widget.Toast.makeText(context, "تعذر قراءة الملف المحدد", android.widget.Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -304,13 +308,23 @@ fun StoreCreateEditDialog(
                 )
 
                 // Passwords with confirmation
-                Text("🔑 كلمة المرور لحساب المالك والمشرف:", fontSize = 11.sp, color = themeColors.textSecondary)
+                Text(
+                    if (store == null) "🔑 كلمة المرور لحساب المالك والمشرف:" else "🔑 تغيير كلمة المرور (اختياري):",
+                    fontSize = 11.sp,
+                    color = themeColors.textSecondary
+                )
                 OutlinedTextField(
                     value = password,
                     onValueChange = { password = it },
-                    label = { Text("كلمة المرور الخاصة بك", fontSize = 11.sp) },
+                    label = {
+                        Text(
+                            if (store == null) "كلمة المرور الخاصة بك" else "كلمة مرور جديدة (اتركها فارغة للإبقاء على الحالية)",
+                            fontSize = 11.sp
+                        )
+                    },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = Color.White,
                         unfocusedTextColor = Color.White
@@ -322,6 +336,7 @@ fun StoreCreateEditDialog(
                     label = { Text("تأكيد كلمة المرور الخاصة بك", fontSize = 11.sp) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = Color.White,
                         unfocusedTextColor = Color.White
@@ -332,10 +347,10 @@ fun StoreCreateEditDialog(
                 if (store != null || phone.isNotEmpty()) {
                     TextButton(
                         onClick = {
-                            if (password.isNotEmpty()) {
+                            if (password.isNotBlank() && !SecureHasher.isHashFormat(password)) {
                                 viewModel.requestPasswordRecoveryForStore(name.ifEmpty { "المتجر" }, phone, password)
                             } else {
-                                android.widget.Toast.makeText(context, "الرجاء إدخال كلمة المرور أولاً ليتم حفظها وطلب استعادتها", android.widget.Toast.LENGTH_SHORT).show()
+                                android.widget.Toast.makeText(context, "الرجاء إدخال كلمة مرور جديدة أولاً لإرسال طلب استعادتها", android.widget.Toast.LENGTH_SHORT).show()
                             }
                         },
                         modifier = Modifier.align(Alignment.Start)
@@ -525,41 +540,40 @@ fun StoreCreateEditDialog(
                             android.widget.Toast.makeText(context, "❌ يرجى تحديد الحي أو الحارة السكنية لتسهيل الوصول!", android.widget.Toast.LENGTH_LONG).show()
                             return@Button
                         }
-                        if (password.trim().isEmpty()) {
+                        if (store == null && password.trim().isEmpty()) {
                             android.widget.Toast.makeText(context, "❌ يرجى تعيين كلمة مرور لحماية متجرك وإمكانية تعديله مستقبلاً!", android.widget.Toast.LENGTH_LONG).show()
                             return@Button
                         }
-                        if (password != confirmPassword) {
+                        if (password.isNotEmpty() && password != confirmPassword) {
                             android.widget.Toast.makeText(context, "❌ كلمتا المرور غير متطابقتين!", android.widget.Toast.LENGTH_LONG).show()
                             return@Button
                         }
-                        if (true) {
-                            val newStore = StoreEntity(
-                                id = store?.id ?: "",
-                                sectionId = store?.sectionId ?: sectionId,
-                                name = name,
-                                description = description,
-                                ownerId = currentUserId,
-                                ownerName = currentUserName.ifEmpty { "تاجر يمني" },
-                                phone = phone,
-                                categoryId = selectedCatId,
-                                cityId = selectedCityId,
-                                localNeighborhood = neighborhood.ifEmpty { "إدارة التطبيق" },
-                                workingHours = workingHours,
-                                logoImage = logoImageBase64,
-                                coverImage = coverImageBase64,
-                                isActive = if (adminRole != "GUEST") true else (store?.isActive ?: false), // Auto-approve if added by admin
-                                isApproved = if (adminRole != "GUEST") true else (store?.isApproved ?: false),
-                                passwordHash = password,
-                                maxImages = customMaxPhotosInput.toIntOrNull() ?: (store?.maxImages ?: 5),
-                                pdfFileUri = pdfUriText,
-                                pdfFileBase64 = pdfBase64Text,
-                                pdfStatus = if (pdfBase64Text.isNotEmpty()) (store?.pdfStatus ?: "PENDING") else "",
-                                images = storePhotosList
-                            )
-                            viewModel.saveStore(newStore)
-                            onDismiss()
-                        }
+                        val resolvedPasswordInput = if (password.isNotBlank()) password else (store?.passwordHash ?: "")
+                        val newStore = StoreEntity(
+                            id = store?.id ?: "",
+                            sectionId = store?.sectionId ?: sectionId,
+                            name = name,
+                            description = description,
+                            ownerId = currentUserId,
+                            ownerName = currentUserName.ifEmpty { "تاجر يمني" },
+                            phone = phone,
+                            categoryId = selectedCatId,
+                            cityId = selectedCityId,
+                            localNeighborhood = neighborhood.ifEmpty { "إدارة التطبيق" },
+                            workingHours = workingHours,
+                            logoImage = logoImageBase64,
+                            coverImage = coverImageBase64,
+                            isActive = if (adminRole != "GUEST") true else (store?.isActive ?: false), // Auto-approve if added by admin
+                            isApproved = if (adminRole != "GUEST") true else (store?.isApproved ?: false),
+                            passwordHash = resolvedPasswordInput,
+                            maxImages = customMaxPhotosInput.toIntOrNull() ?: (store?.maxImages ?: 5),
+                            pdfFileUri = pdfUriText,
+                            pdfFileBase64 = pdfBase64Text,
+                            pdfStatus = if (pdfBase64Text.isNotEmpty()) (store?.pdfStatus ?: "PENDING") else "",
+                            images = storePhotosList
+                        )
+                        viewModel.saveStore(newStore)
+                        onDismiss()
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
                     modifier = Modifier.fillMaxWidth()

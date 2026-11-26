@@ -26,6 +26,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -62,9 +63,9 @@ fun PropertyCreateEditDialog(
     var propertyType by remember { mutableStateOf(property?.propertyType ?: "apartment") } // apartment, house, land, shop
     var selectedCityId by remember { mutableStateOf(property?.cityId ?: cities.firstOrNull()?.id ?: "") }
     
-    // Passwords
-    var password by remember { mutableStateOf(property?.password ?: "") }
-    var confirmPassword by remember { mutableStateOf(property?.password ?: "") }
+    // Passwords (never pre-fill stored passwordHash)
+    var password by remember { mutableStateOf("") }
+    var confirmPassword by remember { mutableStateOf("") }
 
     // Admin limit
     var customMaxPhotosInput by remember { mutableStateOf(if (property != null) property.maxImages.toString() else "5") }
@@ -76,15 +77,18 @@ fun PropertyCreateEditDialog(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
         if (uri != null) {
-            pdfUriText = uri.toString()
             try {
-                val bytes = context.contentResolver.openInputStream(uri)?.readBytes()
+                val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
                 if (bytes != null) {
-                    val base64 = android.util.Base64.encodeToString(bytes, android.util.Base64.DEFAULT)
-                    pdfBase64Text = base64
+                    if (bytes.size > 700_000) {
+                        android.widget.Toast.makeText(context, "⚠️ حجم ملف PDF كبير جداً (الحد الأقصى 700 كيلوبايت)", android.widget.Toast.LENGTH_LONG).show()
+                    } else {
+                        pdfUriText = uri.toString()
+                        pdfBase64Text = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
+                    }
                 }
             } catch (e: Exception) {
-                e.printStackTrace()
+                android.widget.Toast.makeText(context, "تعذر قراءة الملف المحدد", android.widget.Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -98,10 +102,9 @@ fun PropertyCreateEditDialog(
     val propPhotosUriPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetMultipleContents()
     ) { uris ->
-        val converted = uris.map { uri ->
-            val bytes = context.contentResolver.openInputStream(uri)?.readBytes()
-            val base64 = android.util.Base64.encodeToString(bytes, android.util.Base64.DEFAULT)
-            "data:image/jpeg;base64,$base64"
+        val converted = uris.mapNotNull { uri ->
+            val base64 = com.example.utils.compressAndResizeImageUri(context, uri, 800, 70)
+            if (base64.isNotEmpty()) "data:image/jpeg;base64,$base64" else null
         }
         val combined = if (isUnlimited) {
             propPhotosList + converted
@@ -244,13 +247,23 @@ fun PropertyCreateEditDialog(
                 )
 
                 // Passwords with confirmation
-                Text("🔑 كلمة المرور لحساب المالك والمشرف:", fontSize = 11.sp, color = themeColors.textSecondary)
+                Text(
+                    if (property == null) "🔑 كلمة المرور لحساب المالك والمشرف:" else "🔑 تغيير كلمة المرور (اختياري):",
+                    fontSize = 11.sp,
+                    color = themeColors.textSecondary
+                )
                 OutlinedTextField(
                     value = password,
                     onValueChange = { password = it },
-                    label = { Text("كلمة المرور الخاصة بك", fontSize = 11.sp) },
+                    label = {
+                        Text(
+                            if (property == null) "كلمة المرور الخاصة بك" else "كلمة مرور جديدة (اتركها فارغة للإبقاء على الحالية)",
+                            fontSize = 11.sp
+                        )
+                    },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = Color.White,
                         unfocusedTextColor = Color.White
@@ -262,6 +275,7 @@ fun PropertyCreateEditDialog(
                     label = { Text("تأكيد كلمة المرور الخاصة بك", fontSize = 11.sp) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = Color.White,
                         unfocusedTextColor = Color.White
@@ -272,10 +286,10 @@ fun PropertyCreateEditDialog(
                 if (property != null || phone.isNotEmpty()) {
                     TextButton(
                         onClick = {
-                            if (password.isNotEmpty()) {
+                            if (password.isNotBlank() && !SecureHasher.isHashFormat(password)) {
                                 viewModel.requestPasswordRecoveryForProperty(title.ifEmpty { "العقار" }, phone, password)
                             } else {
-                                android.widget.Toast.makeText(context, "الرجاء إدخال كلمة المرور أولاً ليتم حفظها وطلب استعادتها", android.widget.Toast.LENGTH_SHORT).show()
+                                android.widget.Toast.makeText(context, "الرجاء إدخال كلمة مرور جديدة أولاً لإرسال طلب استعادتها", android.widget.Toast.LENGTH_SHORT).show()
                             }
                         },
                         modifier = Modifier.align(Alignment.Start)
@@ -436,40 +450,39 @@ fun PropertyCreateEditDialog(
                             android.widget.Toast.makeText(context, "❌ يرجى تحديد موقع الحي أو الشارع السكني للعقار!", android.widget.Toast.LENGTH_LONG).show()
                             return@Button
                         }
-                        if (password.trim().isEmpty()) {
+                        if (property == null && password.trim().isEmpty()) {
                             android.widget.Toast.makeText(context, "❌ يرجى إدخال كلمة مرور لحماية الإعلان العقاري وتعديله مستقبلاً!", android.widget.Toast.LENGTH_LONG).show()
                             return@Button
                         }
-                        if (password != confirmPassword) {
+                        if (password.isNotEmpty() && password != confirmPassword) {
                             android.widget.Toast.makeText(context, "❌ كلمتا المرور غير متطابقتين!", android.widget.Toast.LENGTH_LONG).show()
                             return@Button
                         }
-                        if (true) {
-                            val newProp = PropertyEntity(
-                                id = property?.id ?: "",
-                                sectionId = property?.sectionId ?: sectionId,
-                                title = title,
-                                description = description,
-                                price = priceInput.toDoubleOrNull() ?: 0.0,
-                                phone = phone,
-                                ownerId = currentUserId,
-                                ownerName = currentUserName.ifEmpty { "معلن عقاري" },
-                                cityId = selectedCityId,
-                                localNeighborhood = neighborhood.ifEmpty { "إدارة التطبيق" },
-                                type = type,
-                                propertyType = propertyType,
-                                isActive = if (adminRole != "GUEST") true else (property?.isActive ?: false), // Auto-approve if added by admin
-                                isApproved = if (adminRole != "GUEST") true else (property?.isApproved ?: false),
-                                passwordHash = password,
-                                maxImages = customMaxPhotosInput.toIntOrNull() ?: (property?.maxImages ?: 5),
-                                pdfFileUri = pdfUriText,
-                                pdfFileBase64 = pdfBase64Text,
-                                pdfStatus = if (pdfBase64Text.isNotEmpty()) (property?.pdfStatus ?: "PENDING") else "",
-                                images = propPhotosList
-                            )
-                            viewModel.saveProperty(newProp)
-                            onDismiss()
-                        }
+                        val resolvedPasswordInput = if (password.isNotBlank()) password else (property?.passwordHash ?: "")
+                        val newProp = PropertyEntity(
+                            id = property?.id ?: "",
+                            sectionId = property?.sectionId ?: sectionId,
+                            title = title,
+                            description = description,
+                            price = priceInput.toDoubleOrNull() ?: 0.0,
+                            phone = phone,
+                            ownerId = currentUserId,
+                            ownerName = currentUserName.ifEmpty { "معلن عقاري" },
+                            cityId = selectedCityId,
+                            localNeighborhood = neighborhood.ifEmpty { "إدارة التطبيق" },
+                            type = type,
+                            propertyType = propertyType,
+                            isActive = if (adminRole != "GUEST") true else (property?.isActive ?: false), // Auto-approve if added by admin
+                            isApproved = if (adminRole != "GUEST") true else (property?.isApproved ?: false),
+                            passwordHash = resolvedPasswordInput,
+                            maxImages = customMaxPhotosInput.toIntOrNull() ?: (property?.maxImages ?: 5),
+                            pdfFileUri = pdfUriText,
+                            pdfFileBase64 = pdfBase64Text,
+                            pdfStatus = if (pdfBase64Text.isNotEmpty()) (property?.pdfStatus ?: "PENDING") else "",
+                            images = propPhotosList
+                        )
+                        viewModel.saveProperty(newProp)
+                        onDismiss()
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
                     modifier = Modifier.fillMaxWidth()

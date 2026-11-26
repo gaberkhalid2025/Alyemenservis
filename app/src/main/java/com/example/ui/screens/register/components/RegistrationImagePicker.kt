@@ -92,7 +92,9 @@ fun RegistrationImagePicker(
                     return@withContext uri
                 }
 
-                val tempFile = File(context.cacheDir, "comp_${System.currentTimeMillis()}_${(1000..9999).random()}.jpg")
+                val sharedDir = File(context.cacheDir, "shared").apply { mkdirs() }
+                sharedDir.listFiles()?.filter { it.isFile && System.currentTimeMillis() - it.lastModified() > 24 * 60 * 60 * 1000L }?.forEach { it.delete() }
+                val tempFile = File(sharedDir, "comp_${System.currentTimeMillis()}_${(1000..9999).random()}.jpg")
                 var quality = 85
                 val out = ByteArrayOutputStream()
                 bitmap.compress(Bitmap.CompressFormat.JPEG, quality, out)
@@ -147,7 +149,8 @@ fun RegistrationImagePicker(
                 isProcessingImages = true
                 withContext(Dispatchers.IO) {
                     try {
-                        val tempFile = File(context.cacheDir, "cam_${System.currentTimeMillis()}.jpg")
+                        val sharedDir = File(context.cacheDir, "shared").apply { mkdirs() }
+                        val tempFile = File(sharedDir, "cam_${System.currentTimeMillis()}.jpg")
                         var quality = 85
                         val out = ByteArrayOutputStream()
                         bitmap.compress(Bitmap.CompressFormat.JPEG, quality, out)

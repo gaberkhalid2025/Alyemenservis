@@ -1,23 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <base-config cleartextTrafficPermitted="false" />
-    <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="true">mt0.google.com</domain>
-        <domain includeSubdomains="true">mt1.google.com</domain>
-        <domain includeSubdomains="true">mt2.google.com</domain>
-        <domain includeSubdomains="true">mt3.google.com</domain>
-        <domain includeSubdomains="true">google.com</domain>
-        <domain includeSubdomains="true">tile.openstreetmap.org</domain>
-        <domain includeSubdomains="true">openstreetmap.org</domain>
-        <domain includeSubdomains="true">openstreetmap.fr</domain>
-        <domain includeSubdomains="true">arcgisonline.com</domain>
-        <domain includeSubdomains="true">firebasestorage.googleapis.com</domain>
-        <domain includeSubdomains="true">firestore.googleapis.com</domain>
-        <domain includeSubdomains="true">identitytoolkit.googleapis.com</domain>
-        <domain includeSubdomains="true">securetoken.googleapis.com</domain>
-        <domain includeSubdomains="true">firebaseinstallations.googleapis.com</domain>
-        <!-- [إصلاح ملاحة نهائي] السماح بالاتصال بخوادم OSRM والملاحة العالمية -->
-        <domain includeSubdomains="true">project-osrm.org</domain>
-        <domain includeSubdomains="true">router.project-osrm.org</domain>
-    </domain-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+    <debug-overrides>
+        <trust-anchors>
+            <certificates src="user" />
+        </trust-anchors>
+    </debug-overrides>
 </network-security-config>

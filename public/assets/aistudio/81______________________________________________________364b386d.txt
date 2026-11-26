@@ -1,0 +1,116 @@
+# 81 – لماذا صارت الخرائط بطيئة بعد أن كانت سريعة؟ وكيف نعيدها أسرع من قبل، ثم نصل للمستوى العالمي
+
+## 1) إجابة صريحة: أسباب التراجع (بعضها من اقتراحاتي أنا)
+كان التطبيق «يعرض طبقة واحدة بلا مرشحات»؛ ثم أضفنا تدريجياً ما يثقل الرسم والشبكة. المرتّبة بالأرجح أثراً:
+| # | السبب | من أين جاء | الأثر |
+|---|---|---|---|
+| 1 | **مرشح الوضع الليلي** `filter: invert(...) hue-rotate(...)` على حاوية البلاطات | **اقتراحي** (المستند 59). والأسوأ: يُفعَّل **تلقائياً** إن كان هاتفك على الوضع الداكن (`state.nightMode = systemDark`) | مرشحات CSS الكبيرة تُعاد رسمها بمعالج الرسوم في كل إطار أثناء السحب والتكبير ⇒ تقطيع شديد، خصوصاً مع صور الأقمار |
+| 2 | **بلاطات CARTO** تعيد صور «API KEY REQUIRED» وتبقى تُطلب وتُخزَّن | كود AI Studio القديم | طلبات فاشلة/بطيئة + كاش مسموم + مربعات سوداء |
+| 3 | 4–6 طبقات متراكبة (أساس + أسماء Esri + أسماء CARTO + EOX/NASA/Meteosat + مناطق) | إضافات متتالية | كل تحريك يطلب 4–6 أضعاف البلاطات |
+| 4 | `detectRetina` (إن كان مفعّلاً) | غالباً من الكود الأصلي | بلاطات 4× حجماً على شاشتك الكثيفة |
+| 5 | إعادة بناء/إرسال JSON العلامات بترميز Base64 عند كل تغيّر صغير (`dynamicOffsets`) | المستند 47 | حِمل على الخيط الرئيسي وWebView |
+| 6 | معترض البلاطات يستعمل `HttpURLConnection` اتصالاً مستقلاً لكل بلاطة (HTTP/1.1) | المستند 08 | بطء وفتح اتصالات كثيرة؛ بينما OkHttp يعيد استعمال الاتصال ويضاعف الطلبات على HTTP/2 |
+| 7 | حيل فواصل البلاطات `mix-blend-mode`/`outline` الإضافية | اقتراح اختياري (المستند 77) | `mix-blend-mode` ثقيل؛ لا تفعّله ما لم يلزم |
+| 8 | ظلال كبيرة (`shadow(6.dp)`) على 5–6 لوحات زجاجية فوق WebView | المستند 77 | تكلفة رسم إضافية صغيرة لكنها تتراكم على أجهزة ضعيفة |
+**ما لا أتهمه:** `zoomSnap: 1` لا يبطئ الرسم؛ لكنه يغيّر إحساس التكبير (يقفز لأقرب مستوى بعد القرصة). إن أزعجك فاستعمل `zoomSnap: 0.5`.
+
+## 2) طريقة التشخيص بالتجربة (30 دقيقة، تحسم الأمر)
+**أ) قياس حقيقي:** في نسخة Debug فعّل `WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG)`، ثم من Chrome على الحاسوب `chrome://inspect` ← Inspect على الخريطة ← **Performance** ← سجّل 5 ثوانٍ تحريكاً وتكبيراً. وللقياس من النظام: `adb shell dumpsys gfxinfo <package> reset` ثم حرّك الخريطة ثم `adb shell dumpsys gfxinfo <package>` وانظر نسبة الإطارات البطيئة (Janky frames).
+**ب) تجارب عزل (واحدة في كل مرة، أعد القياس بعد كل منها):**
+1. أطفئ الوضع الليلي بالكامل وأوقف «الليلي التلقائي»: هل زال التقطيع؟ (متوقع: نعم).
+2. أطفئ كل التراكبات (EOX/NASA/Meteosat/الأسماء/المناطق).
+3. احذف CARTO (المستند 78).
+4. ألغِ الظلال الكبيرة مؤقتاً (`elevation = 0`).
+5. عطّل إرسال العلامات (أرسل قائمة فارغة): إن تحسن الأداء فالمشكلة في JSON/العلامات.
+## 3) الإصلاحات المؤكدة (طبّقها كلها)
+### 3-1) الوضع الليلي: عطّله افتراضياً، واستبدله بتعتيم خفيف رخيص
+**المشكلة:** `invert + hue-rotate` مكلف. **البديل الرخيص (طبقة سوداء شفافة بلا مرشحات):**
+```css
+#nightDim { position: absolute; inset: 0; background: rgba(4, 8, 18, 0.42); pointer-events: none; z-index: 450; display: none; }
+#map.night-dim #nightDim { display: block; }
+```
+```javascript
+// بعد إنشاء الخريطة:
+(function () { var d = document.createElement('div'); d.id = 'nightDim'; map.getContainer().appendChild(d); })();
+function setNightMode(on) {                               // استبدل setNightMode القديمة بهذه
+    nightEnabled = !!on;
+    try { map.getContainer().classList.toggle('night-dim', nightEnabled); } catch (e) {}
+    // الانعكاس الكامل (أجمل لكنه أثقل) اختياري فقط عبر window.setNightInvert(true) من إعدادات «الوضع الليلي الكامل (قد يبطئ)»
+}
+window.setNightMode = setNightMode;
+```
+و`MapScreenContent`: احذف `LaunchedEffect(Unit) { state.nightMode = systemDark }`؛ **الافتراضي مطفأ**، والمستخدم يفعّله بنفسه. (والعلامات والأسماء تبقى فوق الطبقة لأن `z-index` العلامات 600.)
+### 3-2) عميل HTTP سريع للبلاطات (OkHttp + HTTP/2) في `OfflineTileInterceptor`
+```kotlin
+// com/example/utils/TileHttp.kt
+package com.example.utils
+
+import okhttp3.ConnectionPool
+import okhttp3.Dispatcher
+import okhttp3.OkHttpClient
+import okhttp3.Protocol
+import java.util.concurrent.TimeUnit
+
+object TileHttp {
+    val client: OkHttpClient by lazy {
+        val dispatcher = Dispatcher().apply { maxRequests = 48; maxRequestsPerHost = 12 }
+        OkHttpClient.Builder()
+            .dispatcher(dispatcher)
+            .connectionPool(ConnectionPool(8, 3, TimeUnit.MINUTES))
+            .protocols(listOf(Protocol.HTTP_2, Protocol.HTTP_1_1))
+            .connectTimeout(6, TimeUnit.SECONDS).readTimeout(8, TimeUnit.SECONDS).callTimeout(12, TimeUnit.SECONDS)
+            .retryOnConnectionFailure(true)
+            .build()
+    }
+}
+// داخل المعترض بدل HttpURLConnection:
+// val req = okhttp3.Request.Builder().url(url).header("User-Agent", "AlYemenServicesApp/1.0").build()
+// TileHttp.client.newCall(req).execute().use { r -> if (r.isSuccessful) { val bytes = r.body?.bytes(); ... } }
+```
+(OkHttp موجود عندك أصلاً ضمن التبعيات؛ لا إضافة لحجم التطبيق.) **أعد استعماله** أيضاً لـOverpass/Nominatim/Photon في البحث.
+### 3-3) تخفيف ما يُرسَل إلى WebView
+```kotlin
+// في RealLeafletMapView: لا تُعد إرسال العلامات إن لم يتغير محتواها، وأجّل 250ms
+var lastSentHash by remember { mutableIntStateOf(0) }
+LaunchedEffect(isMapReady, markersJson) {
+    if (!isMapReady || markersJson.isBlank()) return@LaunchedEffect
+    val h = markersJson.hashCode()
+    if (h == lastSentHash) return@LaunchedEffect
+    kotlinx.coroutines.delay(250)                                   // دمج التغييرات المتلاحقة
+    lastSentHash = h
+    // ... الإرسال الحالي
+}
+```
+و`dynamicOffsets`: لا تحدّثه أثناء حركة الخريطة؛ أعد حسابه عند `moveend` فقط.
+### 3-4) اتصال مسبق بالمضيفات وقصر الطبقات
+في رأس `map.html`:
+```html
+<link rel="preconnect" href="https://tile.openstreetmap.org" crossorigin>
+<link rel="preconnect" href="https://server.arcgisonline.com" crossorigin>
+<link rel="dns-prefetch" href="https://tile.openstreetmap.fr">
+```
+وطبقة تراكب واحدة فقط في كل مرة (المستند 78-ب-5) وأسماء الشوارع تبدأ من التكبير 14 فقط (`labelsOverlay.options.minZoom = 14`).
+### 3-5) الرسم
+أبقِ `WebView` بطبقة عتادية (الافتراضي)، ولا تضع فوقه عناصر Compose متحركة باستمرار (وميض/دوران) أثناء السحب، وقلّل الظلال (`elevation ≤ 4.dp`، أو بلا ظل للوحات الصغيرة).
+### 3-6) النتيجة المتوقعة
+إزالة المرشح الليلي والتراكبات المتعددة وCARTO وretina وتبديل الشبكة إلى HTTP/2 يعيد السرعة السابقة (وغالباً أفضل منها) لأن كل سبب فيها مثبت بمنطق الرسم والشبكة. **أثبته بالقياس قبل/بعد (القسم 2)**.
+
+## 4) المقارنة الصريحة مع Google وAlibaba والطريق لمستوى عالمي
+| المحور | Google/Alibaba | تطبيقك الآن | كيف نغلق الفجوة (مجاناً) |
+|---|---|---|---|
+| محرك الرسم | متجه أصلي 60fps | Leaflet/WebView (نقطي) | **MapLibre Native** (مفتوح المصدر) — المرحلة C |
+| سرعة التحميل | CDN ضخم + بلاطات متجهة صغيرة | بلاطات نقطية من مصادر عامة | بلاطات **متجهة** (OpenFreeMap/Planetiler) أصغر 5–10× + كاش + حزم أوفلاين |
+| المرور الحي | بيانات بملايين الأجهزة | لا يوجد | بلاغات مجتمعية (المستند 76) + أنماط ساعات الذروة (المستند 62) |
+| التوجيه | شبكة ضخمة وحركة | Valhalla/OSRM بلا حركة | Valhalla بخيارات (بدائل، تجنب وعر)، وتحديث الحزمة شهرياً من OSM |
+| الأوفلاين في اليمن | ضعيف | **تفوق** (توجيه + بحث + حزم) | إكمال حزم العرض المتجهة |
+| الخصوصية والتكلفة | إعلانات/رسوم | **تفوق** | يبقى |
+| الخدمات المحلية | غير موجودة | **تفوق** | يبقى |
+**الخطة (مراحل واقعية):**
+- **A (الآن، أيام):** المستندات 78 و81 هذه ⇒ سرعة وموثوقية.
+- **B (أسبوعان):** ملاحة MapLibre ثلاثية الأبعاد في WebView (المستند 80) مع أسهم وطريق 3D.
+- **C (6–10 أسابيع):** نقل **الخريطة الرئيسية** إلى **MapLibre Native Android** (مكتبة BSD بلا مفاتيح): خريطة متجهة بـ60fps مع دوران وإمالة ومباني 3D، ونمط عربي موحّد الأسماء، ومصدرين: (1) OpenFreeMap عبر الإنترنت، (2) **حزمة MBTiles متجهة لليمن** (Planetiler، نحو 80–150MB) بلا إنترنت مع خطوط وأيقونات محلية. تبقى طبقات الأقمار كمصادر نقطية داخل المحرك نفسه. هذا هو التغيير الذي يضعك فعلاً في فئة Google/Amap من حيث الإحساس؛ وهو مشروع كبير يجب أن يُنفَّذ على مراحل مع اختبار ميداني (ولا أكتب كوده هنا دون اختبار لإصدار المكتبة عندك).
+- **D:** مرور مجتمعي وبدائل مسار وملاحة بمسارات (دراجة/سيارة/دفع رباعي).
+> لا أستطيع أن أعدك بأن تصبح «الأول عالمياً»؛ لكن Phase C مع الأوفلاين والمحلية والخصوصية تجعل منتجك **الأفضل في اليمن فعلاً** ومنافساً جاداً في فئته عالمياً.
+
+## 5) اختبار
+قبل/بعد: (1) نسبة الإطارات البطيئة في `gfxinfo`، (2) زمن ظهور الخريطة بعد فتح الشاشة (ثوانٍ)، (3) الميجابايت المستهلكة لخمس دقائق تحريك (Network Profiler)، (4) عدم ظهور «API KEY»، (5) تكبير مستمر 30 ثانية بلا تقطيع محسوس.

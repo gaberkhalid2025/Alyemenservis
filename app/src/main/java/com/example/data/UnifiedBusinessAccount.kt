@@ -3,6 +3,7 @@ package com.example.data
 import com.example.utils.*
 import androidx.annotation.Keep
 import com.example.utils.EntityIdGenerator
+import com.google.firebase.firestore.Exclude
 
 // @Deprecated: Kept for backward compatibility across modules. Refactor usages to com.example.data.models.ChatChannel.
 typealias ChatChannelEntity = com.example.data.models.ChatChannel
@@ -42,7 +43,7 @@ data class UnifiedBusinessAccount(
     val workingHours: String = "9:00 AM - 10:00 PM",
     val latitude: Double = 15.3694,
     val longitude: Double = 44.1910,
-    val password: String = "",
+    @get:Exclude val password: String = "",
     val isDeleted: Boolean = false,
     val deletedAt: Long? = null,
     val deletedBy: String? = null,
@@ -51,10 +52,10 @@ data class UnifiedBusinessAccount(
     val isBookingEnabled: Boolean = true,
     val isInstantOrdersEnabled: Boolean = true,
     val isChatEnabled: Boolean = true,
-    val rawProvider: ProviderEntity? = null,
-    val rawStore: StoreEntity? = null,
-    val rawProperty: PropertyEntity? = null,
-    val rawJob: JobEntity? = null
+    @get:Exclude val rawProvider: ProviderEntity? = null,
+    @get:Exclude val rawStore: StoreEntity? = null,
+    @get:Exclude val rawProperty: PropertyEntity? = null,
+    @get:Exclude val rawJob: JobEntity? = null
 ) {
     val city: String get() = cityId
     val specialty: String get() = description

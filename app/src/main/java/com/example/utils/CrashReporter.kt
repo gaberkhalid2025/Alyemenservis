@@ -29,11 +29,18 @@ import java.util.Date
 object CrashReporter {
     private const val FILE = "last_crash.txt"
 
+    private fun redactSensitive(raw: String): String {
+        return raw
+            .replace(Regex("[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}"), "[EMAIL]")
+            .replace(Regex("(\\+?967|00967)?0?(7[01378]\\d{7})"), "[PHONE]")
+            .replace(Regex("eyJ[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+"), "[TOKEN]")
+    }
+
     fun install(app: Application) {
         val previous = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
             try {
-                val trace = android.util.Log.getStackTraceString(throwable)
+                val trace = redactSensitive(android.util.Log.getStackTraceString(throwable))
                 val body = if (trace.length > 6000) trace.take(2500) + "\n...\n" + trace.takeLast(3500) else trace
                 File(app.filesDir, FILE).writeText("${Date()}\nthread=${thread.name}\n$body")
             } catch (_: Throwable) {}

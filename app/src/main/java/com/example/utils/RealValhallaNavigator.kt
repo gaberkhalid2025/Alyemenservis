@@ -16,8 +16,6 @@ import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
-import java.net.HttpURLConnection
-import java.net.URL
 import java.net.URLEncoder
 import java.util.Locale
 
@@ -670,92 +668,94 @@ object RealValhallaNavigator {
     }
 
     private fun fetchPhoton(q: String, lat: Double, lng: Double, hasBias: Boolean): List<SearchAddressResult> {
-        var c: HttpURLConnection? = null
         return try {
             val encoded = URLEncoder.encode(q, "UTF-8")
             val bias = if (hasBias) "&lat=$lat&lon=$lng" else ""
-            val url = URL("https://photon.komoot.io/api/?q=$encoded&limit=20$bias")
-            c = (url.openConnection() as HttpURLConnection).apply {
-                connectTimeout = 2_500; readTimeout = 3_500; requestMethod = "GET"
-                setRequestProperty("User-Agent", "AlYemenServicesApp/1.0 (Android; Photon)")
-            }
-            if (c.responseCode != 200) return emptyList()
-            val root = JSONObject(c.inputStream.bufferedReader().use { it.readText() })
-            val features = root.optJSONArray("features") ?: return emptyList()
-            val out = mutableListOf<SearchAddressResult>()
-            for (i in 0 until features.length()) {
-                val f = features.optJSONObject(i) ?: continue
-                val coords = f.optJSONObject("geometry")?.optJSONArray("coordinates") ?: continue
-                if (coords.length() < 2) continue
-                val lo = coords.optDouble(0, Double.NaN)
-                val la = coords.optDouble(1, Double.NaN)
-                if (la.isNaN() || lo.isNaN()) continue
-                // نطاق اليمن الجغرافي التقريبي لتفادي نتائج من دول أخرى
-                if (la !in 11.8..19.2 || lo !in 41.5..55.0) continue
-                val props = f.optJSONObject("properties") ?: JSONObject()
-                val name = props.optString("name").ifBlank { props.optString("street") }.ifBlank { continue }
-                val city = props.optString("city").ifBlank { props.optString("state") }
-                val district = props.optString("district").ifBlank { props.optString("suburb") }
-                val parts = listOf(name, district, city).filter { it.isNotBlank() }.distinct()
-                val osmKey = props.optString("osm_key")
-                val osmVal = props.optString("osm_value")
-                out.add(
-                    SearchAddressResult(
-                        displayName = parts.joinToString(" — "),
-                        shortName = name,
-                        latitude = la,
-                        longitude = lo,
-                        type = osmVal.ifBlank { osmKey.ifBlank { "address" } },
-                        icon = iconForOsmKeyVal(osmKey, osmVal)
+            val url = "https://photon.komoot.io/api/?q=$encoded&limit=20$bias"
+            val req = okhttp3.Request.Builder()
+                .url(url)
+                .header("User-Agent", "AlYemenServicesApp/1.0 (Android; Photon)")
+                .build()
+            TileHttp.client.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) return emptyList()
+                val body = resp.body?.string() ?: return emptyList()
+                val root = JSONObject(body)
+                val features = root.optJSONArray("features") ?: return emptyList()
+                val out = mutableListOf<SearchAddressResult>()
+                for (i in 0 until features.length()) {
+                    val f = features.optJSONObject(i) ?: continue
+                    val coords = f.optJSONObject("geometry")?.optJSONArray("coordinates") ?: continue
+                    if (coords.length() < 2) continue
+                    val lo = coords.optDouble(0, Double.NaN)
+                    val la = coords.optDouble(1, Double.NaN)
+                    if (la.isNaN() || lo.isNaN()) continue
+                    // نطاق اليمن الجغرافي التقريبي لتفادي نتائج من دول أخرى
+                    if (la !in 11.8..19.2 || lo !in 41.5..55.0) continue
+                    val props = f.optJSONObject("properties") ?: JSONObject()
+                    val name = props.optString("name").ifBlank { props.optString("street") }.ifBlank { continue }
+                    val city = props.optString("city").ifBlank { props.optString("state") }
+                    val district = props.optString("district").ifBlank { props.optString("suburb") }
+                    val parts = listOf(name, district, city).filter { it.isNotBlank() }.distinct()
+                    val osmKey = props.optString("osm_key")
+                    val osmVal = props.optString("osm_value")
+                    out.add(
+                        SearchAddressResult(
+                            displayName = parts.joinToString(" — "),
+                            shortName = name,
+                            latitude = la,
+                            longitude = lo,
+                            type = osmVal.ifBlank { osmKey.ifBlank { "address" } },
+                            icon = iconForOsmKeyVal(osmKey, osmVal)
+                        )
                     )
-                )
+                }
+                out
             }
-            out
         } catch (_: Throwable) {
             emptyList()
-        } finally {
-            c?.disconnect()
         }
     }
 
     /** null = فشل (يُسجَّل السبب في lastSearchError)، قائمة فارغة = لا نتائج. */
     private fun fetchNominatim(q: String, lat: Double, lng: Double, hasUser: Boolean): List<SearchAddressResult>? {
-        var c: HttpURLConnection? = null
         return try {
             val encoded = URLEncoder.encode(q, "UTF-8")
             val viewbox = if (hasUser) "&viewbox=${lng - 1.5},${lat + 1.5},${lng + 1.5},${lat - 1.5}&bounded=0" else ""
-            val url = URL("${NavConfig.NOMINATIM_BASE_URL}?format=jsonv2&q=$encoded&countrycodes=ye&accept-language=ar&limit=25$viewbox")
-            c = (url.openConnection() as HttpURLConnection).apply {
-                connectTimeout = 2_500; readTimeout = 3_500; requestMethod = "GET"
-                setRequestProperty("User-Agent", "AlYemenServicesApp/1.0 (Android; Nominatim)")
-            }
-            when (val code = c.responseCode) {
-                200 -> {
-                    val arr = JSONArray(c.inputStream.bufferedReader().use { it.readText() })
-                    val out = mutableListOf<SearchAddressResult>()
-                    for (i in 0 until arr.length()) {
-                        val o = arr.getJSONObject(i)
-                        val la = o.optString("lat").toDoubleOrNull() ?: continue
-                        val lo = o.optString("lon").toDoubleOrNull() ?: continue
-                        if (la == 0.0 && lo == 0.0) continue
-                        val display = o.optString("display_name")
-                        val cls = o.optString("class")
-                        val typ = o.optString("type")
-                        out.add(
-                            SearchAddressResult(
-                                displayName = display,
-                                shortName = display.split(",").first().trim(),
-                                latitude = la,
-                                longitude = lo,
-                                type = typ.ifBlank { "address" },
-                                icon = iconForOsmKeyVal(cls, typ)
+            val url = "${NavConfig.NOMINATIM_BASE_URL}?format=jsonv2&q=$encoded&countrycodes=ye&accept-language=ar&limit=25$viewbox"
+            val req = okhttp3.Request.Builder()
+                .url(url)
+                .header("User-Agent", "AlYemenServicesApp/1.0 (Android; Nominatim)")
+                .build()
+            TileHttp.client.newCall(req).execute().use { resp ->
+                when (val code = resp.code) {
+                    200 -> {
+                        val body = resp.body?.string() ?: return emptyList()
+                        val arr = JSONArray(body)
+                        val out = mutableListOf<SearchAddressResult>()
+                        for (i in 0 until arr.length()) {
+                            val o = arr.getJSONObject(i)
+                            val la = o.optString("lat").toDoubleOrNull() ?: continue
+                            val lo = o.optString("lon").toDoubleOrNull() ?: continue
+                            if (la == 0.0 && lo == 0.0) continue
+                            val display = o.optString("display_name")
+                            val cls = o.optString("class")
+                            val typ = o.optString("type")
+                            out.add(
+                                SearchAddressResult(
+                                    displayName = display,
+                                    shortName = display.split(",").first().trim(),
+                                    latitude = la,
+                                    longitude = lo,
+                                    type = typ.ifBlank { "address" },
+                                    icon = iconForOsmKeyVal(cls, typ)
+                                )
                             )
-                        )
+                        }
+                        out
                     }
-                    out
+                    429 -> { lastSearchError = "تم تجاوز حد الطلبات، حاول بعد قليل"; null }
+                    else -> { lastSearchError = "خدمة البحث غير متاحة حالياً (رمز $code)"; null }
                 }
-                429 -> { lastSearchError = "تم تجاوز حد الطلبات، حاول بعد قليل"; null }
-                else -> { lastSearchError = "خدمة البحث غير متاحة حالياً (رمز $code)"; null }
             }
         } catch (e: java.net.UnknownHostException) {
             lastSearchError = "لا يوجد اتصال بالإنترنت — البحث متاح فقط في الأماكن المحلية"; null
@@ -763,7 +763,7 @@ object RealValhallaNavigator {
             lastSearchError = "انتهت مهلة الاتصال بخدمة البحث"; null
         } catch (t: Throwable) {
             Log.e(TAG, "Nominatim failed: ${t.message}"); lastSearchError = "تعذر البحث الآن"; null
-        } finally { c?.disconnect() }
+        }
     }
 
     private fun normalizeArabic(input: String): String = input.trim().lowercase(Locale.ROOT)

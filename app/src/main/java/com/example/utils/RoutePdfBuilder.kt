@@ -122,6 +122,8 @@ object RoutePdfBuilder {
             doc.finishPage(page)
 
             val dir = File(context.cacheDir, "exports").apply { mkdirs() }
+            val cutoff = System.currentTimeMillis() - 24 * 60 * 60 * 1000L
+            dir.listFiles()?.filter { it.isFile && it.lastModified() < cutoff }?.forEach { it.delete() }
             val outFile = File(dir, "route_${System.currentTimeMillis()}.pdf")
             FileOutputStream(outFile).use { doc.writeTo(it) }
             FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", outFile)

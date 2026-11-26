@@ -700,6 +700,14 @@ fun AppNavigator(
                         onBackClick = { viewModel.goBack() }
                     )
                 }
+                AppScreens.COMING_SOON_SERVICES -> {
+                    com.example.ui.screens.home.ComingSoonServiceScreen(
+                        serviceName = viewModel.comingSoonServiceName,
+                        viewModel = viewModel,
+                        themeColors = themeColors,
+                        onBackClick = { viewModel.goBack() }
+                    )
+                }
                 else -> {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text("الشاشة المعروضة: $currentScreen", color = Color.White, fontSize = 14.sp)

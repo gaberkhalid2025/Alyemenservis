@@ -67,7 +67,7 @@ fun AboutContentRenderer(
         try {
             context.startActivity(intent)
         } catch (e: Exception) {
-            android.util.Log.w("AboutContentRenderer", "Failed to open WhatsApp: $phone", e)
+            android.util.Log.w("AboutContentRenderer", "Failed to open WhatsApp", e)
         }
     }
 
@@ -77,7 +77,7 @@ fun AboutContentRenderer(
         try {
             context.startActivity(intent)
         } catch (e: Exception) {
-            android.util.Log.w("AboutContentRenderer", "Failed to open Dialer: $phone", e)
+            android.util.Log.w("AboutContentRenderer", "Failed to open Dialer", e)
         }
     }
 
@@ -87,7 +87,7 @@ fun AboutContentRenderer(
         try {
             context.startActivity(intent)
         } catch (e: Exception) {
-            android.util.Log.w("AboutContentRenderer", "Failed to open Email: $email", e)
+            android.util.Log.w("AboutContentRenderer", "Failed to open Email", e)
         }
     }
 

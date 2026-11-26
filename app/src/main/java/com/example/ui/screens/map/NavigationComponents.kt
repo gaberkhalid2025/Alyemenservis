@@ -64,7 +64,7 @@ fun NavTopCard(
                 Box(
                     modifier = Modifier
                         .size(64.dp)
-                        .shadow(10.dp, maneuverShape, clip = false, ambientColor = MapUi.RoyalMid, spotColor = MapUi.RoyalShadow)
+                        .shadow(4.dp, maneuverShape, clip = false, ambientColor = MapUi.RoyalMid, spotColor = MapUi.RoyalShadow)
                         .clip(maneuverShape)
                         .background(MapUi.RoyalGemBrush)
                         .drawBehind {

@@ -17,8 +17,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 //  6. PropertyDetailsDialog.kt              (PropertyDetailsDialog)
 //  7. StoreCreateEditDialog.kt              (StoreCreateEditDialog)
 //  8. PropertyCreateEditDialog.kt           (PropertyCreateEditDialog)
-//  9. LegacyAdminStoresPropertiesPanel.kt   (LegacyAdminStoresPropertiesPanel)
-// 10. LegacyAdminJobsAndArchivePanels.kt    (AdminJobsPanel, AdminJobApplicantsPanel,
+//  9. LegacyAdminJobsAndArchivePanels.kt    (AdminJobsPanel, AdminJobApplicantsPanel,
 //                                            AdminCentralizedBlockedPanel, AdminCentralizedDeletedPanel)
 // =====================================================================
 

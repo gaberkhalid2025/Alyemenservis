@@ -1,0 +1,118 @@
+# 82 – سدّ الثغرات الأمنية المرصودة (بالملفات والكود والسكربتات)
+> التقرير منسوب لـAI Studio (Gemini)؛ **لم أرَ الملفات** (`network_security_config.xml`, `file_paths.xml`, `UnifiedBusinessAccount.kt`, `AdminSecurityManager.kt`...). أكتب الإصلاح النهائي المطلوب لكل بند وسكربت تدقيق يؤكد وجود المشكلة قبل التعديل. **نفّذ البروتوكول الآمن (المستند 74-القسم 1).**
+## 0) سكربت تدقيق سريع (شغّله أولاً)
+```bash
+cd app/src
+echo "== 1) cleartext =="; grep -rn 'cleartextTrafficPermitted="true"\|usesCleartextTraffic="true"\|http://' main --include=*.xml --include=*.kt | grep -v "schemas\|xmlns\|w3.org\|apache.org\|android.com/apk"
+echo "== 2) FileProvider paths =="; grep -rn 'path="\."\|path="/"\|external-path\|root-path' main/res/xml
+echo "== 3) password fields =="; grep -rn "password\|passwordHash\|pwdHash" main/java --include=*.kt | grep -i "val \|var " | grep -vi "hint\|label\|placeholder"
+echo "== 4) admin fallbacks =="; grep -rn "admin_secrets\|ownerPasswordHash\|adminPasswordHash\|main_settings" main/java --include=*.kt | head -40
+echo "== 5) exported/ backup/ webview =="; grep -rn 'exported="true"\|allowBackup="true"\|setAllowFileAccess(true)\|setAllowUniversalAccessFromFileURLs(true)\|setJavaScriptCanOpenWindowsAutomatically(true)' main
+echo "== 6) hard-coded keys =="; grep -rEn 'AIza[0-9A-Za-z_-]{30,}|AKIA[0-9A-Z]{16}|sk_live_|-----BEGIN' main ../../ --include=*.kt --include=*.xml --include=*.json --include=*.kts 2>/dev/null | head
+```
+## 1) 🔴 حركة شبكة غير مشفّرة (`network_security_config.xml`)
+**الإصلاح (الملف كاملاً):** لا استثناءات HTTP، ولا نطاقات Firebase/Google بقواعد خاصة (كلها HTTPS أصلاً):
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+            <!-- أندرويد 7.0/7.1.0 فقط: جذر Let's Encrypt إن لزم (المستند 49)
+            <certificates src="@raw/isrg_root_x1" /> -->
+        </trust-anchors>
+    </base-config>
+    <debug-overrides>
+        <trust-anchors><certificates src="user" /></trust-anchors>   <!-- للتصحيح بأدوات الاعتراض في نسخ Debug فقط -->
+    </debug-overrides>
+</network-security-config>
+```
+- **لا تفعّل Certificate Pinning على نطاقات Google/Firebase** (تدوير شهاداتها يعطّل التطبيق عند الجميع). التثبيت فقط لنطاقك الخاص إن وُجد.
+- تأكد: `usesCleartextTraffic="false"` في المانيفست (موجود)، وكل روابط الخدمات `https://` (سكربت 0-1).
+- اختبار: `adb shell` أو نقطة وصول بـmitmproxy على Release ⇒ يجب أن تفشل الطلبات (لا اعتراض).
+## 2) 🟡 `FileProvider` يكشف الجذر (`file_paths.xml`)
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <cache-path name="exports" path="exports/" />      <!-- GPX/PDF/CSV -->
+    <cache-path name="proof" path="proof/" />          <!-- صور إثبات التسليم -->
+    <files-path name="shared" path="shared/" />        <!-- ملفات مشاركة مؤقتة -->
+</paths>
+```
+- احذف أي `path="."` و`external-path` و`root-path`. اكتب الكود فقط داخل هذه المجلدات (`File(cacheDir, "exports")`...).
+- في المانيفست: `android:exported="false"` و`grantUriPermissions="true"` (موجودان)، وامنح الصلاحية **للـUri المحدد فقط** عبر `FLAG_GRANT_READ_URI_PERMISSION` (لا `FLAG_GRANT_WRITE`).
+- نظّف ملفات التصدير القديمة (يُنفَّذ في `GpxWriter` المستند 63).
+## 3) 🔴 كلمات المرور/التجزئة داخل كيانات Firestore
+**المشكلة:** `password/passwordHash` حقول في `StoreEntity/ProviderEntity/UnifiedBusinessAccount`؛ أي قراءة للوثيقة (أو أي قاعدة تسمح بالقراءة) تكشفها، والتحقق من كلمة المرور يتم في العميل بمقارنة التجزئة (يمكن تجاوزه).
+**الحل الجذري (وليس ترقيعاً): لا كلمات مرور في Firestore إطلاقاً** — يتولاها Firebase Auth (يخزّنها مجزّأة بخوارزمية قوية على خوادمه، مجاناً):
+1. **المرحلة 1:** طبّق `AuthBridge.ensureStableUid` (المستند 74-C) عند كل تسجيل دخول/تسجيل بنجاح.
+2. **المرحلة 2:** حوّل التحقق إلى `signInWithEmailAndPassword` (الخادم يتحقق)، وتوقف عن قراءة أي تجزئة.
+3. **المرحلة 3 (حماية فورية قبل الترحيل):** أضف إلى الحقول الحساسة `@get:Exclude` كي لا تُكتب مع الكيان:
+```kotlin
+import com.google.firebase.firestore.Exclude
+data class StoreEntity(
+    // ...
+    @get:Exclude val passwordHash: String = "",       // لا يُسلسَل إلى Firestore
+)
+```
+وانقل التجزئات الحالية إلى مستند منفصل `credentials/{id}` بقواعد صارمة:
+```
+match /credentials/{id} { allow read, write: if isAdmin(); }
+```
+4. **المرحلة 4 (بعد نجاح الدخول عبر Auth لجميع المستخدمين):** احذف الحقول من الوثائق بسكربت Admin SDK على حاسوبك:
+```js
+// delete_password_fields.js  (node delete_password_fields.js)
+const admin = require('firebase-admin'); admin.initializeApp(); const db = admin.firestore();
+async function purge(coll) {
+  let last = null;
+  for (;;) {
+    let q = db.collection(coll).orderBy('__name__').limit(300); if (last) q = q.startAfter(last);
+    const s = await q.get(); if (s.empty) break;
+    const b = db.batch();
+    s.docs.forEach(d => b.update(d.ref, { password: admin.firestore.FieldValue.delete(), passwordHash: admin.firestore.FieldValue.delete() }));
+    await b.commit(); last = s.docs[s.docs.length - 1];
+  }
+}
+(async () => { for (const c of ['providers', 'stores', 'properties', 'users', 'join_requests', 'pending_providers']) await purge(c); console.log('done'); })();
+```
+**لا تشغّله قبل اكتمال المرحلتين 1–2** وإلا فقد المستخدمون إمكانية الدخول. (و**غيّر** كلمات المرور المعروفة السابقة بعد الترحيل لأن التجزئات كانت قابلة للقراءة.)
+## 4) 🔴 مسارات دخول الإدارة المتعددة (6 طبقات احتياطية)
+**الخطر:** يكفي أن يكون أضعف مسار (مستند `admin_secrets` أو `ownerPasswordHash` بقيمة افتراضية) قابلاً للقراءة/التعديل ليُتجاوز الباقي.
+**الهدف: مسار واحد قوي**
+1. حسابات الإدارة (مالك/مدير/مشرف) = **حسابات Firebase Auth** (بريد/كلمة مرور قوية؛ يُنشئها المالك من وحدة التحكم).
+2. الصلاحيات = **Custom Claims** (`admin`, `supervisor`, `role`) تُضبط بسكربت Admin SDK:
+```js
+// set_claims.js:  node set_claims.js <uid> admin
+const admin = require('firebase-admin'); admin.initializeApp();
+admin.auth().setCustomUserClaims(process.argv[2], { [process.argv[3]]: true, role: process.argv[3] }).then(() => console.log('ok'));
+```
+3. بوابة الدخول في التطبيق:
+```kotlin
+// com/example/security/AdminAuth.kt
+object AdminAuth {
+    data class Session(val uid: String, val role: String)
+    suspend fun signIn(email: String, password: String): Result<Session> = try {
+        val auth = FirebaseAuth.getInstance()
+        val user = auth.signInWithEmailAndPassword(email.trim(), password).await().user ?: return Result.failure(IllegalStateException("فشل الدخول"))
+        val claims = user.getIdToken(true).await().claims                       // يتحقق من الخادم بعد تحديث الرمز
+        val role = when { claims["admin"] == true -> "ADMIN"; claims["supervisor"] == true -> "SUPERVISOR"; else -> null }
+        if (role == null) { auth.signOut(); Result.failure(SecurityException("هذا الحساب ليس إدارياً")) } else Result.success(Session(user.uid, role))
+    } catch (e: Exception) { Result.failure(e) }
+}
+```
+(ثم `AdminPermissionResolver` من المستند 74 يحدد التبويبات، والقواعد تفرض الباقي.)
+4. **احذف الطبقات الاحتياطية** بترتيب آمن: (أ) سجّل الدخول عبر المسار الجديد وتأكد أنه يعمل لكل مديريك، (ب) أغلق القراءة العامة لـ`admin_secrets` و`settings/main_settings` (القواعد: `settings` قراءة للمسجلين فقط **بلا أي حقل سري**)، (ج) احذف المستندات والحقول `ownerPasswordHash/adminPasswordHash/admin_secrets`، (د) احذف كود التخزين المحلي والدوال الاحتياطية، (هـ) **دوّر** أي كلمة مرور ظهرت سابقاً.
+5. إضافات أمان: حد محاولات الدخول (الانتظار المتزايد في الواجهة + حماية Firebase المدمجة)، تسجيل تدقيق `admin_audit/{id}` (من، متى، إجراء)، وتفعيل **App Check** (وضع المراقبة أولاً) لمنع الطلبات من تطبيقات مزيفة (مع التنبيه عن التوزيع خارج المتجر، المستند 51).
+## 5) إضافات تقوية (من التقرير ومن فحصي)
+| البند | الإجراء |
+|---|---|
+| ملفات ضخمة >1000 سطر (ديون تقنية) | تقسيم تدريجي بلا تغيير سلوك (مثل `AdminViewModel`، `StoresRealEstateComponents`)، كل مرة ملف واحد + بناء + اختبار؛ أستطيع كتابة خطة لكل ملف عند إرساله |
+| `WebView` | أبقِ `allowFileAccess=false`، قائمة الروابط المسموحة (مطبّقة)، ولا `addJavascriptInterface` بلا `@JavascriptInterface` محدد |
+| الإشعارات | القواعد الجديدة والفصل (المستند 73-C3) |
+| المحفظة | القواعد وطلبات الشحن (المستند 73-C1) |
+| تقرير الانهيار والسجلات | تنقيح الأرقام والإحداثيات (المستند 52) وإزالة السجلات في الإصدار |
+| النسخ الاحتياطي | `allowBackup=false` (موجود) وتحقق أن `data_extraction_rules` لا يشمل ملفات الجلسة |
+## 6) ترتيب التنفيذ
+(1) `network_security_config` + `file_paths` (دقائق) ← (2) سكربت التدقيق 0 ← (3) قواعد Firestore (74/73) ← (4) مسار الإدارة الجديد ثم حذف الاحتياطات ← (5) ترحيل كلمات المرور إلى Firebase Auth ثم حذف الحقول ← (6) App Check. وبعد كل خطوة: اختبار تسجيل الدخول لكل الأدوار على جهاز حقيقي.
+## 7) اختبار
+1. اعتراض الشبكة بـmitmproxy على Release يفشل. 2. محاولة قراءة `credentials`/`admin_secrets` بحساب عادي: `PERMISSION_DENIED`. 3. دخول الإدارة بحساب بلا claim يُرفض. 4. وثائق المتاجر بعد التنظيف بلا حقول كلمات مرور. 5. مشاركة ملف GPX تعمل ولا يمكن لتطبيق آخر قراءة غير الملف الممنوح.

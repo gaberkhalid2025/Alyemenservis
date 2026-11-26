@@ -301,18 +301,28 @@ internal fun BoxScope.MapScreenViewport(
             )
         }
     } else if (state.is3DTerrainEnabled && is3DAvailable && !use3DCssFallback) {
-        Map3DView(
-            centerLat = safeUserLat,
-            centerLng = safeUserLng,
-            userCoords = if (hasRealLocation) Pair(safeUserLat, safeUserLng) else null,
-            markersJson = MapJsonBuilder.buildMarkersJson(
+        val markersJson3D = remember(
+            filteredProviders,
+            filteredStores,
+            filteredProperties,
+            state.dynamicOffsets.toMap(),
+            safeUserLat,
+            safeUserLng
+        ) {
+            MapJsonBuilder.buildMarkersJson(
                 nearbyProviders = filteredProviders.take(MapJsonBuilder.MAX_PER_TYPE),
                 nearbyStores = filteredStores.take(MapJsonBuilder.MAX_PER_TYPE),
                 nearbyProperties = filteredProperties.take(MapJsonBuilder.MAX_PER_TYPE),
                 dynamicOffsets = state.dynamicOffsets,
                 safeUserLat = safeUserLat,
                 safeUserLng = safeUserLng
-            ),
+            )
+        }
+        Map3DView(
+            centerLat = safeUserLat,
+            centerLng = safeUserLng,
+            userCoords = if (hasRealLocation) Pair(safeUserLat, safeUserLng) else null,
+            markersJson = markersJson3D,
             currentMapMode = state.currentMapMode,
             selectedCity = state.selectedCity,
             hybridLabels = hybridLabels,

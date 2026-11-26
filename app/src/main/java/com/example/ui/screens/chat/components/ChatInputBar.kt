@@ -225,7 +225,8 @@ fun ChatInputBar(
     ) { isGranted ->
         if (isGranted) {
             try {
-                val file = File(context.cacheDir, "camera_${System.currentTimeMillis()}.jpg")
+                val sharedDir = File(context.cacheDir, "shared").apply { mkdirs() }
+                val file = File(sharedDir, "camera_${System.currentTimeMillis()}.jpg")
                 pendingCameraFile = file
                 val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
                 pendingCameraUri = uri
@@ -298,7 +299,8 @@ fun ChatInputBar(
 
         try {
             // ✅ استخدام صيغة m4a المدعومة بشكل أصيل مع MPEG_4 / AAC
-            val file = File(context.cacheDir, "audio_rec_${System.currentTimeMillis()}.m4a")
+            val sharedDir = File(context.cacheDir, "shared").apply { mkdirs() }
+            val file = File(sharedDir, "audio_rec_${System.currentTimeMillis()}.m4a")
             audioFile = file
             val recorder = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
                 MediaRecorder(context)
@@ -691,7 +693,8 @@ fun ChatInputBar(
                                 showAttachmentMenu = false
                                 val hasCameraPerm = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
                                 if (hasCameraPerm) {
-                                    val file = File(context.cacheDir, "camera_${System.currentTimeMillis()}.jpg")
+                                    val sharedDir = File(context.cacheDir, "shared").apply { mkdirs() }
+                                    val file = File(sharedDir, "camera_${System.currentTimeMillis()}.jpg")
                                     pendingCameraFile = file
                                     val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
                                     pendingCameraUri = uri

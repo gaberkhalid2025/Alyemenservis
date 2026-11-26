@@ -14,7 +14,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -80,11 +79,6 @@ fun MapScreenContent(
 
     val keyboardController = LocalSoftwareKeyboardController.current
     var areTilesFailing by remember { mutableStateOf(false) }
-
-    val isSysDark = isSystemInDarkTheme()
-    LaunchedEffect(isSysDark) {
-        state.nightMode = isSysDark
-    }
 
     var isDrivingMode by remember { mutableStateOf(true) }
     var companionFilter by remember { mutableStateOf<String?>(null) }
