@@ -42,7 +42,8 @@ internal fun StoreHeroBanner(
     isRestaurant: Boolean,
     isFav: Boolean,
     viewModel: MainViewModel,
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    onReportClick: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     Box(
@@ -156,6 +157,24 @@ internal fun StoreHeroBanner(
                             tint = Color.White,
                             modifier = Modifier.size(18.dp)
                         )
+                    }
+                }
+
+                if (onReportClick != null) {
+                    Surface(
+                        onClick = onReportClick,
+                        shape = CircleShape,
+                        color = Color.Black.copy(alpha = 0.6f),
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.Warning,
+                                contentDescription = "إبلاغ عن مخالفة",
+                                tint = Color(0xFFF59E0B),
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
                     }
                 }
             }

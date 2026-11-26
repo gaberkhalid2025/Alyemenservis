@@ -589,19 +589,19 @@ async function enforceApiKeyRateLimit(uid, actionKey, maxCalls = 30, windowMs = 
 }
 
 exports.getApiKey = functions.https.onCall(async (data, context) => {
-    // التحقق من صلاحيات الأدمن الموحدة
+    // التحقق من صلاحيات المالك / السوبر أدمن حصراً
     const token = context.auth?.token || {};
-    const isAdmin = token.isAdmin === true || token.admin === true || token.isOwner === true || token.isSuperAdmin === true ||
-                    ['admin', 'owner', 'super_admin'].includes((token.role || '').toLowerCase());
-    if (!isAdmin) {
-        throw new functions.https.HttpsError('permission-denied', 'Admin only');
+    const isOwnerOrSuper = token.isOwner === true || token.isSuperAdmin === true ||
+                           ['owner', 'super_admin'].includes((token.role || '').toLowerCase());
+    if (!isOwnerOrSuper) {
+        throw new functions.https.HttpsError('permission-denied', 'Owner or Super Admin only');
     }
     await enforceApiKeyRateLimit(context.auth.uid, 'get');
     
     const { keyName } = data;
     
-    if (!keyName || typeof keyName !== 'string') {
-        throw new functions.https.HttpsError('invalid-argument', 'keyName required');
+    if (!keyName || typeof keyName !== 'string' || !/^[A-Za-z0-9_]{2,64}$/.test(keyName)) {
+        throw new functions.https.HttpsError('invalid-argument', 'Valid keyName required (alphanumeric and underscore only, 2-64 chars)');
     }
     
     const secretName = `yemen_app_${keyName.toLowerCase().replace(/_/g, '-')}`;
@@ -634,22 +634,22 @@ exports.getApiKey = functions.https.onCall(async (data, context) => {
 
 /**
  * 💾 حفظ مفتاح API بشكل آمن
- * - يتطلب صلاحيات الأدمن
+ * - يتطلب صلاحيات المالك حصراً
  * - يخزّن في Secret Manager (ليس Firestore)
  */
 exports.setApiKey = functions.https.onCall(async (data, context) => {
     const token = context.auth?.token || {};
-    const isAdmin = token.isAdmin === true || token.admin === true || token.isOwner === true || token.isSuperAdmin === true ||
-                    ['admin', 'owner', 'super_admin'].includes((token.role || '').toLowerCase());
-    if (!isAdmin) {
-        throw new functions.https.HttpsError('permission-denied', 'Admin only');
+    const isOwnerOrSuper = token.isOwner === true || token.isSuperAdmin === true ||
+                           ['owner', 'super_admin'].includes((token.role || '').toLowerCase());
+    if (!isOwnerOrSuper) {
+        throw new functions.https.HttpsError('permission-denied', 'Owner or Super Admin only');
     }
     await enforceApiKeyRateLimit(context.auth.uid, 'set');
     
     const { keyName, value } = data;
     
-    if (!keyName || !value) {
-        throw new functions.https.HttpsError('invalid-argument', 'keyName and value required');
+    if (!keyName || typeof keyName !== 'string' || !/^[A-Za-z0-9_]{2,64}$/.test(keyName) || !value || typeof value !== 'string') {
+        throw new functions.https.HttpsError('invalid-argument', 'Valid keyName and value required');
     }
     
     const secretName = `yemen_app_${keyName.toLowerCase().replace(/_/g, '-')}`;

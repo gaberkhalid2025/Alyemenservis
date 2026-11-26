@@ -4,6 +4,7 @@ import android.content.Context
 import com.example.ui.*
 import android.content.Intent
 import android.net.Uri
+import com.example.utils.safeStartActivity
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -221,7 +222,7 @@ fun StoreQuickDetailsDialog(
                 Button(
                     onClick = {
                         val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${store.phone}"))
-                        context.startActivity(intent)
+                        context.safeStartActivity(intent, "تعذر فتح تطبيق الاتصال")
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
                     shape = RoundedCornerShape(10.dp),
@@ -362,7 +363,7 @@ fun JobQuickDetailsDialog(
                 Button(
                     onClick = {
                         val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${job.phone}"))
-                        context.startActivity(intent)
+                        context.safeStartActivity(intent, "تعذر فتح تطبيق الاتصال")
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
                     shape = RoundedCornerShape(10.dp),

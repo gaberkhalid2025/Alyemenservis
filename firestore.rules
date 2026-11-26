@@ -6,6 +6,14 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function isRealUser() {
+      return isSignedIn() && (
+        !('firebase' in request.auth.token) ||
+        !('sign_in_provider' in request.auth.token.firebase) ||
+        request.auth.token.firebase.sign_in_provider != 'anonymous'
+      );
+    }
+
     function isOwnerOrAdmin() {
       return isSignedIn() && (
         request.auth.token.role in ['SUPER_ADMIN', 'MAIN_ADMIN', 'OWNER', 'ADMIN', 'owner', 'admin']
@@ -173,11 +181,13 @@ service cloud.firestore {
       allow update, delete: if isStaff() || matchesOwner(resource.data);
     }
     match /job_applications/{d} {
-      allow read, create: if isSignedIn();
+      allow read: if isStaff() || (isSignedIn() && matchesOwner(resource.data));
+      allow create: if isRealUser() && matchesOwner(request.resource.data);
       allow update, delete: if isStaff() || matchesOwner(resource.data);
     }
     match /job_seekers/{d} {
-      allow read, create: if isSignedIn();
+      allow read: if isStaff() || (isSignedIn() && (resource.data.isPublic == true || matchesOwner(resource.data)));
+      allow create: if isRealUser() && matchesOwner(request.resource.data);
       allow update, delete: if isStaff() || matchesOwner(resource.data);
     }
 
@@ -286,7 +296,7 @@ service cloud.firestore {
     }
     match /instant_requests/{d} {
       allow read: if isSignedIn();
-      allow create: if isSignedIn();
+      allow create: if isRealUser();
       allow update: if isSignedIn() && (
         isStaff() ||
         matchesOwner(resource.data) ||
@@ -297,7 +307,7 @@ service cloud.firestore {
 
       match /offers/{offerId} {
         allow read: if isSignedIn();
-        allow create: if isSignedIn();
+        allow create: if isRealUser();
         allow update: if isSignedIn() && (
           isStaff() ||
           matchesOwner(resource.data) ||
@@ -307,11 +317,13 @@ service cloud.firestore {
       }
     }
     match /urgent_requests/{d} {
-      allow read, create: if isSignedIn();
+      allow read: if isSignedIn();
+      allow create: if isRealUser();
       allow update, delete: if isStaff() || matchesOwner(resource.data);
     }
     match /service_requests/{d} {
-      allow read, create: if isSignedIn();
+      allow read: if isSignedIn();
+      allow create: if isRealUser();
       allow update, delete: if isStaff() || matchesOwner(resource.data);
     }
     match /request_offers/{d} {
@@ -378,7 +390,7 @@ service cloud.firestore {
     }
     match /notifications/{notifId} {
       allow read: if isSignedIn();
-      allow create: if isSignedIn();
+      allow create: if isRealUser();
       allow update: if isSignedIn() && (
         isStaff() || resource.data.targetValue == request.auth.uid
       );
@@ -393,12 +405,12 @@ service cloud.firestore {
         (('customerId' in resource.data) && resource.data.customerId == request.auth.uid) ||
         (('customerPhone' in resource.data) && ('email' in request.auth.token) && request.auth.token.email is string && request.auth.token.email == (resource.data.customerPhone + '@yemen-services.app'))
       );
-      allow create: if isSignedIn();
+      allow create: if isRealUser();
       allow update, delete: if isStaff() || matchesOwner(resource.data);
     }
     match /payment_transactions/{d} {
       allow read: if isSignedIn() && (isStaff() || matchesOwner(resource.data));
-      allow create: if isSignedIn();
+      allow create: if isRealUser();
       allow update, delete: if isStaff();
     }
     match /wallets/{d} {
@@ -504,10 +516,12 @@ service cloud.firestore {
       }
     }
     match /presence/{d} {
-      allow read, write: if isSignedIn();
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && (d == request.auth.uid || isStaff());
     }
     match /user_presence/{d} {
-      allow read, write: if isSignedIn();
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && (d == request.auth.uid || isStaff());
     }
     match /fcm_tokens/{d} {
       allow read, create, update: if isSignedIn() && (isStaff() || d == request.auth.uid || (resource != null && matchesOwner(resource.data)));

@@ -123,10 +123,11 @@ object VoiceManager : TextToSpeech.OnInitListener {
                 if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
                     result = tts?.setLanguage(arabicLocale) ?: TextToSpeech.LANG_MISSING_DATA
                 }
+                val currentCtx = appContext
                 if ((result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) &&
-                    !triedGoogleFallback && appContext != null &&
+                    !triedGoogleFallback && currentCtx != null &&
                     com.example.utils.ArabicNavigationVoiceEngine.isPackageInstalled(
-                        appContext!!,
+                        currentCtx,
                         com.example.utils.ArabicNavigationVoiceEngine.GOOGLE_TTS_PACKAGE
                     )
                 ) {
@@ -134,7 +135,7 @@ object VoiceManager : TextToSpeech.OnInitListener {
                     isInitializing = true
                     try { tts?.shutdown() } catch (_: Exception) {}
                     tts = TextToSpeech(
-                        appContext!!,
+                        currentCtx,
                         this,
                         com.example.utils.ArabicNavigationVoiceEngine.GOOGLE_TTS_PACKAGE
                     )

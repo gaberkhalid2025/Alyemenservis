@@ -109,7 +109,15 @@ fun AboutAppDialogView(
                                 }
                                 AboutContentRenderer(
                                     settingsState = state.settings,
-                                    themeColors = themeColors
+                                    themeColors = themeColors,
+                                    onOpenPrivacyPolicy = {
+                                        onDismiss()
+                                        viewModel.navigateToScreen(AppScreens.PRIVACY_POLICY)
+                                    },
+                                    onOpenTermsOfService = {
+                                        onDismiss()
+                                        viewModel.navigateToScreen(AppScreens.TERMS_OF_SERVICE)
+                                    }
                                 )
                             }
                         }
@@ -129,7 +137,15 @@ fun AboutAppDialogView(
                                 )
                                 AboutContentRenderer(
                                     settingsState = state.settings,
-                                    themeColors = themeColors
+                                    themeColors = themeColors,
+                                    onOpenPrivacyPolicy = {
+                                        onDismiss()
+                                        viewModel.navigateToScreen(AppScreens.PRIVACY_POLICY)
+                                    },
+                                    onOpenTermsOfService = {
+                                        onDismiss()
+                                        viewModel.navigateToScreen(AppScreens.TERMS_OF_SERVICE)
+                                    }
                                 )
                             }
                         }
@@ -222,7 +238,9 @@ fun AboutAppScreenContent(
                         }
                         AboutContentRenderer(
                             settingsState = state.settings,
-                            themeColors = themeColors
+                            themeColors = themeColors,
+                            onOpenPrivacyPolicy = { viewModel.navigateToScreen(AppScreens.PRIVACY_POLICY) },
+                            onOpenTermsOfService = { viewModel.navigateToScreen(AppScreens.TERMS_OF_SERVICE) }
                         )
                     }
                 }
@@ -242,7 +260,9 @@ fun AboutAppScreenContent(
                         )
                         AboutContentRenderer(
                             settingsState = state.settings,
-                            themeColors = themeColors
+                            themeColors = themeColors,
+                            onOpenPrivacyPolicy = { viewModel.navigateToScreen(AppScreens.PRIVACY_POLICY) },
+                            onOpenTermsOfService = { viewModel.navigateToScreen(AppScreens.TERMS_OF_SERVICE) }
                         )
                     }
                 }

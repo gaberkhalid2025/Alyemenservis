@@ -651,6 +651,18 @@ fun AppNavigator(
                         onBackClick = { viewModel.goBack() }
                     )
                 }
+                AppScreens.PRIVACY_POLICY -> {
+                    com.example.ui.screens.PrivacyPolicyScreen(
+                        onBack = { viewModel.goBack() },
+                        themeColors = themeColors
+                    )
+                }
+                AppScreens.TERMS_OF_SERVICE -> {
+                    com.example.ui.screens.TermsOfServiceScreen(
+                        onBack = { viewModel.goBack() },
+                        themeColors = themeColors
+                    )
+                }
                 AppScreens.NOTIFICATIONS_VIEW -> {
                     com.example.ui.screens.notifications.UserNotificationsScreen(
                         viewModel = viewModel,

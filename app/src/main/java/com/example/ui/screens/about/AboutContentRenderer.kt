@@ -39,7 +39,9 @@ import com.example.utils.VisualThemePalette
 fun AboutContentRenderer(
     settingsState: AdminSettingsEntity,
     themeColors: VisualThemePalette,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onOpenPrivacyPolicy: (() -> Unit)? = null,
+    onOpenTermsOfService: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     val appTitle = settingsState.appName.ifBlank { "دليل الخدمات الشامل في اليمن" }
@@ -507,6 +509,61 @@ fun AboutContentRenderer(
                     fontWeight = FontWeight.Bold,
                     fontSize = 13.sp
                 )
+            }
+        }
+
+        // 6.5 Legal Policies (Privacy & Terms)
+        if (onOpenPrivacyPolicy != null || onOpenTermsOfService != null) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = "📜 الشروط والسياسات القانونية:",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = themeColors.accent
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        if (onOpenPrivacyPolicy != null) {
+                            OutlinedButton(
+                                onClick = onOpenPrivacyPolicy,
+                                shape = RoundedCornerShape(12.dp),
+                                border = BorderStroke(1.dp, Color(0xFF60A5FA).copy(alpha = 0.5f)),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .heightIn(min = 48.dp)
+                            ) {
+                                Icon(Icons.Default.Lock, contentDescription = null, tint = Color(0xFF60A5FA), modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("سياسة الخصوصية", color = Color.White, fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold)
+                            }
+                        }
+                        if (onOpenTermsOfService != null) {
+                            OutlinedButton(
+                                onClick = onOpenTermsOfService,
+                                shape = RoundedCornerShape(12.dp),
+                                border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.5f)),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .heightIn(min = 48.dp)
+                            ) {
+                                Icon(Icons.Default.Info, contentDescription = null, tint = themeColors.accent, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("شروط الاستخدام", color = Color.White, fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold)
+                            }
+                        }
+                    }
+                }
             }
         }
 

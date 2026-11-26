@@ -5,6 +5,7 @@ import com.example.ui.*
 
 import android.content.Intent
 import android.net.Uri
+import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -263,8 +264,12 @@ fun PropertyDetailsDialog(
 
                         Button(
                             onClick = {
-                                val u = Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/${property.phone.replace("+", "")}"))
-                                context.startActivity(u)
+                                runCatching {
+                                    val u = Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/${property.phone.replace("+", "")}"))
+                                    context.startActivity(u)
+                                }.onFailure {
+                                    Toast.makeText(context, "تعذر فتح تطبيق واتساب", Toast.LENGTH_SHORT).show()
+                                }
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0D9488)),
                             modifier = Modifier.weight(1f)

@@ -32,7 +32,10 @@ fun PrivacyPolicyScreen(
     val textColor = themeColors.textPrimary
     val primaryColor = themeColors.primary
 
+    androidx.activity.compose.BackHandler(onBack = onBack)
+
     Scaffold(
+        containerColor = themeColors.background,
         topBar = {
             TopAppBar(
                 title = { Text("سياسة الخصوصية وحماية البيانات") },
@@ -107,12 +110,16 @@ fun PrivacyPolicyScreen(
                     PrivacyItem(
                         icon = Icons.Default.Check,
                         title = "1. البيانات التي نجمعها",
-                        desc = "الاسم ورقم الهاتف والموقع التقريبي لتسهيل ربطك بالفنيين والمتاجر القريبة منك."
+                        desc = "الاسم ورقم الهاتف والموقع التقريبي لتسهيل ربطك بالفنيين والمتاجر القريبة منك.",
+                        textColor = textColor,
+                        primaryColor = primaryColor
                     )
                     PrivacyItem(
                         icon = Icons.Default.Lock,
                         title = "2. سرية وحماية المدفوعات",
-                        desc = "كافة عمليات التحويل والسندات المالية يتم التحقق منها بصورة مشفرة ومؤمنة تماماً."
+                        desc = "كافة عمليات التحويل والسندات المالية يتم التحقق منها بصورة مشفرة ومؤمنة تماماً.",
+                        textColor = textColor,
+                        primaryColor = primaryColor
                     )
                 }
             }
@@ -192,7 +199,9 @@ fun PrivacyPolicyScreen(
 private fun PrivacyItem(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     title: String,
-    desc: String
+    desc: String,
+    textColor: Color = MaterialTheme.colorScheme.onSurface,
+    primaryColor: Color = MaterialTheme.colorScheme.primary
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -201,12 +210,12 @@ private fun PrivacyItem(
         Icon(
             imageVector = icon,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
+            tint = primaryColor,
             modifier = Modifier.size(22.dp)
         )
         Column {
-            Text(title, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-            Text(desc, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
+            Text(title, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = textColor)
+            Text(desc, fontSize = 13.sp, color = textColor.copy(alpha = 0.75f))
         }
     }
 }

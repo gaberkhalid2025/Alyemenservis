@@ -4,6 +4,7 @@ import com.example.utils.*
 import com.example.ui.*
 import android.content.Intent
 import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
@@ -351,9 +352,13 @@ fun StoreDetailsDialog(
 
                         Button(
                             onClick = {
-                                val cleanPhone = store.phone.replace("+", "").replace(" ", "")
-                                val u = Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/$cleanPhone"))
-                                context.startActivity(u)
+                                runCatching {
+                                    val cleanPhone = store.phone.replace("+", "").replace(" ", "")
+                                    val u = Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/$cleanPhone"))
+                                    context.startActivity(u)
+                                }.onFailure {
+                                    Toast.makeText(context, "تعذر فتح تطبيق واتساب", Toast.LENGTH_SHORT).show()
+                                }
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0D9488)),
                             shape = RoundedCornerShape(10.dp),
@@ -365,12 +370,16 @@ fun StoreDetailsDialog(
 
                         Button(
                             onClick = {
-                                val shareIntent = Intent().apply {
-                                    action = Intent.ACTION_SEND
-                                    putExtra(Intent.EXTRA_TEXT, "🏪 تفضل بزيارة صفحة ${store.name} على دليل خدمات اليمن!\n📞 للتواصل: ${store.phone}\n📍 ${store.localNeighborhood}")
-                                    type = "text/plain"
+                                runCatching {
+                                    val shareIntent = Intent().apply {
+                                        action = Intent.ACTION_SEND
+                                        putExtra(Intent.EXTRA_TEXT, "🏪 تفضل بزيارة صفحة ${store.name} على دليل خدمات اليمن!\n📞 للتواصل: ${store.phone}\n📍 ${store.localNeighborhood}")
+                                        type = "text/plain"
+                                    }
+                                    context.startActivity(Intent.createChooser(shareIntent, "مشاركة المتجر"))
+                                }.onFailure {
+                                    Toast.makeText(context, "تعذر فتح قائمة المشاركة", Toast.LENGTH_SHORT).show()
                                 }
-                                context.startActivity(Intent.createChooser(shareIntent, "مشاركة المتجر"))
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6)),
                             shape = RoundedCornerShape(10.dp),

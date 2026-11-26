@@ -39,7 +39,10 @@ fun BookingCardItem(
     onEditClick: (BookingEntity) -> Unit,
     onCancelClick: (BookingEntity) -> Unit,
     onDeleteClick: (BookingEntity) -> Unit,
-    onOpenChatClick: (BookingEntity) -> Unit
+    onOpenChatClick: (BookingEntity) -> Unit,
+    isPaymentFeatureEnabled: Boolean = false,
+    onTrackStatusClick: ((BookingEntity) -> Unit)? = null,
+    onSubmitPaymentClick: ((BookingEntity) -> Unit)? = null
 ) {
     var isPasswordVisible by remember { mutableStateOf(false) }
     var showPinVerifyDialog by remember { mutableStateOf(false) }
@@ -562,6 +565,53 @@ fun BookingCardItem(
                             Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(14.dp))
                             Spacer(Modifier.width(2.dp))
                             Text("حذف من السجل", fontSize = 11.sp)
+                        }
+                    }
+                }
+            }
+
+            val canSubmitPaymentProof = isPaymentFeatureEnabled &&
+                isUserTheClient &&
+                onSubmitPaymentClick != null &&
+                (booking.totalAmount > 0.0 || booking.advancePayment > 0.0 || booking.price > 0.0) &&
+                booking.status.uppercase() in listOf("APPROVED", "ACCEPTED", "IN_PROGRESS", "COMPLETED") &&
+                booking.paymentStatus.uppercase() !in listOf("PAID", "CONFIRMED")
+
+            if (onTrackStatusClick != null || canSubmitPaymentProof) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    if (onTrackStatusClick != null) {
+                        OutlinedButton(
+                            onClick = { onTrackStatusClick(booking) },
+                            shape = RoundedCornerShape(8.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF00E5FF)),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF00E5FF).copy(alpha = 0.45f)),
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("track_booking_${booking.id}"),
+                            contentPadding = PaddingValues(vertical = 6.dp)
+                        ) {
+                            Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(14.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("تتبع المسار", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+
+                    if (canSubmitPaymentProof) {
+                        Button(
+                            onClick = { onSubmitPaymentClick?.invoke(booking) },
+                            shape = RoundedCornerShape(8.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF059669)),
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("pay_booking_${booking.id}"),
+                            contentPadding = PaddingValues(vertical = 6.dp)
+                        ) {
+                            Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(14.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("إثبات السداد 💳", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }

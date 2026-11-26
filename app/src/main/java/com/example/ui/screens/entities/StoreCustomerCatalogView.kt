@@ -163,6 +163,7 @@ fun StoreCustomerCatalogView(
     var showCartCheckoutDialog by remember { mutableStateOf(false) }
     var showRatingDialog by remember { mutableStateOf(false) }
     var showGuestDialog by remember { mutableStateOf(false) }
+    var showReportDialog by remember { mutableStateOf(false) }
 
     if (showGuestDialog) {
         GuestRegistrationDialog(
@@ -202,7 +203,8 @@ fun StoreCustomerCatalogView(
                     isRestaurant = isRestaurant,
                     isFav = isFav,
                     viewModel = viewModel,
-                    onBackClick = onBackClick
+                    onBackClick = onBackClick,
+                    onReportClick = if (!isOwnerPreview) { { showReportDialog = true } } else null
                 )
             }
 
@@ -436,6 +438,21 @@ fun StoreCustomerCatalogView(
             viewModel = viewModel,
             themeColors = themeColors,
             onDismiss = { showRatingDialog = false }
+        )
+    }
+
+    if (showReportDialog) {
+        com.example.ui.dialogs.SubmitReportDialog(
+            targetId = store.id,
+            targetName = store.name,
+            targetType = when {
+                isMedical -> "MEDICAL"
+                isRestaurant -> "RESTAURANT"
+                else -> "STORE"
+            },
+            viewModel = viewModel,
+            themeColors = themeColors,
+            onDismiss = { showReportDialog = false }
         )
     }
 }

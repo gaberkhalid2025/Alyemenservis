@@ -44,7 +44,7 @@ class AssistantViewModel : ViewModel() {
             } else if (cachedBrain == null) {
                 cachedBrain = LocalGuideBrain(cachedEngine)
             }
-            cachedBrain!!
+            cachedBrain ?: LocalGuideBrain(cachedEngine).also { cachedBrain = it }
         }
     }
 

@@ -21,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -130,6 +131,7 @@ fun DynamicPolymorphicProfileScreen(
 
     var selectedTab by remember { mutableIntStateOf(0) }
     var showRatingDialog by remember { mutableStateOf(false) }
+    var showReportDialog by remember { mutableStateOf(false) }
 
     val entityId = liveProvider?.id ?: liveStore?.id ?: liveProperty?.id ?: liveJob?.id ?: ""
     val favoriteIds by viewModel.favoriteIds.collectAsState()
@@ -230,21 +232,41 @@ fun DynamicPolymorphicProfileScreen(
                     }
                     if (entityPhone.isNotBlank()) {
                         IconButton(onClick = {
-                            val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$entityPhone"))
-                            context.startActivity(intent)
+                            runCatching {
+                                val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$entityPhone"))
+                                context.startActivity(intent)
+                            }.onFailure {
+                                Toast.makeText(context, "تعذر فتح تطبيق الهاتف", Toast.LENGTH_SHORT).show()
+                            }
                         }) {
                             Icon(imageVector = Icons.Default.Phone, contentDescription = "اتصال", tint = Color(0xFF10B981))
                         }
                     }
                     IconButton(onClick = {
-                        val shareText = "دليل خدمات اليمن | $entityName\n${entityType.labelAr}\nالعنوان: $entityAddress\nالهاتف: $entityPhone"
-                        val intent = Intent(Intent.ACTION_SEND).apply {
-                            type = "text/plain"
-                            putExtra(Intent.EXTRA_TEXT, shareText)
+                        runCatching {
+                            val shareText = "دليل خدمات اليمن | $entityName\n${entityType.labelAr}\nالعنوان: $entityAddress\nالهاتف: $entityPhone"
+                            val intent = Intent(Intent.ACTION_SEND).apply {
+                                type = "text/plain"
+                                putExtra(Intent.EXTRA_TEXT, shareText)
+                            }
+                            context.startActivity(Intent.createChooser(intent, "مشاركة الملف"))
+                        }.onFailure {
+                            Toast.makeText(context, "تعذر فتح قائمة المشاركة", Toast.LENGTH_SHORT).show()
                         }
-                        context.startActivity(Intent.createChooser(intent, "مشاركة الملف"))
                     }) {
                         Icon(imageVector = Icons.Default.Share, contentDescription = "مشاركة", tint = themeColors.textPrimary)
+                    }
+                    if (!isOwner) {
+                        IconButton(
+                            onClick = { showReportDialog = true },
+                            modifier = Modifier.testTag("report_entity_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Warning,
+                                contentDescription = "إبلاغ عن مخالفة",
+                                tint = Color(0xFFF59E0B)
+                            )
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = themeColors.surface)
@@ -487,6 +509,17 @@ fun DynamicPolymorphicProfileScreen(
                     Text("إلغاء", color = themeColors.textSecondary)
                 }
             }
+        )
+    }
+
+    if (showReportDialog && entityId.isNotBlank()) {
+        com.example.ui.dialogs.SubmitReportDialog(
+            targetId = entityId,
+            targetName = entityName,
+            targetType = entityType.name,
+            viewModel = viewModel,
+            themeColors = themeColors,
+            onDismiss = { showReportDialog = false }
         )
     }
 }

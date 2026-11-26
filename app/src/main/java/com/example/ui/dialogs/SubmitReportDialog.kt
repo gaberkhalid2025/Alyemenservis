@@ -3,10 +3,13 @@ package com.example.ui.dialogs
 import android.content.Context
 import com.example.ui.*
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -56,6 +59,8 @@ fun SubmitReportDialog(
         "أخرى"
     )
 
+    BackHandler { onDismiss() }
+
     Dialog(onDismissRequest = onDismiss) {
         Card(
             shape = RoundedCornerShape(16.dp),
@@ -66,6 +71,7 @@ fun SubmitReportDialog(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
@@ -101,6 +107,10 @@ fun SubmitReportDialog(
                         value = reporterName,
                         onValueChange = { reporterName = it },
                         label = { Text("اسم مقدم الشكوى", fontSize = 10.sp) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = themeColors.textPrimary,
+                            unfocusedTextColor = themeColors.textPrimary
+                        ),
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
                     )
@@ -109,11 +119,15 @@ fun SubmitReportDialog(
                         value = reporterPhone,
                         onValueChange = { reporterPhone = it },
                         label = { Text("رقم هاتفك للتواصل ومتابعة الشكوى", fontSize = 10.sp) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = themeColors.textPrimary,
+                            unfocusedTextColor = themeColors.textPrimary
+                        ),
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
                     )
 
-                    Text("سبب البلاغ:", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    Text("سبب البلاغ:", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = themeColors.textPrimary)
 
                     // Reasons Dropdown / Selection
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -147,6 +161,10 @@ fun SubmitReportDialog(
                         value = explanation,
                         onValueChange = { explanation = it },
                         label = { Text("تفاصيل الشرح وما حدث بدقة", fontSize = 10.sp) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = themeColors.textPrimary,
+                            unfocusedTextColor = themeColors.textPrimary
+                        ),
                         modifier = Modifier.fillMaxWidth(),
                         minLines = 3
                     )

@@ -32,8 +32,12 @@ fun BookingsScreenLayout(
     val adminRole by viewModel.adminRole.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
     val joinRequestPhone by viewModel.joinRequestPhone.collectAsState()
+    val paymentWallets by viewModel.paymentWallets.collectAsState()
+    val settingsState by viewModel.settings.collectAsState()
 
     var isCreatingNewBooking by remember { mutableStateOf(false) }
+    var selectedBookingForStatus by remember { mutableStateOf<BookingEntity?>(null) }
+    var selectedBookingForPayment by remember { mutableStateOf<BookingEntity?>(null) }
 
     val isAdmin = adminRole != "GUEST" && adminRole != "SUPERVISOR"
 
@@ -55,6 +59,18 @@ fun BookingsScreenLayout(
                 (uid.isNotEmpty() && (bk.clientId.trim() == uid || bk.providerId.trim() == uid))
             }.sortedByDescending { it.createdAt }
         }
+    }
+
+    val activeStatusBooking = selectedBookingForStatus?.let { target ->
+        relevantBookings.find { it.id == target.id } ?: target
+    }
+
+    if (activeStatusBooking != null) {
+        BookingStatusScreen(
+            booking = activeStatusBooking,
+            onBack = { selectedBookingForStatus = null }
+        )
+        return
     }
 
     AnimatedContent(
@@ -82,6 +98,9 @@ fun BookingsScreenLayout(
                 isProvider = viewModel.isProviderUser,
                 isRefreshing = isRefreshing,
                 onRefresh = { viewModel.refreshData(showNotification = true) },
+                isPaymentFeatureEnabled = com.example.BuildConfig.IS_PAYMENT_ENABLED && settingsState.isPaymentEnabled,
+                onTrackStatusClick = { booking -> selectedBookingForStatus = booking },
+                onSubmitPaymentClick = { booking -> selectedBookingForPayment = booking },
                 onBackClick = { viewModel.navigateTo("USER_BROWSE") },
                 onCreateNewBookingClick = { isCreatingNewBooking = true },
                 onUpdateBooking = { updatedBooking ->
@@ -122,5 +141,17 @@ fun BookingsScreenLayout(
                 }
             )
         }
+    }
+
+    val paymentBooking = selectedBookingForPayment
+    if (paymentBooking != null) {
+        com.example.ui.dialogs.UserSubmitPaymentProofDialog(
+            booking = paymentBooking,
+            viewModel = viewModel,
+            paymentWallets = paymentWallets,
+            settingsState = settingsState,
+            themeColors = themeColors,
+            onDismiss = { selectedBookingForPayment = null }
+        )
     }
 }

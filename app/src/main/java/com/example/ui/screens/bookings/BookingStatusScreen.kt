@@ -35,6 +35,8 @@ fun BookingStatusScreen(
     booking: BookingEntity,
     onBack: () -> Unit
 ) {
+    androidx.activity.compose.BackHandler(onBack = onBack)
+
     val steps = listOf(
         BookingStatus.PENDING,
         BookingStatus.UNDER_REVIEW,
@@ -112,13 +114,17 @@ fun BookingStatusScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = booking.serviceType,
+                            text = booking.serviceType.ifBlank { booking.serviceDetails.ifBlank { booking.category.ifBlank { "حجز خدمة" } } },
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
 
-                        val statusColor = Color(android.graphics.Color.parseColor(BookingStateMachine.getStatusColor(booking.status)))
+                        val statusColor = remember(booking.status) {
+                            runCatching {
+                                Color(android.graphics.Color.parseColor(BookingStateMachine.getStatusColor(booking.status)))
+                            }.getOrElse { Color(0xFFF59E0B) }
+                        }
                         Surface(
                             shape = RoundedCornerShape(10.dp),
                             color = statusColor.copy(alpha = 0.15f)

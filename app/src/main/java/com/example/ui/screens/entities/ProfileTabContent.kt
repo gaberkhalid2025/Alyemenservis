@@ -2,6 +2,7 @@ package com.example.ui.screens.entities
 
 import android.content.Intent
 import android.net.Uri
+import com.example.utils.safeStartActivity
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import com.example.ui.*
@@ -516,7 +517,10 @@ fun ProfileTabContent(
                                 if (entityPhone.isNotBlank()) {
                                     Button(
                                         onClick = {
-                                            context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$entityPhone")))
+                                            context.safeStartActivity(
+                                                Intent(Intent.ACTION_DIAL, Uri.parse("tel:$entityPhone")),
+                                                "تعذر فتح تطبيق الاتصال"
+                                            )
                                         },
                                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
                                         modifier = Modifier.weight(1f)
@@ -554,7 +558,10 @@ fun ProfileTabContent(
                                 Button(
                                     onClick = {
                                         val waNum = if (cleanPhone.startsWith("967")) cleanPhone else "967$cleanPhone"
-                                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/$waNum")))
+                                        context.safeStartActivity(
+                                            Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/$waNum")),
+                                            "تعذر فتح تطبيق واتساب"
+                                        )
                                     },
                                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF06B6D4)),
                                     modifier = Modifier.fillMaxWidth()

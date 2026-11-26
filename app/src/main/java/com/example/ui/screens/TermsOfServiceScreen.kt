@@ -29,7 +29,10 @@ fun TermsOfServiceScreen(
     val textColor = themeColors.textPrimary
     val primaryColor = themeColors.primary
 
+    androidx.activity.compose.BackHandler(onBack = onBack)
+
     Scaffold(
+        containerColor = themeColors.background,
         topBar = {
             TopAppBar(
                 title = { Text("شروط وأحكام الاستخدام") },
@@ -104,12 +107,16 @@ fun TermsOfServiceScreen(
                     TermItem(
                         icon = Icons.Default.CheckCircle,
                         title = "1. التزامات العميل ومقدم الخدمة",
-                        desc = "الالتزام بالمواعيد المحددة والتعامل بأمانة وشفافية في تحديد المشاكل وتقديم الأسعار."
+                        desc = "الالتزام بالمواعيد المحددة والتعامل بأمانة وشفافية في تحديد المشاكل وتقديم الأسعار.",
+                        textColor = textColor,
+                        primaryColor = primaryColor
                     )
                     TermItem(
                         icon = Icons.Default.Info,
                         title = "2. سياسة الإلغاء والضمان",
-                        desc = "تخضع الخدمات لضمان الفني أو المحل المباشر، وتحدد إدارة التطبيق شروط استرداد العربون وفقاً للحالة."
+                        desc = "تخضع الخدمات لضمان الفني أو المحل المباشر، وتحدد إدارة التطبيق شروط استرداد العربون وفقاً للحالة.",
+                        textColor = textColor,
+                        primaryColor = primaryColor
                     )
                 }
             }
@@ -163,7 +170,9 @@ fun TermsOfServiceScreen(
 private fun TermItem(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     title: String,
-    desc: String
+    desc: String,
+    textColor: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onSurface,
+    primaryColor: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.primary
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -172,12 +181,12 @@ private fun TermItem(
         Icon(
             imageVector = icon,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
+            tint = primaryColor,
             modifier = Modifier.size(22.dp)
         )
         Column {
-            Text(title, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-            Text(desc, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
+            Text(title, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = textColor)
+            Text(desc, fontSize = 13.sp, color = textColor.copy(alpha = 0.75f))
         }
     }
 }

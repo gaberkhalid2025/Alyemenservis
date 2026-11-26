@@ -13,7 +13,11 @@ import android.os.Bundle
 import android.speech.tts.TextToSpeech
 import android.speech.tts.Voice
 import android.util.Log
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
@@ -317,6 +321,7 @@ class ArabicNavigationVoiceEngine(
  */
 object NavAudioCuePlayer {
     private const val SAMPLE_RATE = 22050
+    private val playerScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
     fun play(maneuverType: ManeuverType?) {
         val tones: List<Pair<Double, Int>> = when (maneuverType) {
@@ -332,15 +337,12 @@ object NavAudioCuePlayer {
                 listOf(659.25 to 110) // نغمة تنبيه مفردة
         }
 
-        Thread {
+        playerScope.launch {
             playTonesInternal(tones)
-        }.apply {
-            isDaemon = true
-            start()
         }
     }
 
-    private fun playTonesInternal(tones: List<Pair<Double, Int>>) {
+    private suspend fun playTonesInternal(tones: List<Pair<Double, Int>>) {
         var track: AudioTrack? = null
         try {
             val totalSamples = tones.sumOf { (_, ms) -> (SAMPLE_RATE * ms) / 1000 }
@@ -388,7 +390,7 @@ object NavAudioCuePlayer {
                 track.write(pcm, 0, pcm.size)
                 track.play()
                 val totalMs = tones.sumOf { it.second }.toLong()
-                Thread.sleep(totalMs + 80L)
+                delay(totalMs + 80L)
             }
         } catch (_: Throwable) {
         } finally {

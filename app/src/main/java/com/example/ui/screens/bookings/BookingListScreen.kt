@@ -42,7 +42,10 @@ fun BookingListScreen(
     onDeleteBooking: (BookingEntity) -> Unit,
     onOpenChatClick: (BookingEntity) -> Unit,
     isRefreshing: Boolean = false,
-    onRefresh: () -> Unit = {}
+    onRefresh: () -> Unit = {},
+    isPaymentFeatureEnabled: Boolean = false,
+    onTrackStatusClick: ((BookingEntity) -> Unit)? = null,
+    onSubmitPaymentClick: ((BookingEntity) -> Unit)? = null
 ) {
     val context = LocalContext.current
 
@@ -302,7 +305,10 @@ fun BookingListScreen(
                             onEditClick = { bookingToEdit = it },
                             onCancelClick = { bookingToCancel = it },
                             onDeleteClick = { bookingToDelete = it },
-                            onOpenChatClick = { onOpenChatClick(it) }
+                            onOpenChatClick = { onOpenChatClick(it) },
+                            isPaymentFeatureEnabled = isPaymentFeatureEnabled,
+                            onTrackStatusClick = onTrackStatusClick,
+                            onSubmitPaymentClick = onSubmitPaymentClick
                         )
                     }
 
