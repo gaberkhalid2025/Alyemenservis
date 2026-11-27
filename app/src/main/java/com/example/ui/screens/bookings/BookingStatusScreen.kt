@@ -21,18 +21,21 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.data.AdminSettingsEntity
 import com.example.data.BookingEntity
 import com.example.utils.BookingStateMachine
 import com.example.utils.BookingStatus
+import com.example.utils.VisualThemePalette
+import com.example.utils.resolveThemePalette
 
 /**
  * 📈 BookingStatusScreen
  * شاشة استعراض مسار ومراحل تقدم الحجز التفصيلي (7 مراحل) مع الخطوات التالية والجدول الزمني.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BookingStatusScreen(
     booking: BookingEntity,
+    themeColors: VisualThemePalette = resolveThemePalette(AdminSettingsEntity()),
     onBack: () -> Unit
 ) {
     androidx.activity.compose.BackHandler(onBack = onBack)
@@ -59,44 +62,48 @@ fun BookingStatusScreen(
         else -> 0
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            text = "متابعة مسار الحجز",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = "#${booking.bookingNumber.ifEmpty { booking.id.take(8) }}",
-                            fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "رجوع",
-                            tint = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
-            )
-        },
-        containerColor = MaterialTheme.colorScheme.background
-    ) { paddingValues ->
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(themeColors.background)
+    ) {
+        Surface(
+            color = themeColors.surface,
+            shadowElevation = 2.dp,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onBack) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "رجوع",
+                        tint = themeColors.textPrimary
+                    )
+                }
+                Column {
+                    Text(
+                        text = "متابعة مسار الحجز",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = themeColors.textPrimary
+                    )
+                    Text(
+                        text = "#${booking.bookingNumber.ifEmpty { booking.id.take(8) }}",
+                        fontSize = 11.5.sp,
+                        color = themeColors.accent
+                    )
+                }
+            }
+        }
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)

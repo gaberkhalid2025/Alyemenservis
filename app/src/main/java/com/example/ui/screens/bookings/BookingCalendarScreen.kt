@@ -136,9 +136,10 @@ fun BookingCalendarScreen(
     Scaffold(
         topBar = {
             TopAppBar(
+                windowInsets = WindowInsets(0, 0, 0, 0),
                 title = {
                     Column {
-                        Text("جدولة موعد وحجز خدمة 📅", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.White)
+                        Text("جدولة موعد وحجز خدمة 📅", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color.White)
                         Text(provider.name + " (${provider.profession.ifEmpty { "فني معتمد" }})", fontSize = 11.sp, color = themeColors.accent)
                     }
                 },
@@ -150,6 +151,7 @@ fun BookingCalendarScreen(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = themeColors.surface)
             )
         },
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         containerColor = Color(0xFF0F172A)
     ) { paddingValues ->
         LazyColumn(

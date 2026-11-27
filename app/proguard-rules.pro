@@ -10,6 +10,12 @@
 }
 -keepclassmembers class * extends com.google.firebase.firestore.EventListener { *; }
 
+# ===== Keep Annotations =====
+-keep @androidx.annotation.Keep class * { *; }
+-keepclassmembers class * {
+    @androidx.annotation.Keep *;
+}
+
 # ===== App Models (data classes) =====
 -keep class com.example.data.** { *; }
 -keep class com.example.data.models.** { *; }

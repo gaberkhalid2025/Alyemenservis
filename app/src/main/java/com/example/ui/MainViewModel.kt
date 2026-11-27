@@ -1,53 +1,62 @@
-
 package com.example.ui
+
+import android.content.Context
 import androidx.compose.runtime.getValue
-import com.example.ui.*
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
-import dagger.hilt.android.lifecycle.HiltViewModel
-import javax.inject.Inject
-import com.example.utils.*
-import com.example.ui.viewmodels.BaseViewModel
-import com.example.ui.viewmodels.BookingDistributionMode
-import com.example.ui.viewmodels.BookingFormFields
-import com.example.utils.BookingStatus
-import androidx.lifecycle.ViewModel
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.viewModelScope
 import com.example.data.*
 import com.example.data.models.*
-import com.example.ui.viewmodels.SettingsViewModel.CardSettings
-import com.example.ui.viewmodels.SettingsViewModel.ChatParticipantType
-import kotlinx.coroutines.flow.*
+import com.example.data.repositories.ChatRepository
+import com.example.data.repositories.NotificationRepository
+import com.example.ui.helpers.*
+import com.example.ui.screens.notifications.NotificationViewModel
+import com.example.ui.viewmodels.*
+import com.example.utils.LocationService
+import com.example.utils.NavWaypoint
+import com.example.utils.OfflineQueueManager
+import com.example.utils.WalletManager
+import com.google.android.gms.location.LocationCallback
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.ListenerRegistration
+import dagger.hilt.EntryPoint
+import dagger.hilt.InstallIn
+import dagger.hilt.android.EntryPointAccessors
+import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.components.SingletonComponent
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
-import java.util.UUID
+import javax.inject.Inject
 
 @HiltViewModel
 class MainViewModel @Inject constructor(
-    val authViewModel: com.example.ui.viewmodels.AuthViewModel,
-    val homeViewModel: com.example.ui.viewmodels.HomeViewModel,
-    val bookingViewModel: com.example.ui.viewmodels.BookingViewModel,
-    val adminViewModel: com.example.ui.viewmodels.AdminViewModel,
-    val settingsViewModel: com.example.ui.viewmodels.SettingsViewModel,
-    val instantRequestViewModel: com.example.ui.viewmodels.InstantRequestViewModel,
-    val chatRepo: com.example.data.repositories.ChatRepository,
-    val appState: com.example.ui.helpers.AppState,
-    val walletManager: com.example.utils.WalletManager,
-    val storeManagementViewModel: com.example.ui.viewmodels.StoreManagementViewModel = com.example.ui.viewmodels.StoreManagementViewModel(appState),
-    val propertyManagementViewModel: com.example.ui.viewmodels.PropertyManagementViewModel = com.example.ui.viewmodels.PropertyManagementViewModel(appState),
-    val jobManagementViewModel: com.example.ui.viewmodels.JobManagementViewModel = com.example.ui.viewmodels.JobManagementViewModel(appState),
-    val paymentManagementViewModel: com.example.ui.viewmodels.PaymentManagementViewModel = com.example.ui.viewmodels.PaymentManagementViewModel(appState)
+    val authViewModel: AuthViewModel,
+    val homeViewModel: HomeViewModel,
+    val bookingViewModel: BookingViewModel,
+    val adminViewModel: AdminViewModel,
+    val settingsViewModel: SettingsViewModel,
+    val instantRequestViewModel: InstantRequestViewModel,
+    val chatRepo: ChatRepository,
+    val appState: AppState,
+    val walletManager: WalletManager,
+    val storeManagementViewModel: StoreManagementViewModel = StoreManagementViewModel(appState),
+    val propertyManagementViewModel: PropertyManagementViewModel = PropertyManagementViewModel(appState),
+    val jobManagementViewModel: JobManagementViewModel = JobManagementViewModel(appState),
+    val paymentManagementViewModel: PaymentManagementViewModel = PaymentManagementViewModel(appState)
 ) : BaseViewModel() {
 
-    val preferenceHelper = com.example.ui.helpers.AppPreferenceHelper()
-    val notificationRepository = com.example.data.repositories.NotificationRepository()
-    val firestoreSeedHelper by lazy { com.example.ui.helpers.FirestoreSeedHelper(db) }
-    val realtimeSyncHelper by lazy { com.example.ui.helpers.RealtimeSyncHelper(db) }
-    val registrationHelper by lazy { com.example.ui.helpers.RegistrationHelper(db, auth, preferenceHelper) }
-    val accountRecoveryHelper by lazy { com.example.ui.helpers.AccountRecoveryHelper(db, preferenceHelper) }
+    val preferenceHelper = AppPreferenceHelper()
+    val notificationRepository = NotificationRepository()
+    val firestoreSeedHelper by lazy { FirestoreSeedHelper(db) }
+    val realtimeSyncHelper by lazy { RealtimeSyncHelper(db) }
+    val registrationHelper by lazy { RegistrationHelper(db, auth, preferenceHelper) }
+    val accountRecoveryHelper by lazy { AccountRecoveryHelper(db, preferenceHelper) }
 
-    private var lastSyncedAuthUid: String? = null
-    private var authStateListener: com.google.firebase.auth.FirebaseAuth.AuthStateListener? = null
+    internal var lastSyncedAuthUid: String? = null
+    internal var authStateListener: FirebaseAuth.AuthStateListener? = null
 
     override fun onCleared() {
         super.onCleared()
@@ -62,7 +71,8 @@ class MainViewModel @Inject constructor(
             e.printStackTrace()
         }
     }
-    val auth = com.google.firebase.auth.FirebaseAuth.getInstance()
+
+    val auth: FirebaseAuth = FirebaseAuth.getInstance()
     internal val _currentLanguage = MutableStateFlow("ar")
     val currentLanguage: StateFlow<String> = _currentLanguage.asStateFlow()
     internal val _favoriteIds = MutableStateFlow<Set<String>>(emptySet())
@@ -85,12 +95,12 @@ class MainViewModel @Inject constructor(
     fun setTargetRegistrationType(type: String?) {
         _targetRegistrationType.value = type
     }
+
     internal val _screenBackStack = MutableStateFlow<List<String>>(listOf("USER_BROWSE"))
     val screenBackStack: StateFlow<List<String>> = _screenBackStack.asStateFlow()
 
     val pendingTrackingToken = MutableStateFlow<String?>(null)
-    // INTENTIONAL: Delegating properties for unified access across ViewModels.
-    // Do not convert to StateFlow - would break existing collectAsState() calls.
+
     val _currentUserId get() = authViewModel._currentUserId
     val currentUserId get() = authViewModel.currentUserId
     val _currentUserName get() = authViewModel._currentUserName
@@ -109,12 +119,14 @@ class MainViewModel @Inject constructor(
     val showBackdoorDialog get() = authViewModel.showBackdoorDialog
     val _categories get() = homeViewModel._categories
     val categories get() = homeViewModel.categories
+
     fun updateAdminSettings(settings: AdminSettingsEntity) = settingsViewModel.updateAdminSettings(settings)
     fun saveCustomProfileTab(tab: CustomProfileTabEntity) = adminViewModel.saveCustomProfileTab(tab)
     fun deleteCustomProfileTab(tabId: String) = adminViewModel.deleteCustomProfileTab(tabId)
     fun toggleCustomProfileTab(tabId: String) = adminViewModel.toggleCustomProfileTab(tabId)
-    fun addNewCategory(nameAr: String, nameEn: String, icon: String, description: String, parentId: String = "", isMainCategory: Boolean = true) = 
+    fun addNewCategory(nameAr: String, nameEn: String, icon: String, description: String, parentId: String = "", isMainCategory: Boolean = true) =
         adminViewModel.addNewCategory(nameAr, nameEn, icon, description, parentId, isMainCategory)
+
     val _providers get() = homeViewModel._providers
     val providers get() = homeViewModel.providers
     val _filteredProviders get() = homeViewModel._filteredProviders
@@ -146,7 +158,7 @@ class MainViewModel @Inject constructor(
     val bookingFormFields = bookingViewModel.bookingFormFields
     val _distributionMode = bookingViewModel._distributionMode
     val distributionMode = bookingViewModel.distributionMode
-    val chatCoordinator = com.example.ui.helpers.ChatCoordinator()
+    val chatCoordinator = ChatCoordinator()
 
     val _chatMessages get() = chatCoordinator._chatMessages
     val chatMessages get() = chatCoordinator.chatMessages
@@ -220,76 +232,58 @@ class MainViewModel @Inject constructor(
     val requestOffers get() = instantRequestViewModel.requestOffers
     val _offers get() = instantRequestViewModel._offers
     val offers get() = instantRequestViewModel.offers
+
     internal val _currentScreen = MutableStateFlow("USER_BROWSE")
     val currentScreen: StateFlow<String> = _currentScreen.asStateFlow()
     internal val _navigationStack = mutableListOf<String>()
-    
-    // NOTE: These are intentionally plain variables, not StateFlow.
-    // They are read synchronously in AppNavigator during navigation.
-    // Do NOT convert to StateFlow without refactoring all call sites.
-    var selectedProvider: com.example.data.ProviderEntity? = null
-    var selectedStore: com.example.data.StoreEntity? = null
-    var selectedProperty: com.example.data.PropertyEntity? = null
-    var selectedJob: com.example.data.JobEntity? = null
-    var comingSoonServiceName by androidx.compose.runtime.mutableStateOf("التوصيل")
+
+    var selectedProvider: ProviderEntity? = null
+    var selectedStore: StoreEntity? = null
+    var selectedProperty: PropertyEntity? = null
+    var selectedJob: JobEntity? = null
+    var comingSoonServiceName by mutableStateOf("التوصيل")
+
     fun openComingSoon(serviceName: String) {
         comingSoonServiceName = serviceName
         navigateToScreen(AppScreens.COMING_SOON_SERVICES)
     }
-    var selectedOfferId by androidx.compose.runtime.mutableStateOf("")
-    var selectedRequestId by androidx.compose.runtime.mutableStateOf("")
-    var showQuickServiceDialog by androidx.compose.runtime.mutableStateOf(false)
-    private val _lastFixAtMs = MutableStateFlow(0L)
-    private var freshnessJob: kotlinx.coroutines.Job? = null
 
-    private fun isFresh(loc: android.location.Location, maxAgeMs: Long = 2 * 60_000L): Boolean {
-        val ageMs = (android.os.SystemClock.elapsedRealtimeNanos() - loc.elapsedRealtimeNanos) / 1_000_000L
-        return ageMs in 0..maxAgeMs
-    }
-
-    private fun markFix() {
-        _lastFixAtMs.value = System.currentTimeMillis()
-        _isUserLocationReal.value = true
-    }
-
-    private fun startFreshnessWatchdog() {
-        if (freshnessJob?.isActive == true) return
-        freshnessJob = viewModelScope.launch {
-            while (true) {
-                kotlinx.coroutines.delay(5_000L)
-                val limit = if (navTrackingJob?.isActive == true) 15_000L else 90_000L
-                if (!_isManualLocationSet.value && _isUserLocationReal.value && System.currentTimeMillis() - _lastFixAtMs.value > limit) {
-                    _isUserLocationReal.value = false
-                    _userLocationAccuracyM.value = Float.MAX_VALUE
-                }
-            }
-        }
-    }
+    var selectedOfferId by mutableStateOf("")
+    var selectedRequestId by mutableStateOf("")
+    var showQuickServiceDialog by mutableStateOf(false)
+    internal val _lastFixAtMs = MutableStateFlow(0L)
+    internal var freshnessJob: Job? = null
 
     internal val _userLatitude = MutableStateFlow(15.3694)
     val userLatitude: StateFlow<Double> = _userLatitude.asStateFlow()
     internal val _userLongitude = MutableStateFlow(44.1910)
     val userLongitude: StateFlow<Double> = _userLongitude.asStateFlow()
-    private val _userLocationAccuracyM = MutableStateFlow(Float.MAX_VALUE)
+    internal val _userLocationAccuracyM = MutableStateFlow(Float.MAX_VALUE)
     val userLocationAccuracyM: StateFlow<Float> = _userLocationAccuracyM.asStateFlow()
-    private val _isUserLocationReal = MutableStateFlow(false)
+    internal val _isUserLocationReal = MutableStateFlow(false)
     val isUserLocationReal: StateFlow<Boolean> = _isUserLocationReal.asStateFlow()
-    private val _isManualLocationSet = MutableStateFlow(false)
+    internal val _isManualLocationSet = MutableStateFlow(false)
     val isManualLocationSet: StateFlow<Boolean> = _isManualLocationSet.asStateFlow()
     internal val _isGpsTrackingActive = MutableStateFlow(false)
     val isGpsTrackingActive: StateFlow<Boolean> = _isGpsTrackingActive.asStateFlow()
-    private var locationCallback: com.google.android.gms.location.LocationCallback? = null
-    private var navTrackingJob: kotlinx.coroutines.Job? = null
-    val locationService by lazy { LocationService(appContext ?: com.example.MyApplication.instance ?: throw IllegalStateException("Context not ready")) }
+    internal var locationCallback: LocationCallback? = null
+    internal var navTrackingJob: Job? = null
 
-    @dagger.hilt.EntryPoint
-    @dagger.hilt.InstallIn(dagger.hilt.components.SingletonComponent::class)
-    interface QueueEntryPoint { fun offlineQueueManager(): OfflineQueueManager }
+    val locationService by lazy {
+        LocationService(appContext ?: com.example.MyApplication.instance ?: throw IllegalStateException("Context not ready"))
+    }
+
+    @EntryPoint
+    @InstallIn(SingletonComponent::class)
+    interface QueueEntryPoint {
+        fun offlineQueueManager(): OfflineQueueManager
+    }
 
     val offlineQueueManager: OfflineQueueManager by lazy {
         val ctx = appContext ?: com.example.MyApplication.instance ?: throw IllegalStateException("Context not ready")
-        dagger.hilt.android.EntryPointAccessors.fromApplication(ctx.applicationContext, QueueEntryPoint::class.java).offlineQueueManager()
+        EntryPointAccessors.fromApplication(ctx.applicationContext, QueueEntryPoint::class.java).offlineQueueManager()
     }
+
     internal val _isProvidersLoading get() = appState._isProvidersLoading
     val isProvidersLoading: StateFlow<Boolean> = _isProvidersLoading.asStateFlow()
     internal val _isChatChannelsLoading get() = appState._isChatChannelsLoading
@@ -312,16 +306,10 @@ class MainViewModel @Inject constructor(
         _showRestoreAccountDialog.value = show
     }
 
-    private var isSettingsLoaded = false
-    private var isCategoriesLoaded = false
-    private var isCitiesLoaded = false
-    private var isProvidersLoaded = false
-
-    private fun checkInitializationComplete() {
-        if (isSettingsLoaded && isCategoriesLoaded && isCitiesLoaded && isProvidersLoaded) {
-            _isInitialized.value = true
-        }
-    }
+    internal var isSettingsLoaded = false
+    internal var isCategoriesLoaded = false
+    internal var isCitiesLoaded = false
+    internal var isProvidersLoaded = false
 
     internal val _isInitialized get() = appState._isInitialized
     val isInitialized: StateFlow<Boolean> = _isInitialized.asStateFlow()
@@ -335,32 +323,12 @@ class MainViewModel @Inject constructor(
     var targetChatUserPhoto by mutableStateOf<String?>(null)
     var targetChatRelatedEntityId by mutableStateOf<String?>(null)
     var targetChatRelatedEntityType by mutableStateOf<String?>(null)
-    var pendingMapFocusPoint by mutableStateOf<com.example.utils.NavWaypoint?>(null)
+    var pendingMapFocusPoint by mutableStateOf<NavWaypoint?>(null)
     var pendingMapAutoNavigate by mutableStateOf(false)
-    val triggerRestoreAccountDialog = MutableStateFlow<Boolean>(false)
+    val triggerRestoreAccountDialog = MutableStateFlow(false)
 
-    fun openInAppMap(
-        latitude: Double,
-        longitude: Double,
-        label: String = "موقع مشارك",
-        startNavigation: Boolean = false
-    ) {
-        if (!com.example.utils.LandmarkAddress.isValid(latitude, longitude)) {
-            triggerToast("⚠️ تعذر قراءة إحداثيات الموقع")
-            return
-        }
-        pendingMapFocusPoint = com.example.utils.NavWaypoint(
-            name = label.ifBlank { "موقع مشارك" },
-            latitude = latitude,
-            longitude = longitude
-        )
-        pendingMapAutoNavigate = startNavigation
-        selectedProvider = null
-        selectedStore = null
-        selectedProperty = null
-        selectedJob = null
-        navigateToScreen(AppScreens.MAP_VIEW)
-    }
+    fun openInAppMap(latitude: Double, longitude: Double, label: String = "موقع مشارك", startNavigation: Boolean = false) =
+        openInAppMapHelper(latitude, longitude, label, startNavigation)
 
     fun openDirectChat(
         targetUserId: String,
@@ -377,7 +345,8 @@ class MainViewModel @Inject constructor(
         targetChatRelatedEntityType = relatedEntityType
         navigateToScreen(AppScreens.CHAT_DIRECT)
     }
-    val notificationViewModel = com.example.ui.screens.notifications.NotificationViewModel(this)
+
+    val notificationViewModel = NotificationViewModel(this)
 
     init {
         _stores.value = getDefaultStoresList()
@@ -411,357 +380,26 @@ class MainViewModel @Inject constructor(
             }
         }
     }
-    private fun checkAndTriggerFavoriteOffersNotifications() {
-    }
-    fun updateUserLocation(lat: Double, lng: Double) {
-        _userLatitude.value = lat
-        _userLongitude.value = lng
-        if (!_isManualLocationSet.value && LandmarkAddress.isValid(lat, lng)) {
-            appContext?.let { ctx ->
-                try {
-                    CoverageLog.sample(ctx, lat, lng, com.example.NetworkUtils.hasInternetTransport(ctx))
-                } catch (_: Throwable) {}
-            }
-        }
-    }
 
-    fun setManualUserLocation(lat: Double, lng: Double) {
-        if (!LandmarkAddress.isValid(lat, lng)) return
-        _isManualLocationSet.value = true
-        _userLatitude.value = lat
-        _userLongitude.value = lng
-        _userLocationAccuracyM.value = 5f
-        markFix()
-    }
+    fun updateUserLocation(lat: Double, lng: Double) = updateUserLocationHelper(lat, lng)
+    fun setManualUserLocation(lat: Double, lng: Double) = setManualUserLocationHelper(lat, lng)
+    fun clearManualUserLocation() = clearManualUserLocationHelper()
+    fun startLocationUpdates() = startLocationUpdatesHelper()
+    fun stopLocationUpdates() = stopLocationUpdatesHelper()
+    fun startNavigationTracking() = startNavigationTrackingHelper()
+    fun stopNavigationTracking() = stopNavigationTrackingHelper()
+    fun enqueueSos(lat: Double, lng: Double, accuracyM: Float?, message: String): Boolean =
+        enqueueSosHelper(lat, lng, accuracyM, message)
 
-    fun clearManualUserLocation() {
-        _isManualLocationSet.value = false
-    }
-
-    fun startLocationUpdates() {
-        val ctx = appContext ?: return
-        try {
-            val fine = androidx.core.content.ContextCompat.checkSelfPermission(ctx, android.Manifest.permission.ACCESS_FINE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED
-            val coarse = androidx.core.content.ContextCompat.checkSelfPermission(ctx, android.Manifest.permission.ACCESS_COARSE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED
-            if (!fine && !coarse) return
-
-            val eco = MapPowerDataPrefs.isEcoMode(ctx)
-            val fusedClient = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(ctx)
-
-            fusedClient.lastLocation.addOnSuccessListener { loc ->
-                if (loc == null || _isManualLocationSet.value) return@addOnSuccessListener
-                val isMock = if (android.os.Build.VERSION.SDK_INT >= 31) loc.isMock else @Suppress("DEPRECATION") loc.isFromMockProvider
-                if (!isMock && LandmarkAddress.isValid(loc.latitude, loc.longitude)) {
-                    updateUserLocation(loc.latitude, loc.longitude)
-                    _userLocationAccuracyM.value = if (loc.hasAccuracy()) loc.accuracy else 25f
-                    markFix()
-                }
-            }
-
-            val intervalMs = if (eco) 12_000L else 6_000L
-            val minDistM = if (eco) 15f else 8f
-            val priority = if (eco) {
-                com.google.android.gms.location.Priority.PRIORITY_BALANCED_POWER_ACCURACY
-            } else {
-                com.google.android.gms.location.Priority.PRIORITY_HIGH_ACCURACY
-            }
-
-            val request = com.google.android.gms.location.LocationRequest.Builder(priority, intervalMs)
-                .setMinUpdateIntervalMillis(if (eco) 6_000L else 3_000L)
-                .setMinUpdateDistanceMeters(minDistM)
-                .build()
-
-            val cb = locationCallback ?: object : com.google.android.gms.location.LocationCallback() {
-                override fun onLocationResult(result: com.google.android.gms.location.LocationResult) {
-                    if (navTrackingJob?.isActive == true || _isManualLocationSet.value) return
-                    val loc = result.lastLocation ?: return
-                    val isMock = if (android.os.Build.VERSION.SDK_INT >= 31) loc.isMock else @Suppress("DEPRECATION") loc.isFromMockProvider
-                    if (!isMock && LandmarkAddress.isValid(loc.latitude, loc.longitude)) {
-                        updateUserLocation(loc.latitude, loc.longitude)
-                        _userLocationAccuracyM.value = if (loc.hasAccuracy()) loc.accuracy else 20f
-                        markFix()
-                    }
-                }
-            }.also { locationCallback = it }
-            fusedClient.requestLocationUpdates(request, cb, android.os.Looper.getMainLooper())
-                .addOnSuccessListener { _isGpsTrackingActive.value = true }
-                .addOnFailureListener { _isGpsTrackingActive.value = false }
-            startFreshnessWatchdog()
-        } catch (e: Exception) {
-            _isGpsTrackingActive.value = false
-            android.util.Log.e("MainViewModel", "Location updates error: ", e)
-        }
-    }
-
-    fun stopLocationUpdates() {
-        val ctx = appContext
-        val cb = locationCallback
-        if (ctx != null && cb != null) {
-            try { com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(ctx).removeLocationUpdates(cb) } catch (_: Exception) {}
-        }
-        _isGpsTrackingActive.value = false
-    }
-
-    fun startNavigationTracking() {
-        if (navTrackingJob?.isActive == true) return
-        startFreshnessWatchdog()
-        val eco = appContext?.let { MapPowerDataPrefs.isEcoMode(it) } == true
-        navTrackingJob = viewModelScope.launch {
-            try {
-                locationService.locationUpdates(
-                    intervalMs = if (eco) 2_500L else 1_500L,
-                    maxAccuracyM = 50f,
-                    minDistanceMeters = if (eco) 5f else 3f
-                ).collect { c ->
-                    _isManualLocationSet.value = false
-                    updateUserLocation(c.latitude, c.longitude)
-                    _userLocationAccuracyM.value = c.accuracyMeters
-                    markFix()
-                }
-            } catch (e: kotlinx.coroutines.CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                android.util.Log.e("MainViewModel", "Navigation tracking error: ", e)
-            }
-        }
-    }
-
-    fun stopNavigationTracking() {
-        navTrackingJob?.cancel()
-        navTrackingJob = null
-    }
-
-    fun enqueueSos(lat: Double, lng: Double, accuracyM: Float?, message: String): Boolean {
-        if (lat.isNaN() || lng.isNaN() || (lat == 0.0 && lng == 0.0)) return false
-        return try {
-            val data = mutableMapOf<String, Any>(
-                "lat" to lat,
-                "lng" to lng,
-                "message" to message,
-                "createdAt" to System.currentTimeMillis(),
-                "status" to "OPEN",
-                "uid" to (auth.currentUser?.uid ?: ""),
-                "phone" to (auth.currentUser?.phoneNumber ?: currentUserPhone.value)
-            )
-            if (accuracyM != null && accuracyM < Float.MAX_VALUE) {
-                data["accuracyM"] = accuracyM.toDouble()
-            }
-            offlineQueueManager.addToQueue(
-                OfflineRequest(
-                    type = "SOS",
-                    priority = 1,
-                    data = data
-                )
-            )
-            true
-        } catch (e: Exception) {
-            android.util.Log.e("MainViewModel", "Failed to enqueue SOS: ", e)
-            false
-        }
-    }
-    fun refreshData(showNotification: Boolean = false) {
-        viewModelScope.launch {
-            _isRefreshing.value = true
-            _uiErrorMessage.value = null
-            try {
-                setupRealtimeFirestoreListeners()
-            } catch (e: Exception) {
-                _uiErrorMessage.value = "تعذر تحديث البيانات: ${e.localizedMessage}"
-            } finally {
-                kotlinx.coroutines.delay(600)
-                _isRefreshing.value = false
-            }
-        }
-    }
+    fun refreshData(@Suppress("UNUSED_PARAMETER") showNotification: Boolean = false) = refreshDataHelper()
     fun updateOnlineStatus(online: Boolean) {
         _isOnline.value = online
     }
-
-    fun saveCustomSettingsState(newSettings: AdminSettingsEntity) {
+    fun saveCustomSettingsState(newSettings: AdminSettingsEntity) =
         settingsViewModel.saveCustomSettingsState(newSettings)
-    }
-    fun retryConnection(context: android.content.Context) {
-        val cm = context.getSystemService(android.content.Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager
-        if (cm != null) {
-            val activeNetwork = cm.activeNetwork
-            val capabilities = cm.getNetworkCapabilities(activeNetwork)
-            val online = capabilities?.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
-            _isOnline.value = online
-            if (online) {
-                setupRealtimeFirestoreListeners()
-            }
-        }
-    }
-    fun initializeUserIdentity(context: android.content.Context) {
-        appContext = context.applicationContext
-        authViewModel.appContext = appContext
-        homeViewModel.appContext = appContext
-        bookingViewModel.appContext = appContext
-        adminViewModel.appContext = appContext
-        settingsViewModel.appContext = appContext
-        instantRequestViewModel.appContext = appContext
-        bookingViewModel.getCoupons = { _coupons.value }
-        bookingViewModel.getProviders = { _providers.value }
-        bookingViewModel.getCurrentUserPhone = { _currentUserPhone.value }
-        bookingViewModel.getCurrentUserName = { _currentUserName.value }
-        bookingViewModel.getCurrentUserResidence = { _currentUserResidence.value }
-        bookingViewModel.setCurrentUserPhone = { _currentUserPhone.value = it }
-        bookingViewModel.setCurrentUserName = { _currentUserName.value = it }
-        bookingViewModel.setCurrentUserResidence = { _currentUserResidence.value = it }
-        bookingViewModel.onAddNotification = { title, message, targetType, targetValue ->
-            addNotification(title = title, message = message, targetType = targetType, targetValue = targetValue)
-        }
-        bookingViewModel.triggerNotificationCallback = { msg ->
-            triggerNotification(msg)
-        }
-        bookingViewModel.onOpenOrCreateChatChannel = { targetId, targetType, targetName, targetPhone, targetCategory, relatedEntityId, relatedEntityType, onComplete ->
-            openOrCreateChatChannel(
-                targetId = targetId,
-                targetType = targetType,
-                targetName = targetName,
-                targetPhone = targetPhone,
-                targetCategory = targetCategory,
-                relatedEntityId = relatedEntityId,
-                relatedEntityType = relatedEntityType,
-                onCreated = onComplete
-            )
-        }
-        adminViewModel.getHomeViewModel = { homeViewModel }
-        adminViewModel.getSettingsViewModel = { settingsViewModel }
-        adminViewModel.getBookingViewModel = { bookingViewModel }
-        adminViewModel.getInstantRequestViewModel = { instantRequestViewModel }
-        adminViewModel.getNotifications = { _notifications }
-        adminViewModel.onAddNotification = { title, message, targetType, targetValue ->
-            addNotification(title = title, message = message, targetType = targetType, targetValue = targetValue)
-        }
-        adminViewModel.onTriggerNotificationFull = { title, message, targetType, targetValue ->
-            triggerNotification(title = title, message = message, targetType = targetType, targetValue = targetValue)
-        }
-        adminViewModel.onTriggerNotification = { msg ->
-            triggerNotification(msg)
-        }
-        adminViewModel.onApplyFilters = {
-            homeViewModel.applyFilters(_currentUserResidence.value)
-        }
-        storeManagementViewModel.onTriggerNotification = { msg -> triggerNotification(msg) }
-        propertyManagementViewModel.onTriggerNotification = { msg -> triggerNotification(msg) }
-        jobManagementViewModel.onTriggerNotification = { msg -> triggerNotification(msg) }
-        paymentManagementViewModel.onTriggerNotification = { msg -> triggerNotification(msg) }
-        settingsViewModel.getAuthViewModel = { authViewModel }
-        settingsViewModel.getHomeViewModel = { homeViewModel }
-        settingsViewModel.getBookingViewModel = { bookingViewModel }
-        settingsViewModel.getAdminViewModel = { adminViewModel }
-        settingsViewModel.getProviders = { _providers }
-        settingsViewModel.getBookings = { _bookings }
-        settingsViewModel.getCategories = { _categories }
-        settingsViewModel.getStores = { _stores }
-        settingsViewModel.getProperties = { _properties }
-        settingsViewModel.getPasswordRecoveryWaitingPhone = { _passwordRecoveryWaitingPhone }
-        settingsViewModel.setPasswordRecoveryWaitingPhone = { _passwordRecoveryWaitingPhone.value = it }
-        settingsViewModel.verifyAdminOrOwnerPassword = { password ->
-            verifyAdminOrOwnerPassword(password)
-        }
-        settingsViewModel.triggerNotification = { msg ->
-            triggerNotification(msg)
-        }
-        instantRequestViewModel.triggerNotification = { msg ->
-            triggerNotification(msg)
-        }
-        instantRequestViewModel.addNotification = { title, message, targetType, targetValue ->
-            addNotification(title = title, message = message, targetType = targetType, targetValue = targetValue)
-        }
-        instantRequestViewModel.getOrCreateChatChannel = { providerId, providerName, customerPhone, customerName ->
-            openOrCreateChatChannel(
-                targetId = providerId,
-                targetType = "URGENT_REQUEST",
-                targetName = providerName,
-                targetPhone = customerPhone,
-                targetCategory = "",
-                relatedEntityId = "",
-                relatedEntityType = "URGENT_REQUEST",
-                onCreated = { }
-            )
-        }
-        try {
-            authViewModel.initializeUserIdentity(context) { savedFavs ->
-                _favoriteIds.value = savedFavs
-                checkAndTriggerFavoriteOffersNotifications()
-            }
-        } catch (e: Exception) {
-            android.util.Log.e("MainViewModel", "❌ Error in AuthViewModel initialization", e)
-        }
-        try {
-            if (authStateListener == null) {
-                val listener = com.google.firebase.auth.FirebaseAuth.AuthStateListener { firebaseAuth ->
-                    val newUid = firebaseAuth.currentUser?.uid
-                    if (newUid != null && newUid != lastSyncedAuthUid) {
-                        lastSyncedAuthUid = newUid
-                        setupRealtimeFirestoreListeners()
-                        seedFirestoreIfEmpty()
-                    }
-                }
-                authStateListener = listener
-                auth.addAuthStateListener(listener)
-            }
-            lastSyncedAuthUid = auth.currentUser?.uid
-            setupRealtimeFirestoreListeners()
-        } catch (e: Exception) {
-            android.util.Log.e("MainViewModel", "❌ Error in setting up realtime listeners", e)
-        }
-        try {
-            settingsViewModel.loadCardSettings()
-        } catch (e: Exception) {
-            android.util.Log.e("MainViewModel", "❌ Error in SettingsViewModel loadCardSettings", e)
-        }
-        try {
-            adminViewModel.loadPendingTechnicians()
-        } catch (e: Exception) {
-            android.util.Log.e("MainViewModel", "❌ Error in AdminViewModel loadPendingTechnicians", e)
-        }
-        try {
-            seedFirestoreIfEmpty()
-        } catch (e: Exception) {
-            android.util.Log.e("MainViewModel", "❌ Error in seedFirestoreIfEmpty", e)
-        }
-        // راقب اكتمال تحميل البيانات الأساسية
-        viewModelScope.launch {
-            settings.collect {
-                isSettingsLoaded = true
-                checkInitializationComplete()
-            }
-        }
-        viewModelScope.launch {
-            categories.collect { cats ->
-                if (cats.isNotEmpty()) {
-                    isCategoriesLoaded = true
-                    checkInitializationComplete()
-                }
-            }
-        }
-        viewModelScope.launch {
-            cities.collect { cityList ->
-                if (cityList.isNotEmpty()) {
-                    isCitiesLoaded = true
-                    checkInitializationComplete()
-                }
-            }
-        }
-        viewModelScope.launch {
-            providers.collect { provList ->
-                if (provList.isNotEmpty()) {
-                    isProvidersLoaded = true
-                    checkInitializationComplete()
-                }
-            }
-        }
-        // مهلة أمان قصوى (fallback) للشاشة الترحيبية في حالة ضعف الاتصال
-        viewModelScope.launch {
-            kotlinx.coroutines.delay(2800)
-            if (!_isInitialized.value) {
-                _isInitialized.value = true
-            }
-        }
-    }
+    fun retryConnection(context: Context) = retryConnectionHelper(context)
+    fun initializeUserIdentity(context: Context) = initializeUserIdentityHelper(context)
+
     fun setupRealtimeFirestoreListeners() {
         realtimeSyncHelper.clearListeners()
         realtimeSyncHelper.setupRealtimeFirestoreListeners(appState)
@@ -769,66 +407,47 @@ class MainViewModel @Inject constructor(
             realtimeSyncHelper.loadOnDemandInitialData(appState)
         }
     }
+
     fun seedFirestoreIfEmpty() {
         firestoreSeedHelper.seedFirestoreIfEmpty()
     }
-    override fun getDefaultStoresList(): List<com.example.data.StoreEntity> {
-        return emptyList()
-    }
-    override fun getDefaultPropertiesList(): List<com.example.data.PropertyEntity> {
-        return emptyList()
-    }
+
+    override fun getDefaultStoresList(): List<StoreEntity> = emptyList()
+    override fun getDefaultPropertiesList(): List<PropertyEntity> = emptyList()
+
     override suspend fun uploadImageStringOrUri(
-        context: android.content.Context,
+        context: Context,
         input: String,
         storagePath: String,
         maxSizeBytes: Long
     ): String {
         return registrationHelper.uploadImageStringOrUri(context, input, storagePath, maxSizeBytes)
     }
+
     override fun getAuthEmailForPhone(phone: String): String = authViewModel.getAuthEmailForPhone(phone)
 
     data class RestoreAccountMatch(
         val type: String,
         val name: String,
-        val provider: com.example.data.ProviderEntity? = null,
-        val store: com.example.data.StoreEntity? = null,
-        val property: com.example.data.PropertyEntity? = null
+        val provider: ProviderEntity? = null,
+        val store: StoreEntity? = null,
+        val property: PropertyEntity? = null
     )
 
-    /**
-     * 🌐 مراقبة حالة طلب استعادة كلمة المرور بشكل حي
-     * هذه الدالة تمنع الواجهة من الوصول المباشر إلى Firestore.
-     */
     fun observePasswordRecoveryStatus(
         phone: String,
         onUpdate: (status: String, newPassword: String, accountName: String, accountType: String) -> Unit
-    ): com.google.firebase.firestore.ListenerRegistration? {
-        return authViewModel.observePasswordRecoveryStatus(phone, onUpdate)
-    }
+    ): ListenerRegistration? = authViewModel.observePasswordRecoveryStatus(phone, onUpdate)
 
-    /**
-     * 🔑 إرسال طلب استعادة كلمة مرور
-     * تفويض إلى AuthViewModel لمنع كتابة Firestore من MainViewModel كمنطق UI
-     */
-    fun requestPasswordRecovery(
-        phone: String,
-        name: String,
-        accountType: String
-    ) {
+    fun requestPasswordRecovery(phone: String, name: String, accountType: String) =
         authViewModel.requestPasswordRecovery(phone, name, accountType)
-    }
 
-    /**
-     * 🔍 البحث الشامل في كافة الفئات (Server-Side)
-     * لحل مشكلة عنق الزجاجة عند كبر حجم البيانات
-     */
     suspend fun searchAll(query: String): Map<String, List<Any>> {
         val providers = realtimeSyncHelper.searchProviders(query)
         val stores = realtimeSyncHelper.searchStores(query)
         val properties = realtimeSyncHelper.searchProperties(query)
         val jobs = realtimeSyncHelper.searchJobs(query)
-        
+
         return mapOf(
             "providers" to providers,
             "stores" to stores,
@@ -836,5 +455,4 @@ class MainViewModel @Inject constructor(
             "jobs" to jobs
         )
     }
-
 }

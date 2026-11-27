@@ -16,13 +16,28 @@ service cloud.firestore {
 
     function isOwnerOrAdmin() {
       return isSignedIn() && (
-        request.auth.token.role in ['SUPER_ADMIN', 'MAIN_ADMIN', 'OWNER', 'ADMIN', 'owner', 'admin']
+        request.auth.token.isOwner == true ||
+        request.auth.token.isSuperAdmin == true ||
+        request.auth.token.admin == true ||
+        request.auth.token.isAdmin == true ||
+        request.auth.token.role in ['SUPER_ADMIN', 'MAIN_ADMIN', 'OWNER', 'ADMIN', 'owner', 'admin', 'super_admin']
       );
     }
 
     function isStaff() {
       return isSignedIn() && (
-        request.auth.token.role in ['SUPER_ADMIN', 'MAIN_ADMIN', 'OWNER', 'ADMIN', 'SUPERVISOR', 'owner', 'admin', 'supervisor']
+        request.auth.token.isOwner == true ||
+        request.auth.token.isSuperAdmin == true ||
+        request.auth.token.admin == true ||
+        request.auth.token.isAdmin == true ||
+        request.auth.token.role in ['SUPER_ADMIN', 'MAIN_ADMIN', 'OWNER', 'ADMIN', 'SUPERVISOR', 'owner', 'admin', 'supervisor', 'super_admin']
+      );
+    }
+
+    function emailMatchesPhoneOrId(val) {
+      return ('email' in request.auth.token) && request.auth.token.email is string && val is string && (
+        request.auth.token.email == (val + '@yemen-services.app') ||
+        request.auth.token.email == ('user_' + val + '@yemen-services.app')
       );
     }
 
@@ -36,12 +51,10 @@ service cloud.firestore {
         (('userId' in data) && data.userId == request.auth.uid) ||
         (('uid' in data) && data.uid == request.auth.uid) ||
         (('id' in data) && data.id == request.auth.uid) ||
-        (('email' in request.auth.token) && request.auth.token.email is string && (
-          (('phone' in data) && data.phone is string && request.auth.token.email == (data.phone + '@yemen-services.app')) ||
-          (('ownerId' in data) && data.ownerId is string && request.auth.token.email == (data.ownerId + '@yemen-services.app')) ||
-          (('providerId' in data) && data.providerId is string && request.auth.token.email == (data.providerId + '@yemen-services.app')) ||
-          (('storeId' in data) && data.storeId is string && request.auth.token.email == (data.storeId + '@yemen-services.app'))
-        ))
+        (('phone' in data) && emailMatchesPhoneOrId(data.phone)) ||
+        (('ownerId' in data) && emailMatchesPhoneOrId(data.ownerId)) ||
+        (('providerId' in data) && emailMatchesPhoneOrId(data.providerId)) ||
+        (('storeId' in data) && emailMatchesPhoneOrId(data.storeId))
       );
     }
 
@@ -161,12 +174,12 @@ service cloud.firestore {
 
     // 2. طلبات الانضمام المعلقة والوظائف
     match /join_requests/{d} {
-      allow read: if isStaff() || (isSignedIn() && (resource.data.uid == request.auth.uid || resource.data.userId == request.auth.uid || matchesOwner(resource.data)));
+      allow read: if isStaff() || (isSignedIn() && (resource == null || resource.data.uid == request.auth.uid || resource.data.userId == request.auth.uid || matchesOwner(resource.data)));
       allow create: if isSignedIn();
       allow update, delete: if isStaff();
     }
     match /pending_providers/{d} {
-      allow read: if isStaff() || (isSignedIn() && (resource.data.ownerId == request.auth.uid || matchesOwner(resource.data)));
+      allow read: if isStaff() || (isSignedIn() && (resource == null || resource.data.ownerId == request.auth.uid || matchesOwner(resource.data)));
       allow create: if isSignedIn();
       allow update, delete: if isStaff();
     }
@@ -228,14 +241,21 @@ service cloud.firestore {
       allow read, update, delete: if isSignedIn() && (isStaff() || matchesOwner(resource.data));
     }
     match /registered_users/{userId} {
-      allow read: if isSignedIn() && (request.auth.uid == userId || isStaff());
+      allow read: if isSignedIn() && (request.auth.uid == userId || (resource != null && matchesOwner(resource.data)) || isStaff());
       allow create: if isSignedIn() && (
         isStaff() || (
           request.auth.uid == userId &&
           (!('role' in request.resource.data) || !(request.resource.data.role in ['ADMIN', 'OWNER', 'SUPER_ADMIN', 'MAIN_ADMIN', 'admin', 'owner']))
         )
       );
-      allow update, delete: if isStaff();
+      allow update: if isSignedIn() && (
+        isStaff() || (
+          (request.auth.uid == userId || matchesOwner(resource.data)) &&
+          (!('role' in request.resource.data) || request.resource.data.role == resource.data.role) &&
+          !(request.resource.data.role in ['ADMIN', 'OWNER', 'SUPER_ADMIN', 'MAIN_ADMIN', 'admin', 'owner'])
+        )
+      );
+      allow delete: if isStaff();
     }
 
     // 5. الإعدادات العامة (قراءة للمستخدمين المسجلين عدا الأسرار، وتعديل للإدارة والمالك فقط)
@@ -391,11 +411,11 @@ service cloud.firestore {
     match /notifications/{notifId} {
       allow read: if isSignedIn();
       allow create: if isRealUser();
-      allow update: if isSignedIn() && (
-        isStaff() || resource.data.targetValue == request.auth.uid
-      );
-      allow delete: if isStaff() || (
-        isSignedIn() && resource.data.targetValue == request.auth.uid
+      allow update, delete: if isSignedIn() && (
+        isStaff() ||
+        resource.data.targetValue == request.auth.uid ||
+        emailMatchesPhoneOrId(resource.data.targetValue) ||
+        matchesOwner(resource.data)
       );
     }
     match /payments/{d} {
@@ -585,6 +605,15 @@ service cloud.firestore {
       allow read, update, delete: if isStaff();
     }
     match /user_behavior_logs/{d} {
+      allow create: if isSignedIn();
+      allow read, update, delete: if isStaff();
+    }
+    match /sos_alerts/{d} {
+      allow read: if isStaff() || (isSignedIn() && matchesOwner(resource.data));
+      allow create: if isSignedIn();
+      allow update, delete: if isStaff();
+    }
+    match /offline_sync_logs/{d} {
       allow create: if isSignedIn();
       allow read, update, delete: if isStaff();
     }

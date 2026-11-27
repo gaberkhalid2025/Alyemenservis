@@ -1,27 +1,24 @@
 package com.example.ui.viewmodels
 
-import com.example.ui.helpers.AppState
 import android.content.Context
-import com.example.ui.*
 import androidx.lifecycle.viewModelScope
 import com.example.data.BookingEntity
+import com.example.data.ChatChannelEntity
+import com.example.data.CouponEntity
+import com.example.data.ProviderEntity
 import com.example.data.repositories.BookingRepository
-import com.example.data.*
-import com.example.data.models.*
-import com.example.utils.*
-import dagger.hilt.android.lifecycle.HiltViewModel
-import java.util.UUID
-import javax.inject.Inject
+import com.example.ui.helpers.AppState
+import com.example.utils.BookingStatus
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 /**
  * 📌 Architectural Note: UI-focused BookingStatus enum providing UI labels and hex colors
  * for state rendering in Compose views.
  */
-
 data class BookingFormFields(
     val tripleName: Boolean = true,
     val phoneNumber: Boolean = true,
@@ -45,7 +42,6 @@ enum class BookingDistributionMode(val label: String) {
     ADMIN_ONLY("للأدمن أولاً")
 }
 
-
 open class BookingViewModel @Inject constructor(
     private val injectedRepository: BookingRepository,
     val appState: AppState
@@ -67,8 +63,8 @@ open class BookingViewModel @Inject constructor(
         get() = injectedRepository
 
     // --- Callback/Lambda Properties for decoupling ---
-    var getCoupons: (() -> List<com.example.data.CouponEntity>)? = null
-    var getProviders: (() -> List<com.example.data.ProviderEntity>)? = null
+    var getCoupons: (() -> List<CouponEntity>)? = null
+    var getProviders: (() -> List<ProviderEntity>)? = null
     var getCurrentUserPhone: (() -> String)? = null
     var getCurrentUserName: (() -> String)? = null
     var getCurrentUserResidence: (() -> String)? = null
@@ -77,7 +73,14 @@ open class BookingViewModel @Inject constructor(
     var setCurrentUserResidence: ((String) -> Unit)? = null
     var onAddNotification: ((title: String, message: String, targetType: String, targetValue: String) -> Unit)? = null
     var triggerNotificationCallback: ((String) -> Unit)? = null
-    var onOpenOrCreateChatChannel: ((targetId: String, targetType: String, targetName: String, targetPhone: String, targetCategory: String, relatedEntityId: String, relatedEntityType: String, onComplete: (com.example.data.ChatChannelEntity?) -> Unit) -> Unit)? = null
+    var onOpenOrCreateChatChannel: ((targetId: String, targetType: String, targetName: String, targetPhone: String, targetCategory: String, relatedEntityId: String, relatedEntityType: String, onComplete: (ChatChannelEntity?) -> Unit) -> Unit)? = null
+
+    internal fun safeBookingFirestoreCall(
+        operation: (onSuccess: () -> Unit, onFailure: (Exception) -> Unit) -> Unit,
+        onSuccess: () -> Unit = {},
+        onError: (Exception) -> Unit = {},
+        errorMessage: String = "حدث خطأ أثناء تنفيذ العملية"
+    ) = safeFirestoreCallWithCallback(operation, onSuccess, onError, errorMessage)
 
     fun createBooking(context: Context, booking: BookingEntity, rawPasswordPin: String = "") {
         appContext = context.applicationContext
@@ -97,181 +100,31 @@ open class BookingViewModel @Inject constructor(
         }
     }
 
-    fun createBooking(booking: BookingEntity, onResult: (Boolean) -> Unit = {}) {
-        if (booking.isRecurring && booking.recurrenceRule != "NONE") {
-            createRecurringBookings(booking, onResult)
-            return
-        }
-        val bId = booking.id.ifEmpty { java.util.UUID.randomUUID().toString() }
-        val secureRandom = java.security.SecureRandom()
-        val bNum = booking.bookingNumber.ifEmpty { "YEM-${10000 + secureRandom.nextInt(90000)}" }
-        val bPass = "${1000 + secureRandom.nextInt(9000)}"
-        val hasPreHashedPin = booking.pinCode.isNotBlank()
-        val finalized = booking.copy(
-            id = bId,
-            bookingNumber = bNum,
-            pinCode = if (hasPreHashedPin) booking.pinCode else com.example.utils.SecureHasher.hashPin(bPass),
-            createdAt = if (booking.createdAt == 0L) System.currentTimeMillis() else booking.createdAt,
-            updatedAt = System.currentTimeMillis()
-        )
-        safeFirestoreCallWithCallback(
-            operation = { onSuccess, onFailure ->
-                db.collection("bookings").document(bId).set(finalized)
-                    .addOnSuccessListener {
-                        _bookings.value = _bookings.value + finalized
-                        val custPhone = finalized.customerPhone.ifEmpty { finalized.clientPhone }
-                        val custName = finalized.customerName.ifEmpty { finalized.clientName.ifEmpty { "العميل" } }
-                        val provPhone = finalized.providerPhone.ifEmpty {
-                            getProviders?.invoke()?.find { it.id == finalized.providerId || it.name.trim() == finalized.providerName.trim() }?.phone?.trim() ?: finalized.providerId
-                        }
-                        
-                        // 1. User notification (without exposing plaintext PIN in Firestore)
-                        onAddNotification?.invoke(
-                            "📅 حجز جديد رقم $bNum",
-                            "تم تسجيل طلب حجز موعد لدى ${finalized.providerName} بنجاح. رقم الحجز: $bNum.",
-                            "USER",
-                            custPhone
-                        )
-                        
-                        // 2. Provider notification
-                        if (provPhone.isNotBlank()) {
-                            onAddNotification?.invoke(
-                                "⚡ حجز جديد وارد رقم $bNum",
-                                "العميل $custName ($custPhone) قام بحجز خدمة (${finalized.serviceType}) لديك.",
-                                "PROVIDER",
-                                provPhone
-                            )
-                        }
-                        
-                        // 3. Admin notification
-                        onAddNotification?.invoke(
-                            "📢 حجز جديد مسجل في النظام",
-                            "نوع العملية: (إنشاء حجز) | رقم الحجز: $bNum | العميل: $custName ($custPhone) لدى: ${finalized.providerName}",
-                            "ADMIN_ONLY",
-                            ""
-                        )
-                        onSuccess()
-                        onResult(true)
-                    }
-                    .addOnFailureListener { e ->
-                        onFailure(e)
-                        onResult(false)
-                    }
-            },
-            onSuccess = {
-                if (hasPreHashedPin) {
-                    triggerToast("✅ تم إنشاء الحجز بنجاح")
-                } else {
-                    triggerToast("✅ تم الحجز #$bNum | احتفظ برمز PIN: $bPass")
-                }
-            },
-            onError = { triggerToast("⚠️ تعذر حفظ الحجز على السحابة، يرجى التحقق من الاتصال") },
-            errorMessage = "فشل إنشاء الحجز"
-        )
-    }
-
-    private fun createRecurringBookings(baseBooking: BookingEntity, onResult: (Boolean) -> Unit) {
-        val parentId = java.util.UUID.randomUUID().toString()
-        val secureRandom = java.security.SecureRandom()
-        val dates = com.example.utils.ScheduleManager.calculateRecurringDates(baseBooking.effectiveDate, baseBooking.recurrenceRule)
-        if (dates.isEmpty()) {
-            onResult(false)
-            return
-        }
-
-        val newBookings = mutableListOf<BookingEntity>()
-        val batches = dates.chunked(450).mapIndexed { chunkIdx, chunkDates ->
-            val batch = db.batch()
-            chunkDates.forEachIndexed { localIdx, dateStr ->
-                val index = chunkIdx * 450 + localIdx
-                val bId = "${parentId}_${index}"
-                val bNum = "YEM-${10000 + secureRandom.nextInt(90000)}"
-                val bPass = "${1000 + secureRandom.nextInt(9000)}"
-                val b = baseBooking.copy(
-                    id = bId,
-                    parentId = parentId,
-                    date = dateStr,
-                    dateString = dateStr,
-                    bookingNumber = bNum,
-                    pinCode = com.example.utils.SecureHasher.hashPin(bPass),
-                    isRecurring = true,
-                    createdAt = System.currentTimeMillis(),
-                    updatedAt = System.currentTimeMillis()
-                )
-                newBookings.add(b)
-                batch.set(db.collection("bookings").document(bId), b)
-            }
-            batch
-        }
-
-        safeFirestoreCallWithCallback(
-            operation = { onSuccess, onFailure ->
-                com.google.android.gms.tasks.Tasks.whenAllComplete(batches.map { it.commit() })
-                    .addOnSuccessListener { tasks ->
-                        val firstError = tasks.firstOrNull { !it.isSuccessful }?.exception
-                        if (firstError != null) {
-                            onFailure(firstError)
-                            onResult(false)
-                            return@addOnSuccessListener
-                        }
-                        _bookings.value = _bookings.value + newBookings
-
-                        val custPhone = baseBooking.effectiveCustomerPhone
-                        val custName = baseBooking.effectiveCustomerName
-                        val provPhone = baseBooking.providerPhone.ifEmpty {
-                            getProviders?.invoke()?.find { it.id == baseBooking.providerId || it.name.trim() == baseBooking.providerName.trim() }?.phone?.trim() ?: baseBooking.providerId
-                        }
-
-                        val msg = "لديك سلسلة حجوزات جديدة متكررة (${newBookings.size} مواعيد) من $custName برقم $custPhone"
-                        if (provPhone.isNotBlank()) {
-                            onAddNotification?.invoke("سلسلة حجوزات جديدة", msg, "PROVIDER", provPhone)
-                        }
-
-                        val auditId = java.util.UUID.randomUUID().toString()
-                        val auditLog = mapOf(
-                            "id" to auditId,
-                            "action" to "CREATE_RECURRING_BOOKING",
-                            "details" to "تم إنشاء ${newBookings.size} حجوزات للمزود ${baseBooking.providerName}",
-                            "timestamp" to System.currentTimeMillis()
-                        )
-                        db.collection("security_audit_logs").document(auditId).set(auditLog)
-
-                        onSuccess()
-                        onResult(true)
-                    }
-                    .addOnFailureListener { e ->
-                        onFailure(e)
-                        onResult(false)
-                    }
-            },
-            onSuccess = { triggerToast("✅ تم إنشاء السلسلة المتكررة بنجاح") },
-            onError = { triggerToast("⚠️ خطأ في المزامنة، يرجى التحقق من اتصالك") },
-            errorMessage = "فشل إنشاء الحجوزات المتكررة"
-        )
-    }
+    fun createBooking(booking: BookingEntity, onResult: (Boolean) -> Unit = {}) =
+        createBookingHelper(booking, onResult)
 
     fun updateBookingFormFields(fields: BookingFormFields) {
         _bookingFormFields.value = fields
         try {
             db.collection("settings").document("booking_fields").set(fields)
-        } catch (e: Exception) {}
+        } catch (_: Exception) {}
     }
 
     fun updateDistributionMode(mode: BookingDistributionMode) {
         _distributionMode.value = mode
         try {
             db.collection("settings").document("distribution_mode").set(mapOf("mode" to mode.name))
-        } catch (e: Exception) {}
+        } catch (_: Exception) {}
     }
 
     fun addBooking(
-        name: String, 
-        phone: String, 
-        area: String, 
-        serviceType: String, 
-        providerId: String, 
-        providerName: String, 
-        dateString: String = "2026-06-20", 
+        name: String,
+        phone: String,
+        area: String,
+        serviceType: String,
+        providerId: String,
+        providerName: String,
+        dateString: String = "2026-06-20",
         timeString: String = "12:00 م",
         couponCode: String = "",
         pinCode: String = "",
@@ -280,184 +133,19 @@ open class BookingViewModel @Inject constructor(
     ) = addBookingImpl(name, phone, area, serviceType, providerId, providerName, dateString, timeString, couponCode, pinCode, customBookingId, customPassword)
 
     fun addBookingImpl(
-        name: String, 
-        phone: String, 
-        area: String, 
-        serviceType: String, 
-        providerId: String, 
-        providerName: String, 
-        dateString: String = "2026-06-20", 
+        name: String,
+        phone: String,
+        area: String,
+        serviceType: String,
+        providerId: String,
+        providerName: String,
+        dateString: String = "2026-06-20",
         timeString: String = "12:00 م",
         couponCode: String = "",
         pinCode: String = "",
         customBookingId: String = "",
         customPassword: String = ""
-    ) {
-        val cleanPhone = phone.trim()
-        val cleanName = name.trim()
-        
-        // 1. Verification of identity of registered Yemeni user phone
-        val isValidYemeniPhone = cleanPhone.length == 9 && (
-            cleanPhone.startsWith("77") || 
-            cleanPhone.startsWith("73") || 
-            cleanPhone.startsWith("71") || 
-            cleanPhone.startsWith("70") || 
-            cleanPhone.startsWith("78")
-        )
-        if (!isValidYemeniPhone) {
-            triggerNotificationCallback?.invoke("❌ الهوية غير مسجلة: رقم الهاتف يجب أن يكون يمنياً صحيحاً مفعلاً ومكوناً من 9 أرقام يبدأ بـ 77 أو 73 أو 71 أو 70!")
-            return
-        }
-
-        // 2. Duplication & Overlap prevention scan
-        val isTimeSlotTaken = _bookings.value.any {
-            it.providerId == providerId &&
-            it.effectiveDate.trim() == dateString.trim() &&
-            it.effectiveTime.trim() == timeString.trim() &&
-            (it.status == "PENDING" || it.status == "APPROVED" || it.status == "ACCEPTED" || it.status == "IN_PROGRESS")
-        }
-        if (isTimeSlotTaken) {
-            triggerNotificationCallback?.invoke("⚠️ عذراً، هذا الموعد ($dateString في $timeString) محجوز مسبقاً لدى هذا الفني. يرجى اختيار وقت آخر!")
-            return
-        }
-
-        // Determine specific pricing via admin settings or coupon logic
-        var discountPercent = 0.0
-        var finalPrice = 0.0
-
-        if (couponCode.isNotBlank()) {
-            val couponsList = getCoupons?.invoke() ?: emptyList()
-            val coupon = couponsList.find { it.code.trim().uppercase() == couponCode.trim().uppercase() && it.status == "ACTIVE" }
-            if (coupon != null) {
-                val now = System.currentTimeMillis()
-                if (now <= coupon.expiryTimestamp) {
-                    discountPercent = coupon.discountPercentage.toDouble()
-                    // Valid coupon! Increment used count in Firestore
-                    val updatedCount = coupon.usedCount + 1
-                    db.collection("coupons").document(coupon.id).update("usedCount", updatedCount)
-                    // Apply discount or points
-                    triggerNotificationCallback?.invoke("🎫 تم تطبيق كوبون الخصم بنجاح! خصم بقيمة ${coupon.discountPercentage}%")
-                } else {
-                    triggerNotificationCallback?.invoke("⚠️ الكوبون المستخدم منتهي الصلاحية")
-                }
-            } else {
-                triggerNotificationCallback?.invoke("⚠️ الكوبون غير صحيح أو غير مفعل")
-            }
-        }
-
-        // Retrieve provider details to ensure accuracy
-        val providersList = getProviders?.invoke() ?: emptyList()
-        val prov = providersList.find { it.id == providerId || (providerId.isBlank() && it.name.trim() == providerName.trim()) }
-        val basePrice = prov?.previewPrice ?: 0.0
-        finalPrice = if (discountPercent > 0.0) {
-            basePrice * (1.0 - (discountPercent / 100.0))
-        } else {
-            basePrice
-        }
-
-        val effectiveProviderPhone = prov?.phone?.trim()?.ifBlank {
-            providersList.find { it.name.trim() == providerName.trim() }?.phone?.trim() ?: ""
-        } ?: ""
-
-        val secureRandom = java.security.SecureRandom()
-        val finalBookingId = if (customBookingId.isNotBlank()) customBookingId else java.util.UUID.randomUUID().toString()
-        val finalBookingNumber = "B-${100000 + secureRandom.nextInt(900000)}"
-        val generatedPass = if (customPassword.isNotBlank()) customPassword else "${1000 + secureRandom.nextInt(9000)}"
-
-        val newBooking = BookingEntity(
-            id = finalBookingId,
-            customerName = cleanName,
-            customerPhone = cleanPhone,
-            customerArea = area,
-            serviceType = serviceType,
-            providerId = providerId,
-            providerName = providerName,
-            providerPhone = effectiveProviderPhone,
-            date = dateString,
-            time = timeString,
-            dateString = dateString,
-            timeString = timeString,
-            status = "PENDING",
-            bookingNumber = finalBookingNumber,
-            pinCode = if (pinCode.isNotBlank()) pinCode else com.example.utils.SecureHasher.hashPin(generatedPass),
-            totalAmount = finalPrice,
-            createdAt = System.currentTimeMillis(),
-            updatedAt = System.currentTimeMillis()
-        )
-
-        try {
-            // Mark slot as booked
-            db.collection("bookings").document(finalBookingId).set(newBooking)
-                .addOnSuccessListener {
-                    _bookings.value = _bookings.value + newBooking
-                    
-                    // Log custom Firebase Analytics event
-                    try {
-                        val bundle = android.os.Bundle().apply {
-                            putString("service_type", serviceType)
-                            putString("provider_name", providerName)
-                            putDouble("price", finalPrice)
-                            putString("booking_number", finalBookingNumber)
-                        }
-                        com.example.MyApplication.logFirebaseEvent("submit_booking", bundle)
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                    }
-
-                    // Auto-save user identity in memory if empty to ensure they can track notifications immediately
-                    if (getCurrentUserPhone?.invoke()?.isEmpty() == true) {
-                        setCurrentUserPhone?.invoke(cleanPhone)
-                        setCurrentUserName?.invoke(cleanName)
-                        setCurrentUserResidence?.invoke(area)
-                    }
-
-                    // Check Admin bookingRouting setting to control notification distribution
-                    val bookingRouting = appState._settings.value.bookingRouting
-                    val sendUserNotif = bookingRouting == "BOTH" || bookingRouting == "PROVIDER" || bookingRouting == "USER" || bookingRouting.isBlank()
-                    val sendProviderNotif = bookingRouting == "BOTH" || bookingRouting == "PROVIDER" || bookingRouting.isBlank()
-                    val sendAdminNotif = bookingRouting == "BOTH" || bookingRouting == "ADMIN" || bookingRouting.isBlank()
-
-                    // 1. Notify the customer (user) without plaintext PIN stored in Firestore
-                    if (sendUserNotif) {
-                        onAddNotification?.invoke(
-                            "📅 تم تسجيل طلب حجزك رقم $finalBookingNumber",
-                            "مرحباً بك $cleanName، تم استقبال طلب الحجز لدى $providerName بنجاح برقم #$finalBookingNumber.",
-                            "USER",
-                            cleanPhone
-                        )
-                    }
-
-                    // 2. Notify the Technician (PROVIDER) with actual phone or ID
-                    if (sendProviderNotif) {
-                        val formattedPrice = java.text.NumberFormat.getNumberInstance(java.util.Locale.US).format(finalPrice)
-                        val technicianTarget = effectiveProviderPhone.ifBlank { providerId.ifBlank { "PROVIDER" } }
-                        onAddNotification?.invoke(
-                            "⚡ حجز عاجل جديد رقم $finalBookingNumber",
-                            "العميل $cleanName ($cleanPhone) من ($area) حجز خدمة ($serviceType) لدى $providerName بموعد $dateString $timeString. سعر الخدمة: $formattedPrice ريال يمني.",
-                            "PROVIDER",
-                            technicianTarget
-                        )
-                    }
-
-                    // 3. Notify the Admin/Supervisor according to settings (no plaintext PIN)
-                    if (sendAdminNotif) {
-                        onAddNotification?.invoke(
-                            "📢 حجز جديد مسجل في النظام",
-                            "العميل $cleanName حجز لدى $providerName في مدينة $area. رقم الحجز: $finalBookingNumber.",
-                            "ADMIN_ONLY",
-                            ""
-                        )
-                    }
-
-                    triggerNotificationCallback?.invoke("✅ تم إنشاء الحجز #$finalBookingNumber | احتفظ برمز الإلغاء: $generatedPass")
-                }
-                .addOnFailureListener { e ->
-                    triggerNotificationCallback?.invoke("❌ فشل الحجز: ${e.message}")
-                }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-    }
+    ) = addBookingImplHelper(name, phone, area, serviceType, providerId, providerName, dateString, timeString, couponCode, pinCode, customBookingId, customPassword)
 
     fun updateBookingStatus(bookingId: String, newStatus: BookingStatus) =
         updateBookingStatusImpl(bookingId, newStatus.name)
@@ -465,242 +153,38 @@ open class BookingViewModel @Inject constructor(
     fun updateBookingStatus(bookingId: String, newStatus: String, rejectionReason: String = "") =
         updateBookingStatusImpl(bookingId, newStatus, rejectionReason)
 
-    fun updateBookingStatusImpl(bookingId: String, newStatus: String, rejectionReason: String = "") {
-        db.collection("bookings").document(bookingId).get().addOnSuccessListener { snapshot ->
-            val b = snapshot.toObject(BookingEntity::class.java)
-            if (b == null) {
-                triggerNotificationCallback?.invoke("❌ تعذر العثور على الحجز المطلوب")
-                return@addOnSuccessListener
-            }
-            if (!com.example.utils.BookingStateMachine.canTransition(b.status, newStatus)) {
-                triggerNotificationCallback?.invoke("⚠️ لا يمكن نقل حالة الحجز من (${com.example.utils.BookingStateMachine.getStatusLabel(b.status)}) إلى (${com.example.utils.BookingStateMachine.getStatusLabel(newStatus)})")
-                return@addOnSuccessListener
-            }
-
-            val now = System.currentTimeMillis()
-            val updated = b.copy(status = newStatus, rejectionReason = rejectionReason, updatedAt = now)
-            db.collection("bookings").document(bookingId).set(updated)
-                .addOnSuccessListener {
-                    _bookings.value = _bookings.value.map { if (it.id == bookingId) updated else it }
-
-                    // Automatically trigger getOrCreateChannel with relatedEntityId & relatedEntityType = "BOOKING" upon acceptance/approval
-                    if (newStatus == "APPROVED" || newStatus == "ACCEPTED" || newStatus == "IN_PROGRESS") {
-                        val otherId = b.providerId.ifEmpty { b.providerPhone.ifEmpty { "ADMIN" } }
-                        val otherName = b.providerName.ifEmpty { "مقدم الخدمة" }
-                        val otherPhone = b.providerPhone
-                        onOpenOrCreateChatChannel?.invoke(
-                            otherId,
-                            "BOOKING",
-                            otherName,
-                            otherPhone,
-                            b.category,
-                            bookingId,
-                            "BOOKING"
-                        ) { createdCh ->
-                            if (createdCh != null && createdCh.id.isNotEmpty()) {
-                                db.collection("bookings").document(bookingId).update("relatedChatChannelId", createdCh.id)
-                            }
-                        }
-                    }
-
-                    val arabicStatusMsg = when (newStatus) {
-                        "APPROVED", "ACCEPTED", "IN_PROGRESS" -> "قبول وتأكيد حجزك بنجاح وسيتواصل معك مزود الخدمة قريباً"
-                        "PENDING", "UNDER_REVIEW" -> "وضع حجزك قيد المراجعة والتدقيق الإداري"
-                        "REJECTED" -> "رفض وإلغاء حجزك" + (if (rejectionReason.isNotBlank()) " لسبب: $rejectionReason" else "")
-                        "COMPLETED" -> "إكمال وإنجاز الخدمة بنجاح وتقييم العمل"
-                        else -> "تعديل حالة طلب حجزك إلى: $newStatus"
-                    }
-
-                    onAddNotification?.invoke(
-                        "📅 تحديث حالة الحجز (رقم ${b.bookingCode.ifBlank { b.bookingNumber.ifBlank { b.id } }})",
-                        "عزيزي العميل، تم $arabicStatusMsg للخدمة المقدمة من ${b.providerName}.",
-                        "USER",
-                        b.customerPhone.ifBlank { b.clientPhone }
-                    )
-
-                    val provTarget = b.providerPhone.ifBlank {
-                        val provObj = getProviders?.invoke()?.find { it.id == b.providerId || it.name.trim() == b.providerName.trim() }
-                        provObj?.phone?.trim()?.ifBlank { b.providerId } ?: b.providerId
-                    }
-                    if (provTarget.isNotBlank()) {
-                        onAddNotification?.invoke(
-                            "📅 تحديث حالة الحجز (رقم ${b.bookingCode.ifBlank { b.bookingNumber.ifBlank { b.id } }})",
-                            "تم تغيير حالة الحجز للعميل ${b.customerName} إلى: $arabicStatusMsg",
-                            "PROVIDER",
-                            provTarget
-                        )
-                    }
-
-                    onAddNotification?.invoke(
-                        "📢 تحديث حالة حجز",
-                        "تم تحديث حالة الحجز رقم ${b.bookingCode.ifBlank { b.bookingNumber.ifBlank { b.id } }} إلى $arabicStatusMsg للعميل ${b.customerName} ولدى ${b.providerName}.",
-                        "ADMIN_ONLY",
-                        ""
-                    )
-
-                    val toastMsg = when (newStatus) {
-                        "APPROVED", "ACCEPTED", "IN_PROGRESS" -> "⚡ تم قبول وتأكيد الحجز بنجاح"
-                        "PENDING", "UNDER_REVIEW" -> "⏳ تم وضع الحجز قيد المراجعة"
-                        "REJECTED" -> "❌ تم رفض الحجز وإلغائه"
-                        "COMPLETED" -> "🎉 تم إكمال الخدمة بنجاح وتوثيق الإنجاز"
-                        else -> "تم تحديث حالة الحجز بنجاح"
-                    }
-                    triggerNotificationCallback?.invoke(toastMsg)
-                }
-                .addOnFailureListener {
-                    triggerNotificationCallback?.invoke("❌ تعذر تحديث حالة الحجز على السحابة، يرجى المحاولة لاحقاً")
-                }
-        }.addOnFailureListener {
-            triggerNotificationCallback?.invoke("❌ تعذر الاتصال بالخادم لتحديث الحجز")
-        }
-    }
+    fun updateBookingStatusImpl(bookingId: String, newStatus: String, rejectionReason: String = "") =
+        updateBookingStatusImplHelper(bookingId, newStatus, rejectionReason)
 
     fun deleteBooking(bookingId: String) = deleteBookingImpl(bookingId)
 
-    fun deleteBookingImpl(bookingId: String) {
-        val b = _bookings.value.find { it.id == bookingId }
-        val status = b?.status?.uppercase() ?: ""
-        if (b != null && status != "COMPLETED" && status != "CANCELLED" && status != "REJECTED") {
-            triggerNotificationCallback?.invoke("⚠️ لا يمكن حذف الحجز إلا إذا كان مكتملاً أو ملغياً")
-            return
-        }
-        db.collection("bookings").document(bookingId).delete()
-            .addOnSuccessListener {
-                _bookings.value = _bookings.value.filter { it.id != bookingId }
-                bookingRepository.deleteBooking(bookingId, {}, {})
-                triggerNotificationCallback?.invoke("🗑️ تم حذف الحجز من السجلات")
-
-                val bkCode = b?.bookingCode?.ifBlank { b.bookingNumber.ifBlank { bookingId } } ?: bookingId
-                val custName = b?.effectiveCustomerName ?: "عميل"
-                onAddNotification?.invoke(
-                    "🗑️ إشعار إداري: حذف حجز",
-                    "نوع العملية: (حذف) | رقم الحجز: $bkCode | اسم العميل: $custName",
-                    "ADMIN_ONLY",
-                    ""
-                )
-            }
-            .addOnFailureListener { e ->
-                val isPerm = e.message?.contains("PERMISSION_DENIED", ignoreCase = true) == true
-                triggerNotificationCallback?.invoke(
-                    if (isPerm) "⚠️ الحذف النهائي للسجلات متاح للإدارة فقط؛ يمكنك إلغاء الحجز بدلاً من ذلك"
-                    else "❌ تعذر حذف الحجز: ${e.localizedMessage ?: "خطأ في الاتصال"}"
-                )
-            }
-    }
+    fun deleteBookingImpl(bookingId: String) = deleteBookingImplHelper(bookingId)
 
     fun deleteAllBookings(customerPhone: String) = deleteAllBookingsImpl(customerPhone)
 
-    fun deleteAllBookingsImpl(customerPhone: String) {
-        _bookings.value = _bookings.value.filter { it.customerPhone != customerPhone }
-        db.collection("bookings")
-            .whereEqualTo("customerPhone", customerPhone)
-            .get()
-            .addOnSuccessListener { querySnapshot ->
-                if (querySnapshot.isEmpty) {
-                    triggerNotificationCallback?.invoke("🗑️ لا توجد حجوزات لحذفها.")
-                    return@addOnSuccessListener
-                }
-                val commitTasks = querySnapshot.documents.chunked(450).map { chunk ->
-                    val batch = db.batch()
-                    chunk.forEach { doc -> batch.delete(doc.reference) }
-                    batch.commit()
-                }
-                com.google.android.gms.tasks.Tasks.whenAllComplete(commitTasks)
-                    .addOnSuccessListener {
-                        triggerNotificationCallback?.invoke("🗑️ تم تصفية وحذف سجل جميع الحجوزات بنجاح.")
-                    }
-            }
-    }
+    fun deleteAllBookingsImpl(customerPhone: String) = deleteAllBookingsImplHelper(customerPhone)
 
     fun updateBooking(booking: BookingEntity) = updateBookingImpl(booking)
 
-    fun updateBookingImpl(booking: BookingEntity) {
-        db.collection("bookings").document(booking.id).set(booking)
-        _bookings.value = _bookings.value.map { if (it.id == booking.id) booking else it }
-        triggerNotificationCallback?.invoke("💾 تم تحديث بيانات الحجز بنجاح")
-
-        val bkCode = booking.bookingCode.ifBlank { booking.bookingNumber.ifBlank { booking.id } }
-        val custName = booking.effectiveCustomerName
-        onAddNotification?.invoke(
-            "✏️ إشعار إداري: تعديل حجز",
-            "نوع العملية: (تعديل) | رقم الحجز: $bkCode | اسم العميل: $custName",
-            "ADMIN_ONLY",
-            ""
-        )
-    }
-
-
-
+    fun updateBookingImpl(booking: BookingEntity) = updateBookingImplHelper(booking)
 
     fun attemptCancelBooking(bookingId: String, input: String, reason: String = "ملغي بطلب العميل", cancelledByParam: String = "USER", onResult: (Boolean, String) -> Unit) =
         attemptCancelBookingImpl(bookingId, input, reason, cancelledByParam, onResult)
 
-        fun attemptCancelBookingImpl(bookingId: String, input: String, reason: String = "ملغي بطلب العميل", cancelledByParam: String = "USER", onResult: (Boolean, String) -> Unit) {
-        val b = _bookings.value.find { it.id == bookingId }
-        if (b == null) {
-            onResult(false, "❌ الحجز غير موجود")
-            return
-        }
-        
-        injectedRepository.cancelBookingWithSecurity(
-            booking = b,
-            inputPinOrPassword = input,
-            cancellationReason = reason,
-            cancelledBy = cancelledByParam,
-            onSuccess = {
-                onResult(true, "✅ تم إلغاء الحجز بنجاح")
-                triggerNotificationCallback?.invoke("✅ تم إلغاء الحجز بنجاح")
-            },
-            onError = { msg ->
-                onResult(false, msg)
-            }
-        )
-    }
+    fun attemptCancelBookingImpl(bookingId: String, input: String, reason: String = "ملغي بطلب العميل", cancelledByParam: String = "USER", onResult: (Boolean, String) -> Unit) =
+        attemptCancelBookingImplHelper(bookingId, input, reason, cancelledByParam, onResult)
 
-    fun editBookingByUser(bookingId: String, newDate: String, newTime: String, newServiceType: String, providerId: String = "", providerName: String = "") {
-        val targetProviderId = providerId.ifEmpty {
-            _bookings.value.find { it.id == bookingId }?.providerId ?: ""
-        }
-        val isTimeSlotTaken = _bookings.value.any {
-            it.id != bookingId &&
-            it.providerId == targetProviderId &&
-            it.effectiveDate.trim() == newDate.trim() &&
-            it.effectiveTime.trim() == newTime.trim() &&
-            (it.status == "PENDING" || it.status == "APPROVED" || it.status == "ACCEPTED" || it.status == "IN_PROGRESS")
-        }
-        if (isTimeSlotTaken) {
-            triggerToast("❌ عذراً! هذا الوقت (${newTime}) وتاريخ (${newDate}) محجوز بالفعل لدى مقدم الخدمة. يرجى اختيار موعد آخر.")
-            return
-        }
-
-        val updates = mutableMapOf<String, Any>(
-            "date" to newDate,
-            "time" to newTime,
-            "dateString" to newDate,
-            "timeString" to newTime,
-            "serviceType" to newServiceType,
-            "updatedAt" to System.currentTimeMillis()
-        )
-        if (providerId.isNotEmpty()) {
-            updates["providerId"] = providerId
-        }
-        if (providerName.isNotEmpty()) {
-            updates["providerName"] = providerName
-        }
-        db.collection("bookings").document(bookingId).update(updates)
-            .addOnSuccessListener {
-                triggerToast("✅ تم تعديل الحجز بنجاح!")
-            }
-    }
+    fun editBookingByUser(bookingId: String, newDate: String, newTime: String, newServiceType: String, providerId: String = "", providerName: String = "") =
+        editBookingByUserHelper(bookingId, newDate, newTime, newServiceType, providerId, providerName)
 
     fun getBookingStatusColor(status: String): String {
         return when (status.uppercase()) {
-            "PENDING", "UNDER_REVIEW" -> "#FF9800" // Orange
-            "APPROVED", "ACCEPTED" -> "#2196F3" // Blue
-            "IN_PROGRESS" -> "#9C27B0" // Purple
-            "COMPLETED" -> "#4CAF50" // Green
-            "CANCELLED", "REJECTED" -> "#F44336" // Red
-            else -> "#757575" // Grey
+            "PENDING", "UNDER_REVIEW" -> "#FF9800"
+            "APPROVED", "ACCEPTED" -> "#2196F3"
+            "IN_PROGRESS" -> "#9C27B0"
+            "COMPLETED" -> "#4CAF50"
+            "CANCELLED", "REJECTED" -> "#F44336"
+            else -> "#757575"
         }
     }
 
@@ -725,86 +209,13 @@ open class BookingViewModel @Inject constructor(
             else -> 0.0f
         }
     }
-    
+
     fun createBookingDirectly(
-        provider: com.example.data.ProviderEntity,
+        provider: ProviderEntity,
         notes: String,
         onSuccess: () -> Unit,
         onError: (String) -> Unit
-    ) {
-        val custPhone = getCurrentUserPhone?.invoke()?.trim().orEmpty()
-        if (custPhone.isBlank()) {
-            onError("⚠️ يرجى تسجيل رقم هاتفك أولاً قبل إرسال الحجز المباشر")
-            return
-        }
-        val custName = getCurrentUserName?.invoke()?.ifBlank { "عميل ($custPhone)" } ?: "عميل ($custPhone)"
-        val bookingDate = com.example.utils.DateFormatter.formatDateDash(System.currentTimeMillis())
-        val bookingTime = com.example.utils.DateFormatter.formatTime24(System.currentTimeMillis() + 3600 * 1000L)
-        val secureRandom = java.security.SecureRandom()
-        val rawPin = "${1000 + secureRandom.nextInt(9000)}"
-        val bNum = "YEM-${10000 + secureRandom.nextInt(90000)}"
-        val bId = java.util.UUID.randomUUID().toString()
-
-        val directBooking = BookingEntity(
-            id = bId,
-            bookingNumber = bNum,
-            bookingCode = bNum,
-            providerId = provider.id,
-            providerName = provider.name,
-            providerPhone = provider.phone,
-            customerName = custName,
-            customerPhone = custPhone,
-            clientName = custName,
-            clientPhone = custPhone,
-            clientId = custPhone,
-            serviceType = provider.profession.ifBlank { provider.customCategoryName.ifBlank { "حجز فوري من الخريطة" } },
-            category = provider.customCategoryName.ifBlank { provider.profession },
-            serviceDetails = notes.ifBlank { "حجز مباشر من خريطة التطبيق" },
-            date = bookingDate,
-            dateString = bookingDate,
-            time = bookingTime,
-            timeString = bookingTime,
-            status = "PENDING",
-            createdAt = System.currentTimeMillis(),
-            updatedAt = System.currentTimeMillis()
-        )
-
-        injectedRepository.createBooking(
-            booking = directBooking,
-            rawPasswordPin = rawPin,
-            onSuccess = { createdBooking ->
-                _bookings.value = _bookings.value.filter { it.id != createdBooking.id } + createdBooking
-
-                // Triple notification for USER, PROVIDER, and ADMIN_ONLY (no plaintext PIN)
-                onAddNotification?.invoke(
-                    "📅 حجز خريطة جديد #${createdBooking.bookingNumber}",
-                    "تم إرسال طلب حجزك بنجاح إلى ${createdBooking.providerName} برقم #${createdBooking.bookingNumber}.",
-                    "USER",
-                    custPhone
-                )
-                if (createdBooking.providerPhone.isNotBlank()) {
-                    onAddNotification?.invoke(
-                        "⚡ طلب حجز جديد من الخريطة #${createdBooking.bookingNumber}",
-                        "قام العميل $custName ($custPhone) بطلب حجز مباشر من الخريطة لديك.",
-                        "PROVIDER",
-                        createdBooking.providerPhone
-                    )
-                }
-                onAddNotification?.invoke(
-                    "📢 حجز خريطة جديد",
-                    "حجز خريطة جديد #${createdBooking.bookingNumber} للعميل $custName لدى ${createdBooking.providerName}.",
-                    "ADMIN_ONLY",
-                    "ALL"
-                )
-
-                triggerToast("🎉 تم الحجز #${createdBooking.bookingNumber} | رمز PIN: $rawPin")
-                onSuccess()
-            },
-            onError = { errorMsg ->
-                onError(errorMsg)
-            }
-        )
-    }
+    ) = createBookingDirectlyHelper(provider, notes, onSuccess, onError)
 
     fun lockBookingAfterFailedAttempts(bookingId: String, lockDurationMs: Long, onResult: (Boolean) -> Unit) {
         viewModelScope.launch {
@@ -821,5 +232,4 @@ open class BookingViewModel @Inject constructor(
             } catch (_: Exception) {}
         }
     }
-
 }

@@ -31,8 +31,11 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.data.AdminSettingsEntity
 import com.example.data.BookingEntity
 import com.example.utils.BookingUtils
+import com.example.utils.VisualThemePalette
+import com.example.utils.resolveThemePalette
 import java.util.Calendar
 import java.util.Locale
 
@@ -40,16 +43,17 @@ import java.util.Locale
  * 📝 BookingFormScreen
  * استمارة تقديم طلب حجز موعد جديد
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BookingFormScreen(
     providerId: String = "",
     providerName: String = "",
     providerPhone: String = "",
     preselectedCategory: String = "",
+    themeColors: VisualThemePalette = resolveThemePalette(AdminSettingsEntity()),
     onBack: () -> Unit,
     onBookingCreated: (BookingEntity) -> Unit
 ) {
+    androidx.activity.compose.BackHandler(onBack = onBack)
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
 
@@ -131,35 +135,41 @@ fun BookingFormScreen(
         false
     )
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = "طلب حجز موعد جديد",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(themeColors.background)
+    ) {
+        Surface(
+            color = themeColors.surface,
+            shadowElevation = 2.dp,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onBack) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "رجوع",
+                        tint = themeColors.textPrimary
                     )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "رجوع"
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
+                }
+                Text(
+                    text = "طلب حجز موعد جديد",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = themeColors.textPrimary
                 )
-            )
-        },
-        containerColor = MaterialTheme.colorScheme.background
-    ) { paddingValues ->
+            }
+        }
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
@@ -518,6 +528,10 @@ fun BookingFormScreen(
                     showSuccessDialog = true
                 },
                 enabled = !isSubmitting,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = themeColors.primary,
+                    contentColor = Color.White
+                ),
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(54.dp),

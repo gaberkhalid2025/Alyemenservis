@@ -141,14 +141,16 @@ fun PasswordResetWaitingScreen(
     }
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             TopAppBar(
+                windowInsets = WindowInsets(0, 0, 0, 0),
                 title = {
                     Text(
                         text = "🔑 استعادة كلمة المرور",
                         fontWeight = FontWeight.Bold,
                         fontSize = 16.sp,
-                        color = Color.White
+                        color = themeColors.textPrimary
                     )
                 },
                 navigationIcon = {
@@ -156,7 +158,7 @@ fun PasswordResetWaitingScreen(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "رجوع",
-                            tint = Color.White
+                            tint = themeColors.textPrimary
                         )
                     }
                 },

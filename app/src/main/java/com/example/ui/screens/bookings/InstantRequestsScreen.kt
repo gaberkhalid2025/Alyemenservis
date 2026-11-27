@@ -35,10 +35,15 @@ fun InstantRequestsScreen(
     val currentUserId by viewModel.currentUserId.collectAsState()
     val adminRole by viewModel.adminRole.collectAsState()
 
-    val filteredList = remember(instantRequests, uiState.selectedTab, uiState.searchQuery, currentUserPhone, currentUserId) {
+    val cleanUserPhone = remember(currentUserPhone) {
+        com.example.ui.helpers.AppPreferenceHelper.normalizePhoneNumber(currentUserPhone)
+    }
+
+    val filteredList = remember(instantRequests, uiState.selectedTab, uiState.searchQuery, cleanUserPhone, currentUserId, adminRole) {
         instantRequests.filter { req ->
+            val reqPhoneClean = com.example.ui.helpers.AppPreferenceHelper.normalizePhoneNumber(req.userPhone)
             val matchesTab = if (uiState.selectedTab == 0) {
-                currentUserPhone.isBlank() || req.userPhone == currentUserPhone || req.userId == currentUserId || adminRole.isNotBlank()
+                cleanUserPhone.isBlank() || reqPhoneClean == cleanUserPhone || req.userId == currentUserId || (adminRole.isNotBlank() && adminRole != "GUEST")
             } else {
                 req.status == "WAITING_FOR_OFFERS" || req.status == "REVIEWING_OFFERS"
             }
@@ -50,12 +55,25 @@ fun InstantRequestsScreen(
         }.sortedByDescending { it.createdAt }
     }
 
+    val isAccentLight = remember(themeColors.accent) {
+        androidx.core.graphics.ColorUtils.calculateLuminance(
+            android.graphics.Color.argb(
+                (themeColors.accent.alpha * 255).toInt(),
+                (themeColors.accent.red * 255).toInt(),
+                (themeColors.accent.green * 255).toInt(),
+                (themeColors.accent.blue * 255).toInt()
+            )
+        ) > 0.45
+    }
+    val onAccentColor = if (isAccentLight) Color(0xFF0B1120) else Color.White
+
     Scaffold(
         topBar = {
             TopAppBar(
+                windowInsets = WindowInsets(0, 0, 0, 0),
                 title = {
                     Column {
-                        Text("🚨 اطلب خدمتك الآن (مزايدة فورية)", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = themeColors.textPrimary)
+                        Text("🚨 اطلب خدمتك الآن (مزايدة فورية)", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = themeColors.textPrimary)
                         Text("عروض أسعار تنافسية ومباشرة خلال ساعتين ⏱️", fontSize = 11.sp, color = themeColors.accent)
                     }
                 },
@@ -71,11 +89,12 @@ fun InstantRequestsScreen(
             ExtendedFloatingActionButton(
                 onClick = { instantReqViewModel.setShowCreateDialog(true) },
                 containerColor = themeColors.accent,
-                contentColor = Color.Black,
-                icon = { Icon(Icons.Default.Add, contentDescription = null, tint = Color.Black) },
-                text = { Text("اطلب خدمتك الآن ⚡", fontWeight = FontWeight.Bold, color = Color.Black) }
+                contentColor = onAccentColor,
+                icon = { Icon(Icons.Default.Add, contentDescription = null, tint = onAccentColor) },
+                text = { Text("اطلب خدمتك الآن ⚡", fontWeight = FontWeight.Bold, color = onAccentColor) }
             )
         },
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         containerColor = themeColors.background
     ) { paddingValues ->
         Column(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
@@ -87,12 +106,16 @@ fun InstantRequestsScreen(
                 Tab(
                     selected = uiState.selectedTab == 0,
                     onClick = { instantReqViewModel.setTab(0) },
-                    text = { Text("طلباتي السابقة 📑", fontSize = 12.sp, color = if (uiState.selectedTab == 0) themeColors.accent else themeColors.textSecondary) }
+                    selectedContentColor = themeColors.accent,
+                    unselectedContentColor = themeColors.textSecondary,
+                    text = { Text("طلباتي السابقة 📑", fontSize = 12.sp, fontWeight = FontWeight.Bold) }
                 )
                 Tab(
                     selected = uiState.selectedTab == 1,
                     onClick = { instantReqViewModel.setTab(1) },
-                    text = { Text("سوق الطلبات المفتوحة (للفنيين) 🛠️", fontSize = 12.sp, color = if (uiState.selectedTab == 1) themeColors.accent else themeColors.textSecondary) }
+                    selectedContentColor = themeColors.accent,
+                    unselectedContentColor = themeColors.textSecondary,
+                    text = { Text("سوق الطلبات المفتوحة (للفنيين) 🛠️", fontSize = 12.sp, fontWeight = FontWeight.Bold) }
                 )
             }
             

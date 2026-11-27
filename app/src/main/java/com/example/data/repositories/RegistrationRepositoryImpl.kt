@@ -185,6 +185,7 @@ class RegistrationRepositoryImpl(
 
             val pendingMap = mapOf(
                 "id" to id,
+                "ownerId" to currentUid,
                 "name" to client.fullName.trim(),
                 "phone" to cleanPhone,
                 "categoryId" to "CLIENT",
@@ -197,19 +198,12 @@ class RegistrationRepositoryImpl(
                 "createdAt" to System.currentTimeMillis()
             )
 
-            firestore.runTransaction { transaction ->
-                val userRef = firestore.collection("users").document(cleanPhone)
-                val userDoc = transaction.get(userRef)
-                if (userDoc.exists()) {
-                    throw Exception("الحساب موجود بالفعل")
-                }
-
-                val reqRef = firestore.collection(AppConstants.COL_JOIN_REQUESTS).document(id)
-                val pendRef = firestore.collection("pending_providers").document(id)
-
-                transaction.set(reqRef, requestMap)
-                transaction.set(pendRef, pendingMap)
-            }.await()
+            val batch = firestore.batch()
+            val reqRef = firestore.collection(AppConstants.COL_JOIN_REQUESTS).document(id)
+            val pendRef = firestore.collection("pending_providers").document(id)
+            batch.set(reqRef, requestMap)
+            batch.set(pendRef, pendingMap)
+            batch.commit().await()
 
             sendAdminJoinNotification(id, request.fullName, cleanPhone, "CLIENT")
             Result.success(id)

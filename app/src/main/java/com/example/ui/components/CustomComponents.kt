@@ -73,6 +73,9 @@ fun Luxury3DNavIcon(
     badgeCount: Int = 0,
     iconSizeDp: Int = 20,
     iconStyle: String = "GOLDEN_3D",
+    unselectedLabelColor: Color = Color(0xFFCBD5E1),
+    selectedLabelColor: Color = Color(0xFFF59E0B),
+    unselectedIconTint: Color = Color(0xFFE2E8F0),
     onClick: () -> Unit
 ) {
     val actualSize = (iconSizeDp * 0.75f).coerceIn(18f, 26f)
@@ -81,12 +84,10 @@ fun Luxury3DNavIcon(
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
-            .clickable(
-                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                indication = null,
-                onClick = onClick
-            )
-            .padding(horizontal = 4.dp, vertical = 2.dp)
+            .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 6.dp, vertical = 3.dp)
     ) {
         Box(contentAlignment = Alignment.Center) {
             if (isSelected) {
@@ -129,7 +130,7 @@ fun Luxury3DNavIcon(
                         Icon(
                             imageVector = vectorIcon,
                             contentDescription = label,
-                            tint = if (isSelected) Color(0xFFF59E0B) else Color(0xFF94A3B8),
+                            tint = if (isSelected) Color(0xFFF59E0B) else unselectedIconTint,
                             modifier = Modifier.size(sizeDp)
                         )
                     } else {
@@ -167,11 +168,11 @@ fun Luxury3DNavIcon(
         Spacer(modifier = Modifier.height(3.dp))
         Text(
             text = label,
-            fontSize = 8.sp,
+            fontSize = 8.5.sp,
             maxLines = 1,
             softWrap = false,
-            color = if (isSelected) Color(0xFFF59E0B) else Color(0xFF94A3B8),
-            fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Medium,
+            color = if (isSelected) selectedLabelColor else unselectedLabelColor,
+            fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.SemiBold,
             fontFamily = TajawalFontFamily
         )
     }

@@ -68,8 +68,11 @@ fun UrgentRequestDetailsScreen(
 
     Scaffold(
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        containerColor = activeTheme.background,
         topBar = {
             TopAppBar(
+                windowInsets = WindowInsets(0, 0, 0, 0),
                 title = {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -79,13 +82,14 @@ fun UrgentRequestDetailsScreen(
                         Text(
                             text = request?.requestCode?.ifBlank { "تفاصيل الطلب العاجل" } ?: "طلب عاجل",
                             fontWeight = FontWeight.Bold,
-                            fontSize = 17.sp
+                            fontSize = 17.sp,
+                            color = Color(0xFF7F1D1D)
                         )
                     }
                 },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "رجوع")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "رجوع", tint = Color(0xFF7F1D1D))
                     }
                 },
                 actions = {
@@ -95,7 +99,11 @@ fun UrgentRequestDetailsScreen(
                         }
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFFFFEBEE))
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color(0xFFFFEBEE),
+                    titleContentColor = Color(0xFF7F1D1D),
+                    navigationIconContentColor = Color(0xFF7F1D1D)
+                )
             )
         }
     ) { innerPadding ->

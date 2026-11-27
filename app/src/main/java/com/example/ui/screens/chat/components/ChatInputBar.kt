@@ -1,23 +1,15 @@
 package com.example.ui.screens.chat.components
 
 import android.Manifest
-import android.content.Context
-import android.content.pm.PackageManager
-import android.location.Location
-import android.location.LocationManager
-import android.media.MediaRecorder
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -25,39 +17,29 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
-import coil.compose.AsyncImage
 import com.example.data.models.ChatMessage
 import com.example.data.models.MediaType
-import com.example.ui.components.InteractiveMapLocationPickerDialog
 import com.example.ui.screens.chat.ChatAttachmentManager
 import com.example.utils.ChatIcons
 import com.example.utils.ChatValidationUtils
 import com.example.utils.OfflineYemenGazetteer
 import com.example.utils.VisualThemePalette
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -81,51 +63,23 @@ fun ChatInputBar(
     val hapticFeedback = LocalHapticFeedback.current
 
     var textInput by remember { mutableStateOf("") }
-    var isRecording by remember { mutableStateOf(false) }
-    var isLockedRecording by remember { mutableStateOf(false) }
-    var recordingDuration by remember { mutableIntStateOf(0) }
-    var mediaRecorder by remember { mutableStateOf<MediaRecorder?>(null) }
-    var audioFile by remember { mutableStateOf<File?>(null) }
     var uploadProgress by remember { mutableStateOf<Float?>(null) }
     var showAttachmentMenu by remember { mutableStateOf(false) }
     var showEmojiPicker by remember { mutableStateOf(false) }
     var showMapLocationPicker by remember { mutableStateOf(false) }
 
-    // Live audio amplitudes for real-time waveform
-    val liveAmplitudes = remember { mutableStateListOf<Int>() }
-
-    // Image preview state
     var previewImageUri by remember { mutableStateOf<Uri?>(null) }
     var imageCaption by remember { mutableStateOf("") }
-    var isUploadingPreview by remember { mutableStateOf(false) }
-    var imageUploadError by remember { mutableStateOf<String?>(null) }
 
-    // Video preview state
     var previewVideoUri by remember { mutableStateOf<Uri?>(null) }
     var videoCaption by remember { mutableStateOf("") }
-    var isUploadingVideo by remember { mutableStateOf(false) }
-    var videoUploadError by remember { mutableStateOf<String?>(null) }
 
-    // Temporary camera capture storage
     var pendingCameraFile by remember { mutableStateOf<File?>(null) }
     var pendingCameraUri by remember { mutableStateOf<Uri?>(null) }
 
-    // Cleanup on dispose
     DisposableEffect(Unit) {
         onDispose {
-            try {
-                mediaRecorder?.let { recorder ->
-                    try { recorder.stop() } catch (_: Exception) {}
-                    try { recorder.release() } catch (_: Exception) {}
-                }
-            } finally {
-                mediaRecorder = null
-                audioFile?.delete()
-                audioFile = null
-                isRecording = false
-                isLockedRecording = false
-                pendingCameraFile?.delete()
-            }
+            pendingCameraFile?.delete()
         }
     }
 
@@ -145,7 +99,18 @@ fun ChatInputBar(
 
     val attachmentManager = remember { ChatAttachmentManager(context) }
 
-    // Debounced typing callback
+    val recorderState = rememberChatAudioRecorderState(
+        context = context,
+        scope = scope,
+        hapticFeedback = hapticFeedback,
+        channelId = channelId,
+        attachmentManager = attachmentManager,
+        onSendMessage = onSendMessage,
+        onSendAudioMessage = onSendAudioMessage,
+        onMediaUploaded = onMediaUploaded,
+        onMediaUploadFailed = onMediaUploadFailed
+    )
+
     LaunchedEffect(textInput) {
         if (textInput.isNotEmpty()) {
             onTyping(textInput)
@@ -153,18 +118,6 @@ fun ChatInputBar(
         }
     }
 
-    val infiniteTransition = rememberInfiniteTransition(label = "recording_pulse")
-    val pulseScale by infiniteTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = 1.3f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(600, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "recording_scale"
-    )
-
-    // Image Gallery Picker
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
@@ -176,11 +129,9 @@ fun ChatInputBar(
             }
             previewImageUri = uri
             imageCaption = ""
-            imageUploadError = null
         }
     }
 
-    // Video Gallery Picker
     val videoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
@@ -192,11 +143,9 @@ fun ChatInputBar(
             }
             previewVideoUri = uri
             videoCaption = ""
-            videoUploadError = null
         }
     }
 
-    // Camera Capture Launcher
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicture()
     ) { success ->
@@ -219,7 +168,6 @@ fun ChatInputBar(
         }
     }
 
-    // Permission launcher for Camera
     val cameraPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
@@ -239,7 +187,6 @@ fun ChatInputBar(
         }
     }
 
-    // Permission launcher for Location
     val locationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
@@ -255,187 +202,6 @@ fun ChatInputBar(
         }
     }
 
-    // Permission launcher for Recording Audio
-    val micPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        if (!isGranted) {
-            Toast.makeText(context, "⚠️ يلزم منح إذن الميكروفون لتسجيل وإرسال الرسائل الصوتية", Toast.LENGTH_LONG).show()
-        }
-    }
-
-    // Timer & Live Amplitude Sampling for active recording
-    LaunchedEffect(isRecording) {
-        if (isRecording) {
-            recordingDuration = 0
-            liveAmplitudes.clear()
-            var tickCount = 0
-            while (isActive && isRecording) {
-                delay(100)
-                tickCount++
-                if (tickCount % 10 == 0) {
-                    recordingDuration++
-                }
-                val amp = try { mediaRecorder?.maxAmplitude ?: 0 } catch (_: Exception) { 0 }
-                val normalized = (amp / 32767f * 100).toInt().coerceIn(12, 100)
-                if (liveAmplitudes.size >= 32) {
-                    liveAmplitudes.removeAt(0)
-                }
-                liveAmplitudes.add(normalized)
-            }
-        }
-    }
-
-    fun startRecording() {
-        val hasMicPermission = ContextCompat.checkSelfPermission(
-            context,
-            Manifest.permission.RECORD_AUDIO
-        ) == PackageManager.PERMISSION_GRANTED
-
-        if (!hasMicPermission) {
-            micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-            return
-        }
-
-        try {
-            // ✅ استخدام صيغة m4a المدعومة بشكل أصيل مع MPEG_4 / AAC
-            val sharedDir = File(context.cacheDir, "shared").apply { mkdirs() }
-            val file = File(sharedDir, "audio_rec_${System.currentTimeMillis()}.m4a")
-            audioFile = file
-            val recorder = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-                MediaRecorder(context)
-            } else {
-                @Suppress("DEPRECATION")
-                MediaRecorder()
-            }
-            recorder.apply {
-                setAudioSource(MediaRecorder.AudioSource.MIC)
-                setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
-                setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
-                setAudioEncodingBitRate(64000)
-                setAudioSamplingRate(44100)
-                setOutputFile(file.absolutePath)
-                prepare()
-                start()
-            }
-            mediaRecorder = recorder
-            isRecording = true
-            isLockedRecording = false
-            liveAmplitudes.clear()
-            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-        } catch (e: Exception) {
-            e.printStackTrace()
-            Toast.makeText(context, "تعذر تشغيل مسجل الصوت", Toast.LENGTH_SHORT).show()
-            audioFile?.delete()
-            audioFile = null
-            isRecording = false
-            isLockedRecording = false
-        }
-    }
-
-    fun stopAndSendRecording() {
-        val capturedWaveform = liveAmplitudes.toList()
-        try {
-            mediaRecorder?.let { recorder ->
-                try { recorder.stop() } catch (_: Exception) {}
-                try { recorder.release() } catch (_: Exception) {}
-            }
-        } finally {
-            mediaRecorder = null
-            isRecording = false
-            isLockedRecording = false
-        }
-
-        val file = audioFile
-        if (file != null && file.exists() && recordingDuration >= 1) {
-            val uri = try {
-                FileProvider.getUriForFile(
-                    context,
-                    "${context.packageName}.fileprovider",
-                    file
-                )
-            } catch (e: Exception) {
-                e.printStackTrace()
-                null
-            }
-            if (uri == null) {
-                Toast.makeText(context, "فشل تجهيز التسجيل الصوتي", Toast.LENGTH_SHORT).show()
-                file.delete()
-                audioFile = null
-                recordingDuration = 0
-                return
-            }
-            val validation = ChatValidationUtils.validateFile(uri, context, false)
-            if (!validation.isValid) {
-                Toast.makeText(context, validation.message, Toast.LENGTH_LONG).show()
-                file.delete()
-                audioFile = null
-                recordingDuration = 0
-                return
-            }
-
-            val recordedDurationText = "تسجيل صوتي (${recordingDuration}ث)"
-            val localAudioUri = uri.toString()
-            val waveformToSend = capturedWaveform.toList()
-
-            // إرسال الصوت فوراً ليظهر في شاشة المحادثة بحالة قيد الإرسال كما في تطبيقات التواصل
-            if (onSendAudioMessage != null) {
-                onSendAudioMessage(
-                    recordedDurationText,
-                    localAudioUri,
-                    waveformToSend
-                )
-            } else {
-                onSendMessage(
-                    recordedDurationText,
-                    MediaType.AUDIO,
-                    localAudioUri
-                )
-            }
-
-            scope.launch {
-                val uploadResult = attachmentManager.uploadAttachment(
-                    channelId = channelId,
-                    uri = uri,
-                    type = "audio"
-                )
-                // [إصلاح نهائي] تحديث رابط الصوت بعد نجاح الرفع، أو تحويل الحالة إلى FAILED عند الفشل
-                uploadResult.fold(
-                    onSuccess = { downloadUrl ->
-                        onMediaUploaded?.invoke(localAudioUri, downloadUrl)
-                    },
-                    onFailure = { error ->
-                        onMediaUploadFailed?.invoke(localAudioUri, error.message ?: "فشل رفع التسجيل الصوتي")
-                    }
-                )
-                file.delete()
-            }
-        } else {
-            file?.delete()
-        }
-        audioFile = null
-        recordingDuration = 0
-    }
-
-    fun cancelRecording() {
-        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-        try {
-            mediaRecorder?.let { recorder ->
-                try { recorder.stop() } catch (_: Exception) {}
-                try { recorder.release() } catch (_: Exception) {}
-            }
-        } finally {
-            mediaRecorder = null
-            isRecording = false
-            isLockedRecording = false
-        }
-        audioFile?.delete()
-        audioFile = null
-        recordingDuration = 0
-        liveAmplitudes.clear()
-        Toast.makeText(context, "تم إلغاء التسجيل", Toast.LENGTH_SHORT).show()
-    }
-
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -443,7 +209,6 @@ fun ChatInputBar(
             .border(1.dp, borderColor)
             .padding(horizontal = 10.dp, vertical = 8.dp)
     ) {
-        // Upload Progress Indicator
         if (uploadProgress != null) {
             LinearProgressIndicator(
                 progress = { uploadProgress ?: 0f },
@@ -457,7 +222,6 @@ fun ChatInputBar(
             Spacer(modifier = Modifier.height(4.dp))
         }
 
-        // Edit banner
         if (editingMessage != null) {
             Row(
                 modifier = Modifier
@@ -492,7 +256,6 @@ fun ChatInputBar(
             }
         }
 
-        // Reply banner
         if (replyingTo != null) {
             Row(
                 modifier = Modifier
@@ -523,139 +286,17 @@ fun ChatInputBar(
             }
         }
 
-        // Active WhatsApp-Level Recording Bar
-        AnimatedVisibility(visible = isRecording) {
-            var dragOffset by remember { mutableFloatStateOf(0f) }
+        ChatRecordingBar(
+            state = recorderState,
+            hapticFeedback = hapticFeedback
+        )
 
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 6.dp)
-                    .background(Color(0xFF0F172A), RoundedCornerShape(16.dp))
-                    .border(1.dp, Color(0xFFE53935).copy(alpha = 0.5f), RoundedCornerShape(16.dp))
-                    .pointerInput(Unit) {
-                        detectHorizontalDragGestures(
-                            onDragEnd = {
-                                if (dragOffset < -80f) {
-                                    cancelRecording()
-                                }
-                                dragOffset = 0f
-                            },
-                            onHorizontalDrag = { _, dragAmount ->
-                                dragOffset += dragAmount
-                                if (dragOffset < -80f) {
-                                    cancelRecording()
-                                    dragOffset = 0f
-                                }
-                            }
-                        )
-                    }
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                // Recording status + timer
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(12.dp)
-                            .scale(pulseScale)
-                            .background(Color(0xFFE53935), CircleShape)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    val minutes = recordingDuration / 60
-                    val seconds = recordingDuration % 60
-                    val timerStr = String.format("%02d:%02d", minutes, seconds)
-                    Text(
-                        text = timerStr,
-                        color = Color.White,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-
-                // Live dynamic waveform visualization
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(30.dp)
-                        .padding(horizontal = 10.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Canvas(modifier = Modifier.fillMaxSize()) {
-                        val barWidth = 3.dp.toPx()
-                        val barSpacing = 2.dp.toPx()
-                        val totalBars = liveAmplitudes.size
-                        val startX = (size.width - (totalBars * (barWidth + barSpacing))).coerceAtLeast(0f) / 2f
-
-                        liveAmplitudes.forEachIndexed { index, amp ->
-                            val barHeight = ((amp / 100f) * size.height).coerceAtLeast(4.dp.toPx())
-                            val x = startX + index * (barWidth + barSpacing)
-                            val y = (size.height - barHeight) / 2f
-                            drawRoundRect(
-                                color = Color(0xFF10B981),
-                                topLeft = Offset(x, y),
-                                size = Size(barWidth, barHeight),
-                                cornerRadius = CornerRadius(2.dp.toPx(), 2.dp.toPx())
-                            )
-                        }
-                    }
-                }
-
-                // Controls: Cancel / Lock / Send
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    // Lock toggle
-                    IconButton(
-                        onClick = {
-                            isLockedRecording = !isLockedRecording
-                            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                        },
-                        modifier = Modifier
-                            .size(32.dp)
-                            .background(if (isLockedRecording) Color(0xFF2563EB) else Color.White.copy(alpha = 0.1f), CircleShape)
-                    ) {
-                        Icon(
-                            imageVector = if (isLockedRecording) Icons.Default.Lock else Icons.Default.LockOpen,
-                            contentDescription = "قفل التسجيل",
-                            tint = Color.White,
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-
-                    // Cancel
-                    IconButton(
-                        onClick = { cancelRecording() },
-                        modifier = Modifier
-                            .size(32.dp)
-                            .background(Color.White.copy(alpha = 0.1f), CircleShape)
-                    ) {
-                        Icon(Icons.Default.Delete, contentDescription = "إلغاء التسجيل", tint = Color(0xFFFF8A80), modifier = Modifier.size(18.dp))
-                    }
-
-                    // Send
-                    IconButton(
-                        onClick = { stopAndSendRecording() },
-                        modifier = Modifier
-                            .size(32.dp)
-                            .background(Color(0xFF10B981), CircleShape)
-                    ) {
-                        Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "إرسال التسجيل", tint = Color.White, modifier = Modifier.size(18.dp))
-                    }
-                }
-            }
-        }
-
-        // Input controls row
-        if (!isRecording) {
+        if (!recorderState.isRecording) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                // Attachment Button with Dropdown Menu
                 Box {
                     IconButton(
                         onClick = { showAttachmentMenu = true },
@@ -666,96 +307,46 @@ fun ChatInputBar(
                         Icon(Icons.Default.Add, contentDescription = "إرفاق", tint = textPrimary, modifier = Modifier.size(20.dp))
                     }
 
-                    DropdownMenu(
+                    ChatAttachmentDropdownMenu(
                         expanded = showAttachmentMenu,
-                        onDismissRequest = { showAttachmentMenu = false },
-                        modifier = Modifier.background(surfaceColor)
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("🖼️ اختيار صورة من المعرض", color = textPrimary, fontSize = 13.sp) },
-                            onClick = {
-                                showAttachmentMenu = false
-                                imagePickerLauncher.launch("image/*")
-                            },
-                            leadingIcon = { Icon(Icons.Default.Image, contentDescription = null, tint = accentColor) }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("🎥 اختيار فيديو من المعرض", color = textPrimary, fontSize = 13.sp) },
-                            onClick = {
-                                showAttachmentMenu = false
-                                videoPickerLauncher.launch("video/*")
-                            },
-                            leadingIcon = { Text("🎬", fontSize = 16.sp) }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("📷 التقاط صورة بالكاميرا", color = textPrimary, fontSize = 13.sp) },
-                            onClick = {
-                                showAttachmentMenu = false
-                                val hasCameraPerm = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
-                                if (hasCameraPerm) {
-                                    val sharedDir = File(context.cacheDir, "shared").apply { mkdirs() }
-                                    val file = File(sharedDir, "camera_${System.currentTimeMillis()}.jpg")
-                                    pendingCameraFile = file
-                                    val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-                                    pendingCameraUri = uri
-                                    cameraLauncher.launch(uri)
-                                } else {
-                                    cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
-                                }
-                            },
-                            leadingIcon = { Icon(Icons.Default.PhotoCamera, contentDescription = null, tint = accentColor) }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("📍 إرسال موقعي الحالي (خريطة التطبيق)", color = accentColor, fontSize = 13.sp, fontWeight = FontWeight.Bold) },
-                            onClick = {
-                                showAttachmentMenu = false
-                                val hasFine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-                                val hasCoarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
-                                if (hasFine || hasCoarse) {
-                                    sendCurrentLocation(context, onSendMessage) {
-                                        showMapLocationPicker = true
-                                    }
-                                } else {
-                                    locationPermissionLauncher.launch(
-                                        arrayOf(
-                                            Manifest.permission.ACCESS_FINE_LOCATION,
-                                            Manifest.permission.ACCESS_COARSE_LOCATION
-                                        )
-                                    )
-                                }
-                            },
-                            leadingIcon = { Icon(Icons.Default.LocationOn, contentDescription = null, tint = Color(0xFFEF4444)) }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("🟢 بث موقعي الحي المباشر (خريطة التطبيق)", color = Color(0xFF34D399), fontSize = 13.sp, fontWeight = FontWeight.Bold) },
-                            onClick = {
-                                showAttachmentMenu = false
-                                val currentLoc = getBestLastKnownLocation(context)
-                                if (currentLoc != null) {
-                                    val lat = currentLoc.latitude
-                                    val lng = currentLoc.longitude
-                                    val summary = OfflineYemenGazetteer.nearestReferenceSummary(context, lat, lng).ifBlank { "موقعي المباشر" }
-                                    val appUri = OfflineYemenGazetteer.buildAppLocationUri(lat, lng, summary) + "&live=1"
-                                    onSendMessage("🟢 بث موقع حي مباشر: $summary", MediaType.LOCATION, appUri)
-                                    Toast.makeText(context, "✅ تم إرسال رابط التتبع الحي على خريطة التطبيق", Toast.LENGTH_SHORT).show()
-                                } else {
-                                    showMapLocationPicker = true
-                                }
-                            },
-                            leadingIcon = { Icon(Icons.Default.MyLocation, contentDescription = null, tint = Color(0xFF34D399)) }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("🗺️ تحديد موقع من خريطة التطبيق", color = Color(0xFF10B981), fontSize = 13.sp, fontWeight = FontWeight.Bold) },
-                            onClick = {
-                                showAttachmentMenu = false
+                        onDismiss = { showAttachmentMenu = false },
+                        surfaceColor = surfaceColor,
+                        textPrimary = textPrimary,
+                        accentColor = accentColor,
+                        context = context,
+                        onPickImage = { imagePickerLauncher.launch("image/*") },
+                        onPickVideo = { videoPickerLauncher.launch("video/*") },
+                        onLaunchCamera = { file, uri ->
+                            pendingCameraFile = file
+                            pendingCameraUri = uri
+                            cameraLauncher.launch(uri)
+                        },
+                        onRequestCameraPermission = { cameraPermissionLauncher.launch(Manifest.permission.CAMERA) },
+                        onSendCurrentLocation = {
+                            sendCurrentLocation(context, onSendMessage) {
                                 showMapLocationPicker = true
-                            },
-                            leadingIcon = { Icon(Icons.Default.Map, contentDescription = null, tint = Color(0xFF10B981)) }
-                        )
-                    }
+                            }
+                        },
+                        onRequestLocationPermissions = {
+                            locationPermissionLauncher.launch(
+                                arrayOf(
+                                    Manifest.permission.ACCESS_FINE_LOCATION,
+                                    Manifest.permission.ACCESS_COARSE_LOCATION
+                                )
+                            )
+                        },
+                        onSendLiveLocation = { currentLoc ->
+                            val lat = currentLoc.latitude
+                            val lng = currentLoc.longitude
+                            val summary = OfflineYemenGazetteer.nearestReferenceSummary(context, lat, lng).ifBlank { "موقعي المباشر" }
+                            val appUri = OfflineYemenGazetteer.buildAppLocationUri(lat, lng, summary) + "&live=1"
+                            onSendMessage("🟢 بث موقع حي مباشر: $summary", MediaType.LOCATION, appUri)
+                            Toast.makeText(context, "✅ تم إرسال رابط التتبع الحي على خريطة التطبيق", Toast.LENGTH_SHORT).show()
+                        },
+                        onOpenMapPicker = { showMapLocationPicker = true }
+                    )
                 }
 
-                // Text field (Restricted to 500 characters max)
                 OutlinedTextField(
                     value = textInput,
                     onValueChange = {
@@ -803,7 +394,6 @@ fun ChatInputBar(
                     })
                 )
 
-                // Send or Record Button
                 if (textInput.isNotBlank()) {
                     IconButton(
                         onClick = {
@@ -826,9 +416,8 @@ fun ChatInputBar(
                         Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "إرسال", tint = Color.White, modifier = Modifier.size(20.dp))
                     }
                 } else {
-                    // Audio Record Mic Button
                     IconButton(
-                        onClick = { startRecording() },
+                        onClick = { recorderState.startRecording() },
                         modifier = Modifier
                             .size(42.dp)
                             .background(primaryColor, CircleShape)
@@ -838,383 +427,187 @@ fun ChatInputBar(
                 }
             }
 
-            // Telegram/Signal-Style Rich Emoji Tray
             AnimatedVisibility(visible = showEmojiPicker) {
-                Surface(
-                    color = Color(0xFF1E293B),
-                    shape = RoundedCornerShape(16.dp),
-                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 8.dp)
-                ) {
-                    val emojiCategories = remember {
-                        listOf(
-                            listOf("😀", "😃", "😄", "😁", "😆", "😅", "😂", "🤣", "😊", "😇"),
-                            listOf("🙂", "🙃", "😉", "😌", "😍", "🥰", "😘", "😗", "😋", "😛"),
-                            listOf("👍", "👎", "👏", "🙌", "🤝", "🙏", "✌️", "🤞", "💪", "❤️"),
-                            listOf("🔥", "⭐", "🎉", "✨", "💯", "✅", "⚠️", "🚨", "⏳", "📌"),
-                            listOf("💼", "🛠️", "🔧", "🏪", "🏥", "🍕", "🚗", "🏠", "📍", "📞")
-                        )
-                    }
-
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(8.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 4.dp, vertical = 2.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "رموز تعبيرية وتفاعلات سريعة",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = accentColor
-                            )
-                            IconButton(
-                                onClick = { showEmojiPicker = false },
-                                modifier = Modifier.size(20.dp)
-                            ) {
-                                Icon(Icons.Default.Close, contentDescription = "إغلاق", tint = textSecondary, modifier = Modifier.size(14.dp))
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(4.dp))
-
-                        emojiCategories.forEach { rowEmojis ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 2.dp),
-                                horizontalArrangement = Arrangement.SpaceEvenly
-                            ) {
-                                rowEmojis.forEach { emoji ->
-                                    Box(
-                                        modifier = Modifier
-                                            .size(34.dp)
-                                            .clip(CircleShape)
-                                            .clickable {
-                                                if (textInput.length + emoji.length <= ChatValidationUtils.MAX_TEXT_LENGTH) {
-                                                    textInput += emoji
-                                                }
-                                            },
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(text = emoji, fontSize = 20.sp)
-                                    }
-                                }
-                            }
+                ChatEmojiTray(
+                    accentColor = accentColor,
+                    textSecondary = textSecondary,
+                    onClose = { showEmojiPicker = false },
+                    onEmojiSelected = { emoji ->
+                        if (textInput.length + emoji.length <= ChatValidationUtils.MAX_TEXT_LENGTH) {
+                            textInput += emoji
                         }
                     }
-                }
+                )
             }
         }
     }
 
-    // Image Preview Before Send Dialog
     val activePreviewUri = previewImageUri
     if (activePreviewUri != null) {
-        AlertDialog(
-            onDismissRequest = {
+        ChatImagePreviewDialog(
+            activePreviewUri = activePreviewUri,
+            imageCaption = imageCaption,
+            onCaptionChange = { imageCaption = it },
+            primaryColor = primaryColor,
+            surfaceColor = surfaceColor,
+            textPrimary = textPrimary,
+            textSecondary = textSecondary,
+            borderColor = borderColor,
+            onSend = { uriToSend, captionToSend ->
                 previewImageUri = null
                 imageCaption = ""
-                imageUploadError = null
+                val localImageUriStr = uriToSend.toString()
+                onSendMessage(captionToSend, MediaType.IMAGE, localImageUriStr)
+
+                scope.launch {
+                    val uploadResult = attachmentManager.uploadAttachment(
+                        channelId = channelId,
+                        uri = uriToSend,
+                        type = "image"
+                    )
+                    uploadResult.fold(
+                        onSuccess = { downloadUrl ->
+                            onMediaUploaded?.invoke(localImageUriStr, downloadUrl)
+                        },
+                        onFailure = { error ->
+                            onMediaUploadFailed?.invoke(localImageUriStr, error.message ?: "فشل رفع الصورة")
+                        }
+                    )
+                    pendingCameraFile?.delete()
+                    pendingCameraFile = null
+                }
+            },
+            onDismiss = {
+                previewImageUri = null
+                imageCaption = ""
                 pendingCameraFile?.delete()
                 pendingCameraFile = null
-            },
-            title = {
-                Text(
-                    text = "معاينة الصورة قبل الإرسال 🖼️",
-                    color = textPrimary,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            },
-            text = {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    AsyncImage(
-                        model = activePreviewUri,
-                        contentDescription = "معاينة الصورة",
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(200.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(Color.Black.copy(alpha = 0.2f)),
-                        contentScale = ContentScale.Fit
-                    )
-
-                    OutlinedTextField(
-                        value = imageCaption,
-                        onValueChange = { if (it.length <= 200) imageCaption = it },
-                        placeholder = { Text("إضافة تعليق على الصورة...", color = textSecondary, fontSize = 12.sp) },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = textPrimary,
-                            unfocusedTextColor = textPrimary,
-                            focusedBorderColor = primaryColor,
-                            unfocusedBorderColor = borderColor
-                        ),
-                        maxLines = 2
-                    )
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        val captionToSend = imageCaption.trim()
-                        val uriToSend = activePreviewUri
-                        previewImageUri = null
-                        imageCaption = ""
-                        imageUploadError = null
-                        isUploadingPreview = false
-
-                        val localImageUriStr = uriToSend.toString()
-                        // إضافة الصورة فوراً لشاشة المحادثة لتظهر بحالة "قيد الإرسال" كما في واتساب وتليجرام
-                        onSendMessage(captionToSend, MediaType.IMAGE, localImageUriStr)
-
-                        scope.launch {
-                            val uploadResult = attachmentManager.uploadAttachment(
-                                channelId = channelId,
-                                uri = uriToSend,
-                                type = "image"
-                            )
-                            // [إصلاح نهائي] تحديث رابط الصورة بعد نجاح الرفع، أو تحويل الحالة إلى FAILED عند الفشل بعد 3 محاولات
-                            uploadResult.fold(
-                                onSuccess = { downloadUrl ->
-                                    onMediaUploaded?.invoke(localImageUriStr, downloadUrl)
-                                },
-                                onFailure = { error ->
-                                    onMediaUploadFailed?.invoke(localImageUriStr, error.message ?: "فشل رفع الصورة")
-                                }
-                            )
-                            pendingCameraFile?.delete()
-                            pendingCameraFile = null
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = primaryColor)
-                ) {
-                    Text(
-                        text = "إرسال الصورة 🚀",
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = {
-                        previewImageUri = null
-                        imageCaption = ""
-                        imageUploadError = null
-                        pendingCameraFile?.delete()
-                        pendingCameraFile = null
-                    }
-                ) {
-                    Text("إلغاء", color = textSecondary)
-                }
-            },
-            containerColor = surfaceColor
+            }
         )
     }
 
-    // Video Preview Before Send Dialog
     val activePreviewVideoUri = previewVideoUri
     if (activePreviewVideoUri != null) {
-        AlertDialog(
-            onDismissRequest = {
+        ChatVideoPreviewDialog(
+            activePreviewVideoUri = activePreviewVideoUri,
+            videoCaption = videoCaption,
+            onCaptionChange = { videoCaption = it },
+            primaryColor = primaryColor,
+            surfaceColor = surfaceColor,
+            textPrimary = textPrimary,
+            textSecondary = textSecondary,
+            borderColor = borderColor,
+            onSend = { uriToSend, captionToSend ->
                 previewVideoUri = null
                 videoCaption = ""
-                videoUploadError = null
-            },
-            title = {
-                Text(
-                    text = "معاينة الفيديو قبل الإرسال 🎥",
-                    color = textPrimary,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            },
-            text = {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(180.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(Color.Black.copy(alpha = 0.4f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.PlayArrow,
-                                contentDescription = "فيديو محدد",
-                                tint = Color.White,
-                                modifier = Modifier
-                                    .size(54.dp)
-                                    .background(primaryColor, CircleShape)
-                                    .padding(8.dp)
-                            )
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text("فيديو محدد للإرسال", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
+                val localVideoUriStr = uriToSend.toString()
+                onSendMessage(captionToSend, MediaType.VIDEO, localVideoUriStr)
 
-                    OutlinedTextField(
-                        value = videoCaption,
-                        onValueChange = { if (it.length <= 200) videoCaption = it },
-                        placeholder = { Text("إضافة تعليق على الفيديو...", color = textSecondary, fontSize = 12.sp) },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = textPrimary,
-                            unfocusedTextColor = textPrimary,
-                            focusedBorderColor = primaryColor,
-                            unfocusedBorderColor = borderColor
-                        ),
-                        maxLines = 2
+                scope.launch {
+                    val uploadResult = attachmentManager.uploadAttachment(
+                        channelId = channelId,
+                        uri = uriToSend,
+                        type = "video"
+                    )
+                    uploadResult.fold(
+                        onSuccess = { downloadUrl ->
+                            onMediaUploaded?.invoke(localVideoUriStr, downloadUrl)
+                        },
+                        onFailure = { error ->
+                            onMediaUploadFailed?.invoke(localVideoUriStr, error.message ?: "فشل رفع الفيديو")
+                        }
                     )
                 }
             },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        val captionToSend = videoCaption.trim()
-                        val uriToSend = activePreviewVideoUri
-                        previewVideoUri = null
-                        videoCaption = ""
-                        videoUploadError = null
-                        isUploadingVideo = false
-
-                        val localVideoUriStr = uriToSend.toString()
-                        // إضافة الفيديو فوراً لشاشة المحادثة
-                        onSendMessage(captionToSend, MediaType.VIDEO, localVideoUriStr)
-
-                        scope.launch {
-                            val uploadResult = attachmentManager.uploadAttachment(
-                                channelId = channelId,
-                                uri = uriToSend,
-                                type = "video"
-                            )
-                            // [إصلاح نهائي] تحديث رابط الفيديو بعد نجاح الرفع، أو تحويل الحالة إلى FAILED عند الفشل بعد 3 محاولات
-                            uploadResult.fold(
-                                onSuccess = { downloadUrl ->
-                                    onMediaUploaded?.invoke(localVideoUriStr, downloadUrl)
-                                },
-                                onFailure = { error ->
-                                    onMediaUploadFailed?.invoke(localVideoUriStr, error.message ?: "فشل رفع الفيديو")
-                                }
-                            )
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = primaryColor)
-                ) {
-                    Text(
-                        text = "إرسال الفيديو 🚀",
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = {
-                        previewVideoUri = null
-                        videoCaption = ""
-                        videoUploadError = null
-                    }
-                ) {
-                    Text("إلغاء", color = textSecondary)
-                }
-            },
-            containerColor = surfaceColor
+            onDismiss = {
+                previewVideoUri = null
+                videoCaption = ""
+            }
         )
     }
 
     if (showMapLocationPicker) {
-        val currentLoc = getBestLastKnownLocation(context)
-        InteractiveMapLocationPickerDialog(
-            initialLat = currentLoc?.latitude ?: 15.3694,
-            initialLng = currentLoc?.longitude ?: 44.1910,
-            hasGps = currentLoc != null,
-            gpsLat = currentLoc?.latitude ?: 0.0,
-            gpsLng = currentLoc?.longitude ?: 0.0,
-            title = "🗺️ تحديد وإرسال موقع على خريطة التطبيق",
+        ChatMapLocationPickerHost(
+            context = context,
             onDismiss = { showMapLocationPicker = false },
-            onLocationPicked = { picked ->
-                val summary = picked.landmarkName.ifBlank { picked.label.ifBlank { picked.formattedAddress.ifBlank { "موقع محدد على الخريطة" } } }
-                val appUri = OfflineYemenGazetteer.buildAppLocationUri(picked.latitude, picked.longitude, summary)
-                val displayText = buildString {
-                    append("📍 موقع جغرافي: ")
-                    append(summary)
-                    if (picked.note.isNotBlank()) {
-                        append(" — ")
-                        append(picked.note)
-                    }
-                }
-                onSendMessage(displayText, MediaType.LOCATION, appUri)
-                Toast.makeText(context, "✅ تم إرسال الموقع عبر خريطة التطبيق", Toast.LENGTH_SHORT).show()
-                showMapLocationPicker = false
-            }
+            onSendMessage = onSendMessage
         )
     }
 }
 
-private fun getBestLastKnownLocation(context: Context): Location? {
-    return try {
-        val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager ?: return null
-        val hasPerm = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
-            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
-        if (!hasPerm) return null
+@Composable
+private fun ChatEmojiTray(
+    accentColor: Color,
+    textSecondary: Color,
+    onClose: () -> Unit,
+    onEmojiSelected: (String) -> Unit
+) {
+    Surface(
+        color = Color(0xFF1E293B),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp)
+    ) {
+        val emojiCategories = remember {
+            listOf(
+                listOf("😀", "😃", "😄", "😁", "😆", "😅", "😂", "🤣", "😊", "😇"),
+                listOf("🙂", "🙃", "😉", "😌", "😍", "🥰", "😘", "😗", "😋", "😛"),
+                listOf("👍", "👎", "👏", "🙌", "🤝", "🙏", "✌️", "🤞", "💪", "❤️"),
+                listOf("🔥", "⭐", "🎉", "✨", "💯", "✅", "⚠️", "🚨", "⏳", "📌"),
+                listOf("💼", "🛠️", "🔧", "🏪", "🏥", "🍕", "🚗", "🏠", "📍", "📞")
+            )
+        }
 
-        var best: Location? = null
-        for (provider in locationManager.getProviders(true)) {
-            val l = locationManager.getLastKnownLocation(provider) ?: continue
-            if (best == null || l.accuracy < best.accuracy) {
-                best = l
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(8.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp, vertical = 2.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "رموز تعبيرية وتفاعلات سريعة",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = accentColor
+                )
+                IconButton(
+                    onClick = onClose,
+                    modifier = Modifier.size(20.dp)
+                ) {
+                    Icon(Icons.Default.Close, contentDescription = "إغلاق", tint = textSecondary, modifier = Modifier.size(14.dp))
+                }
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            emojiCategories.forEach { rowEmojis ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 2.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    rowEmojis.forEach { emoji ->
+                        Box(
+                            modifier = Modifier
+                                .size(34.dp)
+                                .clip(CircleShape)
+                                .clickable { onEmojiSelected(emoji) },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(text = emoji, fontSize = 20.sp)
+                        }
+                    }
+                }
             }
         }
-        best
-    } catch (_: Exception) {
-        null
-    }
-}
-
-private fun sendCurrentLocation(
-    context: Context,
-    onSendMessage: (text: String, mediaType: MediaType, mediaUrl: String) -> Unit,
-    onFallbackToPicker: () -> Unit
-) {
-    try {
-        val location = getBestLastKnownLocation(context)
-        if (location != null) {
-            val lat = location.latitude
-            val lng = location.longitude
-            val summary = OfflineYemenGazetteer.nearestReferenceSummary(context, lat, lng).ifBlank { "موقعي الجغرافي المباشر" }
-            val appUri = OfflineYemenGazetteer.buildAppLocationUri(lat, lng, summary)
-            onSendMessage("📍 موقعي: $summary", MediaType.LOCATION, appUri)
-            Toast.makeText(context, "✅ تم إرسال موقعك عبر خريطة التطبيق", Toast.LENGTH_SHORT).show()
-        } else {
-            Toast.makeText(context, "📍 تعذر التقاط إشارة GPS حالياً، حدد موقعك يدوياً على خريطة التطبيق", Toast.LENGTH_LONG).show()
-            onFallbackToPicker()
-        }
-    } catch (e: Exception) {
-        e.printStackTrace()
-        Toast.makeText(context, "تعذر تحديد الموقع تلقائياً، اختره من الخريطة", Toast.LENGTH_SHORT).show()
-        onFallbackToPicker()
     }
 }

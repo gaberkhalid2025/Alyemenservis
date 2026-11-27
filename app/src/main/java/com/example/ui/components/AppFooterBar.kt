@@ -50,6 +50,20 @@ fun AppFooterBar(viewModel: MainViewModel, themeColors: VisualThemePalette, onIn
         }
     }
 
+    val isBrightFooter = remember(footerBg) {
+        androidx.core.graphics.ColorUtils.calculateLuminance(
+            android.graphics.Color.argb(
+                (footerBg.alpha * 255).toInt(),
+                (footerBg.red * 255).toInt(),
+                (footerBg.green * 255).toInt(),
+                (footerBg.blue * 255).toInt()
+            )
+        ) > 0.25
+    }
+    val footerUnselectedLabel = if (isBrightFooter) Color(0xFF0B1120) else Color(0xFFF1F5F9)
+    val footerSelectedLabel = if (isBrightFooter) Color(0xFF0B1120) else Color(0xFFFBBF24)
+    val footerCenterTextColor = if (isBrightFooter) Color(0xFF0B1120) else Color.White
+
     val orderedItems = remember(settingsState.footerItemsOrder) {
         settingsState.footerItemsOrder
             .split(",")
@@ -70,7 +84,7 @@ fun AppFooterBar(viewModel: MainViewModel, themeColors: VisualThemePalette, onIn
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 4.dp, vertical = 1.dp),
+                .padding(horizontal = 4.dp, vertical = 2.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceAround
         ) {
@@ -78,7 +92,7 @@ fun AppFooterBar(viewModel: MainViewModel, themeColors: VisualThemePalette, onIn
             val currentUserPhone by viewModel.currentUserPhone.collectAsState()
             val providers by viewModel.providers.collectAsState()
 
-            val activeStatuses = remember { setOf("PENDING", "ACCEPTED", "APPROVED", "IN_PROGRESS", "STARTED") }
+            val activeStatuses = remember { setOf("PENDING", "UNDER_REVIEW", "ACCEPTED", "APPROVED", "IN_PROGRESS", "STARTED") }
             val cleanUserPhone = remember(currentUserPhone) { com.example.ui.helpers.AppPreferenceHelper.normalizePhoneNumber(currentUserPhone) }
 
             val matchingProvider = remember(providers, cleanUserPhone) {
@@ -87,7 +101,7 @@ fun AppFooterBar(viewModel: MainViewModel, themeColors: VisualThemePalette, onIn
 
             val unreadCount = remember(bookings, cleanUserPhone, matchingProvider) {
                 val custCount = bookings.count { b ->
-                    com.example.ui.helpers.AppPreferenceHelper.normalizePhoneNumber(b.customerPhone) == cleanUserPhone && cleanUserPhone.isNotEmpty() && b.status.uppercase() in activeStatuses
+                    com.example.ui.helpers.AppPreferenceHelper.normalizePhoneNumber(b.effectiveCustomerPhone) == cleanUserPhone && cleanUserPhone.isNotEmpty() && b.status.uppercase() in activeStatuses
                 }
                 val provCount = if (matchingProvider != null) {
                     bookings.count { b ->
@@ -134,6 +148,8 @@ fun AppFooterBar(viewModel: MainViewModel, themeColors: VisualThemePalette, onIn
                             isSelected = isAbout,
                             iconSizeDp = settingsState.navIconSizeDp,
                             iconStyle = settingsState.topNavIconStyle,
+                            unselectedLabelColor = footerUnselectedLabel,
+                            selectedLabelColor = footerSelectedLabel,
                             onClick = { onInfoClick() }
                         )
                     }
@@ -148,6 +164,8 @@ fun AppFooterBar(viewModel: MainViewModel, themeColors: VisualThemePalette, onIn
                             badgeCount = unreadCount,
                             iconSizeDp = settingsState.navIconSizeDp,
                             iconStyle = settingsState.topNavIconStyle,
+                            unselectedLabelColor = footerUnselectedLabel,
+                            selectedLabelColor = footerSelectedLabel,
                             onClick = { viewModel.navigateTo("BOOKINGS_VIEW") }
                         )
                     }
@@ -161,7 +179,7 @@ fun AppFooterBar(viewModel: MainViewModel, themeColors: VisualThemePalette, onIn
                                 text = if (settingsState.footerMessage.startsWith("card_custom_") || settingsState.footerMessage.isBlank() || settingsState.footerMessage == "WAM2026") "ASH" else settingsState.footerMessage,
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Black,
-                                color = Color(0xFFFFFFFF),
+                                color = footerCenterTextColor,
                                 letterSpacing = 1.sp,
                                 textAlign = TextAlign.Center,
                                 maxLines = 1,
@@ -178,6 +196,8 @@ fun AppFooterBar(viewModel: MainViewModel, themeColors: VisualThemePalette, onIn
                             isSelected = false,
                             iconSizeDp = settingsState.navIconSizeDp,
                             iconStyle = settingsState.topNavIconStyle,
+                            unselectedLabelColor = footerUnselectedLabel,
+                            selectedLabelColor = footerSelectedLabel,
                             onClick = {
                                 viewModel.switchLanguage()
                                 viewModel.triggerNotification(
@@ -196,6 +216,8 @@ fun AppFooterBar(viewModel: MainViewModel, themeColors: VisualThemePalette, onIn
                             isSelected = isAdmin,
                             iconSizeDp = settingsState.navIconSizeDp,
                             iconStyle = settingsState.topNavIconStyle,
+                            unselectedLabelColor = footerUnselectedLabel,
+                            selectedLabelColor = footerSelectedLabel,
                             onClick = { viewModel.navigateTo("ADMIN_PANEL") }
                         )
                     }

@@ -86,6 +86,9 @@ fun MainViewModel.changeAdminCredentials(newPass: String, newOwnerPass: String =
     if (hashUpdates.isNotEmpty()) {
         db.collection("admin_secrets").document("credentials")
             .set(hashUpdates, com.google.firebase.firestore.SetOptions.merge())
+            .addOnFailureListener { e ->
+                android.util.Log.e("MainViewModel", "Cloud credentials sync failed: ${e.message}")
+            }
     }
     val updated = current.copy(ownerPassword = "")
     _settings.value = updated

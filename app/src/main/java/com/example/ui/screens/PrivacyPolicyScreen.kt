@@ -36,8 +36,10 @@ fun PrivacyPolicyScreen(
 
     Scaffold(
         containerColor = themeColors.background,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             TopAppBar(
+                windowInsets = WindowInsets(0, 0, 0, 0),
                 title = { Text("سياسة الخصوصية وحماية البيانات") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
@@ -46,7 +48,8 @@ fun PrivacyPolicyScreen(
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = themeColors.background,
-                    titleContentColor = textColor
+                    titleContentColor = textColor,
+                    navigationIconContentColor = textColor
                 )
             )
         }

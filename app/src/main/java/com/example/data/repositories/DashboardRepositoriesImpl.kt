@@ -182,11 +182,13 @@ class DashboardRepositoryImpl(
                         AppConstants.COL_USER_PROFILES
                     ).distinct()
                     for (col in activeCollections) {
-                        val dupSnap = firestore.collection(col)
-                            .whereEqualTo("phone", cleanPhone)
-                            .limit(2)
-                            .get()
-                            .await()
+                        val dupSnap = runCatching {
+                            firestore.collection(col)
+                                .whereEqualTo("phone", cleanPhone)
+                                .limit(2)
+                                .get()
+                                .await()
+                        }.getOrNull() ?: continue
                         val hasConflict = dupSnap.documents.any { doc ->
                             doc.id != cleanOwnerId &&
                                 (storedPhone.isBlank() || doc.id != storedPhone) &&

@@ -66,6 +66,50 @@ val colorsPresetsList = listOf(
 
 fun getBookingTimestamp(): Long = System.currentTimeMillis()
 
+private fun isLightColor(color: Color): Boolean {
+    return androidx.core.graphics.ColorUtils.calculateLuminance(
+        android.graphics.Color.argb(
+            (color.alpha * 255).toInt(),
+            (color.red * 255).toInt(),
+            (color.green * 255).toInt(),
+            (color.blue * 255).toInt()
+        )
+    ) > 0.45
+}
+
+private fun buildThemeColorScheme(
+    primary: Color,
+    secondary: Color,
+    background: Color,
+    surface: Color,
+    textPrimary: Color,
+    textSecondary: Color,
+    accent: Color,
+    border: Color
+): ColorScheme {
+    val onPrimaryColor = if (isLightColor(primary)) Color(0xFF0B1120) else Color.White
+    val onSecondaryColor = if (isLightColor(secondary)) Color(0xFF0B1120) else Color.White
+    return darkColorScheme(
+        primary = primary,
+        onPrimary = onPrimaryColor,
+        primaryContainer = accent.copy(alpha = 0.22f),
+        onPrimaryContainer = textPrimary,
+        secondary = secondary,
+        onSecondary = onSecondaryColor,
+        secondaryContainer = secondary.copy(alpha = 0.7f),
+        onSecondaryContainer = textPrimary,
+        tertiary = accent,
+        onTertiary = if (isLightColor(accent)) Color(0xFF0B1120) else Color.White,
+        background = background,
+        onBackground = textPrimary,
+        surface = surface,
+        onSurface = textPrimary,
+        surfaceVariant = secondary,
+        onSurfaceVariant = textSecondary,
+        outline = border
+    )
+}
+
 fun resolveThemePalette(settings: AdminSettingsEntity): VisualThemePalette {
     val parseColorSafely = { hex: String, defaultColor: Color ->
         try {
@@ -84,6 +128,7 @@ fun resolveThemePalette(settings: AdminSettingsEntity): VisualThemePalette {
             val textPrimary = Color(0xFFF9FAFB)
             val textSecondary = Color(0xFFD1D5DB)
             val accent = Color(0xFFE5E7EB)
+            val border = Color.White.copy(alpha = 0.14f)
             VisualThemePalette(
                 activeId = "COSMIC_SILVER",
                 primary = primary,
@@ -93,8 +138,9 @@ fun resolveThemePalette(settings: AdminSettingsEntity): VisualThemePalette {
                 textPrimary = textPrimary,
                 textSecondary = textSecondary,
                 accent = accent,
+                border = border,
                 gradientBrush = Brush.verticalGradient(listOf(Color(0xFF1F2937), Color(0xFF111827))),
-                scheme = darkColorScheme(primary = primary, secondary = secondary, background = background, surface = surface)
+                scheme = buildThemeColorScheme(primary, secondary, background, surface, textPrimary, textSecondary, accent, border)
             )
         }
         "LUXURY_GOLD" -> {
@@ -105,6 +151,7 @@ fun resolveThemePalette(settings: AdminSettingsEntity): VisualThemePalette {
             val textPrimary = Color(0xFFFFFAFA)
             val textSecondary = Color(0xFFE7E5E4)
             val accent = Color(0xFFFBBF24)
+            val border = Color(0xFFFBBF24).copy(alpha = 0.2f)
             VisualThemePalette(
                 activeId = "LUXURY_GOLD",
                 primary = primary,
@@ -114,18 +161,20 @@ fun resolveThemePalette(settings: AdminSettingsEntity): VisualThemePalette {
                 textPrimary = textPrimary,
                 textSecondary = textSecondary,
                 accent = accent,
+                border = border,
                 gradientBrush = Brush.verticalGradient(listOf(Color(0xFF292524), Color(0xFF0F0F10))),
-                scheme = darkColorScheme(primary = primary, secondary = secondary, background = background, surface = surface)
+                scheme = buildThemeColorScheme(primary, secondary, background, surface, textPrimary, textSecondary, accent, border)
             )
         }
         "ELITE_EMERALD" -> {
-            val primary = Color(0xFF059669)
-            val secondary = Color(0xFF047857)
+            val primary = Color(0xFF10B981)
+            val secondary = Color(0xFF065F46)
             val background = Color(0xFF022C22)
             val surface = Color(0xFF064E3B)
             val textPrimary = Color(0xFFF0FDF4)
             val textSecondary = Color(0xFFA7F3D0)
             val accent = Color(0xFF34D399)
+            val border = Color(0xFF34D399).copy(alpha = 0.22f)
             VisualThemePalette(
                 activeId = "ELITE_EMERALD",
                 primary = primary,
@@ -135,18 +184,20 @@ fun resolveThemePalette(settings: AdminSettingsEntity): VisualThemePalette {
                 textPrimary = textPrimary,
                 textSecondary = textSecondary,
                 accent = accent,
+                border = border,
                 gradientBrush = Brush.verticalGradient(listOf(Color(0xFF064E3B), Color(0xFF022C22))),
-                scheme = darkColorScheme(primary = primary, secondary = secondary, background = background, surface = surface)
+                scheme = buildThemeColorScheme(primary, secondary, background, surface, textPrimary, textSecondary, accent, border)
             )
         }
         "EMERALD_YEMEN", "YEMEN_EMERALD" -> {
-            val primary = Color(0xFF0F766E)
-            val secondary = Color(0xFF115E59)
-            val background = Color(0xFF042F2E)
-            val surface = Color(0xFF0F766E)
+            val primary = Color(0xFF10B981)
+            val secondary = Color(0xFF134E4A)
+            val background = Color(0xFF042624)
+            val surface = Color(0xFF0A3D3A)
             val textPrimary = Color(0xFFF0FDF4)
             val textSecondary = Color(0xFFCCFBF1)
-            val accent = Color(0xFF14B8A6)
+            val accent = Color(0xFF2DD4BF)
+            val border = Color(0xFF2DD4BF).copy(alpha = 0.24f)
             VisualThemePalette(
                 activeId = "EMERALD_YEMEN",
                 primary = primary,
@@ -156,18 +207,21 @@ fun resolveThemePalette(settings: AdminSettingsEntity): VisualThemePalette {
                 textPrimary = textPrimary,
                 textSecondary = textSecondary,
                 accent = accent,
-                gradientBrush = Brush.verticalGradient(listOf(Color(0xFF115E59), Color(0xFF042F2E))),
-                scheme = darkColorScheme(primary = primary, secondary = secondary, background = background, surface = surface)
+                border = border,
+                gradientBrush = Brush.verticalGradient(listOf(Color(0xFF0F4C48), Color(0xFF042624))),
+                scheme = buildThemeColorScheme(primary, secondary, background, surface, textPrimary, textSecondary, accent, border)
             )
         }
         "CUSTOM" -> {
-            val primary = parseColorSafely(settings.customPrimaryHex, Color(0xFF0F766E))
+            val rawPrimary = parseColorSafely(settings.customPrimaryHex, Color(0xFF10B981))
             val secondary = parseColorSafely(settings.customSecondaryHex, Color(0xFF115E59))
             val background = parseColorSafely(settings.customBackgroundHex, Color(0xFF042F2E))
-            val surface = parseColorSafely(settings.customSurfaceHex, Color(0xFF115E59))
-            val textPrimary = Color(0xFFF9FAFB)
-            val textSecondary = Color(0xFFE5E7EB)
+            val surface = parseColorSafely(settings.customSurfaceHex, Color(0xFF0A3D3A))
+            val primary = if (rawPrimary == surface) Color(0xFF2DD4BF) else rawPrimary
+            val textPrimary = if (isLightColor(background)) Color(0xFF0F172A) else Color(0xFFF9FAFB)
+            val textSecondary = if (isLightColor(background)) Color(0xFF334155) else Color(0xFFE5E7EB)
             val accent = primary
+            val border = textSecondary.copy(alpha = 0.25f)
             VisualThemePalette(
                 activeId = "CUSTOM",
                 primary = primary,
@@ -177,8 +231,9 @@ fun resolveThemePalette(settings: AdminSettingsEntity): VisualThemePalette {
                 textPrimary = textPrimary,
                 textSecondary = textSecondary,
                 accent = accent,
+                border = border,
                 gradientBrush = Brush.verticalGradient(listOf(surface, background)),
-                scheme = darkColorScheme(primary = primary, secondary = secondary, background = background, surface = surface)
+                scheme = buildThemeColorScheme(primary, secondary, background, surface, textPrimary, textSecondary, accent, border)
             )
         }
         else -> {
@@ -189,6 +244,7 @@ fun resolveThemePalette(settings: AdminSettingsEntity): VisualThemePalette {
             val textPrimary = Color(0xFFF8FAFC) // Pure Crisp Slate White
             val textSecondary = Color(0xFF94A3B8) // Refined Slate Gray
             val accent = Color(0xFF06B6D4) // Electric Cyan Accent
+            val border = Color.White.copy(alpha = 0.08f)
             VisualThemePalette(
                 activeId = "ULTRA_LUXURY_DARK",
                 primary = primary,
@@ -198,18 +254,9 @@ fun resolveThemePalette(settings: AdminSettingsEntity): VisualThemePalette {
                 textPrimary = textPrimary,
                 textSecondary = textSecondary,
                 accent = accent,
-                border = Color.White.copy(alpha = 0.08f),
+                border = border,
                 gradientBrush = Brush.verticalGradient(listOf(Color(0xFF141A2E), Color(0xFF0B1120))),
-                scheme = darkColorScheme(
-                    primary = primary,
-                    secondary = secondary,
-                    background = background,
-                    surface = surface,
-                    onPrimary = Color.White,
-                    onSecondary = Color.White,
-                    onBackground = textPrimary,
-                    onSurface = textPrimary
-                )
+                scheme = buildThemeColorScheme(primary, secondary, background, surface, textPrimary, textSecondary, accent, border)
             )
         }
     }

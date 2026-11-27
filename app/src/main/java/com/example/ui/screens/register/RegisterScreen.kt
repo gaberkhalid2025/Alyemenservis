@@ -286,6 +286,7 @@ fun RegisterScreen(
         topBar = {
             if (selectedType == null) {
                 TopAppBar(
+                    windowInsets = WindowInsets(0, 0, 0, 0),
                     title = {
                         Column {
                             Text(
@@ -325,6 +326,7 @@ fun RegisterScreen(
                 )
             }
         },
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         containerColor = Color(0xFF0F172A),
         modifier = modifier.fillMaxSize()
     ) { paddingValues ->

@@ -103,6 +103,41 @@ object PermissionGuard {
         return hasPermission(RoleManager.fromRoleString(role), permission, grantedPermissions)
     }
 
+    /**
+     * 🛡️ التحقق المتقدم والدقيق من صلاحيات الإجراءات (الإضافة، الحذف، التوثيق، التوصية)
+     * لمختلف أقسام المنظومة (المحلات، المطاعم، المراكز الطبية، الفنيين، العقارات، الوظائف).
+     */
+    fun canPerformAction(
+        role: AdminRole,
+        categoryPrefix: String,
+        actionSuffix: String, // مثل: ADD, DELETE, VERIFY, RECOMMEND, EDIT, VIEW
+        grantedPermissions: List<String>
+    ): Boolean {
+        if (role == AdminRole.GUEST) return false
+        if (role == AdminRole.OWNER || role == AdminRole.SUPER_ADMIN || role == AdminRole.MAIN_ADMIN) return true
+
+        val directKey = "${categoryPrefix}_${actionSuffix}".uppercase()
+        if (hasPermission(role, directKey, grantedPermissions)) return true
+
+        // التحقق من الصلاحية العامة للقسم أو التبويب
+        if (hasPermission(role, categoryPrefix, grantedPermissions)) return true
+
+        // التحقق عبر الرموز البديلة (Legacy / Aliases)
+        val legacyKey = "MANAGE_$categoryPrefix"
+        if (hasPermission(role, legacyKey, grantedPermissions)) return true
+
+        return false
+    }
+
+    fun canPerformAction(
+        roleString: String,
+        categoryPrefix: String,
+        actionSuffix: String,
+        grantedPermissions: List<String>
+    ): Boolean {
+        return canPerformAction(RoleManager.fromRoleString(roleString), categoryPrefix, actionSuffix, grantedPermissions)
+    }
+
     @Composable
     fun UnauthorizedView(
         customMessage: String = "🔒 ليس لديك صلاحية للوصول إلى هذه الميزة",

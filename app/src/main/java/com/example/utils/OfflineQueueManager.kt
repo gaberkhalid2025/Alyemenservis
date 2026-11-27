@@ -258,10 +258,15 @@ class OfflineQueueManager @Inject constructor(
     private suspend fun executeRequest(req: OfflineRequest): Boolean = withContext(Dispatchers.IO) {
         try {
             val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+            val chId = req.data["channelId"] as? String
+            if (req.type == "MESSAGE" && chId.isNullOrBlank()) {
+                Log.w(TAG, "Dropping unrouted MESSAGE offline request without channelId: ${req.id}")
+                return@withContext true
+            }
+
             val collection = when (req.type) {
                 "BOOKING" -> "bookings"
                 "REQUEST" -> "instant_requests"
-                "MESSAGE" -> "chat_messages"
                 "OFFER" -> "offers"
                 "SOS" -> "sos_alerts"
                 else -> "offline_sync_logs"
@@ -272,7 +277,6 @@ class OfflineQueueManager @Inject constructor(
                 req.id
             }
 
-            val chId = req.data["channelId"] as? String
             val docRef = if (req.type == "MESSAGE" && !chId.isNullOrBlank()) {
                 db.collection("chat_channels").document(chId).collection("messages").document(targetDoc)
             } else {

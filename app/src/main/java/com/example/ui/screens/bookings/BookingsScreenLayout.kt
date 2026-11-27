@@ -68,6 +68,7 @@ fun BookingsScreenLayout(
     if (activeStatusBooking != null) {
         BookingStatusScreen(
             booking = activeStatusBooking,
+            themeColors = themeColors,
             onBack = { selectedBookingForStatus = null }
         )
         return
@@ -80,6 +81,7 @@ fun BookingsScreenLayout(
     ) { creating ->
         if (creating) {
             BookingFormScreen(
+                themeColors = themeColors,
                 onBack = { isCreatingNewBooking = false },
                 onBookingCreated = { newBooking ->
                     viewModel.createBooking(newBooking) { success ->
@@ -93,6 +95,7 @@ fun BookingsScreenLayout(
         } else {
             BookingListScreen(
                 bookings = relevantBookings,
+                themeColors = themeColors,
                 currentUserId = currentUserId.ifBlank { currentUserPhone },
                 isAdmin = isAdmin,
                 isProvider = viewModel.isProviderUser,

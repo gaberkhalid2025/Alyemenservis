@@ -104,10 +104,13 @@ service firebase.storage {
       allow read: if isAuthenticated();
       allow create, update: if isAuthenticated() &&
                                isValidChatMediaSize() &&
-                               (request.resource.contentType.matches('image/.*') ||
+                               !request.resource.name.matches('.*\\.(exe|bat|sh|apk|dll|so|vbs|cmd|msi|bin|jar)$') &&
+                               (isAllowedImageType() ||
                                 request.resource.contentType.matches('audio/.*') ||
                                 isAllowedVideoType() ||
-                                request.resource.contentType.matches('application/.*'));
+                                isAllowedDocType() ||
+                                request.resource.contentType.matches('application/(msword|vnd\\.openxmlformats-officedocument.*|vnd\\.ms-excel|zip|x-zip-compressed|octet-stream)') ||
+                                request.resource.contentType.matches('text/plain'));
       allow delete: if isAdmin();
     }
 
@@ -115,41 +118,44 @@ service firebase.storage {
       allow read: if isAuthenticated();
       allow create, update: if isAuthenticated() &&
                                isValidChatMediaSize() &&
-                               (request.resource.contentType.matches('image/.*') ||
+                               !request.resource.name.matches('.*\\.(exe|bat|sh|apk|dll|so|vbs|cmd|msi|bin|jar)$') &&
+                               (isAllowedImageType() ||
                                 request.resource.contentType.matches('audio/.*') ||
                                 isAllowedVideoType() ||
-                                request.resource.contentType.matches('application/.*'));
+                                isAllowedDocType() ||
+                                request.resource.contentType.matches('application/(msword|vnd\\.openxmlformats-officedocument.*|vnd\\.ms-excel|zip|x-zip-compressed|octet-stream)') ||
+                                request.resource.contentType.matches('text/plain'));
       allow delete: if isAdmin();
     }
 
-    // 3. وسائط مزودي الخدمات والفنيين (/providers/{providerId}/{fileName})
-    match /providers/{providerId}/{fileName} {
+    // 3. وسائط مزودي الخدمات والفنيين (/providers/{providerId}/... بما فيها work_photos و portfolio)
+    match /providers/{providerId}/{allPaths=**} {
       allow read: if true;
-      allow create, update: if (isAdmin() || isOwner(providerId) || isAuthenticated()) &&
-                               isValidMediaSize() &&
-                               isSafeFileName(fileName) &&
-                               (isAllowedImageType() || isAllowedDocType());
-      allow delete: if isAdmin() || isOwner(providerId);
+      allow create: if (isAdmin() || isOwner(providerId) || isAuthenticated()) &&
+                       isValidMediaSize() &&
+                       !request.resource.name.matches('.*\\.(exe|bat|sh|apk|dll|so|vbs|cmd|msi|bin|jar)$') &&
+                       (isAllowedImageType() || isAllowedDocType());
+      allow update, delete: if isAdmin() || isOwner(providerId);
     }
 
-    // 4. صور المتاجر ومنتجاتها (/stores/{storeId}/{fileName})
-    match /stores/{storeId}/{fileName} {
+    // 4. صور المتاجر ومنتجاتها (/stores/{storeId}/... بما فيها products و photos)
+    match /stores/{storeId}/{allPaths=**} {
       allow read: if true;
-      allow create, update: if (isAdmin() || isOwner(storeId) || isAuthenticated()) &&
-                               isValidImageSize() &&
-                               isSafeFileName(fileName) &&
-                               isAllowedImageType();
-      allow delete: if isAdmin() || isOwner(storeId);
+      allow create: if (isAdmin() || isOwner(storeId) || isAuthenticated()) &&
+                       isValidImageSize() &&
+                       !request.resource.name.matches('.*\\.(exe|bat|sh|apk|dll|so|vbs|cmd|msi|bin|jar)$') &&
+                       isAllowedImageType();
+      allow update, delete: if isAdmin() || isOwner(storeId);
     }
 
-    // 5. صور العقارات المعروضة (/properties/{propertyId}/{fileName})
-    match /properties/{propertyId}/{fileName} {
+    // 5. صور العقارات المعروضة (/properties/{propertyId}/... بما فيها photos)
+    match /properties/{propertyId}/{allPaths=**} {
       allow read: if true;
-      allow create, update: if (isAdmin() || isOwner(propertyId) || isAuthenticated()) &&
-                               isValidImageSize() &&
-                               isSafeFileName(fileName) &&
-                               isAllowedImageType();
-      allow delete: if isAdmin() || isOwner(propertyId);
+      allow create: if (isAdmin() || isOwner(propertyId) || isAuthenticated()) &&
+                       isValidImageSize() &&
+                       !request.resource.name.matches('.*\\.(exe|bat|sh|apk|dll|so|vbs|cmd|msi|bin|jar)$') &&
+                       isAllowedImageType();
+      allow update, delete: if isAdmin() || isOwner(propertyId);
     }
 
     // 6. مرفقات وبلاغات النظام العامة والطلبات العاجلة (/reports/{reportId}/{fileName} و /urgent_requests/{allPaths=**})

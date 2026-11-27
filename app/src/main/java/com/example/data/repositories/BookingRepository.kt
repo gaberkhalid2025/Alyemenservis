@@ -245,16 +245,39 @@ class BookingRepository(
                     // Write Notification payloads to "notifications" collection
                     val cleanCustPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(finalBooking.effectiveCustomerPhone)
                         .ifBlank { finalBooking.customerPhone }
-                    val userNotifId = UUID.randomUUID().toString()
+                    val userNotifId = "notif_user_${finalBooking.id}"
                     val userNotif = mapOf(
                         "id" to userNotifId,
+                        "dedupKey" to "NEW_BOOKING_USER_${finalBooking.id}",
                         "title" to "تم استلام طلب حجزك بنجاح",
-                        "message" to "مرحباً! تم استلام طلب حجزك برقم #${finalBooking.bookingNumber} بنجاح وهو قيد المراجعة. رمز PIN سيُرسل عبر قناة منفصلة.",
+                        "message" to "مرحباً! تم استلام طلب حجزك برقم #${finalBooking.bookingNumber} بنجاح وهو قيد المراجعة.",
                         "targetType" to "USER",
                         "targetValue" to cleanCustPhone,
+                        "bookingId" to finalBooking.id,
                         "timestamp" to System.currentTimeMillis()
                     )
                     firestore.collection(AppConstants.COL_NOTIFICATIONS).document(userNotifId).set(userNotif)
+
+                    fun dispatchProviderNotif(phone: String) {
+                        val normalizedPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(phone)
+                        val canonicalTarget = normalizedPhone.ifBlank { finalBooking.providerId.trim() }
+                        if (canonicalTarget.isNotBlank()) {
+                            val dedupKey = "NEW_BOOKING_${finalBooking.id}"
+                            val providerNotifId = "notif_${dedupKey}"
+                            val providerNotif = mapOf(
+                                "id" to providerNotifId,
+                                "dedupKey" to dedupKey,
+                                "title" to "طلب حجز جديد برقم #${finalBooking.bookingNumber}",
+                                "message" to "لديك طلب حجز جديد برقم #${finalBooking.bookingNumber} من العميل ${finalBooking.customerName.ifEmpty { finalBooking.clientName }}.",
+                                "targetType" to "PROVIDER",
+                                "targetValue" to canonicalTarget,
+                                "targetPhone" to normalizedPhone,
+                                "bookingId" to finalBooking.id,
+                                "timestamp" to System.currentTimeMillis()
+                            )
+                            firestore.collection(AppConstants.COL_NOTIFICATIONS).document(providerNotifId).set(providerNotif)
+                        }
+                    }
 
                     // Resolve provider phone if blank
                     if (finalBooking.providerPhone.isBlank() && finalBooking.providerId.isNotBlank()) {
@@ -263,27 +286,16 @@ class BookingRepository(
                                 val pPhone = pDoc.getString("phone") ?: ""
                                 if (pPhone.isNotBlank()) {
                                     firestore.collection(AppConstants.COL_BOOKINGS).document(docId).update("providerPhone", pPhone)
+                                    dispatchProviderNotif(pPhone)
+                                } else {
+                                    dispatchProviderNotif("")
                                 }
                             }
-                    }
-
-                    val normalizedProviderPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(finalBooking.providerPhone)
-                    val canonicalProviderTarget = normalizedProviderPhone.ifBlank { finalBooking.providerId.trim() }
-                    if (canonicalProviderTarget.isNotBlank()) {
-                        val dedupKey = "NEW_BOOKING_${finalBooking.id}"
-                        val providerNotifId = "notif_${dedupKey}"
-                        val providerNotif = mapOf(
-                            "id" to providerNotifId,
-                            "dedupKey" to dedupKey,
-                            "title" to "طلب حجز جديد برقم #${finalBooking.bookingNumber}",
-                            "message" to "لديك طلب حجز جديد برقم #${finalBooking.bookingNumber} من العميل ${finalBooking.customerName.ifEmpty { finalBooking.clientName }}.",
-                            "targetType" to "PROVIDER",
-                            "targetValue" to canonicalProviderTarget,
-                            "targetPhone" to normalizedProviderPhone,
-                            "bookingId" to finalBooking.id,
-                            "timestamp" to System.currentTimeMillis()
-                        )
-                        firestore.collection(AppConstants.COL_NOTIFICATIONS).document(providerNotifId).set(providerNotif)
+                            .addOnFailureListener {
+                                dispatchProviderNotif("")
+                            }
+                    } else {
+                        dispatchProviderNotif(finalBooking.providerPhone)
                     }
 
                     try {

@@ -33,8 +33,10 @@ fun TermsOfServiceScreen(
 
     Scaffold(
         containerColor = themeColors.background,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             TopAppBar(
+                windowInsets = WindowInsets(0, 0, 0, 0),
                 title = { Text("شروط وأحكام الاستخدام") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
@@ -43,7 +45,8 @@ fun TermsOfServiceScreen(
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = themeColors.background,
-                    titleContentColor = textColor
+                    titleContentColor = textColor,
+                    navigationIconContentColor = textColor
                 )
             )
         }

@@ -155,8 +155,10 @@ fun AdminUserManager(
     } else {
         Scaffold(
             snackbarHost = { SnackbarHost(snackbarHostState) },
+            contentWindowInsets = WindowInsets(0, 0, 0, 0),
             topBar = {
                 TopAppBar(
+                    windowInsets = WindowInsets(0, 0, 0, 0),
                     title = { Text("👥 إدارة المستخدمين والحسابات", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.White) },
                     navigationIcon = {
                         IconButton(onClick = onBack) {

@@ -20,9 +20,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.example.data.AdminSettingsEntity
 import com.example.data.BookingEntity
 import com.example.utils.BookingStateMachine
 import com.example.utils.BookingUtils
+import com.example.utils.VisualThemePalette
+import com.example.utils.resolveThemePalette
 
 /**
  * 📦 BookingCardItem
@@ -32,6 +35,7 @@ import com.example.utils.BookingUtils
 @Composable
 fun BookingCardItem(
     booking: BookingEntity,
+    themeColors: VisualThemePalette = resolveThemePalette(AdminSettingsEntity()),
     currentUserId: String = "",
     isAdmin: Boolean = false,
     isProvider: Boolean = false,
@@ -76,7 +80,7 @@ fun BookingCardItem(
         )
     }
 
-    val isTerminalState = booking.status in listOf("COMPLETED", "CANCELLED", "REJECTED")
+    val isTerminalState = booking.status.uppercase() in listOf("COMPLETED", "PAID", "CLOSED", "CANCELLED", "REJECTED")
 
     val statusColor = remember(booking.status) {
         try {
@@ -95,7 +99,7 @@ fun BookingCardItem(
             .fillMaxWidth()
             .testTag("booking_card_${booking.id}"),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+        colors = CardDefaults.cardColors(containerColor = themeColors.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
@@ -382,7 +386,7 @@ fun BookingCardItem(
                     Button(
                         onClick = { onEditClick(booking) },
                         shape = RoundedCornerShape(8.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6)),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6), contentColor = Color.White),
                         modifier = Modifier.weight(1f),
                         contentPadding = PaddingValues(vertical = 6.dp)
                     ) {
@@ -395,7 +399,7 @@ fun BookingCardItem(
                         Button(
                             onClick = { onCancelClick(booking) },
                             shape = RoundedCornerShape(8.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444), contentColor = Color.White),
                             modifier = Modifier.weight(1f),
                             contentPadding = PaddingValues(vertical = 6.dp)
                         ) {
@@ -407,7 +411,7 @@ fun BookingCardItem(
                         Button(
                             onClick = { onDeleteClick(booking) },
                             shape = RoundedCornerShape(8.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626)),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626), contentColor = Color.White),
                             modifier = Modifier.weight(1f),
                             contentPadding = PaddingValues(vertical = 6.dp)
                         ) {
@@ -438,12 +442,12 @@ fun BookingCardItem(
                         Text("العميل", fontSize = 11.sp)
                     }
 
-                    when (booking.status) {
-                        "PENDING" -> {
+                    when (booking.status.uppercase()) {
+                        "PENDING", "UNDER_REVIEW" -> {
                             Button(
-                                onClick = { onStatusChange(booking, "APPROVED") },
+                                onClick = { onStatusChange(booking, "ACCEPTED") },
                                 shape = RoundedCornerShape(8.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981), contentColor = Color.White),
                                 modifier = Modifier.weight(1.2f),
                                 contentPadding = PaddingValues(vertical = 6.dp)
                             ) {
@@ -455,7 +459,7 @@ fun BookingCardItem(
                             Button(
                                 onClick = { onStatusChange(booking, "REJECTED") },
                                 shape = RoundedCornerShape(8.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444), contentColor = Color.White),
                                 modifier = Modifier.weight(1f),
                                 contentPadding = PaddingValues(vertical = 6.dp)
                             ) {
@@ -464,11 +468,11 @@ fun BookingCardItem(
                                 Text("اعتذار", fontSize = 11.sp)
                             }
                         }
-                        "APPROVED" -> {
+                        "APPROVED", "ACCEPTED" -> {
                             Button(
                                 onClick = { onStatusChange(booking, "IN_PROGRESS") },
                                 shape = RoundedCornerShape(8.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF8B5CF6)),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF8B5CF6), contentColor = Color.White),
                                 modifier = Modifier.weight(1.5f),
                                 contentPadding = PaddingValues(vertical = 6.dp)
                             ) {
@@ -477,11 +481,11 @@ fun BookingCardItem(
                                 Text("بدء تنفيذ الخدمة", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                             }
                         }
-                        "IN_PROGRESS" -> {
+                        "IN_PROGRESS", "STARTED" -> {
                             Button(
                                 onClick = { onStatusChange(booking, "COMPLETED") },
                                 shape = RoundedCornerShape(8.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6)),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6), contentColor = Color.White),
                                 modifier = Modifier.weight(1.5f),
                                 contentPadding = PaddingValues(vertical = 6.dp)
                             ) {
@@ -514,11 +518,11 @@ fun BookingCardItem(
                     }
 
                     if (!isTerminalState) {
-                        if (booking.status == "IN_PROGRESS") {
+                        if (booking.status.uppercase() in listOf("IN_PROGRESS", "STARTED")) {
                             Button(
                                 onClick = { onStatusChange(booking, "COMPLETED") },
                                 shape = RoundedCornerShape(8.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981), contentColor = Color.White),
                                 modifier = Modifier.weight(1.2f),
                                 contentPadding = PaddingValues(vertical = 6.dp)
                             ) {
@@ -532,7 +536,7 @@ fun BookingCardItem(
                             onClick = { onEditClick(booking) },
                             enabled = canModifyOrCancel,
                             shape = RoundedCornerShape(8.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6)),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6), contentColor = Color.White),
                             modifier = Modifier.weight(1f),
                             contentPadding = PaddingValues(vertical = 6.dp)
                         ) {
@@ -545,7 +549,7 @@ fun BookingCardItem(
                             onClick = { onCancelClick(booking) },
                             enabled = canModifyOrCancel,
                             shape = RoundedCornerShape(8.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444), contentColor = Color.White),
                             modifier = Modifier.weight(1f),
                             contentPadding = PaddingValues(vertical = 6.dp)
                         ) {
@@ -558,7 +562,7 @@ fun BookingCardItem(
                         Button(
                             onClick = { onDeleteClick(booking) },
                             shape = RoundedCornerShape(8.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF475569)),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF475569), contentColor = Color.White),
                             modifier = Modifier.weight(1f),
                             contentPadding = PaddingValues(vertical = 6.dp)
                         ) {
@@ -603,7 +607,7 @@ fun BookingCardItem(
                         Button(
                             onClick = { onSubmitPaymentClick?.invoke(booking) },
                             shape = RoundedCornerShape(8.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF059669)),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF059669), contentColor = Color.White),
                             modifier = Modifier
                                 .weight(1f)
                                 .testTag("pay_booking_${booking.id}"),
